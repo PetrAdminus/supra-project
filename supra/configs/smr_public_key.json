@@ -1,0 +1,12 @@
+{
+  "active": "lottery_admin",
+  "list": {
+    "lottery_admin": {
+      "ed25519_public_key": "9b6695ba81fab12fab1a6b280dd1ba2abfbac36fe5f90a0e9852d7b1bbab2813",
+      "account_address": "3bd5cb43528ea967459e0741d8120fa4472f0c580a8b7c04f598cc3dd3341fbc",
+      "rpc_url": "https://rpc-testnet.supra.com/",
+      "faucet_url": "https://rpc-testnet.supra.com/",
+      "chain_id": 6
+    }
+  }
+}

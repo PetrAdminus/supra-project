@@ -1,0 +1,78 @@
+Local: (2025-09-13 14:11:18.257629334 +00:00)	 Utc: (2025-09-13 14:11:18.258713022 UTC)
+
+CMD:
+New(NewProfileArgs { name: Some("lottery_admin"), private_key: Some(SoCryptoSecretKey(...)), profile_option: ProfileAttributeOptionsMaker { network: Some(Testnet), profile_option: None }, interactive: false })
+Output:
+-------------------------- Profile List ---------------------------------
+	(*) lottery_admin
+CliProfile { account_address: "0x3bd5cb43528ea967459e0741d8120fa4472f0c580a8b7c04f598cc3dd3341fbc", ed25519_public_key: 9b6695ba81fab12fab1a6b280dd1ba2abfbac36fe5f90a0e9852d7b1bbab2813, rpc_url: "https://rpc-testnet.supra.com/", faucet_url: "https://rpc-testnet.supra.com/", chain_id: 6 }
+-------------------------------------------------------------------------
+
+
+Local: (2025-09-13 14:11:40.041583967 +00:00)	 Utc: (2025-09-13 14:11:40.041625438 UTC)
+
+CMD:
+Activate(ActivateProfileArgs { name: "lottery_admin" })
+Output:
+-------------------------- Profile List ---------------------------------
+	(*) lottery_admin
+CliProfile { account_address: "0x3bd5cb43528ea967459e0741d8120fa4472f0c580a8b7c04f598cc3dd3341fbc", ed25519_public_key: 9b6695ba81fab12fab1a6b280dd1ba2abfbac36fe5f90a0e9852d7b1bbab2813, rpc_url: "https://rpc-testnet.supra.com/", faucet_url: "https://rpc-testnet.supra.com/", chain_id: 6 }
+-------------------------------------------------------------------------
+
+
+Local: (2025-09-13 14:12:31.069268663 +00:00)	 Utc: (2025-09-13 14:12:31.069318760 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-09-13 14:13:52.809855708 +00:00)	 Utc: (2025-09-13 14:13:52.809901948 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-09-13 14:14:11.147323807 +00:00)	 Utc: (2025-09-13 14:14:11.147376539 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-09-13 14:48:43.802517974 +00:00)	 Utc: (2025-09-13 14:48:43.802544275 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Unable to resolve packages for package 'lottery': While resolving dependency 'SupraFramework' in package 'lottery': Name of dependency declared in package 'SupraFramework' does not match dependency's package name 'AptosFramework'"
+}
+Local: (2025-09-13 14:52:52.466604872 +00:00)	 Utc: (2025-09-13 14:52:52.466631904 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Unable to resolve packages for package 'lottery': While resolving dependency 'SupraVrf' in package 'lottery': Unable to resolve package dependency 'SupraVrf': While resolving dependency 'SupraFramework' in package 'SupraVrf': Unable to resolve package dependency 'SupraFramework': While resolving dependency 'AptosStdlib' in package 'SupraFramework': Unable to resolve package dependency 'AptosStdlib': Conflicting dependencies found: package 'AptosStdlib' conflicts with 'AptosStdlib'"
+}
+Local: (2025-09-13 14:55:39.530249718 +00:00)	 Utc: (2025-09-13 14:55:39.530305937 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-09-13 15:09:59.102517761 +00:00)	 Utc: (2025-09-13 15:09:59.102552028 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Unable to resolve packages for package 'lottery': While resolving dependency 'SupraFramework' in package 'lottery': Name of dependency declared in package 'SupraFramework' does not match dependency's package name 'AptosFramework'"
+}
