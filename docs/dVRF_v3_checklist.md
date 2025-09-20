@@ -19,16 +19,24 @@
 - [ ] Update `request_draw` to use the v3 request API (gas config, confirmations, payload).
 - [x] Adjust stored state (store maxGasPrice/maxGasLimit, contract-level callbackGasPrice/Limit, request counters, sha3-256 request hash).
 - [x] Extend events (DrawRequested, FundsWithdrawn) with fields necessary for v3 tracing, if applicable.
-- [ ] Ensure `on_random_received` validates the new message format and handles multiple random values if offered.
+- [x] Align admin flows with `addClientToWhitelist`/`addContractToWhitelist`; Move-контракт фиксирует снапшоты whitelisting и события, интеграция с SDK v3 — после релиза.
+- [x] Expose `configure_vrf_request` entry for rng_count/clientSeed tracking with audit event.
+- [x] Add sha3-256 payload hash validation inside `on_random_received` (maintains v2 callback signature for now).
+- [ ] Track migrateClient onboarding flow (готовим утилиту для `deposit::migrateClient` и мониторинга `minBalanceLimit`).
+- [ ] Extend `on_random_received` for multi-value RNG arrays once v3 payload format is published.
 - [x] Keep `simple_draw` as offline fallback and document when it should be used.
 
 ## 3. Testing Strategy
 - [ ] Update existing Move unit tests to reflect new abort codes / state transitions.
 - [ ] Add tests covering: pending request guard, nonce mismatch, replay protection, and event emission under v3 rules.
+- [x] Add payload hash validation unit tests (match/mismatch scenarios, offline harness).
+- [ ] Document whitelist snapshot helpers в README и операционных инструкциях.
 - [ ] Maintain offline tests (without VRF) via helper functions (e.g., `set_pending_request_for_test`).
 
 ## 4. Tooling & Infrastructure
+- [x] Record Supra endpoints: testnet `https://rpc-testnet.supra.com` (chain id 6), mainnet `https://rpc-mainnet.supra.com` (chain id 8).
 - [ ] Prepare CLI/Docker scripts for re-running tests after integrating new framework dependency (likely updated supra-cli image).
+- [x] Document Supra testnet runbook (`docs/testnet_runbook.md`) with migration, whitelisting, publish, request flow.
 - [ ] Verify whether `supra-cli` requires upgrades or flags for dVRF v3.
 - [ ] Keep sandbox/offline mode documented for demo environments until v3 is fully whitelisted.
 
@@ -45,3 +53,4 @@
 
 ## Notes
 - Online docs currently require interactive session; capture key API diffs manually once access available.
+

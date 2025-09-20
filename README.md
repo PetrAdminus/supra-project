@@ -31,6 +31,30 @@ docker compose run --rm \n  --entrypoint bash supra_cli \n  -lc "/supra/supra mo
 - supra/move_workspace/lottery/sources/ — основной модуль (Lottery.move)
 - supra/move_workspace/lottery/tests/ — Move-тесты, покрывающие события, поток VRF и админские сценарии
 
+### План версионирования
+- Текущая версия Move-пакета: `0.0.1`.
+- Поднимаем до `0.0.2` после интеграции SDK dVRF v3 и обновления Docker-образа.
+- Синхронизируем `Move.toml`, `README.md` и `docs/dVRF_v3_checklist.md` при каждом бумпе версии.
+- Перед релизом прогоняем `supra move tool test` и фиксируем итоги в changelog (раздел README или docs).
+
+### Подготовка к dVRF v3
+### Запуск на Supra testnet
+- RPC testnet: `https://rpc-testnet.supra.com` (chain id 6).
+- Подробный runbook: см. `docs/testnet_runbook.md`.
+- Все команды выполняем через Docker (`supra_cli`), указывая профиль testnet.
+- Перед запуском заполните `supra/configs/<profile>.yaml` (rpc, адрес, приватный ключ, параметры газа).
+- Для миграции и whitelisting используйте функции `record_client_whitelist_snapshot`, `record_consumer_whitelist_snapshot`, `configure_vrf_request` — они логируют события для аудита.
+
+- Подробный runbook: см. `docs/testnet_runbook.md`.
+- Все команды выполняем через Docker (`supra_cli`), указывая профиль testnet.
+- Перед запуском заполните `supra/configs/<profile>.yaml` (rpc, адрес, приватный ключ, параметры газа).
+- Для миграции и whitelisting используйте функции `record_client_whitelist_snapshot`, `record_consumer_whitelist_snapshot`, `configure_vrf_request` — они логируют события для аудита.
+
+- `record_client_whitelist_snapshot` фиксирует maxGasPrice/maxGasLimit и снапшот `minBalanceLimit`; данные попадают в событие `ClientWhitelistRecordedEvent`.
+- `configure_vrf_request` задаёт желаемую мощность запроса (rng_count, clientSeed) и генерирует событие `VrfRequestConfigUpdatedEvent` для аудита.
+- `record_consumer_whitelist_snapshot` отмечает callbackGasPrice/callbackGasLimit для контракта; факт залогируем через `ContractWhitelistRecordedEvent`.
+- Текущий статус узнаем через `get_whitelist_status`, а снапшот минимального баланса доступен в `get_min_balance_limit_snapshot`.
+
 ### Дорожная карта
 - Следить за релизом Supra dVRF v3, изучить обновлённый API и подготовить план миграции (https://docs.supra.com/dvrf).
 - Обновить лотерейный модуль под dVRF v3, адаптировать события/тесты и задокументировать fallback для простых розыгрышей.

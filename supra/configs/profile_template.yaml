@@ -1,0 +1,9 @@
+﻿# Supra CLI profile template for testnet
+rpc_url: https://rpc-testnet.supra.com # заменить на актуальный endpoint
+account_address: 0xYOUR_ADMIN_ADDRESS
+private_key: YOUR_PRIVATE_KEY_HEX_WITHOUT_0x
+# газовые параметры — подобрать под сеть
+gas_unit_price: 1
+max_gas_amount: 200000
+# необязательные поля
+rest_url: https://rest-testnet.supra.com
