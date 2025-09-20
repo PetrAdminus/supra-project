@@ -31,3 +31,7 @@ __pycache__/
 # System files
 .DS_Store
 Thumbs.db
+# Local scratch artifacts
+migration_dvrf3.html
+migration_dvrf3.txt
+tmp_update.py
