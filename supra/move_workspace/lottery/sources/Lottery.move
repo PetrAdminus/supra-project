@@ -7,19 +7,19 @@ module lottery::main_v2 {
     use 0x1::timestamp;
     use 0x1::signer;
     use 0x1::vector;
-    use 0x1::coin;
     use 0x1::event;
     use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::supra_vrf;
     use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::deposit;
-    use 0x1::supra_coin::SupraCoin;
+    use lottery::treasury_v1;
 
     const E_NOT_OWNER: u64 = 1;
     const E_ALREADY_INITIALIZED: u64 = 2;
     const MIN_REQUEST_WINDOW: u64 = 30;
+    const E_TREASURY_NOT_INITIALIZED: u64 = 12;
+    const E_PLAYER_STORE_NOT_REGISTERED: u64 = 13;
 
     struct LotteryData has key {
         tickets: vector<address>,
-        bank: coin::Coin<SupraCoin>,
         jackpot_amount: u64,
         draw_scheduled: bool,
         next_ticket_id: u64,
@@ -94,11 +94,11 @@ module lottery::main_v2 {
         // Only the lottery contract address can initialize
         assert!(signer::address_of(sender) == @lottery, E_NOT_OWNER);
         assert!(!exists<LotteryData>(@lottery), E_ALREADY_INITIALIZED);
+        assert!(treasury_v1::is_initialized(), E_TREASURY_NOT_INITIALIZED);
 
         // Store lottery data at the lottery contract address
         move_to(sender, LotteryData {
             tickets: vector::empty(),
-            bank: coin::zero<SupraCoin>(),
             jackpot_amount: 0,
             draw_scheduled: false,
             next_ticket_id: 1,
@@ -118,10 +118,11 @@ module lottery::main_v2 {
         let user_addr = signer::address_of(user);
         let ticket_price = 10000000; // 0.01 SUPRA
 
+        assert!(treasury_v1::store_registered(user_addr), E_PLAYER_STORE_NOT_REGISTERED);
+
         // Withdraw from user and add to contract pool
-        let payment = coin::withdraw<SupraCoin>(user, ticket_price);
+        treasury_v1::deposit_from_user(user, ticket_price);
         let lottery = borrow_global_mut<LotteryData>(@lottery);
-        coin::merge(&mut lottery.bank, payment);
         lottery.jackpot_amount = lottery.jackpot_amount + ticket_price;
 
         vector::push_back(&mut lottery.tickets, user_addr);
@@ -269,11 +270,10 @@ module lottery::main_v2 {
         let idx = timestamp % len;
         let winner = *vector::borrow(&lottery.tickets, idx);
 
-        // Transfer prize to winner
-        let prize = coin::extract(&mut lottery.bank, lottery.jackpot_amount);
-        coin::deposit<SupraCoin>(winner, prize);
+        // Transfer prize to winner and system vaults according to config
+        let prize_amount = treasury_v1::distribute_payout(winner, lottery.jackpot_amount);
 
-        event::emit(WinnerSelected { winner, prize: lottery.jackpot_amount });
+        event::emit(WinnerSelected { winner, prize: prize_amount });
 
         // Reset lottery
         lottery.tickets = vector::empty();
@@ -319,6 +319,11 @@ module lottery::main_v2 {
     #[test_only]
     public fun ticket_bought_fields(event: &TicketBought): (address, u64, u64) {
         (event.buyer, event.ticket_id, event.amount)
+    }
+
+    #[test_only]
+    public fun winner_selected_fields(event: &WinnerSelected): (address, u64) {
+        (event.winner, event.prize)
     }
 
     #[test_only]
@@ -411,12 +416,11 @@ module lottery::main_v2 {
         let idx = idx_seed % len;
         let winner = *vector::borrow(&lottery.tickets, idx);
 
-        // Transfer prize to winner
-        let prize = coin::extract(&mut lottery.bank, lottery.jackpot_amount);
-        coin::deposit<SupraCoin>(winner, prize);
+        // Transfer prize to winner and system vaults according to config
+        let prize_amount = treasury_v1::distribute_payout(winner, lottery.jackpot_amount);
 
         lottery.rng_response_count = lottery.rng_response_count + 1;
-        event::emit(WinnerSelected { winner, prize: lottery.jackpot_amount });
+        event::emit(WinnerSelected { winner, prize: prize_amount });
         event::emit(DrawHandledEvent { nonce, success: true });
         lottery.last_request_payload_hash = option::none();
 
@@ -545,15 +549,15 @@ module lottery::main_v2 {
 
     fun first_u64_from_bytes(bytes: &vector<u8>): u64 {
         assert!(vector::length(bytes) >= 8, 8);
-        let acc = 0;
+
+        let head = vector::empty<u8>();
         let i = 0;
         while (i < 8) {
             let byte = *vector::borrow(bytes, i);
-            let shift = (i as u8) * 8u8;
-            let term = ((byte as u64) << shift);
-            acc = acc + term;
+            vector::push_back(&mut head, byte);
             i = i + 1;
         };
-        acc
+
+        bcs::from_bytes<u64>(head)
     }
 }
