@@ -467,6 +467,14 @@ module lottery::treasury_v1 {
         math64::mul_div(total, basis_points, BASIS_POINT_DENOMINATOR)
     }
 
+    fun share_for_recipient(total: u64, basis_points: u64, recipient: address): u64 {
+        if (recipient == @lottery) {
+            return 0
+        };
+
+        calculate_share(total, basis_points)
+    }
+
     fun transfer_share_if_needed(
         state: &TokenState,
         target: address,
@@ -512,11 +520,11 @@ module lottery::treasury_v1 {
 
         let jackpot_share = calculate_share(total_amount, config.bp_jackpot);
         let prize_share = calculate_share(total_amount, config.bp_prize);
-        let treasury_share = calculate_share(total_amount, config.bp_treasury);
-        let marketing_share = calculate_share(total_amount, config.bp_marketing);
-        let community_share = calculate_share(total_amount, config.bp_community);
-        let team_share = calculate_share(total_amount, config.bp_team);
-        let partners_share = calculate_share(total_amount, config.bp_partners);
+        let treasury_share = share_for_recipient(total_amount, config.bp_treasury, recipients.treasury);
+        let marketing_share = share_for_recipient(total_amount, config.bp_marketing, recipients.marketing);
+        let community_share = share_for_recipient(total_amount, config.bp_community, recipients.community);
+        let team_share = share_for_recipient(total_amount, config.bp_team, recipients.team);
+        let partners_share = share_for_recipient(total_amount, config.bp_partners, recipients.partners);
 
         let distributed =
             jackpot_share +

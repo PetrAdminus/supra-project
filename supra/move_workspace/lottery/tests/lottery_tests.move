@@ -228,7 +228,7 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 2)]
+    #[expected_failure(location = @lottery::main_v2, abort_code = 2)]
     fun init_twice_fails() {
         setup_accounts();
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
@@ -237,7 +237,7 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 13)]
+    #[expected_failure(location = @lottery::main_v2, abort_code = 13)]
     fun buy_ticket_requires_store_registration() {
         setup_accounts_base();
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
@@ -246,14 +246,14 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 4)]
+    #[expected_failure(location = @lottery::treasury_v1, abort_code = 4)]
     fun mint_requires_registered_store() {
         setup_accounts_base();
         mint_to(PLAYER1, 1);
     }
 
     #[test]
-    #[expected_failure(abort_code = 4)]
+    #[expected_failure(location = @lottery::treasury_v1, abort_code = 4)]
     fun deposit_requires_registered_store() {
         setup_accounts_base();
         let player_signer = account::create_signer_for_test(PLAYER1);
@@ -409,7 +409,7 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 4)]
+    #[expected_failure(location = @lottery::main_v2, abort_code = 4)]
     fun simple_draw_requires_schedule() {
         setup_accounts();
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
@@ -618,7 +618,7 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 1)]
+    #[expected_failure(location = @lottery::main_v2, abort_code = 1)]
     fun withdraw_requires_admin() {
         setup_accounts();
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
@@ -628,7 +628,7 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 10)]
+    #[expected_failure(location = @lottery::main_v2, abort_code = 10)]
     fun withdraw_fails_with_pending_request() {
         setup_accounts();
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
@@ -655,7 +655,7 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 1)]
+    #[expected_failure(location = @lottery::main_v2, abort_code = 1)]
     fun set_minimum_balance_requires_admin() {
         setup_accounts();
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
@@ -683,7 +683,7 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 6)]
+    #[expected_failure(location = @lottery::main_v2, abort_code = 6)]
     fun simple_draw_rejects_when_pending_request() {
         setup_accounts();
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
