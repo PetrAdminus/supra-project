@@ -552,10 +552,13 @@ module lottery::main_v2 {
         assert!(vector::length(bytes) >= 8, 8);
 
         let value = 0;
+        let multiplier = 1;
         let i = 0;
         while (i < 8) {
             let byte = *vector::borrow(bytes, i);
-            value = math64::mul_div(value, 256, 1) + u8_to_u64(byte);
+            let term = math64::mul_div(u8_to_u64(byte), multiplier, 1);
+            value = value + term;
+            multiplier = math64::mul_div(multiplier, 256, 1);
             i = i + 1;
         };
 
