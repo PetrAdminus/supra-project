@@ -7,6 +7,7 @@ module lottery::main_v2 {
     use 0x1::timestamp;
     use 0x1::signer;
     use 0x1::vector;
+    use 0x1::math64;
     use 0x1::event;
     use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::supra_vrf;
     use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::deposit;
@@ -550,14 +551,25 @@ module lottery::main_v2 {
     fun first_u64_from_bytes(bytes: &vector<u8>): u64 {
         assert!(vector::length(bytes) >= 8, 8);
 
-        let head = vector::empty<u8>();
+        let value = 0;
         let i = 0;
         while (i < 8) {
             let byte = *vector::borrow(bytes, i);
-            vector::push_back(&mut head, byte);
+            value = math64::mul_div(value, 256, 1) + u8_to_u64(byte);
             i = i + 1;
         };
 
-        bcs::from_bytes<u64>(head)
+        value
+    }
+
+    fun u8_to_u64(byte: u8): u64 {
+        let result = 0;
+        let remaining = byte;
+        while (remaining > 0u8) {
+            result = result + 1;
+            remaining = remaining - 1u8;
+        };
+
+        result
     }
 }
