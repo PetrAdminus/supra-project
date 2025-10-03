@@ -8,8 +8,6 @@ module lottery::main_v2 {
     use 0x1::signer;
     use 0x1::vector;
     use 0x1::event;
-    use 0x1::u64;
-    use 0x1::u128;
     use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::supra_vrf;
     use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::deposit;
     use lottery::treasury_v1;
