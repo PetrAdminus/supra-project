@@ -94,9 +94,9 @@ module lottery::lottery_tests {
     }
 
     fun u64_to_u128(value: u64): u128 {
-        let mut result: u128 = 0;
-        let mut temp = value;
-        let mut base: u128 = 1;
+        let result: u128 = 0;
+        let temp = value;
+        let base: u128 = 1;
         while (temp > 0) {
             let bit = temp % 2;
             if (bit == 1) {
@@ -112,9 +112,9 @@ module lottery::lottery_tests {
 
     fun u128_to_u64(value: u128): u64 {
         assert!(value <= U64_MAX_AS_U128, 0);
-        let mut result: u64 = 0;
-        let mut temp = value;
-        let mut base: u64 = 1;
+        let result: u64 = 0;
+        let temp = value;
+        let base: u64 = 1;
         while (temp > 0) {
             let bit = temp % 2u128;
             if (bit == 1u128) {
