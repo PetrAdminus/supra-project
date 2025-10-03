@@ -8,8 +8,6 @@ module lottery::main_v2 {
     use 0x1::signer;
     use 0x1::vector;
     use 0x1::event;
-    use std::u64;
-    use std::u128;
     use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::supra_vrf;
     use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::deposit;
     use lottery::treasury_v1;
@@ -53,7 +51,9 @@ module lottery::main_v2 {
     const E_RNG_RESPONSE_OVERFLOW: u64 = 35;
     const E_RANDOM_INDEX_OVERFLOW: u64 = 36;
     const E_CANNOT_REMOVE_DEFAULT_CONSUMER: u64 = 37;
+    const U64_MAX: u64 = 18446744073709551615;
     const U64_MAX_AS_U128: u128 = 18446744073709551615;
+    const U128_MAX: u128 = 340282366920938463463374607431768211455;
     const TICKET_PRICE: u64 = 10000000; // 0.01 SUPRA
 
     struct ClientWhitelistSnapshot has copy, drop, store {
@@ -327,13 +327,16 @@ module lottery::main_v2 {
             pending_request
         ) = {
             let lottery = borrow_global<LotteryData>(@lottery);
-            ensure_gas_configured(&lottery);
+            ensure_gas_configured(lottery);
+            let max_gas_price = lottery.max_gas_price;
+            let max_gas_limit = lottery.max_gas_limit;
+            let verification_gas_value = lottery.verification_gas_value;
             (
-                calculate_min_balance(&lottery),
-                calculate_per_request_gas_fee(&lottery),
-                lottery.max_gas_price,
-                lottery.max_gas_limit,
-                lottery.verification_gas_value,
+                calculate_min_balance(max_gas_price, max_gas_limit, verification_gas_value),
+                calculate_per_request_gas_fee(max_gas_price, max_gas_limit, verification_gas_value),
+                max_gas_price,
+                max_gas_limit,
+                verification_gas_value,
                 copy_option_address(&lottery.whitelisted_callback_sender),
                 vector::length(&lottery.whitelisted_consumers),
                 copy_option_u64(&lottery.pending_request),
@@ -422,13 +425,16 @@ module lottery::main_v2 {
 
         let (min_balance, per_request_fee, max_gas_price, max_gas_limit, verification_gas_value) = {
             let lottery = borrow_global<LotteryData>(@lottery);
-            ensure_gas_configured(&lottery);
+            ensure_gas_configured(lottery);
+            let max_gas_price = lottery.max_gas_price;
+            let max_gas_limit = lottery.max_gas_limit;
+            let verification_gas_value = lottery.verification_gas_value;
             (
-                calculate_min_balance(&lottery),
-                calculate_per_request_gas_fee(&lottery),
-                lottery.max_gas_price,
-                lottery.max_gas_limit,
-                lottery.verification_gas_value
+                calculate_min_balance(max_gas_price, max_gas_limit, verification_gas_value),
+                calculate_per_request_gas_fee(max_gas_price, max_gas_limit, verification_gas_value),
+                max_gas_price,
+                max_gas_limit,
+                verification_gas_value
             )
         };
         let per_request_fee_u64 = checked_u64_from_u128(per_request_fee, E_MIN_BALANCE_OVERFLOW);
@@ -486,13 +492,24 @@ module lottery::main_v2 {
         assert!(admin == @lottery, E_NOT_OWNER);
 
         let lottery = borrow_global_mut<LotteryData>(@lottery);
-        ensure_gas_configured(&*lottery);
+        ensure_gas_configured_values(
+            lottery.max_gas_price,
+            lottery.max_gas_limit,
+            lottery.verification_gas_value,
+        );
         assert!(lottery.max_gas_price == max_gas_price, E_CLIENT_WHITELIST_SNAPSHOT_MISMATCH);
         assert!(lottery.max_gas_limit == max_gas_limit, E_CLIENT_WHITELIST_SNAPSHOT_MISMATCH);
 
-        let computed_min_balance = calculate_min_balance(&*lottery);
-        let computed_min_balance_u128 = u128::from_u64(computed_min_balance);
-        assert!(min_balance_limit >= computed_min_balance_u128, E_CLIENT_WHITELIST_SNAPSHOT_MISMATCH);
+        let computed_min_balance = calculate_min_balance(
+            lottery.max_gas_price,
+            lottery.max_gas_limit,
+            lottery.verification_gas_value,
+        );
+        let min_balance_limit_u64 = checked_u64_from_u128(
+            min_balance_limit,
+            E_CLIENT_WHITELIST_SNAPSHOT_MISMATCH,
+        );
+        assert!(min_balance_limit_u64 >= computed_min_balance, E_CLIENT_WHITELIST_SNAPSHOT_MISMATCH);
 
         let snapshot = ClientWhitelistSnapshot {
             max_gas_price,
@@ -543,7 +560,7 @@ module lottery::main_v2 {
         let lottery = borrow_global_mut<LotteryData>(@lottery);
         assert!(option::is_none(&lottery.pending_request), E_REQUEST_STILL_PENDING);
         assert!(rng_count == EXPECTED_RNG_COUNT, E_INVALID_REQUEST_CONFIG);
-        assert!(client_seed < u64::max_value(), E_CLIENT_SEED_OVERFLOW);
+        assert!(client_seed < U64_MAX, E_CLIENT_SEED_OVERFLOW);
 
         let current_seed = lottery.next_client_seed;
         assert!(client_seed >= current_seed, E_CLIENT_SEED_REGRESSION);
@@ -577,7 +594,11 @@ module lottery::main_v2 {
         lottery.callback_gas_price = callback_gas_price;
         lottery.callback_gas_limit = callback_gas_limit;
         lottery.verification_gas_value = verification_gas_value;
-        let per_request_fee = calculate_per_request_gas_fee(&*lottery);
+        let per_request_fee = calculate_per_request_gas_fee(
+            max_gas_price,
+            max_gas_limit,
+            verification_gas_value,
+        );
         let per_request_fee_u64 = checked_u64_from_u128(per_request_fee, E_MIN_BALANCE_OVERFLOW);
         lottery.max_gas_fee = per_request_fee_u64;
         let callback_sender = copy_option_address(&lottery.whitelisted_callback_sender);
@@ -683,10 +704,14 @@ module lottery::main_v2 {
     }
 
     fun request_draw(lottery: &mut LotteryData, sender: &signer) {
-        ensure_gas_configured(lottery);
-        ensure_callback_sender_configured(&*lottery);
+        ensure_gas_configured_values(
+            lottery.max_gas_price,
+            lottery.max_gas_limit,
+            lottery.verification_gas_value,
+        );
+        ensure_callback_sender_configured_internal(&lottery.whitelisted_callback_sender);
         let requester = signer::address_of(sender);
-        ensure_consumer_whitelisted(&*lottery, requester);
+        ensure_consumer_whitelisted_internal(&lottery.whitelisted_consumers, requester);
 
         let client_seed = next_client_seed(lottery);
 
@@ -709,7 +734,7 @@ module lottery::main_v2 {
 
     fun next_client_seed(lottery: &mut LotteryData): u64 {
         let current = lottery.next_client_seed;
-        assert!(current < u64::max_value(), E_CLIENT_SEED_OVERFLOW);
+        assert!(current < U64_MAX, E_CLIENT_SEED_OVERFLOW);
         lottery.next_client_seed = current + 1;
         current
     }
@@ -921,6 +946,64 @@ module lottery::main_v2 {
     }
 
     #[test_only]
+    public fun whitelist_status_fields(
+        status: &WhitelistStatus
+    ): (option::Option<address>, vector<address>) {
+        let mut consumers = vector::empty<address>();
+        let mut i = 0;
+        let len = vector::length(&status.consumers);
+        while (i < len) {
+            let consumer = *vector::borrow(&status.consumers, i);
+            vector::push_back(&mut consumers, consumer);
+            i = i + 1;
+        };
+        (status.aggregator, consumers)
+    }
+
+    #[test_only]
+    public fun client_whitelist_snapshot_fields(
+        snapshot_opt: &option::Option<ClientWhitelistSnapshot>
+    ): option::Option<(u128, u128, u128)> {
+        if (option::is_some(snapshot_opt)) {
+            let snapshot = option::borrow(snapshot_opt);
+            option::some((
+                snapshot.max_gas_price,
+                snapshot.max_gas_limit,
+                snapshot.min_balance_limit,
+            ))
+        } else {
+            option::none()
+        }
+    }
+
+    #[test_only]
+    public fun consumer_whitelist_snapshot_fields(
+        snapshot_opt: &option::Option<ConsumerWhitelistSnapshot>
+    ): option::Option<(u128, u128)> {
+        if (option::is_some(snapshot_opt)) {
+            let snapshot = option::borrow(snapshot_opt);
+            option::some((
+                snapshot.callback_gas_price,
+                snapshot.callback_gas_limit,
+            ))
+        } else {
+            option::none()
+        }
+    }
+
+    #[test_only]
+    public fun vrf_request_config_fields(
+        config_opt: &option::Option<VrfRequestConfig>
+    ): option::Option<(u8, u64)> {
+        if (option::is_some(config_opt)) {
+            let config = option::borrow(config_opt);
+            option::some((config.rng_count, config.client_seed))
+        } else {
+            option::none()
+        }
+    }
+
+    #[test_only]
     public fun draw_requested_fields(event: &DrawRequestedEvent): (u64, u64, vector<u8>, u128, u128, address) {
         (
             event.nonce,
@@ -934,11 +1017,15 @@ module lottery::main_v2 {
 
     #[test_only]
     public fun record_request_for_test(nonce: u64, requester: address) acquires LotteryData {
+        {
+            let lottery_view = borrow_global<LotteryData>(@lottery);
+            ensure_gas_configured(lottery_view);
+            ensure_callback_sender_configured(lottery_view);
+            ensure_consumer_whitelisted(lottery_view, requester);
+        };
         let lottery = borrow_global_mut<LotteryData>(@lottery);
-        ensure_gas_configured(&*lottery);
-        ensure_callback_sender_configured(&*lottery);
-        let client_seed = next_client_seed(&mut *lottery);
-        record_vrf_request(&mut *lottery, nonce, client_seed, requester);
+        let client_seed = next_client_seed(lottery);
+        record_vrf_request(lottery, nonce, client_seed, requester);
     }
 
     #[test_only]
@@ -955,7 +1042,18 @@ module lottery::main_v2 {
         let lottery = borrow_global<LotteryData>(@lottery);
         assert!(option::is_some(&lottery.last_requester), E_INVALID_CALLBACK_PAYLOAD);
         let requester = *option::borrow(&lottery.last_requester);
-        ensure_payload_hash_matches(&lottery, nonce, client_seed, requester, message);
+        ensure_payload_hash_matches(
+            &lottery.last_request_payload_hash,
+            lottery.max_gas_price,
+            lottery.max_gas_limit,
+            lottery.callback_gas_price,
+            lottery.callback_gas_limit,
+            lottery.verification_gas_value,
+            nonce,
+            client_seed,
+            requester,
+            message,
+        );
     }
 
     #[test_only]
@@ -965,7 +1063,7 @@ module lottery::main_v2 {
         requester: address
     ): vector<u8> acquires LotteryData {
         let lottery = borrow_global<LotteryData>(@lottery);
-        let envelope = build_request_envelope(nonce, client_seed, requester, &lottery);
+        let envelope = build_request_envelope(nonce, client_seed, requester, lottery);
         encode_request_envelope(&envelope)
     }
 
@@ -1030,13 +1128,21 @@ module lottery::main_v2 {
         assert!(lottery.draw_scheduled, E_DRAW_NOT_SCHEDULED);
         let expected_nonce = *option::borrow(&lottery.pending_request);
         assert!(expected_nonce == nonce, E_NONCE_MISMATCH);
-        ensure_callback_caller_allowed(&*lottery, caller_address);
+        ensure_callback_caller_allowed_internal(&lottery.whitelisted_callback_sender, caller_address);
         assert!(option::is_some(&lottery.last_requester), E_INVALID_CALLBACK_PAYLOAD);
         let expected_requester = *option::borrow(&lottery.last_requester);
-        {
-            let lottery_ref = &*lottery;
-            ensure_payload_hash_matches(lottery_ref, nonce, client_seed, expected_requester, message);
-        };
+        ensure_payload_hash_matches(
+            &lottery.last_request_payload_hash,
+            lottery.max_gas_price,
+            lottery.max_gas_limit,
+            lottery.callback_gas_price,
+            lottery.callback_gas_limit,
+            lottery.verification_gas_value,
+            nonce,
+            client_seed,
+            expected_requester,
+            message,
+        );
 
         assert!(rng_count == EXPECTED_RNG_COUNT, E_UNEXPECTED_RNG_COUNT);
         let actual_len = vector::length(&verified_nums);
@@ -1205,8 +1311,8 @@ module lottery::main_v2 {
             vector::empty<address>()
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
-            let tickets = vector::empty<address>();
-            let i = 0;
+            let mut tickets = vector::empty<address>();
+            let mut i = 0;
             let len = vector::length(&lottery.tickets);
             while (i < len) {
                 let ticket = *vector::borrow(&lottery.tickets, i);
@@ -1226,9 +1332,9 @@ module lottery::main_v2 {
             }
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
-            let consumers = vector::empty<address>();
+            let mut consumers = vector::empty<address>();
             let len = vector::length(&lottery.whitelisted_consumers);
-            let i = 0;
+            let mut i = 0;
             while (i < len) {
                 let consumer = *vector::borrow(&lottery.whitelisted_consumers, i);
                 vector::push_back(&mut consumers, consumer);
@@ -1306,14 +1412,25 @@ module lottery::main_v2 {
     }
 
     fun ensure_gas_configured(lottery: &LotteryData) {
-        assert!(lottery.max_gas_price > 0, E_GAS_CONFIG_NOT_SET);
-        assert!(lottery.max_gas_limit > 0, E_GAS_CONFIG_NOT_SET);
-        assert!(lottery.verification_gas_value > 0, E_GAS_CONFIG_NOT_SET);
+        ensure_gas_configured_values(
+            lottery.max_gas_price,
+            lottery.max_gas_limit,
+            lottery.verification_gas_value,
+        );
+    }
+
+    fun ensure_gas_configured_values(
+        max_gas_price: u128,
+        max_gas_limit: u128,
+        verification_gas_value: u128
+    ) {
+        assert!(max_gas_price > 0, E_GAS_CONFIG_NOT_SET);
+        assert!(max_gas_limit > 0, E_GAS_CONFIG_NOT_SET);
+        assert!(verification_gas_value > 0, E_GAS_CONFIG_NOT_SET);
     }
 
     fun ensure_callback_sender_configured(lottery: &LotteryData): address {
-        assert!(option::is_some(&lottery.whitelisted_callback_sender), E_CALLBACK_SOURCE_NOT_SET);
-        *option::borrow(&lottery.whitelisted_callback_sender)
+        ensure_callback_sender_configured_internal(&lottery.whitelisted_callback_sender)
     }
 
     fun ensure_callback_caller_allowed(lottery: &LotteryData, caller_address: address) {
@@ -1321,12 +1438,31 @@ module lottery::main_v2 {
         assert!(aggregator == caller_address, E_CALLBACK_CALLER_NOT_ALLOWED);
     }
 
+    fun ensure_callback_sender_configured_internal(
+        callback_sender: &option::Option<address>
+    ): address {
+        assert!(option::is_some(callback_sender), E_CALLBACK_SOURCE_NOT_SET);
+        *option::borrow(callback_sender)
+    }
+
+    fun ensure_callback_caller_allowed_internal(
+        callback_sender: &option::Option<address>,
+        caller_address: address
+    ) {
+        let aggregator = ensure_callback_sender_configured_internal(callback_sender);
+        assert!(aggregator == caller_address, E_CALLBACK_CALLER_NOT_ALLOWED);
+    }
+
     fun ensure_consumer_whitelisted(lottery: &LotteryData, consumer: address) {
-        assert!(is_consumer_whitelisted(&lottery.whitelisted_consumers, consumer), E_CONSUMER_NOT_WHITELISTED);
+        ensure_consumer_whitelisted_internal(&lottery.whitelisted_consumers, consumer);
+    }
+
+    fun ensure_consumer_whitelisted_internal(consumers: &vector<address>, consumer: address) {
+        assert!(is_consumer_whitelisted(consumers, consumer), E_CONSUMER_NOT_WHITELISTED);
     }
 
     fun is_consumer_whitelisted(consumers: &vector<address>, target: address): bool {
-        let i = 0;
+        let mut i = 0;
         let len = vector::length(consumers);
         while (i < len) {
             if (*vector::borrow(consumers, i) == target) {
@@ -1339,7 +1475,7 @@ module lottery::main_v2 {
 
     fun remove_consumer_from_list(consumers: &mut vector<address>, target: address): bool {
         let len = vector::length(consumers);
-        let i = 0;
+        let mut i = 0;
         while (i < len) {
             if (*vector::borrow(consumers, i) == target) {
                 vector::swap_remove(consumers, i);
@@ -1357,17 +1493,29 @@ module lottery::main_v2 {
         lottery.vrf_request_config = option::none();
     }
 
-    fun calculate_per_request_gas_fee(lottery: &LotteryData): u128 {
+    fun calculate_per_request_gas_fee(
+        max_gas_price: u128,
+        max_gas_limit: u128,
+        verification_gas_value: u128
+    ): u128 {
         let gas_sum = safe_add_u128(
-            lottery.max_gas_limit,
-            lottery.verification_gas_value,
+            max_gas_limit,
+            verification_gas_value,
             E_GAS_MATH_OVERFLOW,
         );
-        safe_mul_u128(lottery.max_gas_price, gas_sum, E_GAS_MATH_OVERFLOW)
+        safe_mul_u128(max_gas_price, gas_sum, E_GAS_MATH_OVERFLOW)
     }
 
-    fun calculate_min_balance(lottery: &LotteryData): u64 {
-        let per_request_fee = calculate_per_request_gas_fee(lottery);
+    fun calculate_min_balance(
+        max_gas_price: u128,
+        max_gas_limit: u128,
+        verification_gas_value: u128
+    ): u64 {
+        let per_request_fee = calculate_per_request_gas_fee(
+            max_gas_price,
+            max_gas_limit,
+            verification_gas_value,
+        );
         let min_balance_u128 = safe_mul_u128(
             MIN_REQUEST_WINDOW_U128,
             per_request_fee,
@@ -1378,12 +1526,24 @@ module lottery::main_v2 {
 
     fun checked_u64_from_u128(value: u128, abort_code: u64): u64 {
         assert!(value <= U64_MAX_AS_U128, abort_code);
-        u64::from_u128(value)
+        let mut result = 0;
+        let mut temp = value;
+        let mut base = 1;
+        while (temp > 0) {
+            let bit = temp % 2;
+            if (bit == 1) {
+                result = safe_add_u64(result, base, abort_code);
+            };
+            temp = temp / 2;
+            if (temp > 0) {
+                base = safe_mul_u64(base, 2, abort_code);
+            };
+        };
+        result
     }
 
     fun safe_add_u64(a: u64, b: u64, abort_code: u64): u64 {
-        let max = u64::max_value();
-        assert!(b <= max - a, abort_code);
+        assert!(b <= U64_MAX - a, abort_code);
         a + b
     }
 
@@ -1391,15 +1551,13 @@ module lottery::main_v2 {
         if (a == 0 || b == 0) {
             0
         } else {
-            let max = u64::max_value();
-            assert!(a <= max / b, abort_code);
+            assert!(a <= U64_MAX / b, abort_code);
             a * b
         }
     }
 
     fun safe_add_u128(a: u128, b: u128, abort_code: u64): u128 {
-        let max = u128::max_value();
-        assert!(b <= max - a, abort_code);
+        assert!(b <= U128_MAX - a, abort_code);
         a + b
     }
 
@@ -1407,32 +1565,42 @@ module lottery::main_v2 {
         if (a == 0 || b == 0) {
             0
         } else {
-            let max = u128::max_value();
-            assert!(a <= max / b, abort_code);
+            assert!(a <= U128_MAX / b, abort_code);
             a * b
         }
     }
 
     fun ensure_payload_hash_matches(
-        lottery: &LotteryData,
+        stored_hash_opt: &option::Option<vector<u8>>,
+        max_gas_price: u128,
+        max_gas_limit: u128,
+        callback_gas_price: u128,
+        callback_gas_limit: u128,
+        verification_gas_value: u128,
         nonce: u64,
         client_seed: u64,
         expected_requester: address,
         message: vector<u8>
     ) {
-        assert!(option::is_some(&lottery.last_request_payload_hash), E_INVALID_CALLBACK_PAYLOAD);
-        let stored_hash = option::borrow(&lottery.last_request_payload_hash);
+        assert!(option::is_some(stored_hash_opt), E_INVALID_CALLBACK_PAYLOAD);
+        let stored_hash = option::borrow(stored_hash_opt);
         let payload_hash = hash::sha3_256(copy message);
         assert!(vector_equals(stored_hash, &payload_hash), E_INVALID_CALLBACK_PAYLOAD);
-        let envelope: VrfRequestEnvelope = bcs::from_bytes(message);
-        assert!(envelope.nonce == nonce, E_INVALID_CALLBACK_PAYLOAD);
-        assert!(envelope.client_seed == client_seed, E_INVALID_CALLBACK_PAYLOAD);
-        assert!(envelope.requester == expected_requester, E_INVALID_CALLBACK_PAYLOAD);
-        assert!(envelope.max_gas_price == lottery.max_gas_price, E_INVALID_CALLBACK_PAYLOAD);
-        assert!(envelope.max_gas_limit == lottery.max_gas_limit, E_INVALID_CALLBACK_PAYLOAD);
-        assert!(envelope.callback_gas_price == lottery.callback_gas_price, E_INVALID_CALLBACK_PAYLOAD);
-        assert!(envelope.callback_gas_limit == lottery.callback_gas_limit, E_INVALID_CALLBACK_PAYLOAD);
-        assert!(envelope.verification_gas_value == lottery.verification_gas_value, E_INVALID_CALLBACK_PAYLOAD);
+
+        let envelope = VrfRequestEnvelope {
+            nonce,
+            client_seed,
+            max_gas_price,
+            max_gas_limit,
+            callback_gas_price,
+            callback_gas_limit,
+            verification_gas_value,
+            requester: expected_requester,
+        };
+        let expected_payload = encode_request_envelope(&envelope);
+        let expected_hash = hash::sha3_256(copy expected_payload);
+        assert!(vector_equals(&payload_hash, &expected_hash), E_INVALID_CALLBACK_PAYLOAD);
+        assert!(vector_equals(&message, &expected_payload), E_INVALID_CALLBACK_PAYLOAD);
     }
 
     fun vector_equals(lhs: &vector<u8>, rhs: &vector<u8>): bool {
@@ -1440,7 +1608,7 @@ module lottery::main_v2 {
             return false;
         };
 
-        let i = 0;
+        let mut i = 0;
         let len = vector::length(lhs);
         while (i < len) {
             if (*vector::borrow(lhs, i) != *vector::borrow(rhs, i)) {
@@ -1455,8 +1623,8 @@ module lottery::main_v2 {
     fun first_u64_from_bytes(bytes: &vector<u8>): u64 {
         assert!(vector::length(bytes) >= 8, E_RANDOM_BYTES_TOO_SHORT);
 
-        let value = 0;
-        let i = 8;
+        let mut value = 0;
+        let mut i = 8;
         while (i > 0) {
             i = i - 1;
             let byte = *vector::borrow(bytes, i);
@@ -1468,7 +1636,18 @@ module lottery::main_v2 {
     }
 
     fun u8_to_u64(byte: u8): u64 {
-        u64::from_u8(byte)
+        let mut result = 0;
+        let mut temp = byte;
+        let mut base = 1;
+        while (temp > 0) {
+            let bit = temp % 2;
+            if (bit == 1) {
+                result = result + base;
+            };
+            temp = temp / 2;
+            base = base * 2;
+        };
+        result
     }
 
     #[test_only]

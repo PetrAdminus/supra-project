@@ -7,8 +7,6 @@ module lottery::lottery_tests {
     use std::hash;
     use std::string;
     use std::vector;
-    use std::u64;
-    use std::u128;
     use lottery::main_v2;
     use lottery::treasury_v1;
 
@@ -21,7 +19,7 @@ module lottery::lottery_tests {
     const COMMUNITY_RECIPIENT: address = @0x12;
     const TEAM_RECIPIENT: address = @0x13;
     const PARTNERS_RECIPIENT: address = @0x14;
-    const TICKET_PRICE: u64 = main_v2::TICKET_PRICE;
+    const TICKET_PRICE: u64 = 10_000_000;
     const DECIMALS: u8 = 9;
     const STORE_FROZEN_ABORT: u64 = 0x50003;
     const MAX_GAS_PRICE: u128 = 100;
@@ -29,40 +27,43 @@ module lottery::lottery_tests {
     const CALLBACK_GAS_PRICE: u128 = 10;
     const CALLBACK_GAS_LIMIT: u128 = 40;
     const VERIFICATION_GAS_VALUE: u128 = 50;
-    const EXPECTED_GAS_ERROR: u64 = main_v2::E_GAS_CONFIG_NOT_SET;
-    const EXPECTED_CALLBACK_SOURCE_ERROR: u64 = main_v2::E_CALLBACK_SOURCE_NOT_SET;
-    const DRAW_NOT_SCHEDULED_ERROR: u64 = main_v2::E_DRAW_NOT_SCHEDULED;
-    const PENDING_REQUEST_STATE_ERROR: u64 = main_v2::E_PENDING_REQUEST_STATE;
-    const WITHDRAWAL_PENDING_REQUEST_ERROR: u64 = main_v2::E_WITHDRAWAL_PENDING_REQUEST;
-    const NOT_OWNER_ERROR: u64 = main_v2::E_NOT_OWNER;
-    const ALREADY_INITIALIZED_ERROR: u64 = main_v2::E_ALREADY_INITIALIZED;
-    const NO_TICKETS_ERROR: u64 = main_v2::E_NO_TICKETS_AVAILABLE;
-    const GAS_MATH_OVERFLOW_ERROR: u64 = main_v2::E_GAS_MATH_OVERFLOW;
-    const INVALID_GAS_CONFIG_ERROR: u64 = main_v2::E_INVALID_GAS_CONFIG;
-    const INVALID_AGGREGATOR_ERROR: u64 = main_v2::E_INVALID_CALLBACK_SENDER;
-    const INVALID_CONSUMER_ERROR: u64 = main_v2::E_INVALID_CONSUMER_ADDRESS;
-    const DEFAULT_CONSUMER_REMOVE_ERROR: u64 = main_v2::E_CANNOT_REMOVE_DEFAULT_CONSUMER;
-    const CONSUMER_ALREADY_WHITELISTED_ERROR: u64 = main_v2::E_CONSUMER_ALREADY_WHITELISTED;
-    const CONSUMER_NOT_WHITELISTED_ERROR: u64 = main_v2::E_CONSUMER_NOT_WHITELISTED;
-    const CLIENT_WHITELIST_MISMATCH_ERROR: u64 = main_v2::E_CLIENT_WHITELIST_SNAPSHOT_MISMATCH;
-    const CONSUMER_WHITELIST_MISMATCH_ERROR: u64 = main_v2::E_CONSUMER_WHITELIST_SNAPSHOT_MISMATCH;
-    const REQUEST_STILL_PENDING_ERROR: u64 = main_v2::E_REQUEST_STILL_PENDING;
-    const INVALID_REQUEST_CONFIG_ERROR: u64 = main_v2::E_INVALID_REQUEST_CONFIG;
-    const CLIENT_SEED_REGRESSION_ERROR: u64 = main_v2::E_CLIENT_SEED_REGRESSION;
-    const PLAYER_STORE_NOT_REGISTERED_ERROR: u64 = main_v2::E_PLAYER_STORE_NOT_REGISTERED;
-    const INVALID_CALLBACK_PAYLOAD_ERROR: u64 = main_v2::E_INVALID_CALLBACK_PAYLOAD;
-    const UNEXPECTED_RNG_COUNT_ERROR: u64 = main_v2::E_UNEXPECTED_RNG_COUNT;
-    const CALLBACK_CALLER_NOT_ALLOWED_ERROR: u64 = main_v2::E_CALLBACK_CALLER_NOT_ALLOWED;
-    const STORE_NOT_REGISTERED_ERROR: u64 = treasury_v1::E_STORE_NOT_REGISTERED;
-    const JACKPOT_OVERFLOW_ERROR: u64 = main_v2::E_JACKPOT_OVERFLOW;
-    const TICKET_ID_OVERFLOW_ERROR: u64 = main_v2::E_TICKET_ID_OVERFLOW;
-    const RNG_REQUEST_OVERFLOW_ERROR: u64 = main_v2::E_RNG_REQUEST_OVERFLOW;
-    const RNG_RESPONSE_OVERFLOW_ERROR: u64 = main_v2::E_RNG_RESPONSE_OVERFLOW;
+    const EXPECTED_GAS_ERROR: u64 = 16;
+    const EXPECTED_CALLBACK_SOURCE_ERROR: u64 = 20;
+    const DRAW_NOT_SCHEDULED_ERROR: u64 = 4;
+    const PENDING_REQUEST_STATE_ERROR: u64 = 6;
+    const WITHDRAWAL_PENDING_REQUEST_ERROR: u64 = 10;
+    const NOT_OWNER_ERROR: u64 = 1;
+    const ALREADY_INITIALIZED_ERROR: u64 = 2;
+    const NO_TICKETS_ERROR: u64 = 3;
+    const GAS_MATH_OVERFLOW_ERROR: u64 = 28;
+    const INVALID_GAS_CONFIG_ERROR: u64 = 29;
+    const INVALID_AGGREGATOR_ERROR: u64 = 30;
+    const INVALID_CONSUMER_ERROR: u64 = 31;
+    const DEFAULT_CONSUMER_REMOVE_ERROR: u64 = 37;
+    const CONSUMER_ALREADY_WHITELISTED_ERROR: u64 = 22;
+    const CONSUMER_NOT_WHITELISTED_ERROR: u64 = 23;
+    const CLIENT_WHITELIST_MISMATCH_ERROR: u64 = 24;
+    const CONSUMER_WHITELIST_MISMATCH_ERROR: u64 = 25;
+    const REQUEST_STILL_PENDING_ERROR: u64 = 17;
+    const INVALID_REQUEST_CONFIG_ERROR: u64 = 26;
+    const CLIENT_SEED_REGRESSION_ERROR: u64 = 27;
+    const PLAYER_STORE_NOT_REGISTERED_ERROR: u64 = 13;
+    const INVALID_CALLBACK_PAYLOAD_ERROR: u64 = 14;
+    const UNEXPECTED_RNG_COUNT_ERROR: u64 = 18;
+    const CALLBACK_CALLER_NOT_ALLOWED_ERROR: u64 = 21;
+    const STORE_NOT_REGISTERED_ERROR: u64 = 4;
+    const JACKPOT_OVERFLOW_ERROR: u64 = 32;
+    const TICKET_ID_OVERFLOW_ERROR: u64 = 33;
+    const RNG_REQUEST_OVERFLOW_ERROR: u64 = 34;
+    const RNG_RESPONSE_OVERFLOW_ERROR: u64 = 35;
     const VRF_AGGREGATOR: address = @0xa;
     const UNAUTHORIZED_CALLBACK: address = @0xb;
     const SECOND_AGGREGATOR: address = @0xc;
     const ZERO_ADDRESS: address = @0x0;
     const MIN_REQUEST_WINDOW: u128 = 30;
+    const U64_MAX: u64 = 18446744073709551615;
+    const U128_MAX: u128 = 340282366920938463463374607431768211455;
+    const U64_MAX_AS_U128: u128 = 18446744073709551615;
 
     fun setup_accounts_base() {
         account::create_account_for_test(LOTTERY_ADDR);
@@ -90,6 +91,41 @@ module lottery::lottery_tests {
             b"",
             b""
         );
+    }
+
+    fun u64_to_u128(value: u64): u128 {
+        let mut result: u128 = 0;
+        let mut temp = value;
+        let mut base: u128 = 1;
+        while (temp > 0) {
+            let bit = temp % 2;
+            if (bit == 1) {
+                result = result + base;
+            };
+            temp = temp / 2;
+            if (temp > 0) {
+                base = base * 2u128;
+            };
+        };
+        result
+    }
+
+    fun u128_to_u64(value: u128): u64 {
+        assert!(value <= U64_MAX_AS_U128, 0);
+        let mut result: u64 = 0;
+        let mut temp = value;
+        let mut base: u64 = 1;
+        while (temp > 0) {
+            let bit = temp % 2u128;
+            if (bit == 1u128) {
+                result = result + base;
+            };
+            temp = temp / 2u128;
+            if (temp > 0) {
+                base = base * 2;
+            };
+        };
+        result
     }
 
     fun setup_accounts() {
@@ -177,7 +213,7 @@ module lottery::lottery_tests {
         ];
 
         let value = main_v2::first_u64_from_bytes_for_test(bytes);
-        assert!(value == u64::max_value(), 9000);
+        assert!(value == U64_MAX, 9000);
     }
 
     #[test]
@@ -254,13 +290,14 @@ module lottery::lottery_tests {
         assert!(aggregator_addr == VRF_AGGREGATOR, 55);
 
         let status = main_v2::get_whitelist_status();
-        assert!(option::is_some(&status.aggregator), 223);
-        let aggregator = *option::borrow(&status.aggregator);
+        let (aggregator_opt, consumers) = main_v2::whitelist_status_fields(&status);
+        assert!(option::is_some(&aggregator_opt), 223);
+        let aggregator = *option::borrow(&aggregator_opt);
         assert!(aggregator == VRF_AGGREGATOR, 224);
-        let consumer_count = vector::length(&status.consumers);
+        let consumer_count = vector::length(&consumers);
         assert!(consumer_count == 2, 225);
-        let first_consumer = *vector::borrow(&status.consumers, 0);
-        let second_consumer = *vector::borrow(&status.consumers, 1);
+        let first_consumer = *vector::borrow(&consumers, 0);
+        let second_consumer = *vector::borrow(&consumers, 1);
         assert!(first_consumer == LOTTERY_ADDR, 226);
         assert!(second_consumer == PLAYER1, 227);
     }
@@ -352,17 +389,19 @@ module lottery::lottery_tests {
 
         let snapshot_opt = main_v2::get_client_whitelist_snapshot();
         assert!(option::is_some(&snapshot_opt), 204);
-        let snapshot_ref = option::borrow(&snapshot_opt);
-        let snapshot = *snapshot_ref;
-        assert!(snapshot.max_gas_price == MAX_GAS_PRICE, 205);
-        assert!(snapshot.max_gas_limit == MAX_GAS_LIMIT, 206);
-        assert!(snapshot.min_balance_limit == min_balance_limit, 207);
+        let snapshot_fields_opt = main_v2::client_whitelist_snapshot_fields(&snapshot_opt);
+        assert!(option::is_some(&snapshot_fields_opt), 205);
+        let snapshot_fields = option::borrow(&snapshot_fields_opt);
+        let (snapshot_price, snapshot_limit, snapshot_min) = *snapshot_fields;
+        assert!(snapshot_price == MAX_GAS_PRICE, 206);
+        assert!(snapshot_limit == MAX_GAS_LIMIT, 207);
+        assert!(snapshot_min == min_balance_limit, 208);
 
         let min_snapshot_opt = main_v2::get_min_balance_limit_snapshot();
-        assert!(option::is_some(&min_snapshot_opt), 208);
+        assert!(option::is_some(&min_snapshot_opt), 209);
         let min_snapshot_ref = option::borrow(&min_snapshot_opt);
         let min_snapshot = *min_snapshot_ref;
-        assert!(min_snapshot == min_balance_limit, 209);
+        assert!(min_snapshot == min_balance_limit, 210);
     }
 
     #[test]
@@ -399,10 +438,12 @@ module lottery::lottery_tests {
 
         let snapshot_opt = main_v2::get_consumer_whitelist_snapshot();
         assert!(option::is_some(&snapshot_opt), 213);
-        let snapshot_ref = option::borrow(&snapshot_opt);
-        let snapshot = *snapshot_ref;
-        assert!(snapshot.callback_gas_price == CALLBACK_GAS_PRICE, 214);
-        assert!(snapshot.callback_gas_limit == CALLBACK_GAS_LIMIT, 215);
+        let snapshot_fields_opt = main_v2::consumer_whitelist_snapshot_fields(&snapshot_opt);
+        assert!(option::is_some(&snapshot_fields_opt), 214);
+        let snapshot_fields = option::borrow(&snapshot_fields_opt);
+        let (snapshot_price, snapshot_limit) = *snapshot_fields;
+        assert!(snapshot_price == CALLBACK_GAS_PRICE, 215);
+        assert!(snapshot_limit == CALLBACK_GAS_LIMIT, 216);
     }
 
     #[test]
@@ -492,10 +533,12 @@ module lottery::lottery_tests {
 
         let config_opt = main_v2::get_vrf_request_config();
         assert!(option::is_some(&config_opt), 220);
-        let config_ref = option::borrow(&config_opt);
-        let config = *config_ref;
-        assert!(config.rng_count == 1u8, 221);
-        assert!(config.client_seed == new_seed, 222);
+        let config_fields_opt = main_v2::vrf_request_config_fields(&config_opt);
+        assert!(option::is_some(&config_fields_opt), 221);
+        let config_fields = option::borrow(&config_fields_opt);
+        let (rng_count, client_seed) = *config_fields;
+        assert!(rng_count == 1u8, 222);
+        assert!(client_seed == new_seed, 223);
     }
 
     #[test]
@@ -697,7 +740,7 @@ module lottery::lottery_tests {
         assert!(event_callback_price == CALLBACK_GAS_PRICE, 8);
         assert!(event_callback_limit == CALLBACK_GAS_LIMIT, 9);
         assert!(event_verification_value == VERIFICATION_GAS_VALUE, 10);
-        let expected_per_request_fee_u64 = u64::from_u128(expected_per_request_fee);
+        let expected_per_request_fee_u64 = u128_to_u64(expected_per_request_fee);
         assert!(event_per_request_fee == expected_per_request_fee_u64, 11);
 
         let (callback_sender, consumer_count, pending_request) =
@@ -726,11 +769,11 @@ module lottery::lottery_tests {
 
         main_v2::configure_vrf_gas_for_test(
             &lottery_signer,
-            u128::from_u64(max_gas_price),
-            u128::from_u64(max_gas_limit),
-            u128::from_u64(callback_price),
-            u128::from_u64(callback_limit),
-            u128::from_u64(verification_value)
+            u64_to_u128(max_gas_price),
+            u64_to_u128(max_gas_limit),
+            u64_to_u128(callback_price),
+            u64_to_u128(callback_limit),
+            u64_to_u128(verification_value)
         );
 
         let expected_per_request_fee = (max_gas_limit + verification_value) * max_gas_price;
@@ -754,9 +797,9 @@ module lottery::lottery_tests {
         ) = main_v2::subscription_configured_fields(event_ref);
         assert!(min_balance == expected_min_balance, 2);
         assert!(per_request_fee == expected_per_request_fee, 3);
-        assert!(event_max_price == u128::from_u64(max_gas_price), 4);
-        assert!(event_max_limit == u128::from_u64(max_gas_limit), 5);
-        assert!(event_verification_value == u128::from_u64(verification_value), 6);
+        assert!(event_max_price == u64_to_u128(max_gas_price), 4);
+        assert!(event_max_limit == u64_to_u128(max_gas_limit), 5);
+        assert!(event_verification_value == u64_to_u128(verification_value), 6);
         assert!(event_initial_deposit == initial_deposit, 7);
 
         let (callback_sender, consumer_count, pending_request) =
@@ -775,7 +818,7 @@ module lottery::lottery_tests {
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
         main_v2::init(&lottery_signer);
 
-        let max_value = u128::max_value();
+        let max_value = U128_MAX;
         main_v2::configure_vrf_gas_for_test(
             &lottery_signer,
             1u128,
@@ -793,7 +836,7 @@ module lottery::lottery_tests {
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
         main_v2::init(&lottery_signer);
 
-        let max_value = u128::max_value();
+        let max_value = U128_MAX;
         main_v2::configure_vrf_gas_for_test(
             &lottery_signer,
             max_value,
@@ -875,7 +918,7 @@ module lottery::lottery_tests {
         main_v2::init(&lottery_signer);
 
         mint_to(PLAYER1, TICKET_PRICE);
-        main_v2::set_jackpot_amount_for_test(u64::max_value());
+        main_v2::set_jackpot_amount_for_test(U64_MAX);
 
         let player_signer = account::create_signer_for_test(PLAYER1);
         main_v2::buy_ticket(&player_signer);
@@ -892,7 +935,7 @@ module lottery::lottery_tests {
         main_v2::init(&lottery_signer);
 
         mint_to(PLAYER1, TICKET_PRICE);
-        main_v2::set_next_ticket_id_for_test(u64::max_value());
+        main_v2::set_next_ticket_id_for_test(U64_MAX);
 
         let player_signer = account::create_signer_for_test(PLAYER1);
         main_v2::buy_ticket(&player_signer);
@@ -1788,7 +1831,7 @@ module lottery::lottery_tests {
 
         whitelist_callback_sender();
 
-        main_v2::set_rng_counters_for_test(u64::max_value(), 0);
+        main_v2::set_rng_counters_for_test(U64_MAX, 0);
 
         main_v2::record_request_for_test(500, LOTTERY_ADDR);
     }
@@ -1818,7 +1861,7 @@ module lottery::lottery_tests {
         mint_to(PLAYER1, 1_000_000_000);
         buy_ticket_for(PLAYER1);
 
-        main_v2::set_rng_counters_for_test(0, u64::max_value());
+        main_v2::set_rng_counters_for_test(0, U64_MAX);
 
         let nonce = 777;
         let client_seed = main_v2::next_client_seed_for_test();
@@ -2109,11 +2152,11 @@ module lottery::lottery_tests {
 
         main_v2::configure_vrf_gas_for_test(
             &lottery_signer,
-            u128::from_u64(custom_max_price),
-            u128::from_u64(custom_max_limit),
-            u128::from_u64(custom_callback_price),
-            u128::from_u64(custom_callback_limit),
-            u128::from_u64(custom_verification)
+            u64_to_u128(custom_max_price),
+            u64_to_u128(custom_max_limit),
+            u64_to_u128(custom_callback_price),
+            u64_to_u128(custom_callback_limit),
+            u64_to_u128(custom_verification)
         );
 
         main_v2::set_minimum_balance_for_test(&lottery_signer);
@@ -2135,9 +2178,9 @@ module lottery::lottery_tests {
         ) = main_v2::minimum_balance_updated_fields(event_ref);
         assert!(min_balance == expected_min_balance, 2);
         assert!(per_request_fee == expected_per_request_fee, 3);
-        assert!(event_max_price == u128::from_u64(custom_max_price), 4);
-        assert!(event_max_limit == u128::from_u64(custom_max_limit), 5);
-        assert!(event_verification_value == u128::from_u64(custom_verification), 6);
+        assert!(event_max_price == u64_to_u128(custom_max_price), 4);
+        assert!(event_max_limit == u64_to_u128(custom_max_limit), 5);
+        assert!(event_verification_value == u64_to_u128(custom_verification), 6);
 
         let (callback_sender, consumer_count, pending_request) =
             main_v2::minimum_balance_event_context(event_ref);
@@ -2164,11 +2207,11 @@ module lottery::lottery_tests {
 
         main_v2::configure_vrf_gas_for_test(
             &lottery_signer,
-            u128::from_u64(first_price),
-            u128::from_u64(first_limit),
-            u128::from_u64(callback_price),
-            u128::from_u64(callback_limit),
-            u128::from_u64(first_verification)
+            u64_to_u128(first_price),
+            u64_to_u128(first_limit),
+            u64_to_u128(callback_price),
+            u64_to_u128(callback_limit),
+            u64_to_u128(first_verification)
         );
         main_v2::set_minimum_balance_for_test(&lottery_signer);
 
@@ -2178,11 +2221,11 @@ module lottery::lottery_tests {
 
         main_v2::configure_vrf_gas_for_test(
             &lottery_signer,
-            u128::from_u64(second_price),
-            u128::from_u64(second_limit),
-            u128::from_u64(callback_price),
-            u128::from_u64(callback_limit),
-            u128::from_u64(second_verification)
+            u64_to_u128(second_price),
+            u64_to_u128(second_limit),
+            u64_to_u128(callback_price),
+            u64_to_u128(callback_limit),
+            u64_to_u128(second_verification)
         );
         main_v2::set_minimum_balance_for_test(&lottery_signer);
 
@@ -2195,9 +2238,9 @@ module lottery::lottery_tests {
             main_v2::minimum_balance_updated_fields(vector::borrow(&events, 0));
         assert!(first_min_balance == first_expected_min_balance, 8);
         assert!(first_per_request_fee == first_expected_per_request, 9);
-        assert!(first_price_event == u128::from_u64(first_price), 10);
-        assert!(first_limit_event == u128::from_u64(first_limit), 11);
-        assert!(first_verification_event == u128::from_u64(first_verification), 12);
+        assert!(first_price_event == u64_to_u128(first_price), 10);
+        assert!(first_limit_event == u64_to_u128(first_limit), 11);
+        assert!(first_verification_event == u64_to_u128(first_verification), 12);
         let (first_sender, first_consumer_count, first_pending) =
             main_v2::minimum_balance_event_context(vector::borrow(&events, 0));
         assert!(option::is_some(&first_sender), 18);
@@ -2212,9 +2255,9 @@ module lottery::lottery_tests {
             main_v2::minimum_balance_updated_fields(vector::borrow(&events, 1));
         assert!(second_min_balance == second_expected_min_balance, 13);
         assert!(second_per_request_fee == second_expected_per_request, 14);
-        assert!(second_price_event == u128::from_u64(second_price), 15);
-        assert!(second_limit_event == u128::from_u64(second_limit), 16);
-        assert!(second_verification_event == u128::from_u64(second_verification), 17);
+        assert!(second_price_event == u64_to_u128(second_price), 15);
+        assert!(second_limit_event == u64_to_u128(second_limit), 16);
+        assert!(second_verification_event == u64_to_u128(second_verification), 17);
         let (second_sender, second_consumer_count, second_pending) =
             main_v2::minimum_balance_event_context(vector::borrow(&events, 1));
         assert!(option::is_some(&second_sender), 22);
@@ -2231,7 +2274,7 @@ module lottery::lottery_tests {
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
         main_v2::init(&lottery_signer);
 
-        let price = u128::max_value() / 2u128;
+        let price = U128_MAX / 2u128;
         main_v2::configure_vrf_gas_for_test(
             &lottery_signer,
             price,
