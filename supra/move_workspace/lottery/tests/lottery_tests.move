@@ -36,6 +36,7 @@ module lottery::lottery_tests {
     const ALREADY_INITIALIZED_ERROR: u64 = 2;
     const NO_TICKETS_ERROR: u64 = 3;
     const GAS_MATH_OVERFLOW_ERROR: u64 = 28;
+    const MIN_BALANCE_OVERFLOW_ERROR: u64 = 15;
     const INVALID_GAS_CONFIG_ERROR: u64 = 29;
     const INVALID_AGGREGATOR_ERROR: u64 = 30;
     const INVALID_CONSUMER_ERROR: u64 = 31;
@@ -1761,7 +1762,6 @@ module lottery::lottery_tests {
 
         configure_gas_default();
         whitelist_callback_sender();
-        whitelist_consumer(LOTTERY_ADDR);
 
         let empty_tickets = vector::empty<address>();
         main_v2::set_draw_state_for_test(true, empty_tickets);
@@ -1870,6 +1870,7 @@ module lottery::lottery_tests {
         main_v2::record_request_for_test(nonce, PLAYER1);
 
         let message = main_v2::request_payload_message_for_test(nonce, client_seed, PLAYER1);
+        main_v2::set_draw_state_for_test(true, vector[PLAYER1]);
         let verified_nums = vector[123u256];
 
         main_v2::handle_verified_random_for_test(
@@ -2270,20 +2271,25 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    #[expected_failure(location = lottery::main_v2, abort_code = GAS_MATH_OVERFLOW_ERROR)]
+    #[expected_failure(location = lottery::main_v2, abort_code = MIN_BALANCE_OVERFLOW_ERROR)]
     fun set_minimum_balance_rejects_overflowing_window_product() {
         setup_accounts_base();
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
         main_v2::init(&lottery_signer);
 
-        let price = U128_MAX / 2u128;
+        let window = u128_to_u64(MIN_REQUEST_WINDOW);
+        let base = U64_MAX / window;
+        let per_request_target = u64_to_u128(base) + 1u128;
+        let max_gas_price = 1u128;
+        let verification_value = 1u128;
+        let max_gas_limit = per_request_target - verification_value;
         main_v2::configure_vrf_gas_for_test(
             &lottery_signer,
-            price,
+            max_gas_price,
+            max_gas_limit,
             1u128,
             1u128,
-            1u128,
-            1u128,
+            verification_value,
         );
 
         main_v2::set_minimum_balance_for_test(&lottery_signer);

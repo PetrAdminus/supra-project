@@ -1511,26 +1511,30 @@ module lottery::main_v2 {
     fun is_consumer_whitelisted(consumers: &vector<address>, target: address): bool {
         let i = 0;
         let len = vector::length(consumers);
+        let found = false;
         while (i < len) {
             if (*vector::borrow(consumers, i) == target) {
-                return true;
+                found = true;
+                break;
             };
             i = i + 1;
         };
-        false
+        found
     }
 
     fun remove_consumer_from_list(consumers: &mut vector<address>, target: address): bool {
         let len = vector::length(consumers);
         let i = 0;
+        let removed = false;
         while (i < len) {
             if (*vector::borrow(consumers, i) == target) {
                 vector::swap_remove(consumers, i);
-                return true;
+                removed = true;
+                break;
             };
             i = i + 1;
         };
-        false
+        removed
     }
 
     fun clear_pending_request_state(lottery: &mut LotteryData) {
@@ -1652,19 +1656,20 @@ module lottery::main_v2 {
 
     fun vector_equals(lhs: &vector<u8>, rhs: &vector<u8>): bool {
         if (vector::length(lhs) != vector::length(rhs)) {
-            return false;
-        };
-
-        let i = 0;
-        let len = vector::length(lhs);
-        while (i < len) {
-            if (*vector::borrow(lhs, i) != *vector::borrow(rhs, i)) {
-                return false;
+            false
+        } else {
+            let len = vector::length(lhs);
+            let i = 0;
+            let equal = true;
+            while (i < len) {
+                if (*vector::borrow(lhs, i) != *vector::borrow(rhs, i)) {
+                    equal = false;
+                    break;
+                };
+                i = i + 1;
             };
-            i = i + 1;
-        };
-
-        true
+            equal
+        }
     }
 
     fun first_u64_from_bytes(bytes: &vector<u8>): u64 {
