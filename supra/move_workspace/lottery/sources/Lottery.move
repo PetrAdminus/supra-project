@@ -949,55 +949,94 @@ module lottery::main_v2 {
     public fun whitelist_status_fields(
         status: &WhitelistStatus
     ): (option::Option<address>, vector<address>) {
-        let consumers = vector::empty<address>();
-        let i = 0;
-        let len = vector::length(&status.consumers);
-        while (i < len) {
-            let consumer = *vector::borrow(&status.consumers, i);
-            vector::push_back(&mut consumers, consumer);
-            i = i + 1;
-        };
-        (status.aggregator, consumers)
+        (status.aggregator, vector::copy(&status.consumers))
     }
 
     #[test_only]
-    public fun client_whitelist_snapshot_fields(
+    struct ClientWhitelistSnapshotView has copy, drop {
+        max_gas_price: u128,
+        max_gas_limit: u128,
+        min_balance_limit: u128,
+    }
+
+    #[test_only]
+    public fun client_whitelist_snapshot_view_fields(
+        view: &ClientWhitelistSnapshotView
+    ): (u128, u128, u128) {
+        (
+            view.max_gas_price,
+            view.max_gas_limit,
+            view.min_balance_limit,
+        )
+    }
+
+    #[test_only]
+    struct ConsumerWhitelistSnapshotView has copy, drop {
+        callback_gas_price: u128,
+        callback_gas_limit: u128,
+    }
+
+    #[test_only]
+    public fun consumer_whitelist_snapshot_view_fields(
+        view: &ConsumerWhitelistSnapshotView
+    ): (u128, u128) {
+        (view.callback_gas_price, view.callback_gas_limit)
+    }
+
+    #[test_only]
+    struct VrfRequestConfigView has copy, drop {
+        rng_count: u8,
+        client_seed: u64,
+    }
+
+    #[test_only]
+    public fun vrf_request_config_view_fields(
+        view: &VrfRequestConfigView
+    ): (u8, u64) {
+        (view.rng_count, view.client_seed)
+    }
+
+    #[test_only]
+    public fun client_whitelist_snapshot_view(
         snapshot_opt: &option::Option<ClientWhitelistSnapshot>
-    ): option::Option<(u128, u128, u128)> {
+    ): option::Option<ClientWhitelistSnapshotView> {
         if (option::is_some(snapshot_opt)) {
             let snapshot = option::borrow(snapshot_opt);
-            option::some((
-                snapshot.max_gas_price,
-                snapshot.max_gas_limit,
-                snapshot.min_balance_limit,
-            ))
+            option::some(ClientWhitelistSnapshotView {
+                max_gas_price: snapshot.max_gas_price,
+                max_gas_limit: snapshot.max_gas_limit,
+                min_balance_limit: snapshot.min_balance_limit,
+            })
         } else {
             option::none()
         }
     }
 
     #[test_only]
-    public fun consumer_whitelist_snapshot_fields(
+    public fun consumer_whitelist_snapshot_view(
         snapshot_opt: &option::Option<ConsumerWhitelistSnapshot>
-    ): option::Option<(u128, u128)> {
+    ): option::Option<ConsumerWhitelistSnapshotView> {
         if (option::is_some(snapshot_opt)) {
             let snapshot = option::borrow(snapshot_opt);
-            option::some((
-                snapshot.callback_gas_price,
-                snapshot.callback_gas_limit,
-            ))
+            option::some(ConsumerWhitelistSnapshotView {
+                callback_gas_price: snapshot.callback_gas_price,
+                callback_gas_limit: snapshot.callback_gas_limit,
+            })
         } else {
             option::none()
         }
     }
 
     #[test_only]
-    public fun vrf_request_config_fields(
+    public fun vrf_request_config_view(
         config_opt: &option::Option<VrfRequestConfig>
-    ): option::Option<(u8, u64)> {
+    ): option::Option<VrfRequestConfigView> {
         if (option::is_some(config_opt)) {
             let config = option::borrow(config_opt);
-            option::some((config.rng_count, config.client_seed))
+            option::some(VrfRequestConfigView {
+                rng_count: config.rng_count,
+                client_seed: config.client_seed,
+            })
         } else {
             option::none()
         }

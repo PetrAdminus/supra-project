@@ -389,10 +389,11 @@ module lottery::lottery_tests {
 
         let snapshot_opt = main_v2::get_client_whitelist_snapshot();
         assert!(option::is_some(&snapshot_opt), 204);
-        let snapshot_fields_opt = main_v2::client_whitelist_snapshot_fields(&snapshot_opt);
-        assert!(option::is_some(&snapshot_fields_opt), 205);
-        let snapshot_fields = option::borrow(&snapshot_fields_opt);
-        let (snapshot_price, snapshot_limit, snapshot_min) = *snapshot_fields;
+        let snapshot_view_opt = main_v2::client_whitelist_snapshot_view(&snapshot_opt);
+        assert!(option::is_some(&snapshot_view_opt), 205);
+        let snapshot_view_ref = option::borrow(&snapshot_view_opt);
+        let (snapshot_price, snapshot_limit, snapshot_min) =
+            main_v2::client_whitelist_snapshot_view_fields(snapshot_view_ref);
         assert!(snapshot_price == MAX_GAS_PRICE, 206);
         assert!(snapshot_limit == MAX_GAS_LIMIT, 207);
         assert!(snapshot_min == min_balance_limit, 208);
@@ -438,10 +439,11 @@ module lottery::lottery_tests {
 
         let snapshot_opt = main_v2::get_consumer_whitelist_snapshot();
         assert!(option::is_some(&snapshot_opt), 213);
-        let snapshot_fields_opt = main_v2::consumer_whitelist_snapshot_fields(&snapshot_opt);
-        assert!(option::is_some(&snapshot_fields_opt), 214);
-        let snapshot_fields = option::borrow(&snapshot_fields_opt);
-        let (snapshot_price, snapshot_limit) = *snapshot_fields;
+        let snapshot_view_opt = main_v2::consumer_whitelist_snapshot_view(&snapshot_opt);
+        assert!(option::is_some(&snapshot_view_opt), 214);
+        let snapshot_view_ref = option::borrow(&snapshot_view_opt);
+        let (snapshot_price, snapshot_limit) =
+            main_v2::consumer_whitelist_snapshot_view_fields(snapshot_view_ref);
         assert!(snapshot_price == CALLBACK_GAS_PRICE, 215);
         assert!(snapshot_limit == CALLBACK_GAS_LIMIT, 216);
     }
@@ -533,10 +535,10 @@ module lottery::lottery_tests {
 
         let config_opt = main_v2::get_vrf_request_config();
         assert!(option::is_some(&config_opt), 220);
-        let config_fields_opt = main_v2::vrf_request_config_fields(&config_opt);
-        assert!(option::is_some(&config_fields_opt), 221);
-        let config_fields = option::borrow(&config_fields_opt);
-        let (rng_count, client_seed) = *config_fields;
+        let config_view_opt = main_v2::vrf_request_config_view(&config_opt);
+        assert!(option::is_some(&config_view_opt), 221);
+        let config_view_ref = option::borrow(&config_view_opt);
+        let (rng_count, client_seed) = main_v2::vrf_request_config_view_fields(config_view_ref);
         assert!(rng_count == 1u8, 222);
         assert!(client_seed == new_seed, 223);
     }
