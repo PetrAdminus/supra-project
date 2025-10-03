@@ -1,35 +1,30 @@
-# Current dVRF v2 Integration Snapshot
+# Исторический снимок интеграции dVRF v2
 
-## Entry Points
-- `manual_draw` triggers `request_draw` which in turn calls `supra_vrf::rng_request`.
-- `simple_draw` remains purely deterministic using timestamp (offline fallback).
-- `on_random_received` validates nonce, empties pending flag, extracts random winner, emits `WinnerSelected` event.
+> ⚠️ Документ сохранён в репозитории как историческая справка по старой реализации dVRF v2. Текущий код лотереи использует dVRF 3.0 и значительно расширен: whitelisting агрегатора/клиентов, проверка хеша полезной нагрузки, уникальные `client_seed`, учёт параметров газа и снапшоты конфигурации. Для актуальной архитектуры и требований см. `docs/audit/lottery_vrf_audit_ru.md`, `docs/testnet_runbook.md` и соответствующие отчёты соответствия.
 
-## Stored State
-- `LotteryData.pending_request: option<u64>` tracks outstanding VRF requests.
-- `LotteryData.max_gas_fee: u64` is set via admin functions and reused for subscription settings.
-- `LotteryData.last_request_payload_hash: option<vector<u8>>` stores the sha3-256 hash of the VRF request envelope for downstream validation.
+## Ключевые особенности реализации v2 (на момент коммита 3009338)
+- `manual_draw` вызывал `request_draw`, который обращался к `supra_vrf::rng_request` без whitelisting и дополнительных проверок.
+- `simple_draw` оставался детерминированным резервным механизмом (по метке времени блока).
+- `on_random_received` лишь сверял `nonce`, сбрасывал `pending_request` и выбирал победителя.
 
-## Events
-- `DrawRequestedEvent { nonce }` emitted after requesting randomness.
-- `WinnerSelected { winner, prize }` emitted both for simple and VRF flows.
-- Admin/operational events: `SubscriptionConfiguredEvent`, `MinimumBalanceUpdatedEvent`, `FundsWithdrawnEvent`, `TicketBought`.
+## Хранимое состояние v2
+- `LotteryData.pending_request: option<u64>` отслеживал ожидание VRF-ответа.
+- `LotteryData.max_gas_fee: u64` задавался админом и переиспользовался для подписки, без учёта параметров VRF 3.0.
+- `LotteryData.last_request_payload_hash: option<vector<u8>>` сохранял sha3-256 хеш конверта запроса для простейшей проверки.
 
-## View Functions
-- `get_lottery_status` aggregates ticket count, draw scheduling flag, pending VRF request flag, jackpot amount, and RNG counters.
-- `get_vrf_gas_config` / `get_callback_gas_config` expose current gas parameters.
-- `get_rng_counters` returns total VRF request and response counts.
+## События v2
+- `DrawRequestedEvent { nonce }` публиковался после запроса случайности.
+- `WinnerSelected { winner, prize }` срабатывал как для VRF, так и для детерминированного розыгрыша.
+- Административные события: `SubscriptionConfiguredEvent`, `MinimumBalanceUpdatedEvent`, `FundsWithdrawnEvent`, `TicketBought`.
 
-## Helper Functions
-- `set_pending_request_for_test` (test-only) manipulates pending state to emulate VRF callbacks.
-- `withdraw_funds_for_test`, `set_minimum_balance_for_test` avoid calling native deposit functions.
+## Вью-функции v2
+- `get_lottery_status` возвращал количество билетов, флаг розыгрыша, наличие pending-запроса, джекпот и счётчики VRF.
+- `get_vrf_gas_config` / `get_callback_gas_config` предоставляли текущие параметры газа, но без проверки whitelisting.
+- `get_rng_counters` показывал количество VRF-запросов и ответов.
 
-## Tests
-- `simple_draw_rejects_when_pending_request` ensures fallback is blocked if VRF is pending.
-- Additional tests cover admin guards, event emission, view functions, and pending-state toggling.
+## Тесты v2
+- `simple_draw_rejects_when_pending_request` подтверждал блокировку резервного розыгрыша при ожидающем VRF.
+- Дополнительные тесты покрывали базовые админские ограничения и события, но не включали whitelisting и негативные сценарии VRF 3.0.
 
-## TODO for v3 Migration
-- Any new parameters or limits required by `rng_request` need to be stored (e.g., gas limit, callback mode).
-- Update events/tests accordingly.
-
-This document reflects the code as of commit 3009338.
+## Примечание по миграции
+В ветке `Test` реализована полная миграция на Supra dVRF 3.0. Старые TODO по хранению параметров газа, whitelisting и обновлению тестов закрыты. Этот файл следует использовать только для сравнения с текущим состоянием и понимания объёма изменений.

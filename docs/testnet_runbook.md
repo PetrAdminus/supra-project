@@ -179,6 +179,53 @@
      --args u128:<CALLBACK_GAS_PRICE> u128:<CALLBACK_GAS_LIMIT>
    ```
 
+### 3.3 Whitelisting агрегатора и потребителей
+> Основано на [Supra VRF Subscription FAQ](https://raw.githubusercontent.com/Supra-Labs/documentation/main/dvrf/build-with-supra-dvrf/vrf-subscription-model.md) и рекомендациях Supra о контроле доступа.
+
+1. **Whitelisting агрегатора колбэков** — выполняется только администратором лотереи (`@lottery`) после успешного депозита и настройки газа. Команда запрещена, пока активен незавершённый VRF-запрос (`E_REQUEST_STILL_PENDING`).
+   ```bash
+   supra move run \
+     --config /supra/configs/testnet.yaml \
+     --function lottery::main_v2::whitelist_callback_sender \
+     --args address:<AGGREGATOR_ADDR>
+   ```
+   - Зафиксируйте tx hash и событие `AggregatorWhitelistedEvent`.
+   - При необходимости сменить агрегатор сначала убедитесь, что `pending_request` пуст (проверьте `lottery::main_v2::get_whitelist_status`).
+   - Для временного отключения агрегатора используйте `lottery::main_v2::revoke_callback_sender`, но только когда нет активного запроса.
+
+2. **Whitelisting потребителей VRF** — Supra VRF Subscription FAQ требует явно разрешать каждому контракту отправку запросов.
+   ```bash
+   supra move run \
+     --config /supra/configs/testnet.yaml \
+     --function lottery::main_v2::whitelist_consumer \
+     --args address:<CONSUMER_ADDR>
+   ```
+   - Повторите для всех вспомогательных контрактов (операторских или будущих интеграций).
+   - Проверяйте наличие адреса в списке через `lottery::main_v2::get_whitelist_status`.
+
+3. **Удаление потребителя** при отзыве доступа или компрометации ключа:
+   ```bash
+   supra move run \
+     --config /supra/configs/testnet.yaml \
+     --function lottery::main_v2::remove_consumer \
+     --args address:<CONSUMER_ADDR>
+   ```
+   - Команда аварийно завершится `E_CONSUMER_NOT_WHITELISTED`, если адрес отсутствует в whitelist.
+   - После ревока проверяйте событие `ConsumerRemovedEvent`.
+
+4. **Контроль whitelisting через события**. Для аудита используйте CLI:
+   ```bash
+   supra move event --config /supra/configs/testnet.yaml \
+     --address <LOTTERY_ADDR> \
+     --event-type lottery::main_v2::AggregatorWhitelistedEvent
+
+   supra move event --config /supra/configs/testnet.yaml \
+     --address <LOTTERY_ADDR> \
+     --event-type lottery::main_v2::ConsumerWhitelistedEvent
+   ```
+   Сохраняйте timestamp, tx hash и payload событий в runbook журналах.
+
+
 ## 4. Настройка параметров VRF-запроса
 ```bash
 supra move run --config /supra/configs/testnet.yaml \
@@ -258,6 +305,19 @@ supra move run --config /supra/configs/testnet.yaml \
 1. **Зафиксировать состояние**
    - Снять снапшоты `treasury_v1::treasury_balance`, `total_supply`, `get_config` и `account_extended_status` для ключевых адресов.
    - Экспортировать список билетов и текущий `jackpot_amount` через view-функции `lottery::main_v2`.
+
+## 10. Автоматизация Supra Move тестов
+- GitHub Actions workflow [.github/workflows/supra-move-tests.yml](../.github/workflows/supra-move-tests.yml) автоматически выполняет `supra move test -p /supra/move_workspace` при каждом push и pull request в ветки `Test` и `master`. Workflow запускает официальный Docker-образ Supra CLI (`validator-node:v9.0.12`) и использует тома `supra/move_workspace` и `supra/configs` из репозитория.
+- Следите за статусом во вкладке **Actions** GitHub: успешное выполнение гарантирует совместимость изменений с Supra Move SDK; при падении проверяйте логи шага «Run Supra Move tests».
+- Для локальной отладки используйте команду, идентичную CI:
+  ```bash
+  docker run --rm \
+    -v $(pwd)/supra/move_workspace:/supra/move_workspace \
+    -v $(pwd)/supra/configs:/supra/configs \
+    asia-docker.pkg.dev/supra-devnet-misc/supra-testnet/validator-node:v9.0.12 \
+    /supra/supra move test -p /supra/move_workspace
+  ```
+- Документируйте запуск в журнале runbook (дата, commit, ссылка на workflow), чтобы соблюдать рекомендации Supra VRF Subscription FAQ по регулярной валидации клиента.
 2. **Заморозить операции**
    - Временно заблокировать покупку билетов через административную настройку фронтенда/скриптов.
    - По необходимости заморозить primary store игроков `treasury_v1::set_store_frozen(account, true)`.

@@ -3,14 +3,14 @@
 ## Русский
 
 ### Обзор
-Supra Lottery — пакет смарт-контрактов на Move для блокчейна Supra. Он реализует простую лотерею с интеграцией dVRF v2; в репозитории находятся основной модуль, расширенные тесты и Docker-инфраструктура для оффлайн-работы с Supra CLI.
+Supra Lottery — пакет смарт-контрактов на Move для блокчейна Supra. Он реализует лотерею с ончейн-интеграцией Supra dVRF 3.0, whitelisting агрегатора и потребителей, а также защитой колбэка по требованиям Supra; в репозитории находятся основной модуль, тестовая батарея и Docker-инфраструктура для оффлайн-работы с Supra CLI.
 
 ### Технологический стек
 - Язык Move под Supra VM
-- Клиент Supra dVRF v2 (модули supra_vrf, deposit)
+- Клиент Supra dVRF v3 (модули `supra_vrf`, `deposit` и интеграция `lottery::main_v2`)
 - Fungible Asset-токен, развёрнутый через обёртку `lottery::treasury_v1`
 - Среда Supra CLI в Docker (docker-compose.yml)
-- Развёрнутые Move-юнит-тесты в supra/move_workspace/lottery/tests
+- Расширенные Move-юнит-тесты, покрывающие whitelisting, обработку VRF и негативные сценарии (`supra/move_workspace/lottery/tests`)
 
 ### Быстрый старт
 1. Запустите Docker Desktop (или совместимый рантайм).
@@ -21,10 +21,14 @@ Supra Lottery — пакет смарт-контрактов на Move для б
 > Ключи и параметры из supra/configs предназначены только для локальной разработки. Перед публикацией замените их собственными значениями.
 
 ### Запуск Move-тестов
-`
-docker compose run --rm \n  --entrypoint bash supra_cli \n  -lc "/supra/supra move tool test --package-dir /supra/move_workspace/lottery --skip-fetch-latest-git-deps"
-`
-Команда собирает пакет, прогоняет 13 Move-юнит-тестов и изолирует зависимости внутри контейнера.
+```
+docker compose run --rm \
+  --entrypoint bash supra_cli \
+  -lc "/supra/supra move tool test --package-dir /supra/move_workspace/lottery --skip-fetch-latest-git-deps"
+```
+Команда собирает пакет и прогоняет полный набор Move-юнит-тестов (позитивные и негативные сценарии VRF, whitelisting, переполнения счётчиков) внутри контейнера.
+
+> GitHub Actions автоматически запускает `supra move test -p /supra/move_workspace` через workflow [.github/workflows/supra-move-tests.yml](.github/workflows/supra-move-tests.yml) для всех пушей и pull request в ветки `Test` и `master`. Результат тестов отображается во вкладке Actions и служит регрессионной проверкой совместимости с Supra Move SDK.
 
 ### Структура проекта
 - docker-compose.yml — описание контейнера Supra CLI
@@ -63,7 +67,8 @@ docker compose run --rm \n  --entrypoint bash supra_cli \n  -lc "/supra/supra mo
 - Синхронизируем `Move.toml`, `README.md` и `docs/dVRF_v3_checklist.md` при каждом бумпе версии.
 - Перед релизом прогоняем `supra move tool test` и фиксируем итоги в changelog (раздел README или docs).
 
-### Подготовка к dVRF v3
+### Эксплуатация dVRF v3
+Этот раздел агрегирует ончейн-функции и операционные регламенты, необходимые для сопровождения действующей подписки Supra dVRF 3.0.
 ### Запуск на Supra testnet
 - RPC testnet: `https://rpc-testnet.supra.com` (chain id 6).
 - Подробный runbook: см. `docs/testnet_runbook.md`.
@@ -73,20 +78,21 @@ docker compose run --rm \n  --entrypoint bash supra_cli \n  -lc "/supra/supra mo
 - В разделе 8 runbook-а есть чеклист деплоя FA + VRF, а в разделе 9 — план отката на случай инцидентов.
 - `record_client_whitelist_snapshot` фиксирует maxGasPrice/maxGasLimit и снапшот `minBalanceLimit`; данные попадают в событие `ClientWhitelistRecordedEvent`.
 - `configure_vrf_request` задаёт желаемую мощность запроса (`rng_count`, `client_seed`) и генерирует событие `VrfRequestConfigUpdatedEvent` для аудита.
-- `record_consumer_whitelist_snapshot` отмечает `callbackGasPrice`/`callbackGasLimit` для контракта; факт логируется событием `ContractWhitelistRecordedEvent`.
+- `record_consumer_whitelist_snapshot` отмечает `callbackGasPrice`/`callbackGasLimit` для контракта; факт логируется событием `ConsumerWhitelistSnapshotRecordedEvent`.
 - Текущий статус узнаём через `get_whitelist_status`, а снапшот минимального баланса доступен в `get_min_balance_limit_snapshot`.
+- Стоимость билета можно получить через view-функцию `lottery::main_v2::get_ticket_price()`, что упрощает синхронизацию фронтенда.
 
 ### Дорожная карта
-- Следить за релизом Supra dVRF v3, изучить обновлённый API и подготовить план миграции (https://docs.supra.com/dvrf).
-- Обновить лотерейный модуль под dVRF v3, адаптировать события/тесты и задокументировать fallback для простых розыгрышей.
-- Собрать интерактивный фронтенд (React + TypeScript + Supra SDK + StarKey) с покупкой билетов, запуском розыгрыша и историей событий.
-- Подготовить REST/CLI-скрипты и демонстрационные пайплайны вокруг фронтенда и CLI-инструментов.
-- Задокументировать развёртывание/эксплуатацию (эндпоинты devnet/testnet, переменные окружения, хостинг, runbook).
+- Отслеживать обновления Supra dVRF 3.x и при изменении API оперативно обновлять клиент и тестовый стенд.
+- Интегрировать фронтенд (React + TypeScript + Supra SDK + StarKey) с новыми view-функциями (`get_ticket_price`, `get_whitelist_status`).
+- Подготовить REST/CLI-скрипты и пайплайны деплоя, используя `docs/testnet_runbook.md` как основу для автоматизации.
+- Расширить мониторинг: парсинг событий whitelisting и конфигурации газа, алерты по минимальному депозиту, проверки CI.
+- Разработать стратегию архивации исторических розыгрышей и аналитики выплат (графики, выгрузки в BI).
 
 ### Текущий статус
-- Работаем в оффлайн-режиме на simple_draw, пока не завершена миграция на Supra dVRF v3.
-- Регистрация VRF и ончейн-колбэки временно отключены в тестах и демонстрациях.
-- Сначала обновляем контракт и фронтенд, затем включим живую генерацию случайных чисел.
+- Подписка Supra dVRF 3.0 настроена с whitelisting агрегатора и потребителей, а события фиксируют актуальную конфигурацию газа и nonce.
+- Контракт проверяет хеш полезной нагрузки, `rng_count`, инициатора и параметры газа перед обработкой колбэка.
+- Move-тесты покрывают сценарии переполнения, неверного whitelisting и повторной очистки состояния, обеспечивая регрессионный контроль интеграции.
 
 ### Полезные материалы
 - Документация для разработчиков Supra: https://docs.supra.com/move/getting-started
