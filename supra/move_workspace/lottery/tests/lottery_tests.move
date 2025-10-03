@@ -352,16 +352,16 @@ module lottery::lottery_tests {
 
         let snapshot_opt = main_v2::get_client_whitelist_snapshot();
         assert!(option::is_some(&snapshot_opt), 204);
-        let mut snapshot_opt_mut = snapshot_opt;
-        let snapshot = option::extract(&mut snapshot_opt_mut);
+        let snapshot_ref = option::borrow(&snapshot_opt);
+        let snapshot = *snapshot_ref;
         assert!(snapshot.max_gas_price == MAX_GAS_PRICE, 205);
         assert!(snapshot.max_gas_limit == MAX_GAS_LIMIT, 206);
         assert!(snapshot.min_balance_limit == min_balance_limit, 207);
 
         let min_snapshot_opt = main_v2::get_min_balance_limit_snapshot();
         assert!(option::is_some(&min_snapshot_opt), 208);
-        let mut min_snapshot_opt_mut = min_snapshot_opt;
-        let min_snapshot = option::extract(&mut min_snapshot_opt_mut);
+        let min_snapshot_ref = option::borrow(&min_snapshot_opt);
+        let min_snapshot = *min_snapshot_ref;
         assert!(min_snapshot == min_balance_limit, 209);
     }
 
@@ -399,8 +399,8 @@ module lottery::lottery_tests {
 
         let snapshot_opt = main_v2::get_consumer_whitelist_snapshot();
         assert!(option::is_some(&snapshot_opt), 213);
-        let mut snapshot_opt_mut = snapshot_opt;
-        let snapshot = option::extract(&mut snapshot_opt_mut);
+        let snapshot_ref = option::borrow(&snapshot_opt);
+        let snapshot = *snapshot_ref;
         assert!(snapshot.callback_gas_price == CALLBACK_GAS_PRICE, 214);
         assert!(snapshot.callback_gas_limit == CALLBACK_GAS_LIMIT, 215);
     }
@@ -492,8 +492,8 @@ module lottery::lottery_tests {
 
         let config_opt = main_v2::get_vrf_request_config();
         assert!(option::is_some(&config_opt), 220);
-        let mut config_opt_mut = config_opt;
-        let config = option::extract(&mut config_opt_mut);
+        let config_ref = option::borrow(&config_opt);
+        let config = *config_ref;
         assert!(config.rng_count == 1u8, 221);
         assert!(config.client_seed == new_seed, 222);
     }
@@ -907,9 +907,7 @@ module lottery::lottery_tests {
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
         main_v2::init(&lottery_signer);
 
-        let mut tickets = vector::empty<address>();
-        vector::push_back(&mut tickets, PLAYER1);
-        vector::push_back(&mut tickets, PLAYER2);
+        let tickets = vector[PLAYER1, PLAYER2];
 
         main_v2::set_draw_state_for_test(true, tickets);
 
@@ -1184,7 +1182,7 @@ module lottery::lottery_tests {
             option::some(LOTTERY_ADDR)
         );
 
-        let mut tampered_message = main_v2::request_payload_message_for_test(nonce, client_seed, LOTTERY_ADDR);
+        let tampered_message = main_v2::request_payload_message_for_test(nonce, client_seed, LOTTERY_ADDR);
         let byte_len = vector::length(&tampered_message);
         if (byte_len > 0) {
             let last_index = byte_len - 1;
@@ -1486,8 +1484,7 @@ module lottery::lottery_tests {
             option::some(LOTTERY_ADDR)
         );
 
-        let mut tickets = vector::empty<address>();
-        vector::push_back(&mut tickets, PLAYER1);
+        let tickets = vector[PLAYER1];
         main_v2::set_draw_state_for_test(false, tickets);
 
         let message = main_v2::request_payload_message_for_test(nonce, client_seed, LOTTERY_ADDR);

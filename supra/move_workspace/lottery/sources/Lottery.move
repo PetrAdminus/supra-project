@@ -251,8 +251,7 @@ module lottery::main_v2 {
         assert!(treasury_v1::is_initialized(), E_TREASURY_NOT_INITIALIZED);
 
         // Store lottery data at the lottery contract address
-        let mut default_consumers = vector::empty<address>();
-        vector::push_back(&mut default_consumers, @lottery);
+        let default_consumers = vector[@lottery];
         move_to(sender, LotteryData {
             tickets: vector::empty(),
             jackpot_amount: 0,
@@ -1206,8 +1205,8 @@ module lottery::main_v2 {
             vector::empty<address>()
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
-            let mut tickets = vector::empty<address>();
-            let mut i = 0;
+            let tickets = vector::empty<address>();
+            let i = 0;
             let len = vector::length(&lottery.tickets);
             while (i < len) {
                 let ticket = *vector::borrow(&lottery.tickets, i);
@@ -1227,9 +1226,9 @@ module lottery::main_v2 {
             }
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
-            let mut consumers = vector::empty<address>();
+            let consumers = vector::empty<address>();
             let len = vector::length(&lottery.whitelisted_consumers);
-            let mut i = 0;
+            let i = 0;
             while (i < len) {
                 let consumer = *vector::borrow(&lottery.whitelisted_consumers, i);
                 vector::push_back(&mut consumers, consumer);
@@ -1327,7 +1326,7 @@ module lottery::main_v2 {
     }
 
     fun is_consumer_whitelisted(consumers: &vector<address>, target: address): bool {
-        let mut i = 0;
+        let i = 0;
         let len = vector::length(consumers);
         while (i < len) {
             if (*vector::borrow(consumers, i) == target) {
@@ -1340,7 +1339,7 @@ module lottery::main_v2 {
 
     fun remove_consumer_from_list(consumers: &mut vector<address>, target: address): bool {
         let len = vector::length(consumers);
-        let mut i = 0;
+        let i = 0;
         while (i < len) {
             if (*vector::borrow(consumers, i) == target) {
                 vector::swap_remove(consumers, i);
@@ -1441,7 +1440,7 @@ module lottery::main_v2 {
             return false;
         };
 
-        let mut i = 0;
+        let i = 0;
         let len = vector::length(lhs);
         while (i < len) {
             if (*vector::borrow(lhs, i) != *vector::borrow(rhs, i)) {
@@ -1456,8 +1455,8 @@ module lottery::main_v2 {
     fun first_u64_from_bytes(bytes: &vector<u8>): u64 {
         assert!(vector::length(bytes) >= 8, E_RANDOM_BYTES_TOO_SHORT);
 
-        let mut value = 0;
-        let mut i = 8;
+        let value = 0;
+        let i = 8;
         while (i > 0) {
             i = i - 1;
             let byte = *vector::borrow(bytes, i);
