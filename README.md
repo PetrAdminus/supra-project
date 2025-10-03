@@ -26,9 +26,7 @@ docker compose run --rm \
   --entrypoint bash supra_cli \
   -lc "/supra/supra move tool test --package-dir /supra/move_workspace/lottery --skip-fetch-latest-git-deps"
 ```
-Команда собирает пакет и прогоняет полный набор Move-юнит-тестов (позитивные и негативные сценарии VRF, whitelisting, переполнения счётчиков) внутри контейнера.
-
-> GitHub Actions автоматически запускает `supra move test -p /supra/move_workspace` через workflow [.github/workflows/supra-move-tests.yml](.github/workflows/supra-move-tests.yml) для всех пушей и pull request в ветки `Test` и `master`. Результат тестов отображается во вкладке Actions и служит регрессионной проверкой совместимости с Supra Move SDK.
+Команда собирает пакет и прогоняет полный набор Move-юнит-тестов (позитивные и негативные сценарии VRF, whitelisting, переполнения счётчиков) внутри контейнера. На данный момент тесты запускаются вручную перед каждым релизом; автоматический CI отключён по требованию аудитора.
 
 ### Структура проекта
 - docker-compose.yml — описание контейнера Supra CLI

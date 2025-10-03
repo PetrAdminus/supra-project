@@ -35,7 +35,7 @@
 | Риск | Статус | Рекомендация |
 | --- | --- | --- |
 | Недостаточное документирование whitelisting | ✅ Выполнено | Runbook содержит пошаговую процедуру whitelisting агрегатора и потребителей с отсылками к Supra VRF Subscription FAQ.【F:docs/testnet_runbook.md†L1-L120】 |
-| Отсутствие автоматизированного прогона Supra Move CLI | ✅ Выполнено | GitHub Actions workflow `supra-move-tests.yml` автоматически запускает `supra move test -p supra/move_workspace` при push/PR в ветки Test и master.【F:.github/workflows/supra-move-tests.yml†L1-L33】 |
+| Отсутствие автоматизированного прогона Supra Move CLI | ⚠️ Контроль вручную | Автоматический workflow отключён; оператор перед релизами вручную запускает `docker compose run --rm --entrypoint bash supra_cli -lc "/supra/supra move tool test --package-dir /supra/move_workspace/lottery --skip-fetch-latest-git-deps"` и фиксирует результат в отчёте.【F:docs/testnet_runbook.md†L1-L200】 |
 
 ## 5. Итог
 Реализация `lottery::main_v2` соответствует требованиям Supra dVRF 3.0 по безопасности, whitelisting и экономике подписки. Рекомендуется закрепить процессы whitelisting и регрессионное тестирование в операционной документации, следуя руководствам Supra Docs и Supra Labs.

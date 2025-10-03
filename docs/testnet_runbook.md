@@ -307,19 +307,18 @@ supra move run --config /supra/configs/testnet.yaml \
    - Экспортировать список билетов и текущий `jackpot_amount` через view-функции `lottery::main_v2`.
 
 ## 10. Автоматизация Supra Move тестов
-- GitHub Actions workflow [.github/workflows/supra-move-tests.yml](../.github/workflows/supra-move-tests.yml) автоматически выполняет `supra move test -p /supra/move_workspace` при каждом push и pull request в ветки `Test` и `master`. Workflow запускает официальный Docker-образ Supra CLI (`validator-node:v9.0.12`) и использует тома `supra/move_workspace` и `supra/configs` из репозитория.
-- Следите за статусом во вкладке **Actions** GitHub: успешное выполнение гарантирует совместимость изменений с Supra Move SDK; при падении проверяйте логи шага «Run Supra Move tests».
-- Для локальной отладки используйте команду, идентичную CI:
+- Перед публикацией релиза вручную запустите `docker compose run --rm --entrypoint bash supra_cli -lc "/supra/supra move tool test --package-dir /supra/move_workspace/lottery --skip-fetch-latest-git-deps"` и зафиксируйте результат в отчёте. Автоматический GitHub Actions workflow отключён по договорённости — регрессионные проверки выполняются оператором вручную.
+- Для локальной отладки без docker compose используйте команду ниже (идентична основной, но запуск через `docker run`):
   ```bash
   docker run --rm \
     -e SUPRA_HOME=/supra/configs \
     -v $(pwd)/supra/move_workspace:/supra/move_workspace \
     -v $(pwd)/supra/configs:/supra/configs \
-    --entrypoint /supra/supra \
+    --entrypoint bash \
     asia-docker.pkg.dev/supra-devnet-misc/supra-testnet/validator-node:v9.0.12 \
-    move test -p /supra/move_workspace
+    -lc "/supra/supra move tool test --package-dir /supra/move_workspace/lottery --skip-fetch-latest-git-deps"
   ```
-- Документируйте запуск в журнале runbook (дата, commit, ссылка на workflow), чтобы соблюдать рекомендации Supra VRF Subscription FAQ по регулярной валидации клиента.
+- Ведите журнал запусков (дата, commit, конфигурация), чтобы демонстрировать регулярную валидацию клиента Supra VRF согласно рекомендациям Supra VRF Subscription FAQ.
 2. **Заморозить операции**
    - Временно заблокировать покупку билетов через административную настройку фронтенда/скриптов.
    - По необходимости заморозить primary store игроков `treasury_v1::set_store_frozen(account, true)`.
