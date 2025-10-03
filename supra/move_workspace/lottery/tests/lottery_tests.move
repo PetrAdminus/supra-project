@@ -290,14 +290,14 @@ module lottery::lottery_tests {
         assert!(aggregator_addr == VRF_AGGREGATOR, 55);
 
         let status = main_v2::get_whitelist_status();
-        let (aggregator_opt, consumers) = main_v2::whitelist_status_fields(&status);
+        let aggregator_opt = main_v2::whitelist_status_aggregator(&status);
         assert!(option::is_some(&aggregator_opt), 223);
         let aggregator = *option::borrow(&aggregator_opt);
         assert!(aggregator == VRF_AGGREGATOR, 224);
-        let consumer_count = vector::length(&consumers);
+        let consumer_count = main_v2::whitelist_status_consumer_count(&status);
         assert!(consumer_count == 2, 225);
-        let first_consumer = *vector::borrow(&consumers, 0);
-        let second_consumer = *vector::borrow(&consumers, 1);
+        let first_consumer = main_v2::whitelist_status_consumer_at(&status, 0);
+        let second_consumer = main_v2::whitelist_status_consumer_at(&status, 1);
         assert!(first_consumer == LOTTERY_ADDR, 226);
         assert!(second_consumer == PLAYER1, 227);
     }

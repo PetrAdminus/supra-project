@@ -1,13 +1,15 @@
 // sources/Lottery.move
 module lottery::main_v2 {
     use std::string;
-    use std::bcs;
+    use 0x1::bcs;
     use std::option;
     use std::hash;
     use 0x1::timestamp;
     use 0x1::signer;
     use 0x1::vector;
     use 0x1::event;
+    use 0x1::u64;
+    use 0x1::u128;
     use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::supra_vrf;
     use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::deposit;
     use lottery::treasury_v1;
@@ -946,10 +948,18 @@ module lottery::main_v2 {
     }
 
     #[test_only]
-    public fun whitelist_status_fields(
-        status: &WhitelistStatus
-    ): (option::Option<address>, vector<address>) {
-        (status.aggregator, vector::copy(&status.consumers))
+    public fun whitelist_status_aggregator(status: &WhitelistStatus): option::Option<address> {
+        status.aggregator
+    }
+
+    #[test_only]
+    public fun whitelist_status_consumer_count(status: &WhitelistStatus): u64 {
+        vector::length(&status.consumers)
+    }
+
+    #[test_only]
+    public fun whitelist_status_consumer_at(status: &WhitelistStatus, index: u64): address {
+        *vector::borrow(&status.consumers, index)
     }
 
     #[test_only]
