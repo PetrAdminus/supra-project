@@ -312,10 +312,12 @@ supra move run --config /supra/configs/testnet.yaml \
 - Для локальной отладки используйте команду, идентичную CI:
   ```bash
   docker run --rm \
+    -e SUPRA_HOME=/supra/configs \
     -v $(pwd)/supra/move_workspace:/supra/move_workspace \
     -v $(pwd)/supra/configs:/supra/configs \
+    --entrypoint /supra/supra \
     asia-docker.pkg.dev/supra-devnet-misc/supra-testnet/validator-node:v9.0.12 \
-    /supra/supra move test -p /supra/move_workspace
+    move test -p /supra/move_workspace
   ```
 - Документируйте запуск в журнале runbook (дата, commit, ссылка на workflow), чтобы соблюдать рекомендации Supra VRF Subscription FAQ по регулярной валидации клиента.
 2. **Заморозить операции**
