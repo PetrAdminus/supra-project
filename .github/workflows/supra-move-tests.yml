@@ -18,14 +18,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Enable QEMU for ARM images
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/arm64
+
       - name: Pull Supra CLI image
-        run: docker pull asia-docker.pkg.dev/supra-devnet-misc/supra-testnet/validator-node:v9.0.12
+        run: docker pull --platform linux/arm64 asia-docker.pkg.dev/supra-devnet-misc/supra-testnet/validator-node:v9.0.12
 
       - name: Run Supra Move tests
         env:
           SUPRA_HOME: /supra/configs
         run: |
-          docker run --rm \
+          docker run --rm --platform linux/arm64 \
             -e SUPRA_HOME=/supra/configs \
             -v "${{ github.workspace }}/supra/configs:/supra/configs" \
             -v "${{ github.workspace }}/supra/move_workspace:/supra/move_workspace" \
