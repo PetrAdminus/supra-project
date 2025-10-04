@@ -1,0 +1,13 @@
+{
+  "round": 17,
+  "jackpotSupra": "1520.500",
+  "ticketsSold": 238,
+  "ticketPriceSupra": "5.000",
+  "nextDrawTime": "2025-09-27T18:00:00Z",
+  "vrf": {
+    "subscriptionId": "0x0123",
+    "requestPending": true,
+    "lastRequestTime": "2025-09-22T14:00:00Z",
+    "lastFulfillmentTime": null
+  }
+}
