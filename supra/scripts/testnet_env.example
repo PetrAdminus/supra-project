@@ -1,0 +1,63 @@
+# Пример переменных окружения для supra/scripts/testnet_migration.sh
+# Скопируйте этот файл в supra/scripts/testnet_env.local и отредактируйте значения
+# перед запуском: `cp supra/scripts/testnet_env.example supra/scripts/testnet_env.local`
+# Затем экспортируйте переменные: `set -a; source supra/scripts/testnet_env.local; set +a`
+
+# Имя профиля Supra CLI, созданного через `supra profile new`
+PROFILE=my_new_profile
+
+# Полный адрес контракта лотереи (обновите после публикации)
+LOTTERY_ADDR=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0
+
+# Публичный адрес администратора (совпадает с профилем)
+ADMIN_ADDR=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0
+
+# Адрес клиента депозита (по умолчанию = адрес контракта, но можно задать отдельно)
+CLIENT_ADDR=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0
+
+# Адрес модуля депозита Supra dVRF testnet (по состоянию на сентябрь 2025)
+DEPOSIT_ADDR=0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e
+
+# Лимиты газа для запроса dVRF
+MAX_GAS_PRICE=1000
+MAX_GAS_LIMIT=500000
+CALLBACK_GAS_PRICE=100
+CALLBACK_GAS_LIMIT=150000
+VERIFICATION_GAS_VALUE=25000
+
+# Сумма начального депозита (u64). Должна быть >= 30 * MAX_GAS_PRICE * (MAX_GAS_LIMIT + VERIFICATION_GAS_VALUE)
+# Рассчитать значение можно через `python supra/scripts/calc_min_balance.py --max-gas-price $MAX_GAS_PRICE --max-gas-limit $MAX_GAS_LIMIT --verification-gas $VERIFICATION_GAS_VALUE --margin 0.15`
+INITIAL_DEPOSIT=20000000000
+
+# Настройки проверки депозита (используются в monitor_check.sh и monitor_json.py)
+MIN_BALANCE_MARGIN=0.15
+MIN_BALANCE_WINDOW=30
+
+# Параметры VRF-запроса
+RNG_COUNT=1
+CLIENT_SEED=1234567890
+
+# Дополнительные потребители (через запятую) и адрес агрегатора (если известен)
+CONSUMER_ADDRS=
+AGGREGATOR_ADDR=
+
+# Автоматическое минтование токенов игрокам "адрес:сумма" (через запятую)
+PLAYER_MINTS=
+
+# Настройки смоук-теста (используются в testnet_smoke_test.sh)
+TICKETS_REQUIRED=5
+TICKET_FUND=100000000
+
+# Укажите путь к YAML-профилю Supra CLI, если используете общий конфиг
+SUPRA_CONFIG=/supra/configs/testnet.yaml
+
+# Webhook (опционально) для testnet_monitor_slack.py
+MONITOR_WEBHOOK_URL=https://hooks.slack.com/services/XXX/YYY/ZZZ
+MONITOR_WEBHOOK_TYPE=slack
+MONITOR_TITLE="Supra dVRF статус"
+
+# Настройки экспорта метрик Prometheus (используются в testnet_monitor_prometheus.py)
+METRIC_PREFIX=supra_dvrf
+MONITOR_PUSH_URL=
+MONITOR_PUSH_METHOD=POST
+MONITOR_PUSH_TIMEOUT=10
