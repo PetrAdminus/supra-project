@@ -1,4 +1,4 @@
-﻿import type { ReactElement } from "react";
+import type { ReactElement } from "react";
 import { GlassCard } from "../../../components/layout/GlassCard";
 import { useLotteryStatus } from "../hooks/useLotteryStatus";
 import { useI18n } from "../../../i18n/useI18n";

@@ -1,7 +1,8 @@
-﻿import { useEffect, useMemo, useState, type FormEvent, type ReactElement } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactElement } from "react";
 import type { AdminGasConfig } from "../../../api/types";
 import { useUpdateGasConfigMutation } from "../hooks/useAdminMutations";
 import { useI18n } from "../../../i18n/useI18n";
+import './AdminForm.css';
 
 interface GasConfigFormProps {
   gasConfig: AdminGasConfig | null;

@@ -1,0 +1,312 @@
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 1.5rem 2rem;
+  gap: 1.5rem;
+}
+
+.app-shell__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.75rem;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(14, 20, 38, 0.88) 0%, rgba(16, 26, 48, 0.68) 75%);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
+}
+
+.app-shell__header h2 {
+  font-size: 1.25rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.app-shell__header p {
+  margin-top: 0.35rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.app-shell__status {
+  font-size: 0.85rem;
+  background: linear-gradient(120deg, rgba(124, 141, 255, 0.28), rgba(210, 134, 255, 0.22));
+  padding: 0.4rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-border-strong);
+  box-shadow: 0 12px 32px rgba(118, 146, 255, 0.3);
+}
+
+.app-shell__body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1.5rem;
+  min-height: 0;
+}
+
+.app-shell__nav {
+  border-radius: 24px;
+  padding: 1.25rem 1rem;
+  background: linear-gradient(160deg, rgba(10, 16, 30, 0.92) 0%, rgba(17, 26, 46, 0.6) 70%);
+  backdrop-filter: blur(calc(var(--glass-blur) - 6px));
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-soft);
+}
+
+.app-shell__nav ul {
+  list-style: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0;
+}
+
+.nav-link {
+  display: block;
+  padding: 0.75rem 1.25rem;
+  border-radius: 14px;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  border: 1px solid var(--color-border-soft);
+  background: rgba(10, 14, 28, 0.35);
+  transition: background-color var(--transition-default), color var(--transition-default),
+    border-color var(--transition-default), transform var(--transition-default);
+}
+
+.nav-link:hover {
+  color: #fff;
+  background: rgba(120, 148, 255, 0.14);
+  border-color: rgba(129, 158, 255, 0.32);
+  transform: translateX(4px);
+}
+
+.nav-link:focus,
+.nav-link:focus-visible {
+  outline: none;
+  color: #fff;
+  background: rgba(120, 148, 255, 0.18);
+  border-color: rgba(133, 162, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(129, 161, 255, 0.3);
+  transform: translateX(4px);
+}
+
+.nav-link--active {
+  background: linear-gradient(135deg, rgba(124, 141, 255, 0.42), rgba(210, 134, 255, 0.36));
+  color: #fff;
+  border-color: rgba(133, 158, 255, 0.65);
+  box-shadow: 0 18px 40px rgba(90, 130, 255, 0.28);
+}
+
+.app-shell__content {
+  border-radius: 28px;
+  padding: 1.75rem 2rem;
+  background: linear-gradient(155deg, rgba(12, 18, 34, 0.9) 0%, rgba(15, 21, 40, 0.6) 70%);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
+  overflow: auto;
+}
+
+.app-shell__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(12, 18, 36, 0.75);
+  border: 1px solid var(--color-border);
+  padding: 0.5rem 0.9rem;
+  border-radius: 9999px;
+  box-shadow: 0 12px 32px rgba(98, 135, 255, 0.25);
+}
+
+.app-shell__mode-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+}
+
+.app-shell__mode-select {
+  appearance: none;
+  border: 1px solid var(--color-border);
+  background: rgba(10, 16, 32, 0.85);
+  color: #fff;
+  font-size: 0.85rem;
+  padding: 0.35rem 1.75rem 0.35rem 0.75rem;
+  border-radius: 9999px;
+  cursor: pointer;
+}
+
+.app-shell__mode-select:focus {
+  outline: none;
+  border-color: var(--color-border-glow);
+  box-shadow: 0 0 0 3px rgba(121, 155, 255, 0.25);
+}
+
+.app-shell__right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.app-shell__controls select,
+.app-shell__controls .app-shell__mode-select {
+  min-width: 9rem;
+}
+
+@media (max-width: 1200px) {
+  .app-shell {
+    padding: 1.25rem 1.5rem;
+    gap: 1.25rem;
+  }
+
+  .app-shell__header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .app-shell__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-shell__nav {
+    display: flex;
+  }
+
+  .app-shell__nav ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .app-shell {
+    padding: 1rem;
+  }
+
+  .app-shell__body {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell__nav {
+    display: flex;
+    flex-direction: row;
+    gap: 0.75rem;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .app-shell__nav ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .app-shell__content {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    padding: 1rem 1.1rem 1.5rem;
+  }
+
+  .app-shell__header {
+    padding: 1rem 1.25rem;
+    border-radius: 20px;
+  }
+
+  .app-shell__header h2 {
+    font-size: 1.1rem;
+  }
+
+  .app-shell__header p {
+    font-size: 0.85rem;
+  }
+
+  .app-shell__right {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 0.75rem;
+  }
+
+  .app-shell__controls {
+    flex: 1 1 180px;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .app-shell__controls select,
+  .app-shell__controls .app-shell__mode-select {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .app-shell__nav {
+    padding: 0.75rem;
+    overflow: hidden;
+  }
+
+  .app-shell__nav ul {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.4rem;
+  }
+
+  .app-shell__nav ul::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .nav-link {
+    white-space: nowrap;
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem;
+  }
+
+  .app-shell__content {
+    padding: 1.25rem 1.5rem;
+    border-radius: 22px;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 0.75rem;
+  }
+
+  .app-shell__content {
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .app-shell {
+    padding: 0.75rem 0.85rem 1.25rem;
+    gap: 1rem;
+  }
+
+  .app-shell__header {
+    gap: 0.75rem;
+  }
+
+  .app-shell__controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .app-shell__nav {
+    border-radius: 18px;
+  }
+
+  .app-shell__content {
+    padding: 1.15rem 1.2rem;
+    border-radius: 20px;
+  }
+}

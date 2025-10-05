@@ -1,9 +1,10 @@
-﻿import type { ChangeEvent, ReactElement, ReactNode } from "react";
+import type { ChangeEvent, ReactElement, ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { useUiStore } from "../../store/uiStore";
 import { WalletPanel } from "../../features/wallet/WalletPanel";
 import { useI18n } from "../../i18n/useI18n";
 import { locales, type Locale } from "../../i18n/locales";
+import "./ShellLayout.css";
 
 const navItems = [
   { to: "/", role: "user" as const, labelKey: "layout.nav.dashboard" },

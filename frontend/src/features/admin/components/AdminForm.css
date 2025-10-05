@@ -1,0 +1,64 @@
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.admin-form__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.admin-form__grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.admin-form__grid label {
+  align-self: end;
+}
+
+.admin-form__grid input,
+.admin-form__row input,
+.admin-form__grid textarea,
+.admin-form__row textarea {
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border);
+  background: rgba(10, 16, 32, 0.85);
+  padding: 0.65rem 0.85rem;
+  color: #f8fafc;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.admin-form__grid input:focus,
+.admin-form__row input:focus,
+.admin-form__grid textarea:focus,
+.admin-form__row textarea:focus {
+  outline: none;
+  border-color: var(--color-border-glow);
+  box-shadow: 0 0 0 2px rgba(121, 155, 255, 0.25);
+}
+
+.admin-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.admin-form__meta {
+  font-size: 0.875rem;
+  color: var(--color-text-subtle);
+}
+
+.admin-form__error {
+  color: var(--color-status-danger);
+  font-size: 0.9rem;
+}
+
+.admin-form__success {
+  color: var(--color-status-success);
+  font-size: 0.9rem;
+}

@@ -324,7 +324,9 @@ module lottery::main_v2 {
             verification_gas_value,
             callback_sender,
             consumer_count,
-            pending_request
+            pending_request,
+            callback_gas_price,
+            callback_gas_limit
         ) = {
             let lottery = borrow_global<LotteryData>(@lottery);
             ensure_gas_configured(lottery);
@@ -340,14 +342,16 @@ module lottery::main_v2 {
                 copy_option_address(&lottery.whitelisted_callback_sender),
                 vector::length(&lottery.whitelisted_consumers),
                 copy_option_u64(&lottery.pending_request),
+                lottery.callback_gas_price,
+                lottery.callback_gas_limit,
             )
         };
         let per_request_fee_u64 = checked_u64_from_u128(per_request_fee, E_MIN_BALANCE_OVERFLOW);
         assert!(initial_deposit >= min_balance, E_INITIAL_DEPOSIT_TOO_LOW);
         if (call_native) {
-            deposit::client_setting_minimum_balance(sender, min_balance);
-            deposit::deposit_fund(sender, initial_deposit);
-            deposit::add_contract_to_whitelist(sender, @lottery);
+            deposit::clientSettingMinimumBalance(sender, min_balance);
+            deposit::depositFundClient(sender, initial_deposit);
+            deposit::addContractToWhitelist(sender, @lottery, callback_gas_price, callback_gas_limit);
         };
         event::emit(SubscriptionConfiguredEvent {
             min_balance,
@@ -439,7 +443,7 @@ module lottery::main_v2 {
         };
         let per_request_fee_u64 = checked_u64_from_u128(per_request_fee, E_MIN_BALANCE_OVERFLOW);
         if (call_native) {
-            deposit::client_setting_minimum_balance(sender, min_balance);
+            deposit::clientSettingMinimumBalance(sender, min_balance);
         };
 
         let lottery = borrow_global_mut<LotteryData>(@lottery);
@@ -652,7 +656,7 @@ module lottery::main_v2 {
         assert!(can_withdraw, E_WITHDRAWAL_PENDING_REQUEST);
 
         if (call_native) {
-            deposit::withdraw_fund(sender, amount);
+            deposit::withdrawFundClient(sender, amount);
         };
 
         event::emit(FundsWithdrawnEvent { admin, amount });

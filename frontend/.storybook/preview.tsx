@@ -4,7 +4,6 @@ import { AppQueryProvider } from '../src/app/providers/QueryProvider';
 import { resetUiStore, useUiStore } from '../src/store/uiStore';
 import { locales, type Locale } from '../src/i18n/locales';
 import '../src/index.css';
-import '../src/App.css';
 
 function StoreInitializer({ locale, children }: { locale: Locale; children: React.ReactNode }) {
   const initializedRef = React.useRef(false);

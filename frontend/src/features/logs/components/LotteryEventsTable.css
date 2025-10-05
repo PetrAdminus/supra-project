@@ -1,0 +1,115 @@
+.event-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  background: var(--surface-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  overflow: hidden;
+  backdrop-filter: blur(calc(var(--glass-blur) - 6px));
+  box-shadow: var(--shadow-soft);
+}
+
+.event-table thead {
+  background: rgba(9, 15, 32, 0.85);
+}
+
+.event-table th,
+.event-table td {
+  padding: 0.75rem 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.event-table th:first-child,
+.event-table td:first-child,
+.event-table th:nth-child(4),
+.event-table td:nth-child(4) {
+  text-align: left;
+}
+
+.event-table tbody tr + tr {
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.event-table tbody tr:hover {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.event-table__type {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.7rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  color: #fff;
+}
+
+.event-table__type--drawrequested {
+  background: color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+
+.event-table__type--drawhandled {
+  background: color-mix(in srgb, var(--color-status-success) 40%, transparent);
+}
+
+.event-table__type--ticketbought {
+  background: color-mix(in srgb, var(--color-gradient-start) 42%, transparent);
+}
+
+.event-table__type--ticketrefunded {
+  background: color-mix(in srgb, var(--color-status-success) 38%, transparent);
+}
+
+.event-table__ticket-id {
+  white-space: nowrap;
+  font-family: "Space Grotesk", "Fira Code", monospace;
+  color: var(--color-text-main);
+}
+
+@media (max-width: 600px) {
+  .event-table {
+    border-radius: 16px;
+  }
+
+  .event-table thead {
+    display: none;
+  }
+
+  .event-table tbody,
+  .event-table tr,
+  .event-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .event-table tbody {
+    border-top: none;
+  }
+
+  .event-table tr {
+    padding: 0.75rem 0.5rem;
+    border-bottom: 1px solid rgba(121, 155, 255, 0.18);
+  }
+
+  .event-table td {
+    padding: 0.35rem 0;
+    font-size: 0.85rem;
+    text-align: left;
+  }
+
+  .event-table td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-muted);
+    margin-bottom: 0.1rem;
+  }
+
+  .event-table__type {
+    margin-bottom: 0.4rem;
+  }
+}

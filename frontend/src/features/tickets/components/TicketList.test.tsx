@@ -1,4 +1,4 @@
-﻿import { render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import type { TicketPurchase } from "../../../api/types";
 import { TicketList } from "./TicketList";
 

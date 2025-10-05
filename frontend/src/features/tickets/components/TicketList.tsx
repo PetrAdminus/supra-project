@@ -1,6 +1,7 @@
-﻿import type { ReactElement } from "react";
+import type { ReactElement } from "react";
 import type { TicketPurchase } from "../../../api/types";
 import { useI18n } from "../../../i18n/useI18n";
+import './TicketList.css';
 
 interface TicketListProps {
   tickets: TicketPurchase[];

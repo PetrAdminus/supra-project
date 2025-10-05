@@ -12,6 +12,8 @@ module example::example {
     use supra_addr::deposit;
 
     const REOSOURCE_ADDRESS_SEED: vector<u8> = b"example::ResourceSignerCap";
+    const CALLBACK_GAS_PRICE: u128 = 1_000;
+    const CALLBACK_GAS_LIMIT: u128 = 500_000;
 
     /// Store Resource signer cap which is used as owner account which we ask supra admin to whitelist
     struct ResourceSignerCap has key {
@@ -41,7 +43,7 @@ module example::example {
 
         let resource_signer_cap = borrow_global<ResourceSignerCap>(@example);
         let resource_signer = account::create_signer_with_capability(&resource_signer_cap.signer_cap);
-        deposit::add_contract_to_whitelist(&resource_signer, @example)
+        deposit::addContractToWhitelist(&resource_signer, @example, CALLBACK_GAS_PRICE, CALLBACK_GAS_LIMIT)
     }
 
     /// Deposit fund to supra deposit module
@@ -51,7 +53,7 @@ module example::example {
         let resource_address = get_resource_address();
         // First I need to transfer amount to resource account, and the then from this wallet I will transfer it to supra deposit fund
         aptos_account::transfer(sender, resource_address, amount);
-        deposit::deposit_fund(&resource_signer, amount);
+        deposit::depositFundClient(&resource_signer, amount);
     }
 
     /// Make request

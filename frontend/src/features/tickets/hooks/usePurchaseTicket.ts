@@ -1,4 +1,4 @@
-﻿import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { purchaseTicket } from '../../../api/client';
 import type { PurchaseTicketInput, TicketPurchase } from '../../../api/types';
 

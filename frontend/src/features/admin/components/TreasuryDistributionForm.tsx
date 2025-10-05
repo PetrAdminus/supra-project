@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactElement } from 
 import type { TreasuryConfig } from "../../../api/types";
 import { useUpdateTreasuryDistributionMutation } from "../hooks/useAdminMutations";
 import { useI18n } from "../../../i18n/useI18n";
+import './AdminForm.css';
 
 interface TreasuryDistributionFormProps {
   config: TreasuryConfig;

@@ -1,4 +1,4 @@
-﻿import type { ReactElement } from "react";
+import type { ReactElement } from "react";
 import { GlassCard } from "../../../components/layout/GlassCard";
 import { useAdminConfig } from "../hooks/useAdminConfig";
 import { useWhitelistStatus } from "../hooks/useWhitelistStatus";

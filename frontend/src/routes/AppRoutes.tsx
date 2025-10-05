@@ -1,4 +1,4 @@
-﻿import type { ReactElement } from 'react';
+import type { ReactElement } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { ShellLayout } from '../components/layout/ShellLayout';
 import { DashboardPage } from '../features/dashboard/pages/DashboardPage';

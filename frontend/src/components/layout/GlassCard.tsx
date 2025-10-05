@@ -1,5 +1,6 @@
-﻿import type { ReactElement, ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import clsx from 'clsx';
+import './GlassCard.css';
 
 interface GlassCardProps {
   title?: string;

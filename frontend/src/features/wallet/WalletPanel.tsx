@@ -1,8 +1,9 @@
-﻿import { useMemo, useState, type ReactElement } from "react";
+import { useMemo, useState, type ReactElement } from "react";
 import { useWallet } from "./useWallet";
 import { useUiStore } from "../../store/uiStore";
 import type { WalletProvider } from "./walletMock";
 import { useI18n } from "../../i18n/useI18n";
+import './WalletPanel.css';
 
 const providerLabels: Record<WalletProvider, string> = {
   starkey: "StarKey (mock)",

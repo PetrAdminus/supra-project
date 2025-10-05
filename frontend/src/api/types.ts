@@ -1,4 +1,4 @@
-﻿export type TicketStatus = 'pending' | 'confirmed' | 'won' | 'lost';
+export type TicketStatus = 'pending' | 'confirmed' | 'won' | 'lost';
 
 export interface TicketPurchase {
   ticketId: string;
@@ -14,7 +14,7 @@ export interface PurchaseTicketInput {
   numbers: number[];
 }
 
-export type EventType = 'DrawRequested' | 'DrawHandled' | 'TicketBought';
+export type EventType = 'DrawRequested' | 'DrawHandled' | 'TicketBought' | 'TicketRefunded';
 export type EventStatus = 'success' | 'failed' | 'retry';
 
 export interface LotteryEvent {

@@ -1,7 +1,8 @@
-﻿import type { FormEvent, ReactElement } from "react";
+import type { FormEvent, ReactElement } from "react";
 import { useState } from "react";
 import { usePurchaseTicket } from "../hooks/usePurchaseTicket";
 import { useI18n } from "../../../i18n/useI18n";
+import './TicketPurchaseForm.css';
 
 interface TicketPurchaseFormProps {
   round: number;

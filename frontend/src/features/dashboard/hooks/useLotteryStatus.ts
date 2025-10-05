@@ -1,4 +1,4 @@
-﻿import { useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 import { fetchLotteryStatus } from '../../../api/client';
 import type { LotteryStatus } from '../../../api/types';
 

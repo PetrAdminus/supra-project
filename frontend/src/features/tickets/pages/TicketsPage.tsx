@@ -1,4 +1,4 @@
-﻿import type { ReactElement } from "react";
+import type { ReactElement } from "react";
 import { GlassCard } from "../../../components/layout/GlassCard";
 import { TicketPurchaseForm } from "../components/TicketPurchaseForm";
 import { TicketList } from "../components/TicketList";

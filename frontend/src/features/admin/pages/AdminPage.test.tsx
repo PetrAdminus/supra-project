@@ -1,4 +1,4 @@
-﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AdminPage } from "./AdminPage";
@@ -44,6 +44,27 @@ vi.mock("../hooks/useAdminConfig", () => ({
           updatedAt: "2025-09-20T09:00:00Z",
         },
         consumer: null,
+      },
+      treasury: {
+        config: {
+          distributionBp: {
+            jackpot: 5000,
+            prize: 2500,
+            treasury: 2000,
+            marketing: 500,
+          },
+          ticketPriceSupra: "5.00",
+          treasuryAddress: "0xTreasury",
+          salesEnabled: true,
+          updatedAt: "2025-09-21T12:00:00Z",
+        },
+        balances: {
+          jackpotSupra: "1000.00",
+          prizeSupra: "500.00",
+          treasurySupra: "750.00",
+          marketingSupra: "250.00",
+          updatedAt: "2025-09-21T12:00:00Z",
+        },
       },
     },
     isLoading: false,

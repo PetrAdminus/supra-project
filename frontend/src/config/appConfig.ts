@@ -1,4 +1,4 @@
-﻿const rawMode = (import.meta.env.VITE_API_MODE ?? 'mock').toLowerCase();
+const rawMode = (import.meta.env.VITE_API_MODE ?? 'mock').toLowerCase();
 
 export type ApiMode = 'mock' | 'supra';
 

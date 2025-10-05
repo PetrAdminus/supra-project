@@ -1,4 +1,4 @@
-﻿import { useCallback } from 'react';
+import { useCallback } from 'react';
 import { useUiStore } from '../store/uiStore';
 import { translate } from './messages';
 import type { Locale } from './locales';

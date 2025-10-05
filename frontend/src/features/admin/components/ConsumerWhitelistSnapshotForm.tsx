@@ -1,7 +1,8 @@
-﻿import { useEffect, useMemo, useState, type FormEvent, type ReactElement } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactElement } from "react";
 import type { AdminConsumerWhitelistSnapshot } from "../../../api/types";
 import { useRecordConsumerWhitelistMutation } from "../hooks/useAdminMutations";
 import { useI18n } from "../../../i18n/useI18n";
+import './AdminForm.css';
 
 interface ConsumerWhitelistSnapshotFormProps {
   snapshot: AdminConsumerWhitelistSnapshot | null;
@@ -96,4 +97,3 @@ export function ConsumerWhitelistSnapshotForm({
     </form>
   );
 }
-
