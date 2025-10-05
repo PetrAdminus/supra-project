@@ -41,6 +41,8 @@ const en = {
     connect: "Connect",
     disconnect: "Disconnect",
     hint: "Switch to Supra testnet mode to connect.",
+    installHint: "Install or unlock the {{provider}} wallet to continue.",
+    providerComingSoon: "{{provider}} support will be available soon.",
     copy: {
       default: "Copy address",
       copied: "Copied",
@@ -48,6 +50,7 @@ const en = {
     },
     meta: {
       lastConnected: "Last connection: {{value}}",
+      chainId: "Chain ID: {{value}}",
     },
     error: {
       dismiss: "Dismiss",
@@ -87,11 +90,15 @@ const en = {
     title: "Tickets",
     purchaseCard: {
       title: "Buy ticket",
-      subtitle: "Working in mock mode",
+      subtitleMock: "Working in mock mode",
+      subtitleSupra: "Supra mode (read-only)",
       badgeRound: "Round {{round}}",
       badgeLoading: "Round loading...",
       loading: "Loading current draw...",
-      hint: "Until we get whitelisting we polish the UX in mock mode. Once Supra confirms access we will connect StarKey and real transactions.",
+      hintMock:
+        "Until we get whitelisting we polish the UX in mock mode. Once Supra confirms access we will connect StarKey and real transactions.",
+      hintSupra:
+        "Supra API is connected in read-only mode. Ticket purchases will be enabled after wallet whitelisting is approved.",
     },
     historyCard: {
       title: "Ticket history",
@@ -99,6 +106,8 @@ const en = {
       loading: "Loading history...",
       error: "Failed to load ticket history. Try again later.",
       empty: "No tickets yet. Add one in mock mode.",
+      numbersUnavailable: "Ticket numbers are not exposed by the Supra API yet.",
+      supraReadonly: "Supra mode currently shows registered ticket addresses only.",
     },
     form: {
       label: "Ticket numbers",
@@ -107,7 +116,11 @@ const en = {
       pending: "Submitting...",
       submit: "Buy ticket (mock)",
       errorInvalidNumbers: "Enter numbers separated by commas (e.g. 7, 11, 23, 45).",
+      errorRoundUnavailable: "Current round is unknown. Refresh Supra status or try again later.",
+      errorTicketPriceUnavailable: "Ticket price is unavailable in Supra mode. Check the monitoring API.",
       success: "Ticket {{ticketId}} added to history. After whitelisting we will switch to real transactions.",
+      submitSupraDisabled: "Buy ticket (Supra disabled)",
+      disabledSupra: "Ticket purchases are disabled in Supra mode. Complete wallet onboarding to enable them.",
     },
     status: {
       pending: "Pending",
@@ -186,6 +199,15 @@ const en = {
         second: "Replace mock SupraClient calls with real RPC/CLI requests.",
         third: "Connect StarKey and run end-to-end ticket purchase.",
       },
+    },
+    commands: {
+      title: "Supra CLI commands",
+      subtitle: "Helpers exposed via the REST API",
+      loading: "Loading commands...",
+      error: "Failed to load command list.",
+      empty: "No CLI commands available for this mode.",
+      moduleLabel: "Module",
+      count: "Available commands: {{value}}",
     },
     gas: {
       title: "Gas configuration",
@@ -326,6 +348,8 @@ const ru: Messages = {
     connect: "Подключить",
     disconnect: "Отключить",
     hint: "Переключитесь в режим Supra testnet, чтобы подключиться.",
+    installHint: "Установите или разблокируйте кошелёк {{provider}}, чтобы продолжить.",
+    providerComingSoon: "Поддержка {{provider}} появится позднее.",
     copy: {
       default: "Скопировать адрес",
       copied: "Скопировано",
@@ -333,6 +357,7 @@ const ru: Messages = {
     },
     meta: {
       lastConnected: "Последнее подключение: {{value}}",
+      chainId: "ID сети: {{value}}",
     },
     error: {
       dismiss: "Скрыть",
@@ -372,11 +397,15 @@ const ru: Messages = {
     title: "Билеты",
     purchaseCard: {
       title: "Покупка билета",
-      subtitle: "Работаем в mock-режиме",
+      subtitleMock: "Работаем в mock-режиме",
+      subtitleSupra: "Supra-режим (только чтение)",
       badgeRound: "Раунд {{round}}",
       badgeLoading: "Раунд загружается...",
       loading: "Загрузка данных о текущем розыгрыше...",
-      hint: "До получения whitelisting остаёмся на моках и оттачиваем UX. Как только Supra подтвердит доступ, подключим StarKey и реальные транзакции.",
+      hintMock:
+        "До получения whitelisting остаёмся на моках и оттачиваем UX. Как только Supra подтвердит доступ, подключим StarKey и реальные транзакции.",
+      hintSupra:
+        "Supra API подключён в режиме только чтения. Покупка билетов станет доступна после подтверждения whitelisting кошелька.",
     },
     historyCard: {
       title: "История билетов",
@@ -384,6 +413,8 @@ const ru: Messages = {
       loading: "Загрузка истории...",
       error: "Не удалось получить историю покупок. Попробуйте позже.",
       empty: "Пока нет билетов. Добавьте запись в mock-режиме.",
+      numbersUnavailable: "Supra API пока не возвращает номера билетов.",
+      supraReadonly: "В Supra-режиме отображаются только адреса зарегистрированных билетов.",
     },
     form: {
       label: "Номера билета",
@@ -392,7 +423,11 @@ const ru: Messages = {
       pending: "Отправка...",
       submit: "Купить билет (mock)",
       errorInvalidNumbers: "Введите номера через запятую (например, 7, 11, 23, 45).",
+      errorRoundUnavailable: "Текущий раунд неизвестен. Обновите статус Supra или повторите позже.",
+      errorTicketPriceUnavailable: "Цена билета недоступна в Supra-режиме. Проверьте мониторинговый API.",
       success: "Билет {{ticketId}} добавлен в историю. После whitelisting переключим форму на реальные транзакции.",
+      submitSupraDisabled: "Купить билет (Supra отключено)",
+      disabledSupra: "Покупка билетов в Supra-режиме отключена. Завершите онбординг кошелька, чтобы включить её.",
     },
     status: {
       pending: "В обработке",
@@ -471,6 +506,15 @@ const ru: Messages = {
         second: "Заменить mock SupraClient на реальные RPC/CLI вызовы.",
         third: "Подключить StarKey и прогнать покупку билета end-to-end.",
       },
+    },
+    commands: {
+      title: "Команды Supra CLI",
+      subtitle: "Скрипты, доступные через REST API",
+      loading: "Загрузка списка команд...",
+      error: "Не удалось получить список команд.",
+      empty: "Команды недоступны. Проверьте API.",
+      moduleLabel: "Модуль",
+      count: "Доступно команд: {{value}}",
     },
     gas: {
       title: "Настройка газа",

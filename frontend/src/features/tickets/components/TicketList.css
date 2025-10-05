@@ -59,6 +59,12 @@
   font-size: 0.95rem;
 }
 
+.ticket-list__numbers--empty {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
 .ticket-list__status {
   display: flex;
   flex-direction: column;

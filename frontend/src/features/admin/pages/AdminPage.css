@@ -1,0 +1,48 @@
+.admin-commands-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.admin-commands-list__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.admin-commands-list__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+}
+
+.admin-commands-list__name {
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+}
+
+.admin-commands-list__module {
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
+.admin-commands-list__description {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+@media (max-width: 600px) {
+  .admin-commands-list__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

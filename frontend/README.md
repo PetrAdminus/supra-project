@@ -1,6 +1,6 @@
 # Supra Lottery Frontend
 
-Интерфейс для Move-проекта Supra Lottery. Пока ждём whitelisting, используем мок-данные и даём возможность переключаться между режимами `mock` и `supra` (второй будет включён после интеграции).
+Интерфейс для Move-проекта Supra Lottery. Пока ждём whitelisting, используем мок-данные и даём возможность переключаться между режимами `mock` и `supra` (во втором читаем статус из FastAPI и подключаем StarKey-кошелёк).
 
 ## Стек
 - React 19 + Vite 7 + TypeScript
@@ -25,10 +25,32 @@ pnpm install
 - `pnpm run test` — Vitest (jsdom)
 - `pnpm run build` / `pnpm run preview` — production-сборка и предпросмотр
 
+## Настройки окружения
+
+Создайте `.env` на основе `.env.example` и задайте ключевые переменные:
+
+```bash
+cp .env.example .env
+```
+
+- `VITE_API_MODE` — режим API (`mock` или `supra`). По умолчанию приложение запускается с мок-данными.
+- `VITE_SUPRA_API_BASE_URL` — адрес FastAPI-сервиса из директории `SupraLottery` (см. раздел HTTP API в README корневого проекта). Значение по умолчанию — `http://localhost:8000`.
+
+## Подключение Supra StarKey
+
+1. Установите расширение [Supra StarKey](https://chrome.google.com/webstore/detail/supra-starkey-wallet) и авторизуйтесь.
+2. В настройках StarKey переключитесь на Supra Testnet и разблокируйте кошелёк перед запуском фронтенда.
+3. В интерфейсе Supra Lottery активируйте режим `supra` (панель в шапке). После этого кнопка «Подключить» запросит `eth_requestAccounts` у StarKey.
+4. После подключения в блоке «Кошелёк» появится адрес и chainId. Если расширение не найдено, UI подскажет установить или разблокировать его. Поддержка WalletConnect появится позже.
+
+В режиме `supra` фронтенд обращается к эндпоинту `/status` для получения данных мониторинга (draw_scheduled, whitelisting, подписка dVRF, распределение казначейства). Формы фиксации client/consumer whitelist, конфигурации VRF, расчёта минимального баланса и обновления долей казначейства вызывают FastAPI-эндпоинты `/commands/record-client-whitelist`, `/commands/record-consumer-whitelist`, `/commands/configure-vrf-gas`, `/commands/configure-vrf-request`, `/commands/configure-treasury-distribution` и `/commands/set-minimum-balance`, оборачивающие Supra CLI. Остальные админские сценарии по-прежнему используют мок-реализации до появления безопасных RPC/CLI-обёрток.
+
+Карточка «Команды Supra CLI» в админке обращается к `GET /commands` и показывает список доступных скриптов с описаниями и модулями — это помогает проверить, что FastAPI поднят и экспортирует все вспомогательные утилиты для Supra-режима.
+
 ## Структура
 ```
 src/
-+- api/                # client, mockClient, supraClient (заглушки)
++- api/                # client, mockClient, supraClient
 +- app/providers/      # провайдеры React Query и т.д.
 +- components/layout/  # ShellLayout, GlassCard
 +- config/             # appConfig, режимы API
@@ -45,16 +67,15 @@ src/
 ```
 
 - По умолчанию интерфейс стартует в режиме `mock` и подставляет данные из `src/mocks/*`. Переключение режима доступно в шапке (ShellLayout).
-- После получения whitelisting заменим реализации в `src/api/supraClient.ts` на реальные вызовы Supra CLI/REST.
+- В режиме `supra` используем `src/api/supraClient.ts` для HTTP-запросов к FastAPI и `src/features/wallet/walletSupra.ts` для управления StarKey-кошельком.
 - При появлении свежих ответов CLI обновим JSON-моки, сторисы и тесты.
 - Конфигурация лежит в `.storybook/` (подключены провайдеры и Zustand).
 - Для edge-кейсов используем аргументы `mockData` / `mockError`, чтобы быстро воспроизводить загрузку или ошибки.
 - Unit-тесты расположены рядом с компонентами (`*.test.tsx`) и используют Testing Library.
 - Для сброса Zustand-стора есть helper `resetUiStore`.
 1. Дождаться whitelisting (runbook: `../SupraLottery/docs/testnet_runbook.md`).
-2. Реализовать реальные функции в `src/api/supraClient.ts` (REST или CLI-обёртка).
-3. Подключить настоящий кошелёк в `src/features/wallet/` вместо mock-логики.
-4. Переключить UI на режим Supra testnet и пройти end-to-end сценарии.
+2. Проверить работу FastAPI (`/status`) и StarKey в Supra-режиме на тестовой сети.
+3. После открытия мутаций переключить mock-формы на реальные транзакции Supra.
 - Основной README: `../README.md`
 - Runbook с CLI-командами: `../SupraLottery/docs/testnet_runbook.md`
 - Дополнительные заметки по интеграции: `docs/supra_integration.md`

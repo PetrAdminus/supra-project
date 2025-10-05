@@ -1,14 +1,16 @@
 import { useMemo, useState, type ReactElement } from "react";
 import { useWallet } from "./useWallet";
 import { useUiStore } from "../../store/uiStore";
-import type { WalletProvider } from "./walletMock";
 import { useI18n } from "../../i18n/useI18n";
+import {
+  WALLET_PROVIDER_METADATA,
+  type WalletProvider,
+} from "./walletSupra";
 import './WalletPanel.css';
 
-const providerLabels: Record<WalletProvider, string> = {
-  starkey: "StarKey (mock)",
-  walletconnect: "WalletConnect (mock)",
-};
+const providerLabels: Record<WalletProvider, string> = Object.fromEntries(
+  Object.entries(WALLET_PROVIDER_METADATA).map(([value, meta]) => [value, meta.label]),
+) as Record<WalletProvider, string>;
 
 const statusKeyByState = {
   disconnected: "wallet.status.disconnected",
@@ -29,7 +31,12 @@ export function WalletPanel(): ReactElement {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const { t } = useI18n();
 
-  const canConnect = isSupra && wallet.status !== "connecting";
+  const providerMeta = WALLET_PROVIDER_METADATA[wallet.provider];
+  const canConnect =
+    isSupra &&
+    wallet.status !== "connecting" &&
+    providerMeta.supported &&
+    (wallet.providerReady ?? true);
 
   const copyLabel = useMemo(() => t(copyKeyByState[copyState]), [copyState, t]);
 
@@ -121,6 +128,22 @@ export function WalletPanel(): ReactElement {
           </button>
         )}
       </div>
+
+      {providerMeta && !providerMeta.supported && (
+        <p className="wallet-panel__hint">{t("wallet.providerComingSoon", { provider: providerMeta.label })}</p>
+      )}
+
+      {providerMeta.supported && !wallet.providerReady && (
+        <p className="wallet-panel__hint">
+          {t("wallet.installHint", {
+            provider: providerMeta.label,
+          })}
+        </p>
+      )}
+
+      {wallet.chainId && (
+        <p className="wallet-panel__meta">{t("wallet.meta.chainId", { value: wallet.chainId })}</p>
+      )}
 
       {wallet.lastConnectedAt && (
         <p className="wallet-panel__meta">

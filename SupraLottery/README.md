@@ -37,6 +37,66 @@ python -m unittest tests.test_calc_min_balance
 
 Тест проверяет соответствие расчётов `calc_min_balance.calculate` формуле из `lottery::main_v2`, корректность разбора чисел с разделителями (`parse_u128`) и форматирование человекочитаемых сумм.
 
+### HTTP API для фронтенда и автоматизации
+Чтобы отдавать фронтенду живые данные Supra без запуска отдельных скриптов, используйте новый FastAPI-сервис `supra.scripts.api_server`. Он переиспользует `testnet_monitor_json` и предоставляет REST-эндпоинты:
+
+- `GET /healthz` — проверка статуса конфигурации.
+- `GET /status` — агрегированный отчёт о лотерее и депозите (тот же JSON, что и у `testnet_monitor_json`).
+- `GET /commands` — список доступных CLI-команд с описаниями и модулями.
+- `POST /commands/{name}` — запуск любой команды из `supra.scripts.cli` с возвратом `stdout/stderr/returncode`.
+
+Команды `record-client-whitelist`, `record-consumer-whitelist`, `configure-vrf-gas`, `configure-vrf-request`,
+`configure-treasury-distribution` и `set-minimum-balance` добавлены
+специально для фронтенда: они вызывают
+`record_client_whitelist_snapshot`/`record_consumer_whitelist_snapshot`/`configure_vrf_gas`/`configure_vrf_request`/
+`configure_treasury_distribution`/`set_minimum_balance`
+через Supra CLI и печатают JSON с полями `tx_hash`, `submitted_at`, `stdout`, `stderr`. Благодаря этому React-приложение
+может показывать подтверждение транзакции без парсинга сырых логов. Пример запроса для whitelisting:
+
+```bash
+curl -X POST \
+  -H 'Content-Type: application/json' \
+  http://localhost:8000/commands/record-client-whitelist \
+  -d '{"args": ["--max-gas-price", "1000", "--max-gas-limit", "5000", "--min-balance-limit", "7500", "--assume-yes"]}'
+```
+
+Ответ вернёт JSON `{"tx_hash": "0x...", "submitted_at": "2024-05-01T00:00:00Z", ...}`; код возврата команды доступен в поле
+`returncode` основного ответа API. Для настройки VRF фронтенд последовательно вызывает `/commands/configure-vrf-gas`
+и `/commands/configure-vrf-request`, поэтому в логах появятся две транзакции: сначала обновление лимитов газа,
+затем фиксация `rng_count`/`client_seed`. Для изменения долей казначейства используется `/commands/configure-treasury-distribution`,
+который валидирует сумму basis points и вызывает `treasury_v1::set_config`. После подтверждения новых лимитов админка запускает `/commands/set-minimum-balance`,
+который сверяет ожидаемые значения `min_balance`/`per_request_fee` с расчётом мониторинга и вызывает
+`main_v2::set_minimum_balance`.
+
+#### Установка зависимостей
+
+```bash
+python -m venv .venv
+. .venv/bin/activate
+pip install -r SupraLottery/requirements.txt
+```
+
+#### Переменные окружения
+API использует тот же набор переменных, что и `testnet_monitor_json`:
+
+- `PROFILE`, `LOTTERY_ADDR`, `DEPOSIT_ADDR`, `CLIENT_ADDR`
+- `MAX_GAS_PRICE`, `MAX_GAS_LIMIT`, `VERIFICATION_GAS_VALUE`
+- `MIN_BALANCE_MARGIN`, `MIN_BALANCE_WINDOW`
+- `SUPRA_CLI_BIN` (опционально) и `SUPRA_CONFIG` (для передачи пути к YAML конфигу Supra CLI)
+- `SUPRA_API_CACHE_TTL` — время кэширования ответа `/status` в секундах (по умолчанию отключено)
+- `SUPRA_API_CORS_ORIGINS` — список разрешённых Origin через запятую (`*` разрешит всех клиентов)
+
+Запросы могут переопределять любую из переменных через query-параметры (`?profile=...&lottery_addr=...`).
+Параметр `refresh=true` сбрасывает кэш и принудительно обращается к Supra CLI, даже если TTL ещё не истёк.
+
+#### Запуск
+
+```bash
+python -m supra.scripts.cli api-server --host 0.0.0.0 --port 8000 --cache-ttl 5 --cors-origins http://localhost:5173
+```
+
+Параметры `--host`, `--port`, `--log-level`, `--reload`, `--cache-ttl` и `--cors-origins` также можно задавать через переменные окружения `SUPRA_API_HOST`, `SUPRA_API_PORT`, `SUPRA_API_LOG_LEVEL`, `SUPRA_API_CACHE_TTL`, `SUPRA_API_CORS_ORIGINS`.
+
 ### Структура проекта
 - docker-compose.yml — описание контейнера Supra CLI
 - supra/configs/ — локальные конфиги Supra с ключами и историей (только для разработки)

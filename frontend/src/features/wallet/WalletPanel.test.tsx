@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WalletPanel } from "./WalletPanel";
 import { resetUiStore, useUiStore } from "../../store/uiStore";
-import type { WalletInfo } from "./walletMock";
+import type { WalletInfo } from "./walletSupra";
 
 const connectMock = vi.fn(() => Promise.resolve());
 const disconnectMock = vi.fn(() => Promise.resolve());
@@ -23,6 +23,8 @@ describe("WalletPanel", () => {
   const baseWallet: WalletInfo = {
     status: "disconnected",
     provider: "starkey",
+    providerLabel: "StarKey",
+    providerReady: true,
   };
 
   beforeEach(() => {
@@ -69,6 +71,8 @@ describe("WalletPanel", () => {
       wallet: {
         status: "connected",
         provider: "starkey",
+        providerLabel: "StarKey",
+        providerReady: true,
         address: "0x1234",
         lastConnectedAt: "2025-09-25T10:00:00Z",
       },

@@ -72,6 +72,20 @@ vi.mock("../hooks/useAdminConfig", () => ({
   }),
 }));
 
+vi.mock("../hooks/useSupraCommands", () => ({
+  useSupraCommands: () => ({
+    data: [
+      {
+        name: "configure-vrf-gas",
+        module: "supra.scripts.configure_vrf_gas",
+        description: "Update VRF gas limits",
+      },
+    ],
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 const renderPage = () => {
   const queryClient = new QueryClient();
   return render(
@@ -85,6 +99,7 @@ describe("AdminPage", () => {
   it("renders access guard for non-admin role", () => {
     resetUiStore();
     useUiStore.getState().setRole("user");
+    useUiStore.getState().setApiMode("supra");
 
     renderPage();
 
@@ -95,6 +110,7 @@ describe("AdminPage", () => {
   it("shows whitelisting summary and forms for admin", () => {
     resetUiStore();
     useUiStore.getState().setRole("admin");
+    useUiStore.getState().setApiMode("supra");
 
     renderPage();
 
@@ -102,5 +118,7 @@ describe("AdminPage", () => {
     expect(screen.getByText(/Профиль: lottery_v3/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Max gas fee/)).toHaveValue(200000);
     expect(screen.getAllByLabelText(/Callback gas price/)[0]).toHaveValue("10");
+    expect(screen.getByText(/Команды Supra CLI/)).toBeInTheDocument();
+    expect(screen.getByText(/configure-vrf-gas/)).toBeInTheDocument();
   });
 });

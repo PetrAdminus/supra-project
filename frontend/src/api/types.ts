@@ -28,26 +28,49 @@ export interface LotteryEvent {
 }
 
 export interface VrfStatus {
-  subscriptionId: string;
+  subscriptionId: string | null;
   requestPending: boolean;
-  lastRequestTime: string;
+  lastRequestTime: string | null;
   lastFulfillmentTime: string | null;
 }
 
 export interface LotteryStatus {
-  round: number;
-  jackpotSupra: string;
-  ticketsSold: number;
-  ticketPriceSupra: string;
-  nextDrawTime: string;
+  round: number | null;
+  jackpotSupra: string | null;
+  ticketsSold: number | null;
+  ticketPriceSupra: string | null;
+  nextDrawTime: string | null;
   vrf: VrfStatus;
 }
 
 export interface WhitelistStatus {
-  account: string;
-  profile: string;
+  account: string | null;
+  profile: string | null;
   isWhitelisted: boolean;
-  checkedAt: string;
+  checkedAt: string | null;
+}
+
+export interface TreasuryDistributionBp {
+  jackpot: number;
+  prize: number;
+  treasury: number;
+  marketing: number;
+}
+
+export interface TreasuryConfig {
+  ticketPriceSupra: string;
+  salesEnabled: boolean;
+  treasuryAddress: string;
+  distributionBp: TreasuryDistributionBp;
+  updatedAt: string;
+}
+
+export interface TreasuryBalances {
+  jackpotSupra: string;
+  prizeSupra: string;
+  treasurySupra: string;
+  marketingSupra: string;
+  updatedAt: string;
 }
 
 export interface AdminGasConfig {
@@ -79,6 +102,11 @@ export interface AdminConsumerWhitelistSnapshot {
   updatedAt: string;
 }
 
+export interface AdminTreasuryConfig {
+  config: TreasuryConfig;
+  balances: TreasuryBalances;
+}
+
 export interface AdminConfig {
   gas: AdminGasConfig;
   vrf: AdminVrfConfig;
@@ -88,6 +116,7 @@ export interface AdminConfig {
     client: AdminWhitelistSnapshot | null;
     consumer: AdminConsumerWhitelistSnapshot | null;
   };
+  treasury: AdminTreasuryConfig;
 }
 
 export interface AdminMutationResult {
@@ -119,3 +148,23 @@ export interface RecordConsumerWhitelistInput {
   callbackGasPrice: string;
   callbackGasLimit: string;
 }
+
+export interface UpdateTreasuryDistributionInput {
+  jackpotBp: number;
+  prizeBp: number;
+  treasuryBp: number;
+  marketingBp: number;
+}
+
+export interface UpdateTreasuryControlsInput {
+  ticketPriceSupra: string;
+  treasuryAddress: string;
+  salesEnabled: boolean;
+}
+
+export interface SupraCommandInfo {
+  name: string;
+  module: string;
+  description: string;
+}
+

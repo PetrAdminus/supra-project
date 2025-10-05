@@ -10,6 +10,9 @@ import { ConsumerWhitelistSnapshotForm } from "../components/ConsumerWhitelistSn
 import { TreasuryControlsForm } from "../components/TreasuryControlsForm";
 import { TreasuryDistributionForm } from "../components/TreasuryDistributionForm";
 import { useI18n } from "../../../i18n/useI18n";
+import { useSupraCommands } from "../hooks/useSupraCommands";
+
+import "./AdminPage.css";
 
 function formatTimestamp(value?: string | null): string {
   if (!value) {
@@ -27,12 +30,18 @@ const planItemKeys = [
 
 export function AdminPage(): ReactElement {
   const role = useUiStore((state) => state.role);
+  const apiMode = useUiStore((state) => state.apiMode);
   const { data: whitelistStatus, isLoading: isWhitelistLoading, error: whitelistError } = useWhitelistStatus();
   const {
     data: adminConfig,
     isLoading: isAdminConfigLoading,
     error: adminConfigError,
   } = useAdminConfig();
+  const {
+    data: commands,
+    isLoading: isCommandsLoading,
+    error: commandsError,
+  } = useSupraCommands({ enabled: role === "admin" });
   const { t } = useI18n();
 
   if (role !== "admin") {
@@ -137,6 +146,42 @@ export function AdminPage(): ReactElement {
           )}
         </GlassCard>
       </div>
+
+      {apiMode === "supra" && (
+        <div className="glass-grid">
+          <GlassCard
+            accent="neutral"
+            title={t("admin.commands.title")}
+            subtitle={t("admin.commands.subtitle")}
+            footer={
+              commands && commands.length > 0
+                ? <span>{t("admin.commands.count", { value: commands.length })}</span>
+                : undefined
+            }
+          >
+            {isCommandsLoading && <p>{t("admin.commands.loading")}</p>}
+            {commandsError && <p>{t("admin.commands.error")}</p>}
+            {!isCommandsLoading && !commandsError && (!commands || commands.length === 0) && (
+              <p>{t("admin.commands.empty")}</p>
+            )}
+            {commands && commands.length > 0 && (
+              <ul className="admin-commands-list">
+                {commands.map((command) => (
+                  <li key={command.name} className="admin-commands-list__item">
+                    <div className="admin-commands-list__header">
+                      <span className="admin-commands-list__name">{command.name}</span>
+                      <span className="admin-commands-list__module">
+                        {t("admin.commands.moduleLabel")}: <code>{command.module}</code>
+                      </span>
+                    </div>
+                    <p className="admin-commands-list__description">{command.description}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </GlassCard>
+        </div>
+      )}
 
     </section>
   );

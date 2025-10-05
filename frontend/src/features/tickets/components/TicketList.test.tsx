@@ -37,4 +37,21 @@ describe("TicketList", () => {
     expect(screen.getAllByText("2")).not.toHaveLength(0);
     expect(screen.getAllByText("7")).not.toHaveLength(0);
   });
+
+  it("показывает заглушку, если Supra API не вернул номера", () => {
+    const withoutNumbers: TicketPurchase[] = [
+      {
+        ticketId: "0xabc",
+        round: 44,
+        numbers: [],
+        purchaseTime: "2025-09-25T14:00:00Z",
+        status: "confirmed",
+        txHash: null,
+      },
+    ];
+
+    render(<TicketList tickets={withoutNumbers} />);
+
+    expect(screen.getByText("Supra API пока не возвращает номера билетов.")).toBeInTheDocument();
+  });
 });

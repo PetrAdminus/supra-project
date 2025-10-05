@@ -9,6 +9,7 @@ import type {
   TicketPurchase,
   TreasuryBalances,
   TreasuryConfig,
+  SupraCommandInfo,
   UpdateGasConfigInput,
   UpdateTreasuryControlsInput,
   UpdateTreasuryDistributionInput,
@@ -36,4 +37,5 @@ export interface LotteryApi {
   recordConsumerWhitelistSnapshot(
     input: RecordConsumerWhitelistInput,
   ): Promise<AdminMutationResult>;
+  listCommands(): Promise<SupraCommandInfo[]>;
 }

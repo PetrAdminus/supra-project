@@ -13,6 +13,8 @@ class CliTestCase(unittest.TestCase):
         output = buf.getvalue()
         self.assertIn("calc-min-balance", output)
         self.assertIn("manual-draw", output)
+        self.assertIn("set-minimum-balance", output)
+        self.assertIn("configure-treasury-distribution", output)
 
     def test_calc_min_balance_subcommand(self) -> None:
         buf = io.StringIO()

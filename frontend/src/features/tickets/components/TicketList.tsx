@@ -26,9 +26,11 @@ export function TicketList({ tickets }: TicketListProps): ReactElement {
             <span className="ticket-list__meta">{t("tickets.purchaseCard.badgeRound", { round: ticket.round })}</span>
           </div>
           <div className="ticket-list__numbers">
-            {ticket.numbers.map((num) => (
-              <span key={num}>{num}</span>
-            ))}
+            {ticket.numbers.length > 0 ? (
+              ticket.numbers.map((num) => <span key={num}>{num}</span>)
+            ) : (
+              <span className="ticket-list__numbers--empty">{t("tickets.historyCard.numbersUnavailable")}</span>
+            )}
           </div>
           <div className="ticket-list__status">
             <span>{t(statusKeyByState[ticket.status])}</span>

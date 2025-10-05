@@ -3,15 +3,24 @@ import { GlassCard } from "../../../components/layout/GlassCard";
 import { useLotteryStatus } from "../hooks/useLotteryStatus";
 import { useI18n } from "../../../i18n/useI18n";
 
-function formatDate(value: string | null): string {
+function formatDate(value?: string | null): string {
   if (!value) {
     return "-";
   }
 
-  return new Date(value).toLocaleString();
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return date.toLocaleString();
 }
 
-function formatSupra(value: string | number): string {
+function formatSupra(value?: string | number | null): string {
+  if (value === null || value === undefined) {
+    return "-";
+  }
+
   return `${value} $SUPRA`;
 }
 
@@ -51,8 +60,10 @@ export function DashboardPage(): ReactElement {
         <GlassCard
           accent="primary"
           title={t("dashboard.card.current.title")}
-          subtitle={t("dashboard.card.current.subtitle", { round: data.round })}
-          footer={<span className="badge">{t("dashboard.card.current.badge", { id: data.vrf.subscriptionId })}</span>}
+          subtitle={t("dashboard.card.current.subtitle", { round: data.round ?? "-" })}
+          footer={
+            <span className="badge">{t("dashboard.card.current.badge", { id: data.vrf.subscriptionId ?? "-" })}</span>
+          }
         >
           <div className="glass-card__metric">
             <span className="stat-label">{t("dashboard.card.current.jackpotLabel")}</span>
@@ -61,7 +72,7 @@ export function DashboardPage(): ReactElement {
           <div className="glass-grid glass-grid--three">
             <div className="glass-card__metric">
               <span className="stat-label">{t("dashboard.card.current.ticketsSoldLabel")}</span>
-              <span className="stat-value" style={{ fontSize: "1.9rem" }}>{data.ticketsSold}</span>
+              <span className="stat-value" style={{ fontSize: "1.9rem" }}>{data.ticketsSold ?? "-"}</span>
             </div>
             <div className="glass-card__metric">
               <span className="stat-label">{t("dashboard.card.current.ticketPriceLabel")}</span>
@@ -84,7 +95,7 @@ export function DashboardPage(): ReactElement {
         >
           <ul>
             <li>
-              <strong>Subscription ID:</strong> {data.vrf.subscriptionId}
+              <strong>Subscription ID:</strong> {data.vrf.subscriptionId ?? "-"}
             </li>
             <li>
               <strong>{t("dashboard.card.vrf.pendingLabel")}:</strong> {vrfPendingLabel}

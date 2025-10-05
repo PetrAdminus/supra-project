@@ -11,10 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess
 import sys
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
 
 # Allow relative import when executed from repository root
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -22,15 +19,15 @@ if SCRIPT_DIR not in sys.path:
     sys.path.append(SCRIPT_DIR)
     sys.path.append(os.path.dirname(SCRIPT_DIR))
 
-from calc_min_balance import calculate  # type: ignore  # pylint: disable=wrong-import-position
 from monitor_common import env_default  # type: ignore  # pylint: disable=wrong-import-position
-
-DEFAULT_MARGIN = 0.15
-DEFAULT_WINDOW = 30
-
-
-class CliError(RuntimeError):
-    pass
+from lib.monitoring import (  # type: ignore  # pylint: disable=wrong-import-position
+    DEFAULT_MARGIN,
+    DEFAULT_WINDOW,
+    CliError,
+    ConfigError,
+    gather_data,
+    monitor_config_from_namespace,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -132,144 +129,15 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def run_cli(args: argparse.Namespace, extra: List[str]) -> Dict[str, Any]:
-    env = os.environ.copy()
-    if args.supra_config:
-        env["SUPRA_CONFIG"] = args.supra_config
-    cmd = [args.supra_cli_bin] + extra
-    try:
-        completed = subprocess.run(
-            cmd,
-            env=env,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except subprocess.CalledProcessError as exc:
-        raise CliError(
-            f"Ошибка Supra CLI ({' '.join(cmd)}): {exc.stderr or exc.stdout}"
-        ) from exc
-
-    output = completed.stdout.strip()
-    if not output:
-        raise CliError(f"Пустой вывод Supra CLI для команды: {' '.join(cmd)}")
-    try:
-        return json.loads(output)
-    except json.JSONDecodeError as exc:
-        raise CliError(f"Неверный JSON от Supra CLI: {output}") from exc
-
-
-def move_view(args: argparse.Namespace, function_id: str, call_args: Optional[List[str]] = None) -> Any:
-    cli_args = [
-        "move",
-        "tool",
-        "view",
-        "--profile",
-        args.profile,
-        "--function-id",
-        function_id,
-    ]
-    if call_args:
-        cli_args.append("--args")
-        cli_args.extend(call_args)
-    data = run_cli(args, cli_args)
-    return data.get("result")
-
-
-def flatten_single_value(value: Any) -> Any:
-    if isinstance(value, list) and len(value) == 1:
-        return value[0]
-    return value
-
-
-def gather_data(args: argparse.Namespace) -> Dict[str, Any]:
-    calculation = calculate(
-        args.max_gas_price,
-        args.max_gas_limit,
-        args.verification_gas,
-        args.margin,
-        args.window,
-    )
-
-    lottery_prefix = f"{args.lottery_addr}::main_v2"
-    deposit_prefix = f"{args.deposit_addr}::deposit"
-
-    lottery_status = move_view(args, f"{lottery_prefix}::get_lottery_status")
-    vrf_config = move_view(args, f"{lottery_prefix}::get_vrf_request_config")
-    whitelist_status = move_view(args, f"{lottery_prefix}::get_whitelist_status")
-
-    deposit_balance = move_view(
-        args,
-        f"{deposit_prefix}::checkClientFund",
-        [f"address:{args.client_addr}"],
-    )
-    min_balance_on_chain = move_view(
-        args,
-        f"{deposit_prefix}::checkMinBalanceClient",
-        [f"address:{args.client_addr}"],
-    )
-    min_balance_reached = move_view(
-        args,
-        f"{deposit_prefix}::isMinimumBalanceReached",
-        [f"address:{args.client_addr}"],
-    )
-    contract_details = move_view(
-        args,
-        f"{deposit_prefix}::getContractDetails",
-        [f"address:{args.lottery_addr}"],
-    )
-    subscription_info = move_view(
-        args,
-        f"{deposit_prefix}::getSubscriptionInfoByClient",
-        [f"address:{args.client_addr}"],
-    )
-
-    whitelisted_contracts = move_view(
-        args,
-        f"{deposit_prefix}::listAllWhitelistedContractByClient",
-        [f"address:{args.client_addr}"],
-    )
-
-    max_gas_price_on_chain = move_view(
-        args,
-        f"{deposit_prefix}::checkMaxGasPriceClient",
-        [f"address:{args.client_addr}"],
-    )
-    max_gas_limit_on_chain = move_view(
-        args,
-        f"{deposit_prefix}::checkMaxGasLimitClient",
-        [f"address:{args.client_addr}"],
-    )
-
-    return {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "profile": args.profile,
-        "lottery_addr": args.lottery_addr,
-        "deposit_addr": args.deposit_addr,
-        "client_addr": args.client_addr,
-        "calculation": calculation.to_json(),
-        "lottery": {
-            "status": lottery_status,
-            "vrf_request_config": vrf_config,
-            "whitelist_status": whitelist_status,
-        },
-        "deposit": {
-            "balance": flatten_single_value(deposit_balance),
-            "min_balance": flatten_single_value(min_balance_on_chain),
-            "min_balance_reached": flatten_single_value(min_balance_reached),
-            "contract_details": contract_details,
-            "subscription_info": subscription_info,
-            "whitelisted_contracts": whitelisted_contracts,
-            "max_gas_price": flatten_single_value(max_gas_price_on_chain),
-            "max_gas_limit": flatten_single_value(max_gas_limit_on_chain),
-        },
-    }
-
-
 def main() -> None:
     args = parse_args()
     try:
-        report = gather_data(args)
+        config = monitor_config_from_namespace(args)
+    except ConfigError as exc:
+        print(f"[error] {exc}", file=sys.stderr)
+        sys.exit(2)
+    try:
+        report = gather_data(config)
     except CliError as exc:
         print(f"[error] {exc}", file=sys.stderr)
         sys.exit(2)

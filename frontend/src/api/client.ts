@@ -9,6 +9,7 @@ import type {
   TicketPurchase,
   TreasuryBalances,
   TreasuryConfig,
+  SupraCommandInfo,
   UpdateGasConfigInput,
   UpdateTreasuryControlsInput,
   UpdateTreasuryDistributionInput,
@@ -24,6 +25,7 @@ import {
   fetchTreasuryBalancesMock,
   fetchTreasuryConfigMock,
   fetchWhitelistStatusMock,
+  listCommandsMock,
   purchaseTicketMock,
   recordClientWhitelistSnapshotMock,
   recordConsumerWhitelistSnapshotMock,
@@ -40,6 +42,7 @@ import {
   fetchTreasuryBalancesSupra,
   fetchTreasuryConfigSupra,
   fetchWhitelistStatusSupra,
+  listSupraCommandsSupra,
   purchaseTicketSupra,
   recordClientWhitelistSnapshotSupra,
   recordConsumerWhitelistSnapshotSupra,
@@ -66,6 +69,7 @@ const mockApi: LotteryApi = {
   updateTreasuryControls: updateTreasuryControlsMock,
   recordClientWhitelistSnapshot: recordClientWhitelistSnapshotMock,
   recordConsumerWhitelistSnapshot: recordConsumerWhitelistSnapshotMock,
+  listCommands: listCommandsMock,
 };
 
 const supraApi: LotteryApi = {
@@ -83,6 +87,7 @@ const supraApi: LotteryApi = {
   updateTreasuryControls: updateTreasuryControlsSupra,
   recordClientWhitelistSnapshot: recordClientWhitelistSnapshotSupra,
   recordConsumerWhitelistSnapshot: recordConsumerWhitelistSnapshotSupra,
+  listCommands: listSupraCommandsSupra,
 };
 
 const apiByMode: Record<ApiMode, LotteryApi> = {
@@ -164,6 +169,10 @@ export async function recordConsumerWhitelistSnapshot(
   input: RecordConsumerWhitelistInput,
 ): Promise<AdminMutationResult> {
   return getApi().recordConsumerWhitelistSnapshot(input);
+}
+
+export async function listCommands(): Promise<SupraCommandInfo[]> {
+  return getApi().listCommands();
 }
 
 export function getCurrentApi(): LotteryApi {

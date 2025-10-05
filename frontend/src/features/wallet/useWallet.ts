@@ -8,7 +8,7 @@ import {
   subscribeWallet,
   type WalletInfo,
   type WalletProvider,
-} from "./walletMock";
+} from "./walletSupra";
 
 interface UseWalletResult {
   wallet: WalletInfo;

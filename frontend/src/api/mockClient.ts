@@ -9,6 +9,7 @@ import type {
   TicketPurchase,
   TreasuryBalances,
   TreasuryConfig,
+  SupraCommandInfo,
   UpdateGasConfigInput,
   UpdateTreasuryControlsInput,
   UpdateTreasuryDistributionInput,
@@ -26,6 +27,24 @@ const lotterySnapshot: LotteryStatus = structuredClone(lotteryStatusJson as Lott
 const ticketStore: TicketPurchase[] = structuredClone(ticketsJson as TicketPurchase[]);
 const eventStore: LotteryEvent[] = structuredClone(eventsJson as LotteryEvent[]);
 const adminConfigStore: AdminConfig = structuredClone(adminConfigJson as AdminConfig);
+
+const mockCommands: SupraCommandInfo[] = [
+  {
+    name: "configure-vrf-gas",
+    module: "supra.scripts.configure_vrf_gas",
+    description: "Update VRF gas limits via Supra CLI",
+  },
+  {
+    name: "configure-vrf-request",
+    module: "supra.scripts.configure_vrf_request",
+    description: "Configure RNG count and client seed",
+  },
+  {
+    name: "set-minimum-balance",
+    module: "supra.scripts.set_minimum_balance",
+    description: "Submit set_minimum_balance with validation",
+  },
+];
 
 let ticketSequence = ticketStore.length;
 
@@ -208,4 +227,8 @@ export async function purchaseTicketMock(input: PurchaseTicketInput): Promise<Ti
   });
 
   return simulateDelay(ticket);
+}
+
+export async function listCommandsMock(): Promise<SupraCommandInfo[]> {
+  return simulateDelay(mockCommands);
 }

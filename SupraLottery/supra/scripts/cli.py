@@ -32,6 +32,34 @@ COMMAND_MAP: Dict[str, Tuple[str, str]] = {
         "supra.scripts.testnet_manual_draw",
         "Выполнить manual_draw с предварительной проверкой",
     ),
+    "record-client-whitelist": (
+        "supra.scripts.record_client_whitelist_snapshot",
+        "Зафиксировать client whitelist snapshot через Supra CLI",
+    ),
+    "record-consumer-whitelist": (
+        "supra.scripts.record_consumer_whitelist_snapshot",
+        "Зафиксировать consumer whitelist snapshot через Supra CLI",
+    ),
+    "configure-vrf-gas": (
+        "supra.scripts.configure_vrf_gas",
+        "Обновить лимиты и стоимость газа VRF через Supra CLI",
+    ),
+    "configure-vrf-request": (
+        "supra.scripts.configure_vrf_request",
+        "Настроить rng_count и client_seed для VRF-запроса",
+    ),
+    "configure-treasury-distribution": (
+        "supra.scripts.configure_treasury_distribution",
+        "Обновить доли распределения treasury_v1::set_config",
+    ),
+    "set-minimum-balance": (
+        "supra.scripts.set_minimum_balance",
+        "Выполнить set_minimum_balance и обновить per_request_fee/min_balance",
+    ),
+    "api-server": (
+        "supra.scripts.api_server",
+        "Запустить FastAPI-сервис с REST-обёрткой над Supra CLI",
+    ),
 }
 
 

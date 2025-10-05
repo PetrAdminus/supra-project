@@ -1,7 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
+import { act } from "react";
 import { TicketPurchaseForm } from "./TicketPurchaseForm";
+import { resetUiStore, useUiStore } from "../../../store/uiStore";
 
 const mutateMock = vi.fn();
 
@@ -19,6 +21,9 @@ vi.mock("../hooks/usePurchaseTicket", () => ({
 describe("TicketPurchaseForm", () => {
   beforeEach(() => {
     mutateMock.mockReset();
+    act(() => {
+      resetUiStore();
+    });
   });
 
   it("показывает ошибку при пустом вводе", async () => {
@@ -48,5 +53,22 @@ describe("TicketPurchaseForm", () => {
       { round: 18, numbers: [1, 5, 9] },
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
+  });
+
+  it("блокирует отправку в Supra-режиме", async () => {
+    const user = userEvent.setup();
+    act(() => {
+      useUiStore.getState().setApiMode("supra");
+    });
+
+    render(<TicketPurchaseForm round={19} ticketPrice="10.000" />);
+
+    const button = screen.getByRole("button", { name: /Supra отключено/i });
+    expect(button).toBeDisabled();
+
+    expect(screen.getByText(/Покупка билетов в Supra-режиме отключена/i)).toBeInTheDocument();
+
+    await user.click(button);
+    expect(mutateMock).not.toHaveBeenCalled();
   });
 });
