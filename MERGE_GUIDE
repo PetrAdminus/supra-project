@@ -23,7 +23,7 @@ git commit -m "WIP: подготовка перед merge"
 
 ## 1) Базовый merge ветки `feature` в текущую (`Test`)
 ```bash
-git checkout Test
+git checkout Main
 git merge origin/feature
 # если без конфликтов → сразу push
 git push origin Test

@@ -32,6 +32,8 @@ def build_namespace(**kwargs) -> Namespace:
         require_aggregator=False,
         expect_aggregator=None,
         print_json=False,
+        json_summary=False,
+        include_report=False,
     )
     defaults.update(kwargs)
     return Namespace(**defaults)
@@ -130,6 +132,44 @@ class DrawReadinessMainTests(unittest.TestCase):
         self.assertIn("Минимальный баланс", output)
         self.assertIn("Недостаточно билетов", output)
 
+    def test_main_outputs_json_summary(self) -> None:
+        ns = build_namespace(json_summary=True)
+        report = ready_report()
+        process = CompletedProcess(args=["python"], returncode=0, stdout=json.dumps(report))
+
+        parser_mock = Mock()
+        parser_mock.parse_args.return_value = ns
+        parser_mock.error.side_effect = AssertionError
+
+        with patch.object(readiness, "build_parser", return_value=parser_mock), patch.object(
+            readiness, "run_monitor", return_value=process
+        ), patch("sys.stdout", new=io.StringIO()) as stdout, self.assertRaises(SystemExit) as exc:
+            readiness.main()
+
+        self.assertEqual(exc.exception.code, 0)
+        summary = json.loads(stdout.getvalue())
+        self.assertTrue(summary["ready"])
+        self.assertEqual(summary["ticket_count"], report["lottery"]["status"]["ticket_count"])
+
+    def test_main_includes_report_when_requested(self) -> None:
+        ns = build_namespace(json_summary=True, include_report=True)
+        report = ready_report()
+        process = CompletedProcess(args=["python"], returncode=0, stdout=json.dumps(report))
+
+        parser_mock = Mock()
+        parser_mock.parse_args.return_value = ns
+        parser_mock.error.side_effect = AssertionError
+
+        with patch.object(readiness, "build_parser", return_value=parser_mock), patch.object(
+            readiness, "run_monitor", return_value=process
+        ), patch("sys.stdout", new=io.StringIO()) as stdout, self.assertRaises(SystemExit) as exc:
+            readiness.main()
+
+        self.assertEqual(exc.exception.code, 0)
+        summary = json.loads(stdout.getvalue())
+        self.assertIn("report", summary)
+        self.assertEqual(summary["report"], report)
+
     def test_main_reports_cli_errors(self) -> None:
         ns = build_namespace()
         parser_mock = Mock()
@@ -139,6 +179,16 @@ class DrawReadinessMainTests(unittest.TestCase):
         with patch.object(readiness, "build_parser", return_value=parser_mock), patch.object(
             readiness, "run_monitor", side_effect=readiness.MonitorError("boom")
         ):
+            with self.assertRaises(SystemExit):
+                readiness.main()
+
+    def test_main_requires_json_summary_for_include_report(self) -> None:
+        ns = build_namespace(include_report=True)
+        parser_mock = Mock()
+        parser_mock.parse_args.return_value = ns
+        parser_mock.error.side_effect = SystemExit
+
+        with patch.object(readiness, "build_parser", return_value=parser_mock):
             with self.assertRaises(SystemExit):
                 readiness.main()
 

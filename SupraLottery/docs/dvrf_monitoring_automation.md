@@ -19,6 +19,7 @@
 | `supra/scripts/testnet_monitor_slack.py` | Формирует человеко-читаемое сообщение, отправляет его в Slack/Teams webhook и возвращает код `testnet_monitor_json.py` (например, `1`, если баланс ниже порога). | Все переменные, что и у `testnet_monitor_json.py`, плюс `MONITOR_WEBHOOK_URL` |
 | `supra/scripts/testnet_monitor_prometheus.py` | Преобразует JSON-отчёт в Prometheus-метрики, печатает их в stdout и, при необходимости, отправляет на Pushgateway/HTTP endpoint. | Все переменные, что и у `testnet_monitor_json.py`, а также `METRIC_PREFIX`, `MONITOR_PUSH_URL`, `MONITOR_PUSH_METHOD`, `MONITOR_PUSH_TIMEOUT` |
 | `python -m supra.scripts <подкоманда>` | Унифицированный способ запуска Python-скриптов без указания пути к файлу. Используйте `--list`, чтобы посмотреть доступные команды. | Совпадают с выбранной подкомандой (например, `monitor-json`, `manual-draw`) |
+| `python -m supra.scripts auto-draw` | Новая подкоманда, совмещающая проверку готовности и запуск `manual_draw`, печатает результат в формате JSONL. | `PROFILE`, `LOTTERY_ADDR`, `DEPOSIT_ADDR` и остальные параметры проверки/розыгрыша |
 | `supra/scripts/testnet_smoke_test.sh` | Выполняет смоук-тест (настройка, покупка билетов, запрос VRF) и проверяет события. | `PROFILE`, `LOTTERY_ADDR`, `DEPOSIT_ADDR`, `AGGREGATOR_ADDR`, `PLAYER_PROFILES` и т.д. |
 
 > Шаблон `supra/scripts/testnet_env.example` содержит полный список переменных, рекомендуемых для автоматизации. Скопируйте его в `.env`, подставьте значения и подключайте через `set -a; source ...; set +a`.
@@ -64,6 +65,8 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 * `testnet_monitor_json.py` создаёт машиночитаемый JSON, который удобно передавать в AutoFi webhook или системам анализа логов.
 * `testnet_monitor_slack.py` отправляет компактное сообщение в Slack/Teams и возвращает код возврата, который можно использовать в триггерах AutoFi.
 * `testnet_monitor_prometheus.py` печатает и при необходимости пушит метрики в формате Prometheus, поэтому его удобно подключать к Pushgateway или системам метрик вроде VictoriaMetrics.
+* `testnet_draw_readiness.py` поддерживает флаг `--json-summary`, который выводит краткое резюме (готовность, причины отказа, счётчик билетов) без текстовых строк. При необходимости добавьте `--include-report`, чтобы вложить полный JSON из `testnet_monitor_json.py` в то же резюме и не печатать второй объект в stdout — это упрощает парсинг cron/AutoFi.
+* `testnet_manual_draw.py` теперь умеет печатать структурированный результат через `--json-result`: код возврата Supra CLI, stdout/stderr и использованную команду попадают в JSON вместо обычных логов.
 
 ## 4. Интеграция с Supra AutoFi
 
@@ -74,6 +77,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
    ./supra/scripts/testnet_monitor_check.sh || supra-alert "Deposit below minimum"
    ./supra/scripts/testnet_monitor_slack.py --include-json --fail-on-low || supra-alert "Slack webhook error"
    python supra/scripts/testnet_draw_readiness.py || supra-alert "Draw readiness failed"
+   python -m supra.scripts auto-draw --execute || supra-alert "Auto draw failed"
    ```
 4. Для мониторинга событий добавьте дополнительный шаг с `supra/scripts/testnet_status_report.sh` или командой `supra/supra move tool events list ...` из справочника `docs/dvrf_event_monitoring.md`.
 5. При необходимости сохраните машиночитаемый отчёт: `python supra/scripts/testnet_monitor_json.py --pretty > autofi-artifacts/dvrf_status.json` и прикрепите файл в AutoFi job.
@@ -96,4 +100,46 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 * Автоматизировать покупку тестовых билетов перед запуском `manual_draw`, чтобы гарантировать выполнение условий розыгрыша.
 * Расширить `testnet_monitor_check.sh` метриками количества успешных/неудачных запросов VRF (по событиям) и интегрировать с Prometheus.
 * Подготовить ansible-роль/terraform-модуль, разворачивающий cron/AutoFi job вместе с необходимыми конфигами.
+
+## 8. Авто-оркестратор розыгрышей
+
+`python -m supra.scripts auto-draw` объединяет проверку готовности (`testnet_draw_readiness.py`) и запуск `manual_draw` в один шаг. Команда всегда выводит одну строку JSON со статусом `not_ready`, `ready_dry_run`, `executed` или `manual_draw_failed`, а также включает использованные аргументы и коды возврата дочерних скриптов. Благодаря прокси-флагу `--include-report` в подкоманде readiness полный отчёт мониторинга автоматически попадает в лог.
+
+Примеры использования:
+
+```bash
+# Только проверка готовности, без вызова manual_draw
+python -m supra.scripts auto-draw \
+  --profile $PROFILE \
+  --lottery-addr $LOTTERY_ADDR \
+  --deposit-addr $DEPOSIT_ADDR > logs/auto_draw.log
+
+# Полноценный запуск manual_draw с JSON-логом для AutoFi
+python -m supra.scripts auto-draw --execute \
+  --profile $PROFILE \
+  --lottery-addr $LOTTERY_ADDR \
+  --deposit-addr $DEPOSIT_ADDR \
+  --assume-yes >> logs/auto_draw.jsonl
+```
+
+JSON-лог удобно собирать в файл (`.jsonl`) и отправлять в централизованное хранилище: каждая строка содержит время запуска, команду readiness/manual_draw и результат исполнения. При необходимости можно включить дополнительные проверки (`--require-aggregator`, `--expect-aggregator`, `--skip-min-balance`) — все флаги проксируются в оба скрипта.
+
+## 9. Текущий статус и дальнейший план с AutoFi
+
+### Зафиксированные результаты
+
+* Скрипт `testnet_draw_readiness.py` возвращает структурированный ответ через `--json-summary` и может включать полный отчёт мониторинга (`--include-report`), поэтому планировщики получают весь контекст одним JSON-объектом.
+* `testnet_manual_draw.py` поддерживает флаг `--json-result`, что позволяет AutoFi job анализировать исход Supra CLI, коды возврата и stdout/stderr без дополнительного парсинга логов.
+* Подкоманда `python -m supra.scripts auto-draw` объединяет проверку готовности и запуск розыгрыша, автоматически пробрасывает `--include-report` и печатает одну строку JSONL со статусом `not_ready`, `ready_dry_run`, `executed` или `manual_draw_failed`.
+* Документация обновлена шаблонами Cron/AutoFi: достаточно подключить `.env` и вызвать `python -m supra.scripts auto-draw --execute` (или dry-run), чтобы получать машиночитаемые журналы.
+
+### Дальнейший план
+
+1. **Пилот в AutoFi.** Создать отдельную AutoFi job, которая использует контейнер из runbook, подгружает `.env` и запускает `python -m supra.scripts auto-draw --execute --assume-yes`. Сохранить stdout в артефакт `auto_draw.jsonl` и включить уведомления по ненулевому `exit_code`.
+2. **Верификация логов.** Проверить, что JSONL корректно парсится в AutoFi и в downstream-инструментах (например, Loki/Elastic). При необходимости добавить шаг с выгрузкой файла в S3 или push на централизованный лог-сервис.
+3. **Алерты и ретраи.** Настроить правила AutoFi: при статусе `not_ready` оставлять информационное уведомление, при `manual_draw_failed` — критический алерт и автоматический повтор через `retry policy`. Для успеха фиксировать метрику/событие (например, webhooks).
+4. **Безопасность параллельных запусков.** Добавить файловый лок (`--lock-file`) в `auto_draw_runner`, чтобы предотвращать пересечение cron/AutoFi запусков и дублирование `manual_draw`; после реализации обновить документацию и пилотный job.
+5. **Расширение мониторинга.** На следующем этапе автоматизировать покупку тестовых билетов перед запуском, добавить проверки whitelisting и депозитов через Prometheus-метрики, чтобы AutoFi мог строить дашборды по готовности розыгрыша.
+
+Все изменения следует тестировать командой `PYTHONPATH=SupraLottery pytest SupraLottery/tests` перед выкладкой на production и фиксировать заметки о каждом запуске AutoFi в журнале сопровождения.
 

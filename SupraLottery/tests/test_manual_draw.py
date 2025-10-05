@@ -1,7 +1,9 @@
+import io
 import json
 import subprocess
 import sys
 from unittest import TestCase, mock
+from unittest.mock import patch
 
 from supra.scripts import testnet_manual_draw
 
@@ -67,3 +69,79 @@ class ManualDrawTests(TestCase):
 
         self.assertEqual(ctx.exception.code, 0)
         mocked_run.assert_not_called()
+
+    def test_json_result_includes_reasons_on_failure(self) -> None:
+        report = {
+            "lottery": {"status": {"ticket_count": 1, "draw_scheduled": False}},
+            "deposit": {"min_balance_reached": False},
+        }
+        args = self.default_args + ["--json-result"]
+
+        with mock.patch.object(testnet_manual_draw, "run_monitor", return_value=_completed(json.dumps(report))), mock.patch.object(
+            testnet_manual_draw.subprocess,
+            "run",
+        ) as mocked_run, mock.patch.object(sys, "argv", args), patch("sys.stdout", new=io.StringIO()) as stdout:
+            with self.assertRaises(SystemExit) as ctx:
+                testnet_manual_draw.main()
+
+        self.assertEqual(ctx.exception.code, 1)
+        mocked_run.assert_not_called()
+        payload = json.loads(stdout.getvalue())
+        self.assertFalse(payload["ready"])
+        self.assertFalse(payload["executed"])
+        self.assertIn("Недостаточно билетов", " ".join(payload["readiness"]["reasons"]))
+
+    def test_json_result_dry_run_reports_command(self) -> None:
+        report = {
+            "lottery": {
+                "status": {
+                    "ticket_count": 10,
+                    "draw_scheduled": True,
+                    "pending_request": False,
+                }
+            },
+            "deposit": {"min_balance_reached": True},
+        }
+        args = self.default_args + ["--json-result", "--dry-run"]
+
+        with mock.patch.object(testnet_manual_draw, "run_monitor", return_value=_completed(json.dumps(report))), mock.patch.object(
+            testnet_manual_draw.subprocess,
+            "run",
+        ) as mocked_run, mock.patch.object(sys, "argv", args), patch("sys.stdout", new=io.StringIO()) as stdout:
+            with self.assertRaises(SystemExit) as ctx:
+                testnet_manual_draw.main()
+
+        self.assertEqual(ctx.exception.code, 0)
+        mocked_run.assert_not_called()
+        payload = json.loads(stdout.getvalue())
+        self.assertTrue(payload["ready"])
+        self.assertFalse(payload["executed"])
+        self.assertIn("manual_draw", payload["command"][-1])
+
+    def test_json_result_on_successful_execution(self) -> None:
+        report = {
+            "lottery": {
+                "status": {
+                    "ticket_count": 10,
+                    "draw_scheduled": True,
+                    "pending_request": False,
+                }
+            },
+            "deposit": {"min_balance_reached": True},
+        }
+        args = self.default_args + ["--json-result", "--assume-yes"]
+
+        with mock.patch.object(testnet_manual_draw, "run_monitor", return_value=_completed(json.dumps(report))), mock.patch.object(
+            testnet_manual_draw.subprocess,
+            "run",
+            return_value=_completed("ok"),
+        ) as mocked_run, mock.patch.object(sys, "argv", args), patch("sys.stdout", new=io.StringIO()) as stdout:
+            with self.assertRaises(SystemExit) as ctx:
+                testnet_manual_draw.main()
+
+        self.assertEqual(ctx.exception.code, 0)
+        mocked_run.assert_called_once()
+        payload = json.loads(stdout.getvalue())
+        self.assertTrue(payload["executed"])
+        self.assertEqual(payload["returncode"], 0)
+        self.assertEqual(payload["stdout"], "ok")

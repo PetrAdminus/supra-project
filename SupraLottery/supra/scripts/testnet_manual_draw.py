@@ -65,6 +65,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="вывести отчёт readiness в JSON перед вызовом manual_draw",
     )
     parser.add_argument(
+        "--json-result",
+        action="store_true",
+        help="вывести только структурированный JSON-результат",
+    )
+    parser.add_argument(
         "--assume-yes",
         action="store_true",
         help="передать --assume-yes в команду Supra CLI",
@@ -110,11 +115,20 @@ def build_manual_draw_command(ns: argparse.Namespace) -> List[str]:
     return cmd
 
 
+def _log(message: str, *, error: bool, enabled: bool) -> None:
+    if enabled:
+        target = sys.stderr if error else sys.stdout
+        print(message, file=target)
+
+
 def main() -> None:
     parser = build_parser()
     ns = parser.parse_args()
 
+    logging_enabled = not ns.json_result
+
     report: Dict[str, Any] = {}
+    readiness_summary: Dict[str, Any] | None = None
     if not ns.skip_readiness:
         try:
             report = readiness_report(ns)
@@ -122,26 +136,64 @@ def main() -> None:
             parser.error(str(exc))
 
         reasons = readiness.evaluate(report, ns)
+        readiness_summary = readiness.build_summary(report, ns, reasons)
         if reasons:
-            print("❌ manual_draw не запущен: контракт не готов")
-            for reason in reasons:
-                print(f" - {reason}")
-            if ns.print_json:
-                print(json.dumps(report, ensure_ascii=False, indent=2))
+            if logging_enabled:
+                print("❌ manual_draw не запущен: контракт не готов")
+                for reason in reasons:
+                    print(f" - {reason}")
+                if ns.print_json:
+                    print(json.dumps(report, ensure_ascii=False, indent=2))
+            result = {
+                "ready": False,
+                "readiness": readiness_summary,
+                "readiness_skipped": False,
+                "command": None,
+                "executed": False,
+                "dry_run": ns.dry_run,
+                "returncode": None,
+                "stdout": None,
+                "stderr": None,
+            }
+            if ns.json_result:
+                if ns.print_json:
+                    result["readiness_report"] = report
+                print(json.dumps(result, ensure_ascii=False, indent=2))
             raise SystemExit(1)
 
-        print("✅ Контракт прошёл проверку готовности, выполняем manual_draw")
-        if ns.print_json:
-            print(json.dumps(report, ensure_ascii=False, indent=2))
+        if logging_enabled:
+            print("✅ Контракт прошёл проверку готовности, выполняем manual_draw")
+            if ns.print_json:
+                print(json.dumps(report, ensure_ascii=False, indent=2))
+        elif ns.json_result and ns.print_json:
+            readiness_summary = readiness_summary or readiness.build_summary(report, ns, [])
 
     try:
         cmd = build_manual_draw_command(ns)
     except MonitorError as exc:
         parser.error(str(exc))
 
-    print("Команда Supra CLI:", " ".join(cmd))
+    result: Dict[str, Any] = {
+        "ready": True if ns.skip_readiness else readiness_summary.get("ready", True)
+        if readiness_summary
+        else None,
+        "readiness": readiness_summary,
+        "readiness_skipped": ns.skip_readiness,
+        "command": cmd,
+        "executed": False,
+        "dry_run": ns.dry_run,
+        "returncode": None,
+        "stdout": None,
+        "stderr": None,
+    }
+    if ns.json_result and ns.print_json and not ns.skip_readiness and report:
+        result["readiness_report"] = report
+
+    _log("Команда Supra CLI: " + " ".join(cmd), error=False, enabled=logging_enabled)
     if ns.dry_run:
-        print("--dry-run: вызов manual_draw пропущен")
+        _log("--dry-run: вызов manual_draw пропущен", error=False, enabled=logging_enabled)
+        if ns.json_result:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
         raise SystemExit(0)
 
     env = os.environ.copy()
@@ -149,18 +201,31 @@ def main() -> None:
         env["SUPRA_CONFIG"] = ns.supra_config
 
     process = subprocess.run(cmd, text=True, capture_output=True, env=env)
+    result.update(
+        executed=True,
+        returncode=process.returncode,
+        stdout=process.stdout.strip() if process.stdout else "",
+        stderr=process.stderr.strip() if process.stderr else "",
+    )
 
     if process.returncode != 0:
-        print("❌ manual_draw завершился с ошибкой", file=sys.stderr)
-        if process.stdout:
-            print(process.stdout.strip(), file=sys.stderr)
-        if process.stderr:
-            print(process.stderr.strip(), file=sys.stderr)
+        if logging_enabled:
+            print("❌ manual_draw завершился с ошибкой", file=sys.stderr)
+            if process.stdout:
+                print(process.stdout.strip(), file=sys.stderr)
+            if process.stderr:
+                print(process.stderr.strip(), file=sys.stderr)
+        if ns.json_result:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
         raise SystemExit(process.returncode or 1)
 
-    print("✅ manual_draw выполнен успешно")
-    if process.stdout:
-        print(process.stdout.strip())
+    if logging_enabled:
+        print("✅ manual_draw выполнен успешно")
+        if process.stdout:
+            print(process.stdout.strip())
+
+    if ns.json_result:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
 
     raise SystemExit(0)
 
