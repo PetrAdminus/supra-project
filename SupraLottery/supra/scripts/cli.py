@@ -32,6 +32,10 @@ COMMAND_MAP: Dict[str, Tuple[str, str]] = {
         "supra.scripts.testnet_manual_draw",
         "Выполнить manual_draw с предварительной проверкой",
     ),
+    "auto-draw": (
+        "supra.automation.auto_draw_runner",
+        "Проверить готовность и при необходимости выполнить manual_draw",
+    ),
 }
 
 

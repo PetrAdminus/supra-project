@@ -81,6 +81,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="дополнительно вывести полный JSON-отчёт",
     )
+    parser.add_argument(
+        "--json-summary",
+        action="store_true",
+        help="вывести только машиночитаемое резюме без текстовых строк",
+    )
+    parser.add_argument(
+        "--include-report",
+        action="store_true",
+        help="вложить полный отчёт monitor_json в JSON-резюме",
+    )
     return parser
 
 
@@ -127,9 +137,51 @@ def evaluate(report: Dict[str, Any], ns: argparse.Namespace) -> List[str]:
     return reasons
 
 
+def build_summary(
+    report: Dict[str, Any], ns: argparse.Namespace, reasons: List[str]
+) -> Dict[str, Any]:
+    """Собрать краткое резюме проверки готовности."""
+
+    lottery = report.get("lottery", {})
+    status = lottery.get("status", {})
+    whitelist = lottery.get("whitelist_status", {}) or {}
+    deposit = report.get("deposit", {}) or {}
+
+    ticket_value = status.get("ticket_count") or status.get("tickets")
+    ticket_count: Any
+    if ticket_value is None:
+        ticket_count = None
+    else:
+        try:
+            ticket_count = _as_int(ticket_value)
+        except MonitorError:
+            ticket_count = None
+
+    aggregators = list(whitelist.get("aggregators", []) or [])
+
+    summary: Dict[str, Any] = {
+        "ready": not reasons,
+        "reasons": reasons,
+        "ticket_count": ticket_count,
+        "min_tickets_required": ns.min_tickets,
+        "draw_scheduled": _as_bool(status.get("draw_scheduled", False)),
+        "pending_request": _as_bool(status.get("pending_request", False)),
+        "min_balance_reached": _as_bool(deposit.get("min_balance_reached", False)),
+        "aggregators": [str(value) for value in aggregators],
+    }
+
+    if ns.expect_aggregator:
+        summary["expected_aggregators"] = list(ns.expect_aggregator)
+
+    return summary
+
+
 def main() -> None:
     parser = build_parser()
     ns = parser.parse_args()
+
+    if ns.include_report and not ns.json_summary:
+        parser.error("--include-report доступен только вместе с --json-summary")
 
     try:
         process = run_monitor(ns, include_fail_on_low=False)
@@ -142,24 +194,31 @@ def main() -> None:
         parser.error(f"Не удалось разобрать JSON отчёта: {exc}")
 
     reasons = evaluate(report, ns)
+    summary = build_summary(report, ns, reasons)
+
+    exit_code = 0 if summary["ready"] else 1
+
+    if ns.json_summary:
+        summary_output = dict(summary)
+        if ns.include_report:
+            summary_output["report"] = report
+        print(json.dumps(summary_output, ensure_ascii=False, indent=2))
+        if ns.print_json and not ns.include_report:
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+        raise SystemExit(exit_code)
 
     if reasons:
         print("❌ Контракт не готов к manual_draw:")
         for reason in reasons:
             print(f" - {reason}")
-        exit_code = 1
     else:
-        status = report.get("lottery", {}).get("status", {})
-        ticket_value = status.get("ticket_count") or status.get("tickets")
-        ticket_count = _as_int(ticket_value) if ticket_value is not None else "?"
         print(
             "✅ Контракт готов к manual_draw — билеты: {tickets}, draw_scheduled={draw}, pending_request={pending}".format(
-                tickets=ticket_count,
-                draw=_as_bool(status.get("draw_scheduled", False)),
-                pending=_as_bool(status.get("pending_request", False)),
+                tickets=summary["ticket_count"] if summary["ticket_count"] is not None else "?",
+                draw=summary["draw_scheduled"],
+                pending=summary["pending_request"],
             )
         )
-        exit_code = 0
 
     if ns.print_json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
