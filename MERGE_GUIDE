@@ -1,0 +1,146 @@
+# Шпаргалка по `git merge`
+
+> Короткая инструкция для частых слияний. Скопируй в `MERGE_GUIDE.md`.
+
+---
+
+## 0) Обновить ссылки на удалённые ветки
+```bash
+git fetch origin --prune
+```
+
+Перед git merge нужно, чтобы рабочая директория была чистая.
+Проверь:
+git status
+
+Если есть изменённые файлы, сначала зафиксируй их:
+git add .
+git commit -m "WIP: подготовка перед merge"
+
+
+Если merge прошёл без конфликтов, Git создаст коммит автоматически.
+---
+
+## 1) Базовый merge ветки `feature` в текущую (`Test`)
+```bash
+git checkout Test
+git merge origin/feature
+# если без конфликтов → сразу push
+git push origin Test
+```
+
+Если были конфликты, ты их решаешь вручную → и только после этого делаешь:
+git add .
+git commit -m "Resolve merge conflicts between Test and codex/create-supra-l1-on-chain-subscription"
+
+> Если увидел `Already up to date.` — в текущей ветке уже есть все изменения.
+
+---
+
+## 2) Если локальные правки мешают merge
+- **Сохранить временно и слить:**
+```bash
+git stash push -m "before merge feature -> Test"
+git merge origin/feature
+git stash pop
+# при конфликтах после pop → реши, затем:
+git add .
+git commit
+git push origin Test
+```
+
+- **Отменить свои незакоммиченные правки и слить:**
+```bash
+git restore .
+git merge origin/feature
+git push origin Test
+```
+
+---
+
+## 3) Разрешение конфликтов
+1) Открой файлы с маркерами:
+```
+<<<<<<< HEAD
+... твоя версия ...
+=======
+... их версия ...
+>>>>>>> origin/feature
+```
+2) Оставь нужное, удали маркеры.
+3) Заверши merge:
+```bash
+git add .
+git commit -m "Merge branch 'feature' into Test"
+git push origin Test
+```
+
+> Подсказка: быстро выбрать сторону для одного файла  
+> — **оставить свою (ours)**: `git checkout --ours path/to/file`  
+> — **их (theirs)**: `git checkout --theirs path/to/file`  
+> затем `git add path/to/file`.
+
+---
+
+## 4) Создать *merge-коммит* даже при fast-forward
+```bash
+git checkout Test
+git merge --no-ff origin/feature -m "Merge feature into Test"
+git push origin Test
+```
+
+---
+
+## 5) Отменить незавершённый merge
+```bash
+git merge --abort
+```
+> Работает только если merge ещё в процессе (есть MERGE_HEAD).
+
+---
+
+## 6) Откатить уже выполненный *merge-коммит*
+Найди хэш merge-коммита (`git log --merges --oneline`) и:
+```bash
+git revert -m 1 <merge_commit_hash>
+git push origin Test
+```
+> `-m 1` — оставить «базового» родителя (ветку, в которую вливали).
+
+---
+
+## 7) Полностью сделать `Test` = `feature` (переписать ветку)
+> Опасно: переписывает историю удалённой ветки.
+```bash
+git checkout Test
+git reset --hard origin/feature
+git push --force origin Test
+```
+
+---
+
+## 8) Диагностика и проверка
+```bash
+# Состояние и блокирующие изменения
+git status
+
+# Последние коммиты с ветками
+git log --oneline --graph --decorate -15
+
+# Список отличий между ветками
+git diff --name-status origin/feature..HEAD
+
+# Активные/удалённые ветки
+git branch -vv
+git branch -a
+```
+
+---
+
+## 9) Частые команды-алиасы (по желанию)
+```bash
+git config --global alias.lg "log --oneline --graph --decorate --all"
+git config --global alias.st "status -sb"
+```
+
+> Теперь `git lg` и `git st` ускорят проверку перед/после merge.
