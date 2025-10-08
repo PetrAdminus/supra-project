@@ -27,7 +27,7 @@ module vrf_hub::hub_tests {
         assert!(*vector::borrow(&active, 0) == id, 0);
 
         let registration_opt = hub::get_registration(id);
-        let registration = option::extract(&mut registration_opt);
+        let registration = option::destroy_some(registration_opt);
         assert!(registration.owner == OWNER, 0);
         assert!(registration.lottery == LOTTERY_ADDR, 0);
         assert!(vector::length(&registration.metadata) == 4, 0);
@@ -47,7 +47,7 @@ module vrf_hub::hub_tests {
 
         hub::update_metadata(&hub_signer, id, b"data");
         let registration_opt = hub::get_registration(id);
-        let registration = option::extract(&mut registration_opt);
+        let registration = option::destroy_some(registration_opt);
         assert!(vector::length(&registration.metadata) == 4, 0);
         assert!(*vector::borrow(&registration.metadata, 0) == 100, 0); // 'd'
     }
@@ -67,7 +67,7 @@ module vrf_hub::hub_tests {
         assert!(*vector::borrow(&pending, 0) == request_id, 0);
 
         let record_opt = hub::get_request(request_id);
-        let preview = option::extract(&mut record_opt);
+        let preview = option::destroy_some(record_opt);
         assert!(preview.lottery_id == lottery_id, 0);
         assert!(vector::length(&preview.payload) == 7, 0);
 

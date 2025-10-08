@@ -91,8 +91,8 @@ module lottery::metadata {
     public fun list_lottery_ids(): vector<u64> acquires MetadataRegistry {
         let state = borrow_state();
         let len = vector::length(&state.lottery_ids);
-        let mut result = vector::empty<u64>();
-        let mut i = 0;
+        let result = vector::empty<u64>();
+        let i = 0;
         while (i < len) {
             vector::push_back(&mut result, *vector::borrow(&state.lottery_ids, i));
             i = i + 1;
@@ -112,7 +112,7 @@ module lottery::metadata {
 
     public entry fun set_admin(caller: &signer, new_admin: address) acquires MetadataRegistry {
         ensure_admin(caller);
-        let mut state = borrow_global_mut<MetadataRegistry>(@lottery);
+        let state = borrow_global_mut<MetadataRegistry>(@lottery);
         let previous = state.admin;
         state.admin = new_admin;
         event::emit_event(&mut state.admin_events, MetadataAdminUpdatedEvent { previous, next: new_admin });
@@ -125,9 +125,9 @@ module lottery::metadata {
     ) acquires MetadataRegistry {
         ensure_admin(caller);
         let metadata_for_event = clone_metadata(&metadata);
-        let mut state = borrow_global_mut<MetadataRegistry>(@lottery);
+        let state = borrow_global_mut<MetadataRegistry>(@lottery);
         let created = if (table::contains(&state.entries, lottery_id)) {
-            let mut entry = table::borrow_mut(&mut state.entries, lottery_id);
+            let entry = table::borrow_mut(&mut state.entries, lottery_id);
             *entry = metadata;
             false
         } else {
@@ -143,7 +143,7 @@ module lottery::metadata {
 
     public entry fun remove_metadata(caller: &signer, lottery_id: u64) acquires MetadataRegistry {
         ensure_admin(caller);
-        let mut state = borrow_global_mut<MetadataRegistry>(@lottery);
+        let state = borrow_global_mut<MetadataRegistry>(@lottery);
         if (!table::contains(&state.entries, lottery_id)) {
             abort E_METADATA_MISSING;
         };
@@ -177,9 +177,9 @@ module lottery::metadata {
     }
 
     fun clone_bytes(source: &vector<u8>): vector<u8> {
-        let mut buffer = vector::empty<u8>();
+        let buffer = vector::empty<u8>();
         let len = vector::length(source);
-        let mut i = 0;
+        let i = 0;
         while (i < len) {
             vector::push_back(&mut buffer, *vector::borrow(source, i));
             i = i + 1;
@@ -189,7 +189,7 @@ module lottery::metadata {
 
     fun remove_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
         let len = vector::length(ids);
-        let mut i = 0;
+        let i = 0;
         while (i < len) {
             if (*vector::borrow(ids, i) == lottery_id) {
                 vector::swap_remove(ids, i);

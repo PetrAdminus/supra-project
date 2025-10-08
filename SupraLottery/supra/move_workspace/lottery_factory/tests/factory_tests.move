@@ -26,7 +26,7 @@ module lottery_factory::factory_tests {
         assert!(hub::is_lottery_active(lottery_id), 0);
 
         let info_opt = registry::get_lottery(lottery_id);
-        let info = option::extract(&mut info_opt);
+        let info = option::destroy_some(info_opt);
         assert!(info.owner == OWNER, 0);
         assert!(info.lottery == LOTTERY_ADDR, 0);
         assert!(info.blueprint.ticket_price == 10, 0);
@@ -35,7 +35,7 @@ module lottery_factory::factory_tests {
         registry::update_blueprint(&factory_signer, lottery_id, new_blueprint);
 
         let updated_opt = registry::get_lottery(lottery_id);
-        let updated = option::extract(&mut updated_opt);
+        let updated = option::destroy_some(updated_opt);
         assert!(updated.blueprint.ticket_price == 25, 0);
         assert!(updated.blueprint.jackpot_share_bps == 150, 0);
     }

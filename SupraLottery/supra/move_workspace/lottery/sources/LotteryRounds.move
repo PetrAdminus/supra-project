@@ -232,7 +232,7 @@ module lottery::rounds {
         if (!table::contains(&state.rounds, lottery_id)) {
             abort E_NO_PENDING_REQUEST;
         };
-        let mut round = table::borrow_mut(&mut state.rounds, lottery_id);
+        let round = table::borrow_mut(&mut state.rounds, lottery_id);
         if (!option::is_some(&round.pending_request)) {
             abort E_NO_PENDING_REQUEST;
         };
@@ -356,7 +356,7 @@ module lottery::rounds {
         jackpot_share_bps: u16,
         ticket_count: u64,
     ): u64 acquires instances::LotteryCollection {
-        let jackpot_bps = (jackpot_share_bps as u64);
+        let jackpot_bps = math64::from_u16(jackpot_share_bps);
         let jackpot_contribution = math64::mul_div(ticket_price, jackpot_bps, BASIS_POINT_DENOMINATOR);
         let issued = 0;
         let total_amount = 0;
@@ -452,7 +452,7 @@ module lottery::rounds {
             abort E_INSTANCE_MISSING;
         };
         if (table::contains(&state.rounds, lottery_id)) {
-            let mut round = table::borrow_mut(&mut state.rounds, lottery_id);
+            let round = table::borrow_mut(&mut state.rounds, lottery_id);
             round.tickets = tickets;
             round.draw_scheduled = draw_scheduled;
             round.next_ticket_id = next_ticket_id;
@@ -470,8 +470,8 @@ module lottery::rounds {
         if (vector::length(randomness) < 8) {
             abort E_RANDOM_BYTES_TOO_SHORT;
         };
-        let mut prefix = vector::empty<u8>();
-        let mut i = 0;
+        let prefix = vector::empty<u8>();
+        let i = 0;
         while (i < 8) {
             let byte = *vector::borrow(randomness, i);
             vector::push_back(&mut prefix, byte);
@@ -481,9 +481,9 @@ module lottery::rounds {
     }
 
     fun clone_bytes(data: &vector<u8>): vector<u8> {
-        let mut buffer = vector::empty<u8>();
+        let buffer = vector::empty<u8>();
         let len = vector::length(data);
-        let mut i = 0;
+        let i = 0;
         while (i < len) {
             let byte = *vector::borrow(data, i);
             vector::push_back(&mut buffer, byte);

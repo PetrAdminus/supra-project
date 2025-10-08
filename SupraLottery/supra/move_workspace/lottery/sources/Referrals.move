@@ -291,28 +291,46 @@ module lottery::referrals {
             return;
         };
 
-        let mut available = operations_balance;
+        let available_before_referrer = operations_balance;
         let desired_referrer = math64::mul_div(amount, referrer_bps, BASIS_POINT_DENOMINATOR);
         let desired_referee = math64::mul_div(amount, referee_bps, BASIS_POINT_DENOMINATOR);
-        let mut referrer_paid = 0;
-        let mut referee_paid = 0;
 
-        if (desired_referrer > 0 && available > 0) {
-            let pay_referrer = if (desired_referrer > available) { available } else { desired_referrer };
+        let referrer_paid;
+        let available_after_referrer;
+        if (desired_referrer > 0 && available_before_referrer > 0) {
+            let pay_referrer = if (desired_referrer > available_before_referrer) {
+                available_before_referrer
+            } else {
+                desired_referrer
+            };
             if (pay_referrer > 0) {
                 treasury_multi::pay_operations_bonus_internal(lottery_id, referrer, pay_referrer);
-                available = available - pay_referrer;
                 referrer_paid = pay_referrer;
+                available_after_referrer = available_before_referrer - pay_referrer;
+            } else {
+                referrer_paid = 0;
+                available_after_referrer = available_before_referrer;
             };
+        } else {
+            referrer_paid = 0;
+            available_after_referrer = available_before_referrer;
         };
 
-        if (desired_referee > 0 && available > 0) {
-            let pay_referee = if (desired_referee > available) { available } else { desired_referee };
+        let referee_paid;
+        if (desired_referee > 0 && available_after_referrer > 0) {
+            let pay_referee = if (desired_referee > available_after_referrer) {
+                available_after_referrer
+            } else {
+                desired_referee
+            };
             if (pay_referee > 0) {
                 treasury_multi::pay_operations_bonus_internal(lottery_id, buyer, pay_referee);
-                available = available - pay_referee;
                 referee_paid = pay_referee;
+            } else {
+                referee_paid = 0;
             };
+        } else {
+            referee_paid = 0;
         };
 
         if (referrer_paid == 0 && referee_paid == 0) {
@@ -371,7 +389,7 @@ module lottery::referrals {
 
     fun record_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
         let len = vector::length(ids);
-        let mut idx = 0;
+        let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
                 return;
@@ -382,9 +400,9 @@ module lottery::referrals {
     }
 
     fun copy_u64_vector(values: &vector<u64>): vector<u64> {
-        let mut out = vector::empty<u64>();
+        let out = vector::empty<u64>();
         let len = vector::length(values);
-        let mut idx = 0;
+        let idx = 0;
         while (idx < len) {
             vector::push_back(&mut out, *vector::borrow(values, idx));
             idx = idx + 1;

@@ -78,7 +78,7 @@ module lottery::history_tests {
         rounds::request_randomness(lottery_admin, lottery_id, b"log");
         let request_id = test_utils::unwrap(rounds::pending_request_id(lottery_id));
 
-        let mut randomness = vector::empty<u8>();
+        let randomness = vector::empty<u8>();
         vector::push_back(&mut randomness, 9);
         vector::push_back(&mut randomness, 0);
         vector::push_back(&mut randomness, 0);
@@ -150,7 +150,7 @@ module lottery::history_tests {
         rounds::request_randomness(lottery_admin, lottery_id, b"clear");
         let request_id = test_utils::unwrap(rounds::pending_request_id(lottery_id));
 
-        let mut randomness = vector::empty<u8>();
+        let randomness = vector::empty<u8>();
         vector::push_back(&mut randomness, 11);
         vector::push_back(&mut randomness, 0);
         vector::push_back(&mut randomness, 0);

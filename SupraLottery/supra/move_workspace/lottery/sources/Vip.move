@@ -149,7 +149,7 @@ module lottery::vip {
         let state = borrow_state_mut();
         let config = VipConfig { price, duration_secs, bonus_tickets };
         if (table::contains(&state.lotteries, lottery_id)) {
-            let mut lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
+            let lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
             lottery.config = config;
         } else {
             table::add(
@@ -221,9 +221,9 @@ module lottery::vip {
         let lottery = table::borrow(&state.lotteries, lottery_id);
         let total_members = vector::length(&lottery.members);
         let now = timestamp::now_seconds();
-        let mut active_members = 0;
+        let active_members = 0;
         let len = total_members;
-        let mut idx = 0;
+        let idx = 0;
         while (idx < len) {
             let member = *vector::borrow(&lottery.members, idx);
             if (table::contains(&lottery.subscriptions, member)) {
@@ -315,7 +315,7 @@ module lottery::vip {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return;
         };
-        let mut lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
+        let lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
         lottery.bonus_tickets_issued = math64::checked_add(lottery.bonus_tickets_issued, bonus_tickets);
         event::emit_event(
             &mut state.bonus_events,
@@ -336,7 +336,7 @@ module lottery::vip {
         if (!table::contains(&state.lotteries, lottery_id)) {
             abort E_UNKNOWN_LOTTERY;
         };
-        let mut lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
+        let lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
         let config_snapshot = lottery.config;
         let price = config_snapshot.price;
         let duration_secs = config_snapshot.duration_secs;
@@ -353,7 +353,7 @@ module lottery::vip {
         let renewed = table::contains(&lottery.subscriptions, player);
         let actual_expiry = expiry;
         if (renewed) {
-            let mut subscription = table::borrow_mut(&mut lottery.subscriptions, player);
+            let subscription = table::borrow_mut(&mut lottery.subscriptions, player);
             if (subscription.expiry_ts > now) {
                 subscription.expiry_ts = math64::checked_add(subscription.expiry_ts, duration_secs);
             } else {
@@ -394,7 +394,7 @@ module lottery::vip {
         if (!table::contains(&state.lotteries, lottery_id)) {
             abort E_UNKNOWN_LOTTERY;
         };
-        let mut lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
+        let lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
         if (!table::contains(&lottery.subscriptions, player)) {
             abort E_SUBSCRIPTION_NOT_FOUND;
         };
@@ -402,7 +402,7 @@ module lottery::vip {
         if (!caller_is_player && caller_addr != state.admin) {
             abort E_NOT_AUTHORIZED;
         };
-        let mut subscription = table::borrow_mut(&mut lottery.subscriptions, player);
+        let subscription = table::borrow_mut(&mut lottery.subscriptions, player);
         subscription.expiry_ts = timestamp::now_seconds();
         subscription.bonus_tickets = 0;
         event::emit_event(
@@ -419,7 +419,7 @@ module lottery::vip {
 
     fun record_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
         let len = vector::length(ids);
-        let mut idx = 0;
+        let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
                 return;
@@ -431,7 +431,7 @@ module lottery::vip {
 
     fun record_member(members: &mut vector<address>, member: address) {
         let len = vector::length(members);
-        let mut idx = 0;
+        let idx = 0;
         while (idx < len) {
             if (*vector::borrow(members, idx) == member) {
                 return;
@@ -442,9 +442,9 @@ module lottery::vip {
     }
 
     fun copy_u64_vector(values: &vector<u64>): vector<u64> {
-        let mut out = vector::empty<u64>();
+        let out = vector::empty<u64>();
         let len = vector::length(values);
-        let mut idx = 0;
+        let idx = 0;
         while (idx < len) {
             vector::push_back(&mut out, *vector::borrow(values, idx));
             idx = idx + 1;
@@ -453,9 +453,9 @@ module lottery::vip {
     }
 
     fun copy_address_vector(values: &vector<address>): vector<address> {
-        let mut out = vector::empty<address>();
+        let out = vector::empty<address>();
         let len = vector::length(values);
-        let mut idx = 0;
+        let idx = 0;
         while (idx < len) {
             vector::push_back(&mut out, *vector::borrow(values, idx));
             idx = idx + 1;

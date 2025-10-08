@@ -416,12 +416,12 @@ module std::vault {
                 VaultDelegate{vault_address: cap.vault_address, granted_caps: vector::empty()}
             );
             // Add the the delegate to VaultDelegates.
-            let mut vault_delegates = borrow_global_mut<VaultDelegates<Content>>(cap.vault_address);
+            let vault_delegates = borrow_global_mut<VaultDelegates<Content>>(cap.vault_address);
             add_element(&mut vault_delegates.delegates, addr);
         };
 
         // Grant the capability.
-        let mut delegate = borrow_global_mut<VaultDelegate<Content>>(addr);
+        let delegate = borrow_global_mut<VaultDelegate<Content>>(addr);
         add_element(&mut delegate.granted_caps, *&cap_type);
 
         // Generate event
@@ -437,14 +437,14 @@ module std::vault {
         );
         assert!(exists<VaultDelegate<Content>>(addr), error::not_found(EDELEGATE));
 
-        let mut delegate = borrow_global_mut<VaultDelegate<Content>>(addr);
+        let delegate = borrow_global_mut<VaultDelegate<Content>>(addr);
         remove_element(&mut delegate.granted_caps, &cap_type);
 
         // If the granted caps of this delegate drop to zero, remove it.
         if (vector::is_empty(&delegate.granted_caps)) {
             let VaultDelegate{ vault_address: _owner, granted_caps: _granted_caps} =
                 move_from<VaultDelegate<Content>>(addr);
-            let mut vault_delegates = borrow_global_mut<VaultDelegates<Content>>(cap.vault_address);
+            let vault_delegates = borrow_global_mut<VaultDelegates<Content>>(cap.vault_address);
             remove_element(&mut vault_delegates.delegates, &addr);
         };
 

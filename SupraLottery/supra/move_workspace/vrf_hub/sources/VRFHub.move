@@ -139,7 +139,7 @@ module vrf_hub::hub {
     ): u64 acquires HubState {
         ensure_admin(caller);
         let metadata_event = clone_bytes(&metadata);
-        let mut state = borrow_global_mut<HubState>(@vrf_hub);
+        let state = borrow_global_mut<HubState>(@vrf_hub);
         let id = state.next_lottery_id;
         state.next_lottery_id = id + 1;
         table::add(
@@ -164,11 +164,11 @@ module vrf_hub::hub {
     ) acquires HubState {
         ensure_admin(caller);
         let metadata_event = clone_bytes(&metadata);
-        let mut state = borrow_global_mut<HubState>(@vrf_hub);
+        let state = borrow_global_mut<HubState>(@vrf_hub);
         if (!table::contains(&state.lotteries, lottery_id)) {
             abort E_UNKNOWN_LOTTERY;
         };
-        let mut registration = table::borrow_mut(&mut state.lotteries, lottery_id);
+        let registration = table::borrow_mut(&mut state.lotteries, lottery_id);
         registration.metadata = metadata;
         event::emit_event(
             &mut state.metadata_events,
@@ -183,11 +183,11 @@ module vrf_hub::hub {
         active: bool,
     ) acquires HubState {
         ensure_admin(caller);
-        let mut state = borrow_global_mut<HubState>(@vrf_hub);
+        let state = borrow_global_mut<HubState>(@vrf_hub);
         if (!table::contains(&state.lotteries, lottery_id)) {
             abort E_UNKNOWN_LOTTERY;
         };
-        let mut registration = table::borrow_mut(&mut state.lotteries, lottery_id);
+        let registration = table::borrow_mut(&mut state.lotteries, lottery_id);
         if (registration.active != active) {
             registration.active = active;
             event::emit_event(
@@ -200,7 +200,7 @@ module vrf_hub::hub {
 
     public entry fun set_admin(caller: &signer, new_admin: address) acquires HubState {
         ensure_admin(caller);
-        let mut state = borrow_global_mut<HubState>(@vrf_hub);
+        let state = borrow_global_mut<HubState>(@vrf_hub);
         state.admin = new_admin;
     }
 
@@ -240,8 +240,8 @@ module vrf_hub::hub {
     #[view]
     public fun list_active_lottery_ids(): vector<u64> acquires HubState {
         let state = borrow_state();
-        let mut result = vector::empty<u64>();
-        let mut i = 0;
+        let result = vector::empty<u64>();
+        let i = 0;
         let len = vector::length(&state.lottery_ids);
         while (i < len) {
             let id = *vector::borrow(&state.lottery_ids, i);
@@ -259,7 +259,7 @@ module vrf_hub::hub {
 
     public entry fun set_callback_sender(caller: &signer, sender: address) acquires HubState {
         ensure_admin(caller);
-        let mut state = borrow_global_mut<HubState>(@vrf_hub);
+        let state = borrow_global_mut<HubState>(@vrf_hub);
         state.callback_sender = option::some(sender);
     }
 
@@ -271,7 +271,7 @@ module vrf_hub::hub {
 
 
     public(friend) fun request_randomness(lottery_id: u64, payload: vector<u8>): u64 acquires HubState {
-        let mut state = borrow_global_mut<HubState>(@vrf_hub);
+        let state = borrow_global_mut<HubState>(@vrf_hub);
         if (!table::contains(&state.lotteries, lottery_id)) {
             abort E_UNKNOWN_LOTTERY;
         };
@@ -294,7 +294,7 @@ module vrf_hub::hub {
 
 
     public(friend) fun consume_request(request_id: u64): RequestRecord acquires HubState {
-        let mut state = borrow_global_mut<HubState>(@vrf_hub);
+        let state = borrow_global_mut<HubState>(@vrf_hub);
         if (!table::contains(&state.requests, request_id)) {
             abort E_UNKNOWN_REQUEST;
         };
@@ -326,7 +326,7 @@ module vrf_hub::hub {
         lottery_id: u64,
         randomness: vector<u8>,
     ) acquires HubState {
-        let mut state = borrow_global_mut<HubState>(@vrf_hub);
+        let state = borrow_global_mut<HubState>(@vrf_hub);
         let randomness_for_event = clone_bytes(&randomness);
         event::emit_event(
             &mut state.fulfill_events,
@@ -361,8 +361,8 @@ module vrf_hub::hub {
 
     fun clone_bytes(data: &vector<u8>): vector<u8> {
         let length = vector::length(data);
-        let mut i = 0;
-        let mut buffer = vector::empty<u8>();
+        let i = 0;
+        let buffer = vector::empty<u8>();
         while (i < length) {
             let byte = *vector::borrow(data, i);
             vector::push_back(&mut buffer, byte);
@@ -372,8 +372,8 @@ module vrf_hub::hub {
     }
 
     fun clone_ids(ids: &vector<u64>): vector<u64> {
-        let mut result = vector::empty<u64>();
-        let mut i = 0;
+        let result = vector::empty<u64>();
+        let i = 0;
         let len = vector::length(ids);
         while (i < len) {
             let value = *vector::borrow(ids, i);
@@ -384,8 +384,8 @@ module vrf_hub::hub {
     }
 
     fun remove_pending_request_id(ids: &mut vector<u64>, request_id: u64) {
-        let mut i = 0;
-        let mut len = vector::length(ids);
+        let i = 0;
+        let len = vector::length(ids);
         while (i < len) {
             let current = *vector::borrow(ids, i);
             if (current == request_id) {

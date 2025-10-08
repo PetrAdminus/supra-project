@@ -88,7 +88,7 @@ module lottery_factory::registry {
         metadata: vector<u8>,
     ): u64 acquires FactoryState, hub::HubState {
         ensure_admin(caller);
-        let mut state = borrow_global_mut<FactoryState>(@lottery_factory);
+        let state = borrow_global_mut<FactoryState>(@lottery_factory);
         let lottery_id = hub::register_lottery(caller, owner, lottery, metadata);
         table::add(
             &mut state.lotteries,
@@ -107,18 +107,18 @@ module lottery_factory::registry {
         blueprint: LotteryBlueprint,
     ) acquires FactoryState {
         ensure_admin(caller);
-        let mut state = borrow_global_mut<FactoryState>(@lottery_factory);
+        let state = borrow_global_mut<FactoryState>(@lottery_factory);
         if (!table::contains(&state.lotteries, lottery_id)) {
             abort E_UNKNOWN_LOTTERY;
         };
-        let mut info = table::borrow_mut(&mut state.lotteries, lottery_id);
+        let info = table::borrow_mut(&mut state.lotteries, lottery_id);
         info.blueprint = blueprint;
     }
 
 
     public entry fun set_admin(caller: &signer, new_admin: address) acquires FactoryState {
         ensure_admin(caller);
-        let mut state = borrow_global_mut<FactoryState>(@lottery_factory);
+        let state = borrow_global_mut<FactoryState>(@lottery_factory);
         state.admin = new_admin;
     }
 

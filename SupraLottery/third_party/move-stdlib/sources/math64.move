@@ -1,4 +1,5 @@
 module std::math64 {
+    friend std::fixed_point32;
     const E_OVERFLOW: u64 = 0;
     const E_DIV_BY_ZERO: u64 = 1;
 
@@ -27,12 +28,54 @@ module std::math64 {
 
     public fun mul_div(value: u64, numerator: u64, denominator: u64): u64 {
         assert!(denominator > 0, E_DIV_BY_ZERO);
-        let value128 = value as u128;
-        let numerator128 = numerator as u128;
-        let denominator128 = denominator as u128;
+        let value128 = to_u128(value);
+        let numerator128 = to_u128(numerator);
+        let denominator128 = to_u128(denominator);
         let product = value128 * numerator128;
         let result128 = product / denominator128;
-        assert!(result128 <= MAX_U64_AS_U128, E_OVERFLOW);
-        result128 as u64
+        from_u128(result128)
+    }
+
+    public(friend) fun to_u128(value: u64): u128 {
+        let result = 0u128;
+        let base = 1u128;
+        let remaining = value;
+        while (remaining > 0) {
+            if ((remaining & 1) == 1) {
+                result = result + base;
+            };
+            remaining = remaining >> 1;
+            if (remaining > 0) {
+                base = base << 1;
+            };
+        };
+        result
+    }
+
+    public(friend) fun from_u128(value: u128): u64 {
+        assert!(value <= MAX_U64_AS_U128, E_OVERFLOW);
+        let result = 0u64;
+        let base = 1u64;
+        let remaining = value;
+        while (remaining > 0) {
+            if ((remaining & 1u128) == 1u128) {
+                result = result + base;
+            };
+            remaining = remaining >> 1;
+            if (remaining > 0) {
+                base = base << 1;
+            };
+        };
+        result
+    }
+
+    public fun from_u16(value: u16): u64 {
+        let result = 0u64;
+        let remaining = value;
+        while (remaining > 0) {
+            result = result + 1;
+            remaining = remaining - 1;
+        };
+        result
     }
 }

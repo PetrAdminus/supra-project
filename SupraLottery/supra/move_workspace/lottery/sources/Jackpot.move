@@ -125,7 +125,7 @@ module lottery::jackpot {
     public entry fun grant_tickets_batch(caller: &signer, players: vector<address>) acquires JackpotState {
         ensure_admin(caller);
         let len = vector::length(&players);
-        let mut i = 0;
+        let i = 0;
         while (i < len) {
             let player = *vector::borrow(&players, i);
             grant_ticket(caller, player);
@@ -320,8 +320,8 @@ module lottery::jackpot {
         if (vector::length(randomness) < 8) {
             abort E_RANDOM_BYTES_TOO_SHORT;
         };
-        let mut prefix = vector::empty<u8>();
-        let mut i = 0;
+        let prefix = vector::empty<u8>();
+        let i = 0;
         while (i < 8) {
             let byte = *vector::borrow(randomness, i);
             vector::push_back(&mut prefix, byte);
@@ -331,9 +331,9 @@ module lottery::jackpot {
     }
 
     fun clone_bytes(data: &vector<u8>): vector<u8> {
-        let mut buffer = vector::empty<u8>();
+        let buffer = vector::empty<u8>();
         let len = vector::length(data);
-        let mut i = 0;
+        let i = 0;
         while (i < len) {
             let byte = *vector::borrow(data, i);
             vector::push_back(&mut buffer, byte);

@@ -142,7 +142,7 @@ module lottery::store {
         let state_ref = borrow_state_mut();
         let store = borrow_or_add_store(state_ref, lottery_id);
         if (table::contains(&store.items, item_id)) {
-            let mut record = table::borrow_mut(&mut store.items, item_id);
+            let record = table::borrow_mut(&mut store.items, item_id);
             let metadata_for_record = copy_vec_u8(&metadata);
             record.item = StoreItem { price, metadata: metadata_for_record, available, stock };
         } else {
@@ -173,11 +173,11 @@ module lottery::store {
         if (!table::contains(&state_ref.lotteries, lottery_id)) {
             abort E_ITEM_NOT_FOUND;
         };
-        let mut store = table::borrow_mut(&mut state_ref.lotteries, lottery_id);
+        let store = table::borrow_mut(&mut state_ref.lotteries, lottery_id);
         if (!table::contains(&store.items, item_id)) {
             abort E_ITEM_NOT_FOUND;
         };
-        let mut record = table::borrow_mut(&mut store.items, item_id);
+        let record = table::borrow_mut(&mut store.items, item_id);
         record.item.available = available;
         event::emit_event(
             &mut state_ref.item_events,
@@ -206,7 +206,7 @@ module lottery::store {
         if (!table::contains(&store.items, item_id)) {
             abort E_ITEM_NOT_FOUND;
         };
-        let mut record = table::borrow_mut(&mut store.items, item_id);
+        let record = table::borrow_mut(&mut store.items, item_id);
         if (!record.item.available) {
             abort E_ITEM_NOT_FOUND;
         };
@@ -305,8 +305,8 @@ module lottery::store {
             return option::none();
         };
         let store = table::borrow(&state_ref.lotteries, lottery_id);
-        let mut result = vector::empty<ItemWithStats>();
-        let mut idx = 0;
+        let result = vector::empty<ItemWithStats>();
+        let idx = 0;
         let len = vector::length(&store.item_ids);
         while (idx < len) {
             let item_id = *vector::borrow(&store.item_ids, idx);
@@ -357,8 +357,8 @@ module lottery::store {
     }
 
     fun copy_vec_u8(source: &vector<u8>): vector<u8> {
-        let mut result = vector::empty<u8>();
-        let mut i = 0;
+        let result = vector::empty<u8>();
+        let i = 0;
         let len = vector::length(source);
         while (i < len) {
             vector::push_back(&mut result, *vector::borrow(source, i));
@@ -368,8 +368,8 @@ module lottery::store {
     }
 
     fun copy_vec_u64(source: &vector<u64>): vector<u64> {
-        let mut result = vector::empty<u64>();
-        let mut i = 0;
+        let result = vector::empty<u64>();
+        let i = 0;
         let len = vector::length(source);
         while (i < len) {
             vector::push_back(&mut result, *vector::borrow(source, i));

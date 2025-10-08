@@ -52,7 +52,7 @@ module std::vector {
 
     /// Return an vector of size one containing element `e`.
     public fun singleton<Element>(e: Element): vector<Element> {
-        let mut v = empty();
+        let v = empty();
         push_back(&mut v, e);
         v
     }
@@ -68,8 +68,8 @@ module std::vector {
         let len = length(v);
         if (len == 0) return ();
 
-        let mut front_index = 0;
-        let mut back_index = len - 1;
+        let front_index = 0;
+        let back_index = len - 1;
         while (front_index < back_index) {
             swap(v, front_index, back_index);
             front_index = front_index + 1;
@@ -83,7 +83,7 @@ module std::vector {
 
     /// Pushes all of the elements of the `other` vector into the `lhs` vector.
     public fun append<Element>(lhs: &mut vector<Element>, other: vector<Element>) {
-        let mut rhs = other;
+        let rhs = other;
         reverse(&mut rhs);
         while (!is_empty(&rhs)) push_back(lhs, pop_back(&mut rhs));
         destroy_empty(rhs);
@@ -104,7 +104,7 @@ module std::vector {
     /// Return true if `e` is in the vector `v`.
     /// Otherwise, returns false.
     public fun contains<Element>(v: &vector<Element>, e: &Element): bool {
-        let mut i = 0;
+        let i = 0;
         let len = length(v);
         while (i < len) {
             if (borrow(v, i) == e) return true;
@@ -119,7 +119,7 @@ module std::vector {
     /// Return `(true, i)` if `e` is in the vector `v` at index `i`.
     /// Otherwise, returns `(false, 0)`.
     public fun index_of<Element>(v: &vector<Element>, e: &Element): (bool, u64) {
-        let mut i = 0;
+        let i = 0;
         let len = length(v);
         while (i < len) {
             if (borrow(v, i) == e) return (true, i);
@@ -138,7 +138,7 @@ module std::vector {
         let len = length(v);
         if (index >= len) abort EINDEX_OUT_OF_BOUNDS;
 
-        let mut current = index;
+        let current = index;
         let last = len - 1;
         while (current < last) {
             swap(v, current, current + 1);
@@ -160,7 +160,7 @@ module std::vector {
         if (index > len) abort EINDEX_OUT_OF_BOUNDS;
 
         push_back(v, e);
-        let mut current = len;
+        let current = len;
         while (current > index) {
             let prev = current - 1;
             swap(v, prev, current);

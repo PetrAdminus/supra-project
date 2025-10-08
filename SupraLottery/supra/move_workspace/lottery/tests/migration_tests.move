@@ -20,7 +20,7 @@ module lottery::migration_tests {
     ) {
         setup_environment(lottery);
 
-        let mut metadata = vector::empty<u8>();
+        let metadata = vector::empty<u8>();
         let blueprint = registry::new_blueprint(100, 1_000);
         let lottery_id = registry::create_lottery(
             lottery,
@@ -31,7 +31,7 @@ module lottery::migration_tests {
         );
         instances::create_instance(lottery, lottery_id);
 
-        let mut tickets = vector::empty<address>();
+        let tickets = vector::empty<address>();
         vector::push_back(&mut tickets, signer::address_of(lottery_owner));
         vector::push_back(&mut tickets, signer::address_of(lottery_contract));
         main_v2::set_draw_state_for_test(true, tickets);
@@ -73,7 +73,7 @@ module lottery::migration_tests {
         setup_environment(lottery);
 
         let blueprint = registry::new_blueprint(100, 1_000);
-        let mut metadata = vector::empty<u8>();
+        let metadata = vector::empty<u8>();
         let lottery_id = registry::create_lottery(
             lottery,
             signer::address_of(lottery),

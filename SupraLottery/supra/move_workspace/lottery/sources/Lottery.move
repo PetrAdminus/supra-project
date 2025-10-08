@@ -211,7 +211,7 @@ module lottery::main_v2 {
     }
 
     public(friend) fun clear_state_after_migration() acquires LotteryData {
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         clear_addresses(&mut lottery.tickets);
         lottery.jackpot_amount = 0;
         lottery.draw_scheduled = false;
@@ -224,9 +224,9 @@ module lottery::main_v2 {
     }
 
     fun clone_addresses(source: &vector<address>): vector<address> {
-        let mut result = vector::empty<address>();
+        let result = vector::empty<address>();
         let len = vector::length(source);
-        let mut i = 0;
+        let i = 0;
         while (i < len) {
             let value = *vector::borrow(source, i);
             vector::push_back(&mut result, value);
@@ -333,7 +333,7 @@ module lottery::main_v2 {
 
         // Withdraw from user and add to contract pool
         treasury_v1::deposit_from_user(user, ticket_price);
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         let new_jackpot = safe_add_u64(lottery.jackpot_amount, ticket_price, E_JACKPOT_OVERFLOW);
         lottery.jackpot_amount = new_jackpot;
 
@@ -411,7 +411,7 @@ module lottery::main_v2 {
             pending_request,
         });
 
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         lottery.max_gas_fee = per_request_fee_u64;
     }
 
@@ -424,7 +424,7 @@ module lottery::main_v2 {
         let admin = signer::address_of(sender);
         assert!(admin == @lottery, E_NOT_OWNER);
 
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         assert!(option::is_none(&lottery.pending_request), E_REQUEST_STILL_PENDING);
         assert!(aggregator != @0x0, E_INVALID_CALLBACK_SENDER);
         lottery.whitelisted_callback_sender = option::some(aggregator);
@@ -435,7 +435,7 @@ module lottery::main_v2 {
         let admin = signer::address_of(sender);
         assert!(admin == @lottery, E_NOT_OWNER);
 
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         assert!(option::is_none(&lottery.pending_request), E_REQUEST_STILL_PENDING);
         assert!(option::is_some(&lottery.whitelisted_callback_sender), E_CALLBACK_SOURCE_NOT_SET);
         let aggregator = option::extract(&mut lottery.whitelisted_callback_sender);
@@ -446,7 +446,7 @@ module lottery::main_v2 {
         let admin = signer::address_of(sender);
         assert!(admin == @lottery, E_NOT_OWNER);
 
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         assert!(consumer != @0x0, E_INVALID_CONSUMER_ADDRESS);
         assert!(!is_consumer_whitelisted(&lottery.whitelisted_consumers, consumer), E_CONSUMER_ALREADY_WHITELISTED);
         vector::push_back(&mut lottery.whitelisted_consumers, consumer);
@@ -457,7 +457,7 @@ module lottery::main_v2 {
         let admin = signer::address_of(sender);
         assert!(admin == @lottery, E_NOT_OWNER);
 
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         assert!(consumer != @lottery, E_CANNOT_REMOVE_DEFAULT_CONSUMER);
         let removed = remove_consumer_from_list(&mut lottery.whitelisted_consumers, consumer);
         assert!(removed, E_CONSUMER_NOT_WHITELISTED);
@@ -492,7 +492,7 @@ module lottery::main_v2 {
             deposit::clientSettingMinimumBalance(sender, min_balance);
         };
 
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         lottery.max_gas_fee = per_request_fee_u64;
         let callback_sender = copy_option_address(&lottery.whitelisted_callback_sender);
         let consumer_count = vector::length(&lottery.whitelisted_consumers);
@@ -541,7 +541,7 @@ module lottery::main_v2 {
         let admin = signer::address_of(sender);
         assert!(admin == @lottery, E_NOT_OWNER);
 
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         ensure_gas_configured_values(
             lottery.max_gas_price,
             lottery.max_gas_limit,
@@ -583,7 +583,7 @@ module lottery::main_v2 {
         let admin = signer::address_of(sender);
         assert!(admin == @lottery, E_NOT_OWNER);
 
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         assert!(lottery.callback_gas_price == callback_gas_price, E_CONSUMER_WHITELIST_SNAPSHOT_MISMATCH);
         assert!(lottery.callback_gas_limit == callback_gas_limit, E_CONSUMER_WHITELIST_SNAPSHOT_MISMATCH);
 
@@ -607,7 +607,7 @@ module lottery::main_v2 {
         let admin = signer::address_of(sender);
         assert!(admin == @lottery, E_NOT_OWNER);
 
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         assert!(option::is_none(&lottery.pending_request), E_REQUEST_STILL_PENDING);
         assert!(rng_count == EXPECTED_RNG_COUNT, E_INVALID_REQUEST_CONFIG);
         assert!(client_seed < U64_MAX, E_CLIENT_SEED_OVERFLOW);
@@ -632,7 +632,7 @@ module lottery::main_v2 {
         let admin = signer::address_of(sender);
         assert!(admin == @lottery, E_NOT_OWNER);
 
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         assert!(option::is_none(&lottery.pending_request), E_REQUEST_STILL_PENDING);
         assert!(max_gas_price > 0, E_INVALID_GAS_CONFIG);
         assert!(max_gas_limit > 0, E_INVALID_GAS_CONFIG);
@@ -717,7 +717,7 @@ module lottery::main_v2 {
         // Only lottery admin can trigger manual draw
         assert!(signer::address_of(sender) == @lottery, E_NOT_OWNER);
 
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         assert!(lottery.draw_scheduled, E_DRAW_NOT_SCHEDULED); // Draw must be scheduled
         assert!(vector::length(&lottery.tickets) > 0, E_NO_TICKETS_AVAILABLE); // Must have tickets
         assert!(option::is_none(&lottery.pending_request), E_PENDING_REQUEST_STATE); // Prevent overlapping requests
@@ -730,7 +730,7 @@ module lottery::main_v2 {
         // Only lottery admin can trigger simple draw
         assert!(signer::address_of(sender) == @lottery, E_NOT_OWNER);
 
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         assert!(lottery.draw_scheduled, E_DRAW_NOT_SCHEDULED); // Draw must be scheduled
         assert!(vector::length(&lottery.tickets) > 0, E_NO_TICKETS_AVAILABLE); // Must have tickets
         assert!(option::is_none(&lottery.pending_request), E_PENDING_REQUEST_STATE); // Respect pending VRF request
@@ -832,7 +832,7 @@ module lottery::main_v2 {
         payload_hash: option::Option<vector<u8>>,
         requester: option::Option<address>
     ) acquires LotteryData {
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         lottery.pending_request = nonce;
         lottery.last_request_payload_hash = payload_hash;
         lottery.last_requester = requester;
@@ -840,14 +840,14 @@ module lottery::main_v2 {
 
     #[test_only]
     public fun clear_pending_request_state_for_test() acquires LotteryData {
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         clear_pending_request_state(lottery);
     }
 
     #[test_only]
     public fun set_draw_state_for_test(draw_scheduled: bool, tickets: vector<address>) acquires LotteryData {
         let ticket_count = vector::length(&tickets);
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         lottery.draw_scheduled = draw_scheduled;
         lottery.tickets = tickets;
         lottery.next_ticket_id = safe_add_u64(ticket_count, 1, E_TICKET_ID_OVERFLOW);
@@ -855,13 +855,13 @@ module lottery::main_v2 {
 
     #[test_only]
     public fun set_jackpot_amount_for_test(amount: u64) acquires LotteryData {
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         lottery.jackpot_amount = amount;
     }
 
     #[test_only]
     public fun set_next_ticket_id_for_test(next_id: u64) acquires LotteryData {
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         lottery.next_ticket_id = next_id;
     }
 
@@ -880,7 +880,7 @@ module lottery::main_v2 {
         client_seed: u64,
         caller_address: address
     ) acquires LotteryData {
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         handle_verified_random(lottery, nonce, message, verified_nums, rng_count, client_seed, caller_address);
     }
     #[test_only]
@@ -1120,7 +1120,7 @@ module lottery::main_v2 {
             ensure_callback_sender_configured(lottery_view);
             ensure_consumer_whitelisted(lottery_view, requester);
         };
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         let client_seed = next_client_seed(lottery);
         record_vrf_request(lottery, nonce, client_seed, requester);
     }
@@ -1194,14 +1194,14 @@ module lottery::main_v2 {
 
     #[test_only]
     public fun set_rng_counters_for_test(requests: u64, responses: u64) acquires LotteryData {
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         lottery.rng_request_count = requests;
         lottery.rng_response_count = responses;
     }
 
     #[test_only]
     public fun set_callback_aggregator_for_test(value: option::Option<address>) acquires LotteryData {
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         lottery.whitelisted_callback_sender = value;
     }
 
@@ -1288,7 +1288,7 @@ module lottery::main_v2 {
             client_seed
         );
 
-        let mut lottery = borrow_global_mut<LotteryData>(@lottery);
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
         let caller = caller_address;
         handle_verified_random(lottery, nonce, message, verified_nums, rng_count, client_seed, caller);
     }
@@ -1408,8 +1408,8 @@ module lottery::main_v2 {
             vector::empty<address>()
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
-            let mut tickets = vector::empty<address>();
-            let mut i = 0;
+            let tickets = vector::empty<address>();
+            let i = 0;
             let len = vector::length(&lottery.tickets);
             while (i < len) {
                 let ticket = *vector::borrow(&lottery.tickets, i);
@@ -1429,9 +1429,9 @@ module lottery::main_v2 {
             }
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
-            let mut consumers = vector::empty<address>();
+            let consumers = vector::empty<address>();
             let len = vector::length(&lottery.whitelisted_consumers);
-            let mut i = 0;
+            let i = 0;
             while (i < len) {
                 let consumer = *vector::borrow(&lottery.whitelisted_consumers, i);
                 vector::push_back(&mut consumers, consumer);
@@ -1559,9 +1559,9 @@ module lottery::main_v2 {
     }
 
     fun is_consumer_whitelisted(consumers: &vector<address>, target: address): bool {
-        let mut i = 0;
+        let i = 0;
         let len = vector::length(consumers);
-        let mut found = false;
+        let found = false;
         while (i < len) {
             if (*vector::borrow(consumers, i) == target) {
                 found = true;
@@ -1574,8 +1574,8 @@ module lottery::main_v2 {
 
     fun remove_consumer_from_list(consumers: &mut vector<address>, target: address): bool {
         let len = vector::length(consumers);
-        let mut i = 0;
-        let mut removed = false;
+        let i = 0;
+        let removed = false;
         while (i < len) {
             if (*vector::borrow(consumers, i) == target) {
                 vector::swap_remove(consumers, i);
@@ -1709,8 +1709,8 @@ module lottery::main_v2 {
             false
         } else {
             let len = vector::length(lhs);
-            let mut i = 0;
-            let mut equal = true;
+            let i = 0;
+            let equal = true;
             while (i < len) {
                 if (*vector::borrow(lhs, i) != *vector::borrow(rhs, i)) {
                     equal = false;
@@ -1725,8 +1725,8 @@ module lottery::main_v2 {
     fun first_u64_from_bytes(bytes: &vector<u8>): u64 {
         assert!(vector::length(bytes) >= 8, E_RANDOM_BYTES_TOO_SHORT);
 
-        let mut value = 0;
-        let mut i = 8;
+        let value = 0;
+        let i = 8;
         while (i > 0) {
             i = i - 1;
             let byte = *vector::borrow(bytes, i);

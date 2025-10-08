@@ -30,9 +30,9 @@ module lottery::jackpot_tests {
     }
 
     fun build_randomness(value: u8): vector<u8> {
-        let mut randomness = vector::empty<u8>();
+        let randomness = vector::empty<u8>();
         vector::push_back(&mut randomness, value);
-        let mut i = 1;
+        let i = 1;
         while (i < 8) {
             vector::push_back(&mut randomness, 0);
             i = i + 1;

@@ -167,9 +167,9 @@ module lottery::treasury_v1 {
     }
 
     fun to_u128(value: u64): u128 {
-        let mut remaining = value;
-        let mut result: u128 = 0;
-        let mut place: u128 = 1;
+        let remaining = value;
+        let result: u128 = 0;
+        let place: u128 = 1;
         while (remaining > 0) {
             if (remaining % 2 == 1) {
                 result = result + place;
@@ -201,7 +201,7 @@ module lottery::treasury_v1 {
         let symbol_string = string::utf8(symbol);
         let icon_uri_string = string::utf8(icon_uri);
         let project_uri_string = string::utf8(project_uri);
-        let mut stores = table::new<address, StoreInfo>();
+        let stores = table::new<address, StoreInfo>();
         table::add(&mut stores, admin_addr, StoreInfo { balance: 0, frozen: false });
 
         move_to(
@@ -271,7 +271,7 @@ module lottery::treasury_v1 {
         let state = borrow_state_mut();
         ensure_store_exists(state, owner);
         {
-            let mut store = table::borrow_mut(&mut state.stores, owner);
+            let store = table::borrow_mut(&mut state.stores, owner);
             assert!(!store.frozen, E_STORE_FROZEN);
             store.balance = store.balance - amount;
         };
@@ -290,12 +290,12 @@ module lottery::treasury_v1 {
         ensure_store_exists(state, from);
         ensure_store_exists(state, to);
         {
-            let mut from_store = table::borrow_mut(&mut state.stores, from);
+            let from_store = table::borrow_mut(&mut state.stores, from);
             assert!(!from_store.frozen, E_STORE_FROZEN);
             from_store.balance = from_store.balance - amount;
         };
         {
-            let mut to_store = table::borrow_mut(&mut state.stores, to);
+            let to_store = table::borrow_mut(&mut state.stores, to);
             assert!(!to_store.frozen, E_STORE_FROZEN);
             to_store.balance = to_store.balance + amount;
         };
@@ -310,7 +310,7 @@ module lottery::treasury_v1 {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
         let state = borrow_state_mut();
         ensure_store_exists(state, account);
-        let mut store = table::borrow_mut(&mut state.stores, account);
+        let store = table::borrow_mut(&mut state.stores, account);
         store.frozen = frozen;
     }
 
@@ -321,12 +321,12 @@ module lottery::treasury_v1 {
         assert!(store_registered_internal(state, user_addr), E_STORE_NOT_REGISTERED);
         assert!(store_registered_internal(state, @lottery), E_TREASURY_STORE_NOT_REGISTERED);
         {
-            let mut store = table::borrow_mut(&mut state.stores, user_addr);
+            let store = table::borrow_mut(&mut state.stores, user_addr);
             assert!(!store.frozen, E_STORE_FROZEN);
             store.balance = store.balance - amount;
         };
         {
-            let mut treasury_store = table::borrow_mut(&mut state.stores, @lottery);
+            let treasury_store = table::borrow_mut(&mut state.stores, @lottery);
             treasury_store.balance = treasury_store.balance + amount;
         };
     }
@@ -337,11 +337,11 @@ module lottery::treasury_v1 {
         assert!(store_registered_internal(state, @lottery), E_TREASURY_STORE_NOT_REGISTERED);
         assert!(store_registered_internal(state, recipient), E_STORE_NOT_REGISTERED);
         {
-            let mut treasury_store = table::borrow_mut(&mut state.stores, @lottery);
+            let treasury_store = table::borrow_mut(&mut state.stores, @lottery);
             treasury_store.balance = treasury_store.balance - amount;
         };
         {
-            let mut recipient_store = table::borrow_mut(&mut state.stores, recipient);
+            let recipient_store = table::borrow_mut(&mut state.stores, recipient);
             assert!(!recipient_store.frozen, E_STORE_FROZEN);
             recipient_store.balance = recipient_store.balance + amount;
         };
@@ -366,7 +366,7 @@ module lottery::treasury_v1 {
         ensure_recipient_store_registered(state, team);
         ensure_recipient_store_registered(state, partners);
 
-        let mut vaults = borrow_global_mut<Vaults>(@lottery);
+        let vaults = borrow_global_mut<Vaults>(@lottery);
         vaults.recipients = VaultRecipients { treasury, marketing, community, team, partners };
     }
 
@@ -562,11 +562,11 @@ module lottery::treasury_v1 {
             E_RECIPIENT_STORE_NOT_REGISTERED
         );
         {
-            let mut treasury_store = table::borrow_mut(&mut state.stores, @lottery);
+            let treasury_store = table::borrow_mut(&mut state.stores, @lottery);
             treasury_store.balance = treasury_store.balance - amount;
         };
         {
-            let mut target_store = table::borrow_mut(&mut state.stores, target);
+            let target_store = table::borrow_mut(&mut state.stores, target);
             assert!(!target_store.frozen, E_STORE_FROZEN);
             target_store.balance = target_store.balance + amount;
         };
@@ -619,11 +619,11 @@ module lottery::treasury_v1 {
 
         let winner_amount = winner_share;
         {
-            let mut treasury_store = table::borrow_mut(&mut state.stores, @lottery);
+            let treasury_store = table::borrow_mut(&mut state.stores, @lottery);
             treasury_store.balance = treasury_store.balance - winner_amount;
         };
         {
-            let mut winner_store = table::borrow_mut(&mut state.stores, winner);
+            let winner_store = table::borrow_mut(&mut state.stores, winner);
             assert!(!winner_store.frozen, E_STORE_FROZEN);
             winner_store.balance = winner_store.balance + winner_amount;
         };
@@ -674,7 +674,7 @@ module lottery::treasury_v1 {
         };
         validate_basis_points(&config);
 
-        let mut vaults = borrow_global_mut<Vaults>(@lottery);
+        let vaults = borrow_global_mut<Vaults>(@lottery);
         vaults.config = config;
         emit_config();
     }

@@ -55,7 +55,7 @@ module std::ascii {
     /// characters. Otherwise returns `None`.
     public fun try_string(bytes: vector<u8>): Option<String> {
        let len = vector::length(&bytes);
-       let mut i = 0;
+       let i = 0;
        while ({
            spec {
                invariant i <= len;
@@ -78,7 +78,7 @@ module std::ascii {
     /// Returns `false` otherwise. Not all `String`s are printable strings.
     public fun all_characters_printable(string: &String): bool {
        let len = vector::length(&string.bytes);
-       let mut i = 0;
+       let i = 0;
        while ({
            spec {
                invariant i <= len;

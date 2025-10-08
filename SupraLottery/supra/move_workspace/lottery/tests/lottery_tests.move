@@ -1976,7 +1976,7 @@ module lottery::lottery_tests {
         if (vector::length(lhs) != vector::length(rhs)) {
             return false
         };
-        let mut i = 0;
+        let i = 0;
         let len = vector::length(lhs);
         while (i < len) {
             if (*vector::borrow(lhs, i) != *vector::borrow(rhs, i)) {

@@ -15,7 +15,7 @@
 module std::errors {
     /// A function to create an error from from a category and a reason.
     fun make(category: u8, reason: u64): u64 {
-        (category as u64) + (reason << 8)
+        u8_to_u64(category) + (reason << 8)
     }
     spec make {
         pragma opaque = true;
@@ -131,5 +131,15 @@ module std::errors {
         pragma opaque = true;
         aborts_if false;
         ensures result == CUSTOM;
+    }
+
+    fun u8_to_u64(value: u8): u64 {
+        let result = 0u64;
+        let remaining = value;
+        while (remaining > 0) {
+            result = result + 1;
+            remaining = remaining - 1;
+        };
+        result
     }
 }

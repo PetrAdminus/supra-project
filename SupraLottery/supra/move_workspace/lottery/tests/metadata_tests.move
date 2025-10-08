@@ -10,7 +10,7 @@ module lottery::metadata_tests {
             return false;
         };
         let len = vector::length(lhs);
-        let mut i = 0;
+        let i = 0;
         while (i < len) {
             if (*vector::borrow(lhs, i) != *vector::borrow(rhs, i)) {
                 return false;

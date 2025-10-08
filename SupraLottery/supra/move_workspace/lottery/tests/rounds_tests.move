@@ -218,7 +218,7 @@ module lottery::rounds_tests {
         let request_opt = rounds::pending_request_id(lottery_id);
         let request_id = test_utils::unwrap(request_opt);
 
-        let mut randomness = vector::empty<u8>();
+        let randomness = vector::empty<u8>();
         vector::push_back(&mut randomness, 5);
         vector::push_back(&mut randomness, 0);
         vector::push_back(&mut randomness, 0);

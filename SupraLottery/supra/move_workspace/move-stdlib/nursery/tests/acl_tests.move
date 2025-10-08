@@ -17,7 +17,7 @@ module std::aclTests {
         acl::add(&mut acl, signer::address_of(&alice));
         move_to(&alice, Data {value: 0, write_acl: acl});
 
-        let mut alice_data = borrow_global_mut<Data>(signer::address_of(&alice));
+        let alice_data = borrow_global_mut<Data>(signer::address_of(&alice));
         acl::add(&mut alice_data.write_acl, signer::address_of(&bob));
         acl::remove(&mut alice_data.write_acl, signer::address_of(&bob));
     }
@@ -30,7 +30,7 @@ module std::aclTests {
         acl::add(&mut acl, signer::address_of(&alice));
         move_to(&alice, Data {value: 0, write_acl: acl});
 
-        let mut alice_data = borrow_global_mut<Data>(signer::address_of(&alice));
+        let alice_data = borrow_global_mut<Data>(signer::address_of(&alice));
         acl::add(&mut alice_data.write_acl, signer::address_of(&bob));
         acl::add(&mut alice_data.write_acl, signer::address_of(&bob));
     }
@@ -43,7 +43,7 @@ module std::aclTests {
         acl::add(&mut acl, signer::address_of(&alice));
         move_to(&alice, Data {value: 0, write_acl: acl});
 
-        let mut alice_data = borrow_global_mut<Data>(signer::address_of(&alice));
+        let alice_data = borrow_global_mut<Data>(signer::address_of(&alice));
         acl::remove(&mut alice_data.write_acl, signer::address_of(&bob));
     }
 

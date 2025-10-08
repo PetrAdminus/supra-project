@@ -139,7 +139,7 @@ module lottery::autopurchase {
                 AutopurchasePlan { balance: 0, tickets_per_draw, active },
             );
         } else {
-            let mut plan = table::borrow_mut(&mut plans.plans, player);
+            let plan = table::borrow_mut(&mut plans.plans, player);
             plan.tickets_per_draw = tickets_per_draw;
             plan.active = active;
         };
@@ -167,7 +167,7 @@ module lottery::autopurchase {
                 AutopurchasePlan { balance: amount, tickets_per_draw: 0, active: false },
             );
         } else {
-            let mut plan = table::borrow_mut(&mut plans.plans, player);
+            let plan = table::borrow_mut(&mut plans.plans, player);
             plan.balance = math64::checked_add(plan.balance, amount);
         };
         plans.total_balance = math64::checked_add(plans.total_balance, amount);
@@ -192,7 +192,7 @@ module lottery::autopurchase {
         if (!table::contains(&plans.plans, player)) {
             abort E_PLAN_NOT_FOUND;
         };
-        let mut plan = table::borrow_mut(&mut plans.plans, player);
+        let plan = table::borrow_mut(&mut plans.plans, player);
         if (!plan.active) {
             abort E_PLAN_INACTIVE;
         };
@@ -245,7 +245,7 @@ module lottery::autopurchase {
         if (!table::contains(&plans.plans, player)) {
             abort E_PLAN_NOT_FOUND;
         };
-        let mut plan = table::borrow_mut(&mut plans.plans, player);
+        let plan = table::borrow_mut(&mut plans.plans, player);
         if (plan.balance < amount) {
             abort E_INSUFFICIENT_BALANCE;
         };
@@ -288,8 +288,8 @@ module lottery::autopurchase {
         };
         let plans = table::borrow(&state.lotteries, lottery_id);
         let total_players = vector::length(&plans.players);
-        let mut active_players = 0;
-        let mut idx = 0;
+        let active_players = 0;
+        let idx = 0;
         while (idx < total_players) {
             let player = *vector::borrow(&plans.players, idx);
             if (table::contains(&plans.plans, player)) {
@@ -363,7 +363,7 @@ module lottery::autopurchase {
 
     fun record_player(plans: &mut LotteryPlans, player: address) {
         let len = vector::length(&plans.players);
-        let mut idx = 0;
+        let idx = 0;
         while (idx < len) {
             if (*vector::borrow(&plans.players, idx) == player) {
                 return;
@@ -395,9 +395,9 @@ module lottery::autopurchase {
     }
 
     fun copy_u64_vector(values: &vector<u64>): vector<u64> {
-        let mut out = vector::empty<u64>();
+        let out = vector::empty<u64>();
         let len = vector::length(values);
-        let mut idx = 0;
+        let idx = 0;
         while (idx < len) {
             vector::push_back(&mut out, *vector::borrow(values, idx));
             idx = idx + 1;
@@ -406,9 +406,9 @@ module lottery::autopurchase {
     }
 
     fun copy_address_vector(values: &vector<address>): vector<address> {
-        let mut out = vector::empty<address>();
+        let out = vector::empty<address>();
         let len = vector::length(values);
-        let mut idx = 0;
+        let idx = 0;
         while (idx < len) {
             vector::push_back(&mut out, *vector::borrow(values, idx));
             idx = idx + 1;
