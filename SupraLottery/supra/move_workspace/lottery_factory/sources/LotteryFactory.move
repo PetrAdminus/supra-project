@@ -1,7 +1,7 @@
 module lottery_factory::registry {
     use std::option;
     use std::signer;
-    use aptos_std::table;
+    use vrf_hub::table;
     use std::event;
     use vrf_hub::hub;
 
@@ -15,13 +15,13 @@ module lottery_factory::registry {
     const E_UNKNOWN_LOTTERY: u64 = 4;
 
 
-    public struct LotteryBlueprint has copy, drop, store {
+    struct LotteryBlueprint has copy, drop, store {
         ticket_price: u64,
         jackpot_share_bps: u16,
     }
 
 
-    public struct LotteryInfo has copy, drop, store {
+    struct LotteryInfo has copy, drop, store {
         owner: address,
         lottery: address,
         blueprint: LotteryBlueprint,

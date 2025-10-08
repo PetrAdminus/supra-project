@@ -4,7 +4,7 @@ module lottery::rounds {
     use std::option;
     use std::signer;
     use std::vector;
-    use aptos_std::table;
+    use vrf_hub::table;
     use std::event;
     use std::bcs;
     use std::math64;
@@ -87,7 +87,7 @@ module lottery::rounds {
         payload: vector<u8>,
     }
 
-    public struct RoundSnapshot has copy, drop, store {
+    struct RoundSnapshot has copy, drop, store {
         ticket_count: u64,
         draw_scheduled: bool,
         has_pending_request: bool,

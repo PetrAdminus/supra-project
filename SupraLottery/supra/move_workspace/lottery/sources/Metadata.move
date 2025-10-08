@@ -1,8 +1,8 @@
 module lottery::metadata {
     use std::option;
     use std::signer;
-    use aptos_std::table;
-    use aptos_std::vector;
+    use vrf_hub::table;
+    use std::vector;
     use std::event;
 
     const E_ALREADY_INIT: u64 = 1;
@@ -10,7 +10,7 @@ module lottery::metadata {
     const E_NOT_AUTHORIZED: u64 = 3;
     const E_METADATA_MISSING: u64 = 4;
 
-    public struct LotteryMetadata has copy, drop, store {
+    struct LotteryMetadata has copy, drop, store {
         title: vector<u8>,
         description: vector<u8>,
         image_uri: vector<u8>,
@@ -21,7 +21,7 @@ module lottery::metadata {
     struct MetadataRegistry has key {
         admin: address,
         entries: table::Table<u64, LotteryMetadata>,
-        lottery_ids: vector::Vector<u64>,
+        lottery_ids: vector<u64>,
         upsert_events: event::EventHandle<LotteryMetadataUpsertedEvent>,
         remove_events: event::EventHandle<LotteryMetadataRemovedEvent>,
         admin_events: event::EventHandle<MetadataAdminUpdatedEvent>,
@@ -88,7 +88,7 @@ module lottery::metadata {
         };
     }
 
-    public fun list_lottery_ids(): vector::Vector<u64> acquires MetadataRegistry {
+    public fun list_lottery_ids(): vector<u64> acquires MetadataRegistry {
         let state = borrow_state();
         let len = vector::length(&state.lottery_ids);
         let result = vector::empty<u64>();
@@ -187,7 +187,7 @@ module lottery::metadata {
         buffer
     }
 
-    fun remove_lottery_id(ids: &mut vector::Vector<u64>, lottery_id: u64) {
+    fun remove_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
         let len = vector::length(ids);
         let i = 0;
         while (i < len) {

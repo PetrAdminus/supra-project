@@ -3,7 +3,7 @@ module lottery::instances {
     friend lottery::rounds;
     use std::option;
     use std::signer;
-    use aptos_std::table;
+    use vrf_hub::table;
     use std::event;
     use std::math64;
     use lottery_factory::registry;
@@ -29,7 +29,7 @@ module lottery::instances {
     const E_STATUS_MISMATCH: u64 = 9;
 
 
-    public struct InstanceStats has copy, drop, store {
+    struct InstanceStats has copy, drop, store {
         tickets_sold: u64,
         jackpot_accumulated: u64,
         active: bool,
@@ -48,7 +48,7 @@ module lottery::instances {
         admin: address,
         hub: address,
         instances: table::Table<u64, InstanceState>,
-        lottery_ids: vector::Vector<u64>,
+        lottery_ids: vector<u64>,
         create_events: event::EventHandle<LotteryInstanceCreatedEvent>,
         blueprint_events: event::EventHandle<LotteryInstanceBlueprintSyncedEvent>,
         admin_events: event::EventHandle<AdminUpdatedEvent>,
@@ -293,7 +293,7 @@ module lottery::instances {
     }
 
 
-    public fun list_lottery_ids(): vector::Vector<u64> acquires LotteryCollection {
+    public fun list_lottery_ids(): vector<u64> acquires LotteryCollection {
         let state = borrow_state();
         let len = vector::length(&state.lottery_ids);
         let result = vector::empty<u64>();
@@ -307,7 +307,7 @@ module lottery::instances {
     }
 
 
-    public fun list_active_lottery_ids(): vector::Vector<u64> acquires LotteryCollection {
+    public fun list_active_lottery_ids(): vector<u64> acquires LotteryCollection {
         let state = borrow_state();
         let len = vector::length(&state.lottery_ids);
         let result = vector::empty<u64>();

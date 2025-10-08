@@ -1,5 +1,5 @@
 module example::example_module {
-    use aptos_std::table;
+    use example::table;
     use supra_addr::supra_vrf;
     use std::string;
 

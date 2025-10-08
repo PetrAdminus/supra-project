@@ -65,7 +65,7 @@ module lottery::jackpot {
         payload: vector<u8>,
     }
 
-    public struct JackpotSnapshot has copy, drop, store {
+    struct JackpotSnapshot has copy, drop, store {
         ticket_count: u64,
         draw_scheduled: bool,
         has_pending_request: bool,

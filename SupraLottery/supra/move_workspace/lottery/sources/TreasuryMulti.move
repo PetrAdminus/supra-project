@@ -8,7 +8,7 @@ module lottery::treasury_multi {
     use std::option;
     use std::signer;
     use std::vector;
-    use aptos_std::table;
+    use vrf_hub::table;
     use std::event;
     use std::math64;
     use lottery::treasury_v1;
@@ -26,14 +26,14 @@ module lottery::treasury_multi {
     const BASIS_POINT_DENOMINATOR: u64 = 10_000;
 
 
-    public struct LotteryShareConfig has copy, drop, store {
+    struct LotteryShareConfig has copy, drop, store {
         prize_bps: u64,
         jackpot_bps: u64,
         operations_bps: u64,
     }
 
 
-    public struct LotteryPool has copy, drop, store {
+    struct LotteryPool has copy, drop, store {
         prize_balance: u64,
         operations_balance: u64,
     }
@@ -46,7 +46,7 @@ module lottery::treasury_multi {
         jackpot_balance: u64,
         configs: table::Table<u64, LotteryShareConfig>,
         pools: table::Table<u64, LotteryPool>,
-        lottery_ids: vector::Vector<u64>,
+        lottery_ids: vector<u64>,
         config_events: event::EventHandle<LotteryConfigUpdatedEvent>,
         allocation_events: event::EventHandle<AllocationRecordedEvent>,
         admin_events: event::EventHandle<AdminUpdatedEvent>,
@@ -123,7 +123,7 @@ module lottery::treasury_multi {
         amount: u64,
     }
 
-    public struct LotterySummary has copy, drop, store {
+    struct LotterySummary has copy, drop, store {
         config: LotteryShareConfig,
         pool: LotteryPool,
     }
@@ -527,7 +527,7 @@ module lottery::treasury_multi {
         vector::push_back(&mut state.lottery_ids, lottery_id);
     }
 
-    fun copy_u64_vector(values: &vector::Vector<u64>): vector<u64> {
+    fun copy_u64_vector(values: &vector<u64>): vector<u64> {
         let out = vector::empty<u64>();
         let len = vector::length(values);
         let idx = 0;

@@ -9,4 +9,3 @@ lottery = "0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490"
 
 [dependencies]
 MoveStdlib = { local = "../move-stdlib" }
-AptosStdlib = { local = "../aptos-stdlib" }

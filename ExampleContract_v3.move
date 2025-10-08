@@ -4,7 +4,7 @@ module example::example {
     use std::signer;
     use std::string;
 
-    use aptos_std::table;
+    use example::table;
     use aptos_framework::account;
     use aptos_framework::account::SignerCapability;
     use aptos_framework::aptos_account;

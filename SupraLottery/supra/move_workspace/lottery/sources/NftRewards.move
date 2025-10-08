@@ -3,7 +3,7 @@ module lottery::nft_rewards {
     use std::option;
     use std::signer;
     use std::vector;
-    use aptos_std::table;
+    use vrf_hub::table;
     use std::event;
 
     const E_NOT_AUTHORIZED: u64 = 1;
@@ -12,7 +12,7 @@ module lottery::nft_rewards {
     const E_BADGE_NOT_FOUND: u64 = 4;
 
 
-    public struct WinnerBadgeData has copy, drop, store {
+    struct WinnerBadgeData has copy, drop, store {
         badge_id: u64,
         lottery_id: u64,
         draw_id: u64,
@@ -23,7 +23,7 @@ module lottery::nft_rewards {
 
     struct UserBadges has store {
         badges: table::Table<u64, WinnerBadgeData>,
-        badge_ids: vector::Vector<u64>,
+        badge_ids: vector<u64>,
     }
 
 
@@ -204,7 +204,7 @@ module lottery::nft_rewards {
     }
 
 
-    fun remove_badge_id(ids: &mut vector::Vector<u64>, badge_id: u64) {
+    fun remove_badge_id(ids: &mut vector<u64>, badge_id: u64) {
         let len = vector::length(ids);
         let i = 0;
         while (i < len) {
@@ -249,7 +249,7 @@ module lottery::nft_rewards {
         out
     }
 
-    fun clone_u64_vector(data: &vector::Vector<u64>): vector<u64> {
+    fun clone_u64_vector(data: &vector<u64>): vector<u64> {
         let out = vector::empty<u64>();
         let len = vector::length(data);
         let i = 0;

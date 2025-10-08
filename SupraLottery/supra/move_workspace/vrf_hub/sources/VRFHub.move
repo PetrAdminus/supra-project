@@ -4,7 +4,7 @@ module vrf_hub::hub {
     use std::option;
     use std::signer;
     use std::vector;
-    use aptos_std::table;
+    use vrf_hub::table;
     use std::event;
 
 
@@ -31,7 +31,7 @@ module vrf_hub::hub {
     }
 
 
-    public struct RequestRecord has copy, drop, store {
+    struct RequestRecord has copy, drop, store {
         lottery_id: u64,
         payload: vector<u8>,
     }
@@ -43,8 +43,8 @@ module vrf_hub::hub {
         next_request_id: u64,
         lotteries: table::Table<u64, LotteryRegistration>,
         requests: table::Table<u64, RequestRecord>,
-        lottery_ids: vector::Vector<u64>,
-        pending_request_ids: vector::Vector<u64>,
+        lottery_ids: vector<u64>,
+        pending_request_ids: vector<u64>,
         callback_sender: option::Option<address>,
         register_events: event::EventHandle<LotteryRegisteredEvent>,
         status_events: event::EventHandle<LotteryStatusChangedEvent>,
@@ -225,12 +225,12 @@ module vrf_hub::hub {
     }
 
 
-    public fun list_lottery_ids(): vector::Vector<u64> acquires HubState {
+    public fun list_lottery_ids(): vector<u64> acquires HubState {
         clone_ids(&borrow_state().lottery_ids)
     }
 
 
-    public fun list_active_lottery_ids(): vector::Vector<u64> acquires HubState {
+    public fun list_active_lottery_ids(): vector<u64> acquires HubState {
         let state = borrow_state();
         let result = vector::empty<u64>();
         let i = 0;
@@ -305,7 +305,7 @@ module vrf_hub::hub {
     }
 
 
-    public fun list_pending_request_ids(): vector::Vector<u64> acquires HubState {
+    public fun list_pending_request_ids(): vector<u64> acquires HubState {
         clone_ids(&borrow_state().pending_request_ids)
     }
 
@@ -360,7 +360,7 @@ module vrf_hub::hub {
         buffer
     }
 
-    fun clone_ids(ids: &vector::Vector<u64>): vector::Vector<u64> {
+    fun clone_ids(ids: &vector<u64>): vector<u64> {
         let result = vector::empty<u64>();
         let i = 0;
         let len = vector::length(ids);
@@ -372,7 +372,7 @@ module vrf_hub::hub {
         result
     }
 
-    fun remove_pending_request_id(ids: &mut vector::Vector<u64>, request_id: u64) {
+    fun remove_pending_request_id(ids: &mut vector<u64>, request_id: u64) {
         let i = 0;
         let len = vector::length(ids);
         while (i < len) {

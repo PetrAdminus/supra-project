@@ -8,4 +8,3 @@ supra_addr = "0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e
 
 [dependencies]
 MoveStdlib = { local = "../move-stdlib" }
-AptosStdlib = { local = "../aptos-stdlib" }
