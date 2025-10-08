@@ -78,6 +78,7 @@ module lottery::operators {
     }
 
     #[view]
+    #[view]
     public fun is_initialized(): bool {
         exists<LotteryOperators>(@lottery)
     }
@@ -115,7 +116,7 @@ module lottery::operators {
             return;
         };
 
-        let entry = table::borrow_mut(&mut state.entries, lottery_id);
+        let mut entry = table::borrow_mut(&mut state.entries, lottery_id);
         if (entry.owner != owner) {
             let previous_owner = entry.owner;
             entry.owner = owner;
@@ -134,7 +135,7 @@ module lottery::operators {
     acquires LotteryOperators {
         ensure_can_manage(caller, lottery_id);
         let state = borrow_state_mut();
-        let entry = table::borrow_mut(&mut state.entries, lottery_id);
+        let mut entry = table::borrow_mut(&mut state.entries, lottery_id);
         if (table::contains(&entry.operators, operator)) {
             abort E_OPERATOR_EXISTS;
         };
@@ -154,7 +155,7 @@ module lottery::operators {
     acquires LotteryOperators {
         ensure_can_manage(caller, lottery_id);
         let state = borrow_state_mut();
-        let entry = table::borrow_mut(&mut state.entries, lottery_id);
+        let mut entry = table::borrow_mut(&mut state.entries, lottery_id);
         if (!table::contains(&entry.operators, operator)) {
             abort E_OPERATOR_MISSING;
         };
@@ -288,7 +289,7 @@ module lottery::operators {
 
     fun record_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
         let len = vector::length(ids);
-        let idx = 0;
+        let mut idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
                 return;
@@ -300,7 +301,7 @@ module lottery::operators {
 
     fun record_operator(operators: &mut vector<address>, operator: address) {
         let len = vector::length(operators);
-        let idx = 0;
+        let mut idx = 0;
         while (idx < len) {
             if (*vector::borrow(operators, idx) == operator) {
                 return;
@@ -312,7 +313,7 @@ module lottery::operators {
 
     fun remove_operator(operators: &mut vector<address>, operator: address) {
         let len = vector::length(operators);
-        let idx = 0;
+        let mut idx = 0;
         while (idx < len) {
             if (*vector::borrow(operators, idx) == operator) {
                 if (idx != len - 1) {
@@ -326,9 +327,9 @@ module lottery::operators {
     }
 
     fun copy_u64_vector(values: &vector<u64>): vector<u64> {
-        let out = vector::empty<u64>();
+        let mut out = vector::empty<u64>();
         let len = vector::length(values);
-        let idx = 0;
+        let mut idx = 0;
         while (idx < len) {
             vector::push_back(&mut out, *vector::borrow(values, idx));
             idx = idx + 1;
@@ -337,9 +338,9 @@ module lottery::operators {
     }
 
     fun copy_address_vector(values: &vector<address>): vector<address> {
-        let out = vector::empty<address>();
+        let mut out = vector::empty<address>();
         let len = vector::length(values);
-        let idx = 0;
+        let mut idx = 0;
         while (idx < len) {
             vector::push_back(&mut out, *vector::borrow(values, idx));
             idx = idx + 1;

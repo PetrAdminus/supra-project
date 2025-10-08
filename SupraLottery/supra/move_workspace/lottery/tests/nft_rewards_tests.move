@@ -3,6 +3,7 @@ module lottery::nft_rewards_tests {
     use std::vector;
     use std::signer;
     use lottery::nft_rewards;
+    use lottery::test_utils;
 
     #[test(admin = @lottery, owner = @0x123)]
     fun mint_flow(admin: &signer, owner: &signer) {
@@ -16,7 +17,7 @@ module lottery::nft_rewards_tests {
         assert!(*vector::borrow(&badges, 0) == 1, 2);
         let info_opt = nft_rewards::get_badge(owner_addr, 1);
         assert!(option::is_some(&info_opt), 3);
-        let info = option::extract(info_opt);
+        let info = test_utils::unwrap(info_opt);
         assert!(info.lottery_id == 1, 4);
         assert!(info.draw_id == 7, 5);
         assert!(info.minted_by == signer::address_of(admin), 6);

@@ -2,6 +2,7 @@ module lottery::instances_tests {
     use std::option;
     use std::vector;
     use lottery::instances;
+    use lottery::test_utils;
     use lottery_factory::registry;
     use vrf_hub::hub;
 
@@ -30,7 +31,7 @@ module lottery::instances_tests {
         assert!(instances::contains_instance(lottery_id), 2);
         assert!(instances::is_instance_active(lottery_id), 3);
 
-        let info = option::extract(instances::get_lottery_info(lottery_id));
+        let info = test_utils::unwrap(instances::get_lottery_info(lottery_id));
         let owner = info.owner;
         let lottery_addr = info.lottery;
         let blueprint = info.blueprint;
@@ -45,7 +46,7 @@ module lottery::instances_tests {
         registry::update_blueprint(factory_admin, lottery_id, updated_blueprint);
         instances::sync_blueprint(lottery_admin, lottery_id);
 
-        let synced_info = option::extract(instances::get_lottery_info(lottery_id));
+        let synced_info = test_utils::unwrap(instances::get_lottery_info(lottery_id));
         let synced_blueprint = synced_info.blueprint;
         let synced_price = synced_blueprint.ticket_price;
         let synced_share = synced_blueprint.jackpot_share_bps;

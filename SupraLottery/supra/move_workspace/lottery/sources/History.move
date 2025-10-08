@@ -82,7 +82,7 @@ module lottery::history {
         ensure_admin(caller);
         let state = borrow_state_mut();
         if (table::contains(&state.histories, lottery_id)) {
-            let history = table::borrow_mut(&mut state.histories, lottery_id);
+            let mut history = table::borrow_mut(&mut state.histories, lottery_id);
             clear_records(&mut history.records);
         };
     }
@@ -126,6 +126,7 @@ module lottery::history {
         );
     }
 
+    #[view]
     public fun has_history(lottery_id: u64): bool acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
             return false;
@@ -134,6 +135,7 @@ module lottery::history {
         table::contains(&state.histories, lottery_id)
     }
 
+    #[view]
     public fun list_lottery_ids(): vector<u64> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
             return vector::empty<u64>();
@@ -142,6 +144,7 @@ module lottery::history {
         clone_u64_vector(&state.lottery_ids)
     }
 
+    #[view]
     public fun get_history(lottery_id: u64): option::Option<vector<DrawRecord>> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
             return option::none<vector<DrawRecord>>();
@@ -152,9 +155,10 @@ module lottery::history {
         } else {
             let history = table::borrow(&state.histories, lottery_id);
             option::some(clone_records(&history.records))
-        };
+        }
     }
 
+    #[view]
     public fun latest_record(lottery_id: u64): option::Option<DrawRecord> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
             return option::none<DrawRecord>();
@@ -169,8 +173,8 @@ module lottery::history {
             } else {
                 let last_index = vector::length(&history.records) - 1;
                 option::some(*vector::borrow(&history.records, last_index))
-            };
-        };
+            }
+        }
     }
 
     fun borrow_state() : &HistoryCollection acquires HistoryCollection {
@@ -213,7 +217,7 @@ module lottery::history {
 
     fun push_unique(list: &mut vector<u64>, lottery_id: u64) {
         let len = vector::length(list);
-        let index = 0;
+        let mut index = 0;
         while (index < len) {
             if (*vector::borrow(list, index) == lottery_id) {
                 return;
@@ -224,9 +228,9 @@ module lottery::history {
     }
 
     fun clone_u64_vector(values: &vector<u64>) : vector<u64> {
-        let result = vector::empty<u64>();
+        let mut result = vector::empty<u64>();
         let len = vector::length(values);
-        let index = 0;
+        let mut index = 0;
         while (index < len) {
             vector::push_back(&mut result, *vector::borrow(values, index));
             index = index + 1;
@@ -235,9 +239,9 @@ module lottery::history {
     }
 
     fun clone_records(records: &vector<DrawRecord>): vector<DrawRecord> {
-        let result = vector::empty<DrawRecord>();
+        let mut result = vector::empty<DrawRecord>();
         let len = vector::length(records);
-        let index = 0;
+        let mut index = 0;
         while (index < len) {
             vector::push_back(&mut result, *vector::borrow(records, index));
             index = index + 1;

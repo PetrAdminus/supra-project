@@ -60,7 +60,7 @@ module std::guid {
     }
 
     fun create_impl(addr: address): GUID acquires Generator {
-        let generator = borrow_global_mut<Generator>(addr);
+        let mut generator = borrow_global_mut<Generator>(addr);
         let creation_num = generator.counter;
         generator.counter = creation_num + 1;
         GUID { id: ID { creation_num, addr } }

@@ -7,6 +7,7 @@ module lottery::referrals_tests {
     use lottery::referrals;
     use lottery::rounds;
     use lottery::treasury_multi;
+    use lottery::test_utils;
     use lottery::treasury_v1;
     use lottery_factory::registry;
     use vrf_hub::hub;
@@ -83,7 +84,7 @@ module lottery::referrals_tests {
         assert!(buyer_balance == 4_906, 1);
 
         let stats_opt = referrals::get_lottery_stats(lottery_id);
-        let stats = option::extract(stats_opt);
+        let stats = test_utils::unwrap(stats_opt);
         let referrals::ReferralStats {
             rewarded_purchases,
             total_referrer_rewards,
@@ -95,7 +96,7 @@ module lottery::referrals_tests {
 
         let referrer_opt = referrals::get_referrer(signer::address_of(buyer));
         assert!(option::is_some(&referrer_opt), 5);
-        let stored_referrer = option::extract(referrer_opt);
+        let stored_referrer = test_utils::unwrap(referrer_opt);
         assert!(stored_referrer == signer::address_of(referrer), 6);
 
         assert!(referrals::total_registered() == 1, 7);

@@ -95,14 +95,17 @@ module lottery::jackpot {
         );
     }
 
+    #[view]
     public fun is_initialized(): bool {
         exists<JackpotState>(@lottery)
     }
 
+    #[view]
     public fun admin(): address acquires JackpotState {
         borrow_state().admin
     }
 
+    #[view]
     public fun lottery_id(): u64 acquires JackpotState {
         borrow_state().lottery_id
     }
@@ -122,7 +125,7 @@ module lottery::jackpot {
     public entry fun grant_tickets_batch(caller: &signer, players: vector<address>) acquires JackpotState {
         ensure_admin(caller);
         let len = vector::length(&players);
-        let i = 0;
+        let mut i = 0;
         while (i < len) {
             let player = *vector::borrow(&players, i);
             grant_ticket(caller, player);
@@ -245,6 +248,7 @@ module lottery::jackpot {
         );
     }
 
+    #[view]
     public fun get_snapshot(): option::Option<JackpotSnapshot> acquires JackpotState {
         if (!exists<JackpotState>(@lottery)) {
             return option::none<JackpotSnapshot>();
@@ -257,6 +261,7 @@ module lottery::jackpot {
         })
     }
 
+    #[view]
     public fun pending_request(): option::Option<u64> acquires JackpotState {
         if (!exists<JackpotState>(@lottery)) {
             return option::none<u64>();
@@ -266,7 +271,7 @@ module lottery::jackpot {
             option::some(*option::borrow(&state.pending_request))
         } else {
             option::none<u64>()
-        };
+        }
     }
 
     fun borrow_state(): &JackpotState acquires JackpotState {
@@ -315,8 +320,8 @@ module lottery::jackpot {
         if (vector::length(randomness) < 8) {
             abort E_RANDOM_BYTES_TOO_SHORT;
         };
-        let prefix = vector::empty<u8>();
-        let i = 0;
+        let mut prefix = vector::empty<u8>();
+        let mut i = 0;
         while (i < 8) {
             let byte = *vector::borrow(randomness, i);
             vector::push_back(&mut prefix, byte);
@@ -326,9 +331,9 @@ module lottery::jackpot {
     }
 
     fun clone_bytes(data: &vector<u8>): vector<u8> {
-        let buffer = vector::empty<u8>();
+        let mut buffer = vector::empty<u8>();
         let len = vector::length(data);
-        let i = 0;
+        let mut i = 0;
         while (i < len) {
             let byte = *vector::borrow(data, i);
             vector::push_back(&mut buffer, byte);

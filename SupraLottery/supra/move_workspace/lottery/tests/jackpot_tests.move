@@ -6,6 +6,7 @@ module lottery::jackpot_tests {
     use lottery::jackpot;
     use lottery::treasury_multi;
     use lottery::treasury_v1;
+    use lottery::test_utils;
     use vrf_hub::hub;
 
     fun setup_token(lottery_admin: &signer, player1: &signer, player2: &signer) {
@@ -29,9 +30,9 @@ module lottery::jackpot_tests {
     }
 
     fun build_randomness(value: u8): vector<u8> {
-        let randomness = vector::empty<u8>();
+        let mut randomness = vector::empty<u8>();
         vector::push_back(&mut randomness, value);
-        let i = 1;
+        let mut i = 1;
         while (i < 8) {
             vector::push_back(&mut randomness, 0);
             i = i + 1;
@@ -74,11 +75,11 @@ module lottery::jackpot_tests {
         jackpot::schedule_draw(lottery_admin);
         jackpot::request_randomness(lottery_admin, b"global");
 
-        let request_id = option::extract(jackpot::pending_request());
+        let request_id = test_utils::unwrap(jackpot::pending_request());
         let randomness = build_randomness(1);
         jackpot::fulfill_draw(aggregator, request_id, randomness);
 
-        let snapshot = option::extract(jackpot::get_snapshot());
+        let snapshot = test_utils::unwrap(jackpot::get_snapshot());
         let jackpot::JackpotSnapshot { ticket_count, draw_scheduled, has_pending_request } = snapshot;
         assert!(ticket_count == 0, 1);
         assert!(!draw_scheduled, 2);
@@ -121,7 +122,7 @@ module lottery::jackpot_tests {
         jackpot::schedule_draw(lottery_admin);
         jackpot::request_randomness(lottery_admin, b"global");
 
-        let request_id = option::extract(jackpot::pending_request());
+        let request_id = test_utils::unwrap(jackpot::pending_request());
         let randomness = build_randomness(0);
         jackpot::fulfill_draw(aggregator, request_id, randomness);
     }

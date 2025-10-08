@@ -3,6 +3,7 @@ module lottery::operators_tests {
     use std::vector;
     use std::signer;
     use lottery::operators;
+    use lottery::test_utils;
 
     #[test(lottery_admin = @lottery, owner = @player1, operator = @player2)]
     fun admin_assigns_and_grants(
@@ -14,13 +15,13 @@ module lottery::operators_tests {
         operators::set_owner(lottery_admin, 0, signer::address_of(owner));
 
         let owner_opt = operators::get_owner(0);
-        let owner_addr = option::extract(owner_opt);
+        let owner_addr = test_utils::unwrap(owner_opt);
         assert!(owner_addr == signer::address_of(owner), 0);
 
         operators::grant_operator(lottery_admin, 0, signer::address_of(operator));
         assert!(operators::is_operator(0, signer::address_of(operator)), 1);
 
-        let operators_list = option::extract(operators::list_operators(0));
+        let operators_list = test_utils::unwrap(operators::list_operators(0));
         assert!(vector::length(&operators_list) == 1, 2);
         assert!(*vector::borrow(&operators_list, 0) == signer::address_of(operator), 3);
 
@@ -44,7 +45,7 @@ module lottery::operators_tests {
         operators::revoke_operator(owner, 7, signer::address_of(operator));
         assert!(!operators::is_operator(7, signer::address_of(operator)), 11);
 
-        let operators_after = option::extract(operators::list_operators(7));
+        let operators_after = test_utils::unwrap(operators::list_operators(7));
         assert!(vector::length(&operators_after) == 0, 12);
     }
 

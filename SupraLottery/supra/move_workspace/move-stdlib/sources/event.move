@@ -37,7 +37,7 @@ module std::event {
     public fun new_event_handle<T: drop + store>(account: &signer): EventHandle<T> {
         // must be 24 for compatibility with legacy Event ID's--see comment on GUIDWrapper
         let len_bytes = 24u8;
-         EventHandle<T> {
+        EventHandle<T> {
             counter: 0,
             guid: GUIDWrapper { len_bytes, guid: guid::create(account) }
         }
@@ -49,11 +49,14 @@ module std::event {
         handle_ref.counter = handle_ref.counter + 1;
     }
 
-    /// Emit одноразовое событие, созданное атрибутом `#[event]`.
+    /// Emit a one-off event created with the `#[event]` attribute.
     ///
-    /// Как и в основной библиотеке, здесь мы временно отбрасываем
-    /// полезную нагрузку, чтобы Move 1-проекты могли компилироваться, пока
-    /// хост-среда фиксирует события нативно.
+    /// The Move 1 toolchain generates calls to `event::emit` when an event struct is
+    /// annotated with `#[event]`.  Supra's Move runtime does not yet surface a public
+    /// API for creating the ephemeral handles that the upstream standard library uses,
+    /// so for now we simply discard the payload after ensuring the type satisfies the
+    /// required abilities.  This keeps the source code compiling while the host
+    /// environment captures events through native instrumentation.
     public fun emit<T: drop + store>(msg: T) {
         let _ = msg;
     }

@@ -40,7 +40,7 @@ module example::table {
 
     fun find_index<K: copy + drop>(keys: &vector<K>, key: K): (bool, u64) {
         let len = vector::length(keys);
-        let i = 0;
+        let mut i = 0;
         while (i < len) {
             if (*vector::borrow(keys, i) == key) {
                 return (true, i);

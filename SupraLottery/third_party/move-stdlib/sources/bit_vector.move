@@ -18,8 +18,8 @@ module std::bit_vector {
     public fun new(length: u64): BitVector {
         assert!(length > 0, ELENGTH);
         assert!(length < MAX_SIZE, ELENGTH);
-        let counter = 0;
-        let bit_field = vector::empty();
+        let mut counter = 0;
+        let mut bit_field = vector::empty();
         while ({spec {
             invariant counter <= length;
             invariant len(bit_field) == counter;
@@ -86,14 +86,14 @@ module std::bit_vector {
     public fun shift_left(bitvector: &mut BitVector, amount: u64) {
         if (amount >= bitvector.length) {
            let len = vector::length(&bitvector.bit_field);
-           let i = 0;
+           let mut i = 0;
            while (i < len) {
                let elem = vector::borrow_mut(&mut bitvector.bit_field, i);
                *elem = false;
                i = i + 1;
            };
-        } else {
-            let i = amount;
+       } else {
+            let mut i = amount;
 
             while (i < bitvector.length) {
                 if (is_index_set(bitvector, i)) set(bitvector, i - amount)
@@ -143,7 +143,7 @@ module std::bit_vector {
     /// sequence, then `0` is returned.
     public fun longest_set_sequence_starting_at(bitvector: &BitVector, start_index: u64): u64 {
         assert!(start_index < bitvector.length, EINDEX);
-        let index = start_index;
+        let mut index = start_index;
 
         // Find the greatest index in the vector such that all indices less than it are set.
         while (index < bitvector.length) {

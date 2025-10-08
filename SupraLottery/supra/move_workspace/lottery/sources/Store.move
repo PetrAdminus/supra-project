@@ -101,11 +101,13 @@ module lottery::store {
     }
 
 
+    #[view]
     public fun is_initialized(): bool {
         exists<StoreState>(@lottery)
     }
 
 
+    #[view]
     public fun admin() : address acquires StoreState {
         borrow_state().admin
     }
@@ -140,7 +142,7 @@ module lottery::store {
         let state_ref = borrow_state_mut();
         let store = borrow_or_add_store(state_ref, lottery_id);
         if (table::contains(&store.items, item_id)) {
-            let record = table::borrow_mut(&mut store.items, item_id);
+            let mut record = table::borrow_mut(&mut store.items, item_id);
             let metadata_for_record = copy_vec_u8(&metadata);
             record.item = StoreItem { price, metadata: metadata_for_record, available, stock };
         } else {
@@ -171,11 +173,11 @@ module lottery::store {
         if (!table::contains(&state_ref.lotteries, lottery_id)) {
             abort E_ITEM_NOT_FOUND;
         };
-        let store = table::borrow_mut(&mut state_ref.lotteries, lottery_id);
+        let mut store = table::borrow_mut(&mut state_ref.lotteries, lottery_id);
         if (!table::contains(&store.items, item_id)) {
             abort E_ITEM_NOT_FOUND;
         };
-        let record = table::borrow_mut(&mut store.items, item_id);
+        let mut record = table::borrow_mut(&mut store.items, item_id);
         record.item.available = available;
         event::emit_event(
             &mut state_ref.item_events,
@@ -204,7 +206,7 @@ module lottery::store {
         if (!table::contains(&store.items, item_id)) {
             abort E_ITEM_NOT_FOUND;
         };
-        let record = table::borrow_mut(&mut store.items, item_id);
+        let mut record = table::borrow_mut(&mut store.items, item_id);
         if (!record.item.available) {
             abort E_ITEM_NOT_FOUND;
         };
@@ -229,6 +231,7 @@ module lottery::store {
     }
 
 
+    #[view]
     public fun get_item(lottery_id: u64, item_id: u64): option::Option<StoreItem> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
             return option::none();
@@ -242,10 +245,11 @@ module lottery::store {
             option::none()
         } else {
             option::some(table::borrow(&store.items, item_id).item)
-        };
+        }
     }
 
 
+    #[view]
     public fun get_item_with_stats(lottery_id: u64, item_id: u64): option::Option<ItemWithStats>
     acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
@@ -261,20 +265,22 @@ module lottery::store {
         } else {
             let record = table::borrow(&store.items, item_id);
             option::some(ItemWithStats { item: record.item, sold: record.sold })
-        };
+        }
     }
 
 
+    #[view]
     public fun list_lottery_ids(): vector<u64> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
             vector::empty<u64>()
         } else {
             let state_ref = borrow_state();
             copy_vec_u64(&state_ref.lottery_ids)
-        };
+        }
     }
 
 
+    #[view]
     public fun list_item_ids(lottery_id: u64): vector<u64> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
             return vector::empty<u64>();
@@ -284,10 +290,11 @@ module lottery::store {
             vector::empty<u64>()
         } else {
             copy_vec_u64(&table::borrow(&state_ref.lotteries, lottery_id).item_ids)
-        };
+        }
     }
 
 
+    #[view]
     public fun get_lottery_summary(lottery_id: u64): option::Option<vector<ItemWithStats>>
     acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
@@ -298,8 +305,8 @@ module lottery::store {
             return option::none();
         };
         let store = table::borrow(&state_ref.lotteries, lottery_id);
-        let result = vector::empty<ItemWithStats>();
-        let idx = 0;
+        let mut result = vector::empty<ItemWithStats>();
+        let mut idx = 0;
         let len = vector::length(&store.item_ids);
         while (idx < len) {
             let item_id = *vector::borrow(&store.item_ids, idx);
@@ -339,7 +346,7 @@ module lottery::store {
             table::add(&mut state.lotteries, lottery_id, LotteryStore { items: table::new(), item_ids: vector::empty<u64>() });
             vector::push_back(&mut state.lottery_ids, lottery_id);
             table::borrow_mut(&mut state.lotteries, lottery_id)
-        };
+        }
     }
 
     fun borrow_store_mut(state: &mut StoreState, lottery_id: u64): &mut LotteryStore {
@@ -350,8 +357,8 @@ module lottery::store {
     }
 
     fun copy_vec_u8(source: &vector<u8>): vector<u8> {
-        let result = vector::empty<u8>();
-        let i = 0;
+        let mut result = vector::empty<u8>();
+        let mut i = 0;
         let len = vector::length(source);
         while (i < len) {
             vector::push_back(&mut result, *vector::borrow(source, i));
@@ -361,8 +368,8 @@ module lottery::store {
     }
 
     fun copy_vec_u64(source: &vector<u64>): vector<u64> {
-        let result = vector::empty<u64>();
-        let i = 0;
+        let mut result = vector::empty<u64>();
+        let mut i = 0;
         let len = vector::length(source);
         while (i < len) {
             vector::push_back(&mut result, *vector::borrow(source, i));

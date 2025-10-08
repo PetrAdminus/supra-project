@@ -6,11 +6,9 @@ module lottery::treasury_v1 {
     use std::string;
     use std::event;
     use std::vector;
-    use std::object;
-    use std::fungible_asset;
-    use std::primary_fungible_store;
     use std::signer;
     use std::math64;
+    use vrf_hub::table;
 
     const E_NOT_OWNER: u64 = 1;
     const E_ALREADY_INITIALIZED: u64 = 2;
@@ -19,6 +17,7 @@ module lottery::treasury_v1 {
     const E_TREASURY_STORE_NOT_REGISTERED: u64 = 5;
     const E_INVALID_BASIS_POINTS: u64 = 6;
     const E_RECIPIENT_STORE_NOT_REGISTERED: u64 = 7;
+    const E_STORE_FROZEN: u64 = 0x50003;
 
     const BASIS_POINT_DENOMINATOR: u64 = 10_000;
     const DEFAULT_BP_JACKPOT: u64 = 5_000;
@@ -98,7 +97,7 @@ module lottery::treasury_v1 {
             community: @lottery,
             team: @lottery,
             partners: @lottery,
-        };
+        }
     }
 
     fun emit_config() acquires Vaults {
@@ -127,11 +126,60 @@ module lottery::treasury_v1 {
         assert!(sum == BASIS_POINT_DENOMINATOR, E_INVALID_BASIS_POINTS);
     }
 
+    struct StoreInfo has store {
+        balance: u64,
+        frozen: bool,
+    }
+
     struct TokenState has key {
-        metadata: object::Object<fungible_asset::Metadata>,
-        mint_ref: fungible_asset::MintRef,
-        burn_ref: fungible_asset::BurnRef,
-        transfer_ref: fungible_asset::TransferRef,
+        name: string::String,
+        symbol: string::String,
+        decimals: u8,
+        icon_uri: string::String,
+        project_uri: string::String,
+        total_supply: u128,
+        stores: table::Table<address, StoreInfo>,
+    }
+
+    const METADATA_ADDRESS: address = @lottery;
+
+    fun borrow_state(): &TokenState {
+        borrow_global<TokenState>(@lottery)
+    }
+
+    fun borrow_state_mut(): &mut TokenState {
+        borrow_global_mut<TokenState>(@lottery)
+    }
+
+    fun ensure_store_entry(state: &mut TokenState, account: address): &mut StoreInfo {
+        if (!table::contains(&state.stores, account)) {
+            table::add(&mut state.stores, account, StoreInfo { balance: 0, frozen: false });
+        };
+        table::borrow_mut(&mut state.stores, account)
+    }
+
+    fun ensure_store_exists(state: &TokenState, account: address) {
+        assert!(table::contains(&state.stores, account), E_STORE_NOT_REGISTERED);
+    }
+
+    fun store_registered_internal(state: &TokenState, account: address): bool {
+        table::contains(&state.stores, account)
+    }
+
+    fun to_u128(value: u64): u128 {
+        let mut remaining = value;
+        let mut result: u128 = 0;
+        let mut place: u128 = 1;
+        while (remaining > 0) {
+            if (remaining % 2 == 1) {
+                result = result + place;
+            };
+            remaining = remaining / 2;
+            if (remaining > 0) {
+                place = place * 2u128;
+            };
+        };
+        result
     }
 
     public entry fun init_token(
@@ -148,50 +196,45 @@ module lottery::treasury_v1 {
         assert!(!exists<TokenState>(admin_addr), E_ALREADY_INITIALIZED);
         assert!(!exists<Vaults>(admin_addr), E_ALREADY_INITIALIZED);
 
-        let constructor_ref = object::create_named_object(admin, seed);
+        let _ = seed;
         let name_string = string::utf8(name);
         let symbol_string = string::utf8(symbol);
         let icon_uri_string = string::utf8(icon_uri);
         let project_uri_string = string::utf8(project_uri);
-        let max_supply = option::none<u128>();
+        let mut stores = table::new<address, StoreInfo>();
+        table::add(&mut stores, admin_addr, StoreInfo { balance: 0, frozen: false });
 
-        primary_fungible_store::create_primary_store_enabled_fungible_asset(
-            &constructor_ref,
-            max_supply,
-            name_string,
-            symbol_string,
-            decimals,
-            icon_uri_string,
-            project_uri_string,
+        move_to(
+            admin,
+            TokenState {
+                name: name_string,
+                symbol: symbol_string,
+                decimals,
+                icon_uri: icon_uri_string,
+                project_uri: project_uri_string,
+                total_supply: 0,
+                stores,
+            },
         );
-
-        let metadata = object::object_from_constructor_ref<fungible_asset::Metadata>(&constructor_ref);
-        let mint_ref = fungible_asset::generate_mint_ref(&constructor_ref);
-        let burn_ref = fungible_asset::generate_burn_ref(&constructor_ref);
-        let transfer_ref = fungible_asset::generate_transfer_ref(&constructor_ref);
-
-        primary_fungible_store::ensure_primary_store_exists(admin_addr, metadata);
-
-        move_to(admin, TokenState { metadata, mint_ref, burn_ref, transfer_ref });
         move_to(admin, Vaults { config: default_config(), recipients: default_recipients() });
         emit_config();
     }
 
     public entry fun register_store(account: &signer) acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
-        primary_fungible_store::ensure_primary_store_exists(signer::address_of(account), state.metadata);
+        let state = borrow_state_mut();
+        let _ = ensure_store_entry(state, signer::address_of(account));
     }
 
     public entry fun register_store_for(admin: &signer, account: address) acquires TokenState {
         assert!(signer::address_of(admin) == @lottery, E_NOT_OWNER);
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
-        primary_fungible_store::ensure_primary_store_exists(account, state.metadata);
+        let state = borrow_state_mut();
+        let _ = ensure_store_entry(state, account);
     }
 
     fun register_stores_for_internal(
-        state: &TokenState,
+        state: &mut TokenState,
         accounts: &vector<address>,
         idx: u64
     ) {
@@ -201,33 +244,38 @@ module lottery::treasury_v1 {
         };
 
         let addr = *vector::borrow(accounts, idx);
-        primary_fungible_store::ensure_primary_store_exists(addr, state.metadata);
+        let _ = ensure_store_entry(state, addr);
         register_stores_for_internal(state, accounts, idx + 1);
     }
 
     public entry fun register_stores_for(admin: &signer, accounts: vector<address>) acquires TokenState {
         assert!(signer::address_of(admin) == @lottery, E_NOT_OWNER);
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
+        let state = borrow_state_mut();
         register_stores_for_internal(state, &accounts, 0);
     }
 
     public entry fun mint_to(admin: &signer, recipient: address, amount: u64) acquires TokenState {
         assert!(signer::address_of(admin) == @lottery, E_NOT_OWNER);
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
-        assert!(primary_fungible_store::primary_store_exists(recipient, state.metadata), E_STORE_NOT_REGISTERED);
-        let store = primary_fungible_store::ensure_primary_store_exists(recipient, state.metadata);
-        fungible_asset::mint_to(&state.mint_ref, store, amount);
+        let state = borrow_state_mut();
+        let store = ensure_store_entry(state, recipient);
+        assert!(!store.frozen, E_STORE_FROZEN);
+        store.balance = store.balance + amount;
+        state.total_supply = state.total_supply + to_u128(amount);
     }
 
     public entry fun burn_from(admin: &signer, owner: address, amount: u64) acquires TokenState {
         assert!(signer::address_of(admin) == @lottery, E_NOT_OWNER);
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
-        assert!(primary_fungible_store::primary_store_exists(owner, state.metadata), E_STORE_NOT_REGISTERED);
-        let store = primary_fungible_store::ensure_primary_store_exists(owner, state.metadata);
-        fungible_asset::burn_from(&state.burn_ref, store, amount);
+        let state = borrow_state_mut();
+        ensure_store_exists(state, owner);
+        {
+            let mut store = table::borrow_mut(&mut state.stores, owner);
+            assert!(!store.frozen, E_STORE_FROZEN);
+            store.balance = store.balance - amount;
+        };
+        state.total_supply = state.total_supply - to_u128(amount);
     }
 
     public entry fun transfer_between(
@@ -238,12 +286,19 @@ module lottery::treasury_v1 {
     ) acquires TokenState {
         assert!(signer::address_of(admin) == @lottery, E_NOT_OWNER);
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
-        assert!(primary_fungible_store::primary_store_exists(from, state.metadata), E_STORE_NOT_REGISTERED);
-        assert!(primary_fungible_store::primary_store_exists(to, state.metadata), E_STORE_NOT_REGISTERED);
-        let from_store = primary_fungible_store::ensure_primary_store_exists(from, state.metadata);
-        let to_store = primary_fungible_store::ensure_primary_store_exists(to, state.metadata);
-        fungible_asset::transfer_with_ref(&state.transfer_ref, from_store, to_store, amount);
+        let state = borrow_state_mut();
+        ensure_store_exists(state, from);
+        ensure_store_exists(state, to);
+        {
+            let mut from_store = table::borrow_mut(&mut state.stores, from);
+            assert!(!from_store.frozen, E_STORE_FROZEN);
+            from_store.balance = from_store.balance - amount;
+        };
+        {
+            let mut to_store = table::borrow_mut(&mut state.stores, to);
+            assert!(!to_store.frozen, E_STORE_FROZEN);
+            to_store.balance = to_store.balance + amount;
+        };
     }
 
     public entry fun set_store_frozen(
@@ -253,28 +308,43 @@ module lottery::treasury_v1 {
     ) acquires TokenState {
         assert!(signer::address_of(admin) == @lottery, E_NOT_OWNER);
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
-        assert!(primary_fungible_store::primary_store_exists(account, state.metadata), E_STORE_NOT_REGISTERED);
-        primary_fungible_store::set_frozen_flag(&state.transfer_ref, account, frozen);
+        let state = borrow_state_mut();
+        ensure_store_exists(state, account);
+        let mut store = table::borrow_mut(&mut state.stores, account);
+        store.frozen = frozen;
     }
 
     public fun deposit_from_user(user: &signer, amount: u64) acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
-        assert!(primary_fungible_store::primary_store_exists(signer::address_of(user), state.metadata), E_STORE_NOT_REGISTERED);
-        assert!(primary_fungible_store::primary_store_exists(@lottery, state.metadata), E_TREASURY_STORE_NOT_REGISTERED);
-        let asset = primary_fungible_store::withdraw(user, state.metadata, amount);
-        primary_fungible_store::deposit(@lottery, asset);
+        let state = borrow_state_mut();
+        let user_addr = signer::address_of(user);
+        assert!(store_registered_internal(state, user_addr), E_STORE_NOT_REGISTERED);
+        assert!(store_registered_internal(state, @lottery), E_TREASURY_STORE_NOT_REGISTERED);
+        {
+            let mut store = table::borrow_mut(&mut state.stores, user_addr);
+            assert!(!store.frozen, E_STORE_FROZEN);
+            store.balance = store.balance - amount;
+        };
+        {
+            let mut treasury_store = table::borrow_mut(&mut state.stores, @lottery);
+            treasury_store.balance = treasury_store.balance + amount;
+        };
     }
 
     public(friend) fun payout_from_treasury(recipient: address, amount: u64) acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
-        assert!(primary_fungible_store::primary_store_exists(@lottery, state.metadata), E_TREASURY_STORE_NOT_REGISTERED);
-        assert!(primary_fungible_store::primary_store_exists(recipient, state.metadata), E_STORE_NOT_REGISTERED);
-        let treasury_store = primary_fungible_store::ensure_primary_store_exists(@lottery, state.metadata);
-        let recipient_store = primary_fungible_store::ensure_primary_store_exists(recipient, state.metadata);
-        fungible_asset::transfer_with_ref(&state.transfer_ref, treasury_store, recipient_store, amount);
+        let state = borrow_state_mut();
+        assert!(store_registered_internal(state, @lottery), E_TREASURY_STORE_NOT_REGISTERED);
+        assert!(store_registered_internal(state, recipient), E_STORE_NOT_REGISTERED);
+        {
+            let mut treasury_store = table::borrow_mut(&mut state.stores, @lottery);
+            treasury_store.balance = treasury_store.balance - amount;
+        };
+        {
+            let mut recipient_store = table::borrow_mut(&mut state.stores, recipient);
+            assert!(!recipient_store.frozen, E_STORE_FROZEN);
+            recipient_store.balance = recipient_store.balance + amount;
+        };
     }
 
     public entry fun set_recipients(
@@ -289,29 +359,39 @@ module lottery::treasury_v1 {
         assert!(exists<Vaults>(@lottery), E_NOT_INITIALIZED);
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
 
-        let state = borrow_global<TokenState>(@lottery);
+        let state = borrow_state();
         ensure_recipient_store_registered(state, treasury);
         ensure_recipient_store_registered(state, marketing);
         ensure_recipient_store_registered(state, community);
         ensure_recipient_store_registered(state, team);
         ensure_recipient_store_registered(state, partners);
 
-        let vaults = borrow_global_mut<Vaults>(@lottery);
+        let mut vaults = borrow_global_mut<Vaults>(@lottery);
         vaults.recipients = VaultRecipients { treasury, marketing, community, team, partners };
     }
 
     #[view]
     public fun treasury_balance(): u64 acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
-        primary_fungible_store::balance(@lottery, state.metadata)
+        let state = borrow_state();
+        if (!store_registered_internal(state, @lottery)) {
+            0
+        } else {
+            let store = table::borrow(&state.stores, @lottery);
+            store.balance
+        }
     }
 
     #[view]
     public fun balance_of(account: address): u64 acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
-        primary_fungible_store::balance(account, state.metadata)
+        let state = borrow_state();
+        if (!store_registered_internal(state, account)) {
+            0
+        } else {
+            let store = table::borrow(&state.stores, account);
+            store.balance
+        }
     }
 
     #[view]
@@ -319,8 +399,8 @@ module lottery::treasury_v1 {
         if (!exists<TokenState>(@lottery)) {
             return false
         };
-        let state = borrow_global<TokenState>(@lottery);
-        primary_fungible_store::primary_store_exists(account, state.metadata)
+        let state = borrow_state();
+        store_registered_internal(state, account)
     }
 
     #[view]
@@ -328,52 +408,46 @@ module lottery::treasury_v1 {
         if (!exists<TokenState>(@lottery)) {
             return false
         };
-        let state = borrow_global<TokenState>(@lottery);
-        primary_fungible_store::is_frozen(account, state.metadata)
+        let state = borrow_state();
+        if (!store_registered_internal(state, account)) {
+            false
+        } else {
+            let store = table::borrow(&state.stores, account);
+            store.frozen
+        }
     }
 
     #[view]
     public fun primary_store_address(account: address): address acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
-        primary_fungible_store::primary_store_address(account, state.metadata)
+        let state = borrow_state();
+        assert!(store_registered_internal(state, account), E_STORE_NOT_REGISTERED);
+        account
     }
 
     #[view]
     public fun total_supply(): u128 acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
-        let supply_opt = fungible_asset::supply(state.metadata);
-        if (option::is_some(&supply_opt)) {
-            let supply_ref = option::borrow(&supply_opt);
-            *supply_ref
-        } else {
-            0
-        };
+        borrow_state().total_supply
     }
 
     #[view]
     public fun metadata_address(): address acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
-        object::object_address(&state.metadata)
+        let _ = borrow_state();
+        METADATA_ADDRESS
     }
 
     #[view]
     public fun metadata_summary(): (string::String, string::String, u8, string::String, string::String) acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_global<TokenState>(@lottery);
-        let name = fungible_asset::name(state.metadata);
-        let symbol = fungible_asset::symbol(state.metadata);
-        let icon_uri = fungible_asset::icon_uri(state.metadata);
-        let project_uri = fungible_asset::project_uri(state.metadata);
-
+        let state = borrow_state();
         (
-            name,
-            symbol,
-            fungible_asset::decimals(state.metadata),
-            icon_uri,
-            project_uri
+            state.name,
+            state.symbol,
+            state.decimals,
+            state.icon_uri,
+            state.project_uri
         )
     }
 
@@ -383,15 +457,14 @@ module lottery::treasury_v1 {
             return (false, option::none(), 0)
         };
 
-        let state = borrow_global<TokenState>(@lottery);
-        let registered = primary_fungible_store::primary_store_exists(account, state.metadata);
+        let state = borrow_state();
+        let registered = store_registered_internal(state, account);
         if (!registered) {
             return (false, option::none(), 0)
         };
 
-        let store_address = primary_fungible_store::primary_store_address(account, state.metadata);
-        let balance = primary_fungible_store::balance(account, state.metadata);
-        (true, option::some(store_address), balance)
+        let store = table::borrow(&state.stores, account);
+        (true, option::some(account), store.balance)
     }
 
     #[view]
@@ -400,16 +473,14 @@ module lottery::treasury_v1 {
             return (false, false, option::none(), 0)
         };
 
-        let state = borrow_global<TokenState>(@lottery);
-        let registered = primary_fungible_store::primary_store_exists(account, state.metadata);
+        let state = borrow_state();
+        let registered = store_registered_internal(state, account);
         if (!registered) {
             return (false, false, option::none(), 0)
         };
 
-        let frozen = primary_fungible_store::is_frozen(account, state.metadata);
-        let store_address = primary_fungible_store::primary_store_address(account, state.metadata);
-        let balance = primary_fungible_store::balance(account, state.metadata);
-        (true, frozen, option::some(store_address), balance)
+        let store = table::borrow(&state.stores, account);
+        (true, store.frozen, option::some(account), store.balance)
     }
 
     #[view]
@@ -478,7 +549,7 @@ module lottery::treasury_v1 {
     }
 
     fun transfer_share_if_needed(
-        state: &TokenState,
+        state: &mut TokenState,
         target: address,
         amount: u64
     ) {
@@ -487,12 +558,18 @@ module lottery::treasury_v1 {
         };
 
         assert!(
-            primary_fungible_store::primary_store_exists(target, state.metadata),
+            store_registered_internal(state, target),
             E_RECIPIENT_STORE_NOT_REGISTERED
         );
-        let treasury_store = primary_fungible_store::ensure_primary_store_exists(@lottery, state.metadata);
-        let target_store = primary_fungible_store::ensure_primary_store_exists(target, state.metadata);
-        fungible_asset::transfer_with_ref(&state.transfer_ref, treasury_store, target_store, amount);
+        {
+            let mut treasury_store = table::borrow_mut(&mut state.stores, @lottery);
+            treasury_store.balance = treasury_store.balance - amount;
+        };
+        {
+            let mut target_store = table::borrow_mut(&mut state.stores, target);
+            assert!(!target_store.frozen, E_STORE_FROZEN);
+            target_store.balance = target_store.balance + amount;
+        };
     }
 
     fun ensure_recipient_store_registered(state: &TokenState, account: address) {
@@ -501,7 +578,7 @@ module lottery::treasury_v1 {
         };
 
         assert!(
-            primary_fungible_store::primary_store_exists(account, state.metadata),
+            store_registered_internal(state, account),
             E_RECIPIENT_STORE_NOT_REGISTERED
         );
     }
@@ -512,8 +589,8 @@ module lottery::treasury_v1 {
             return 0
         };
 
-        let state = borrow_global<TokenState>(@lottery);
-        assert!(primary_fungible_store::primary_store_exists(winner, state.metadata), E_STORE_NOT_REGISTERED);
+        let state = borrow_state_mut();
+        assert!(store_registered_internal(state, winner), E_STORE_NOT_REGISTERED);
 
         assert!(exists<Vaults>(@lottery), E_NOT_INITIALIZED);
         let vaults = borrow_global<Vaults>(@lottery);
@@ -540,10 +617,16 @@ module lottery::treasury_v1 {
         let remainder = total_amount - distributed;
         let winner_share = jackpot_share + prize_share + remainder;
 
-        let treasury_store = primary_fungible_store::ensure_primary_store_exists(@lottery, state.metadata);
-        let winner_store = primary_fungible_store::ensure_primary_store_exists(winner, state.metadata);
         let winner_amount = winner_share;
-        fungible_asset::transfer_with_ref(&state.transfer_ref, treasury_store, winner_store, winner_amount);
+        {
+            let mut treasury_store = table::borrow_mut(&mut state.stores, @lottery);
+            treasury_store.balance = treasury_store.balance - winner_amount;
+        };
+        {
+            let mut winner_store = table::borrow_mut(&mut state.stores, winner);
+            assert!(!winner_store.frozen, E_STORE_FROZEN);
+            winner_store.balance = winner_store.balance + winner_amount;
+        };
 
         transfer_share_if_needed(state, recipients.treasury, treasury_share);
         transfer_share_if_needed(state, recipients.marketing, marketing_share);
@@ -591,7 +674,7 @@ module lottery::treasury_v1 {
         };
         validate_basis_points(&config);
 
-        let vaults = borrow_global_mut<Vaults>(@lottery);
+        let mut vaults = borrow_global_mut<Vaults>(@lottery);
         vaults.config = config;
         emit_config();
     }

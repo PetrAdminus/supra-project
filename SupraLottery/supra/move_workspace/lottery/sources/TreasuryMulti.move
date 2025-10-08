@@ -219,7 +219,7 @@ module lottery::treasury_multi {
         validate_basis_points(&config);
         let state = borrow_state_mut();
         if (table::contains(&state.configs, lottery_id)) {
-            let entry = table::borrow_mut(&mut state.configs, lottery_id);
+            let mut entry = table::borrow_mut(&mut state.configs, lottery_id);
             *entry = config;
         } else {
             record_lottery_id(state, lottery_id);
@@ -319,7 +319,7 @@ module lottery::treasury_multi {
             abort E_CONFIG_MISSING;
         };
         if (table::contains(&state.pools, lottery_id)) {
-            let pool = table::borrow_mut(&mut state.pools, lottery_id);
+            let mut pool = table::borrow_mut(&mut state.pools, lottery_id);
             pool.operations_balance = math64::checked_add(pool.operations_balance, amount);
         } else {
             table::add(
@@ -351,26 +351,29 @@ module lottery::treasury_multi {
     }
 
 
+    #[view]
     public fun get_config(lottery_id: u64): option::Option<LotteryShareConfig> acquires TreasuryState {
         let state = borrow_state();
         if (!table::contains(&state.configs, lottery_id)) {
             option::none()
         } else {
             option::some(*table::borrow(&state.configs, lottery_id))
-        };
+        }
     }
 
 
+    #[view]
     public fun get_pool(lottery_id: u64): option::Option<LotteryPool> acquires TreasuryState {
         let state = borrow_state();
         if (!table::contains(&state.pools, lottery_id)) {
             option::none()
         } else {
             option::some(*table::borrow(&state.pools, lottery_id))
-        };
+        }
     }
 
 
+    #[view]
     public fun jackpot_balance(): u64 acquires TreasuryState {
         borrow_state().jackpot_balance
     }
@@ -416,7 +419,7 @@ module lottery::treasury_multi {
 
         state.jackpot_balance = state.jackpot_balance + jackpot_amount;
         if (table::contains(&state.pools, lottery_id)) {
-            let pool = table::borrow_mut(&mut state.pools, lottery_id);
+            let mut pool = table::borrow_mut(&mut state.pools, lottery_id);
             pool.prize_balance = pool.prize_balance + prize_amount;
             pool.operations_balance = pool.operations_balance + operations_amount;
         } else {
@@ -443,7 +446,7 @@ module lottery::treasury_multi {
         if (!table::contains(&state.pools, lottery_id)) {
             abort E_POOL_MISSING;
         };
-        let pool = table::borrow_mut(&mut state.pools, lottery_id);
+        let mut pool = table::borrow_mut(&mut state.pools, lottery_id);
         let amount = pool.prize_balance;
         if (amount == 0) {
             return 0;
@@ -461,7 +464,7 @@ module lottery::treasury_multi {
         if (!table::contains(&state.pools, lottery_id)) {
             abort E_POOL_MISSING;
         };
-        let pool = table::borrow_mut(&mut state.pools, lottery_id);
+        let mut pool = table::borrow_mut(&mut state.pools, lottery_id);
         let amount = pool.operations_balance;
         if (amount == 0) {
             return 0;
@@ -488,7 +491,7 @@ module lottery::treasury_multi {
         if (!table::contains(&state.pools, lottery_id)) {
             abort E_POOL_MISSING;
         };
-        let pool = table::borrow_mut(&mut state.pools, lottery_id);
+        let mut pool = table::borrow_mut(&mut state.pools, lottery_id);
         if (pool.operations_balance < amount) {
             abort E_INSUFFICIENT_OPERATIONS;
         };
@@ -517,7 +520,7 @@ module lottery::treasury_multi {
 
     fun record_lottery_id(state: &mut TreasuryState, lottery_id: u64) {
         let len = vector::length(&state.lottery_ids);
-        let idx = 0;
+        let mut idx = 0;
         while (idx < len) {
             if (*vector::borrow(&state.lottery_ids, idx) == lottery_id) {
                 return;
@@ -528,9 +531,9 @@ module lottery::treasury_multi {
     }
 
     fun copy_u64_vector(values: &vector<u64>): vector<u64> {
-        let out = vector::empty<u64>();
+        let mut out = vector::empty<u64>();
         let len = vector::length(values);
-        let idx = 0;
+        let mut idx = 0;
         while (idx < len) {
             vector::push_back(&mut out, *vector::borrow(values, idx));
             idx = idx + 1;

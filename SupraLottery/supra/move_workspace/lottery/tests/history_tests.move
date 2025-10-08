@@ -8,6 +8,7 @@ module lottery::history_tests {
     use lottery::instances;
     use lottery::rounds;
     use lottery::treasury_multi;
+    use lottery::test_utils;
     use lottery::treasury_v1;
     use lottery_factory::registry;
     use vrf_hub::hub;
@@ -75,9 +76,9 @@ module lottery::history_tests {
         hub::set_callback_sender(vrf_admin, signer::address_of(aggregator));
 
         rounds::request_randomness(lottery_admin, lottery_id, b"log");
-        let request_id = option::extract(rounds::pending_request_id(lottery_id));
+        let request_id = test_utils::unwrap(rounds::pending_request_id(lottery_id));
 
-        let randomness = vector::empty<u8>();
+        let mut randomness = vector::empty<u8>();
         vector::push_back(&mut randomness, 9);
         vector::push_back(&mut randomness, 0);
         vector::push_back(&mut randomness, 0);
@@ -90,7 +91,7 @@ module lottery::history_tests {
         rounds::fulfill_draw(aggregator, request_id, randomness);
 
         let history_opt = history::get_history(lottery_id);
-        let records = option::extract(history_opt);
+        let records = test_utils::unwrap(history_opt);
         assert!(vector::length(&records) == 1, 0);
         let record = *vector::borrow(&records, 0);
         assert!(record.request_id == request_id, 1);
@@ -105,7 +106,7 @@ module lottery::history_tests {
         assert!(*vector::borrow(&ids, 0) == lottery_id, 8);
 
         let latest_opt = history::latest_record(lottery_id);
-        let latest = option::extract(latest_opt);
+        let latest = test_utils::unwrap(latest_opt);
         assert!(latest.request_id == record.request_id, 9);
     }
 
@@ -147,9 +148,9 @@ module lottery::history_tests {
         rounds::schedule_draw(lottery_admin, lottery_id);
         hub::set_callback_sender(vrf_admin, signer::address_of(aggregator));
         rounds::request_randomness(lottery_admin, lottery_id, b"clear");
-        let request_id = option::extract(rounds::pending_request_id(lottery_id));
+        let request_id = test_utils::unwrap(rounds::pending_request_id(lottery_id));
 
-        let randomness = vector::empty<u8>();
+        let mut randomness = vector::empty<u8>();
         vector::push_back(&mut randomness, 11);
         vector::push_back(&mut randomness, 0);
         vector::push_back(&mut randomness, 0);
@@ -161,13 +162,13 @@ module lottery::history_tests {
 
         rounds::fulfill_draw(aggregator, request_id, randomness);
 
-        let records_before = option::extract(history::get_history(lottery_id));
+        let records_before = test_utils::unwrap(history::get_history(lottery_id));
         assert!(vector::length(&records_before) == 1, 0);
 
         history::clear_history(lottery_admin, lottery_id);
 
         let records_after_opt = history::get_history(lottery_id);
-        let records_after = option::extract(records_after_opt);
+        let records_after = test_utils::unwrap(records_after_opt);
         assert!(vector::is_empty(&records_after), 1);
 
         let latest_opt = history::latest_record(lottery_id);

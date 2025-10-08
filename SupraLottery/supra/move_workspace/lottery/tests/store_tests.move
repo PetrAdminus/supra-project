@@ -6,6 +6,7 @@ module lottery::store_tests {
     use lottery::rounds;
     use lottery::store;
     use lottery::treasury_multi;
+    use lottery::test_utils;
     use lottery::treasury_v1;
     use lottery_factory::registry;
     use vrf_hub::hub;
@@ -82,15 +83,15 @@ module lottery::store_tests {
 
         store::purchase(buyer, lottery_id, 1, 2);
 
-        let item_stats = option::extract(store::get_item_with_stats(lottery_id, 1));
+        let item_stats = test_utils::unwrap(store::get_item_with_stats(lottery_id, 1));
         let item = item_stats.item;
         let sold = item_stats.sold;
         let stock = item.stock;
         assert!(sold == 2, 0);
-        let remaining = option::extract(stock);
+        let remaining = test_utils::unwrap(stock);
         assert!(remaining == ITEM_STOCK - 2, 1);
 
-        let summary = option::extract(treasury_multi::get_lottery_summary(lottery_id));
+        let summary = test_utils::unwrap(treasury_multi::get_lottery_summary(lottery_id));
         let pool = summary.pool;
         let operations_balance = pool.operations_balance;
         assert!(operations_balance == ITEM_PRICE * 2, 2);

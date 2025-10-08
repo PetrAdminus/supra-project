@@ -7,6 +7,7 @@ module lottery::migration_tests {
     use lottery::migration;
     use lottery::rounds;
     use lottery::treasury_multi;
+    use lottery::test_utils;
     use lottery::treasury_v1;
     use lottery_factory::registry;
     use vrf_hub::hub;
@@ -19,7 +20,7 @@ module lottery::migration_tests {
     ) {
         setup_environment(lottery);
 
-        let metadata = vector::empty<u8>();
+        let mut metadata = vector::empty<u8>();
         let blueprint = registry::new_blueprint(100, 1_000);
         let lottery_id = registry::create_lottery(
             lottery,
@@ -30,7 +31,7 @@ module lottery::migration_tests {
         );
         instances::create_instance(lottery, lottery_id);
 
-        let tickets = vector::empty<address>();
+        let mut tickets = vector::empty<address>();
         vector::push_back(&mut tickets, signer::address_of(lottery_owner));
         vector::push_back(&mut tickets, signer::address_of(lottery_contract));
         main_v2::set_draw_state_for_test(true, tickets);
@@ -42,14 +43,14 @@ module lottery::migration_tests {
 
         let stats_opt = instances::get_instance_stats(lottery_id);
         assert!(option::is_some(&stats_opt), 0);
-        let stats = option::extract(stats_opt);
+        let stats = test_utils::unwrap(stats_opt);
         assert!(stats.tickets_sold == 2, stats.tickets_sold);
         assert!(stats.jackpot_accumulated == 0, stats.jackpot_accumulated);
         assert!(stats.active, 6);
 
         let snapshot_opt = rounds::get_round_snapshot(lottery_id);
         assert!(option::is_some(&snapshot_opt), 1);
-        let snapshot = option::extract(snapshot_opt);
+        let snapshot = test_utils::unwrap(snapshot_opt);
         assert!(snapshot.ticket_count == 2, snapshot.ticket_count);
         assert!(snapshot.draw_scheduled, 2);
         assert!(!snapshot.has_pending_request, 3);
@@ -57,7 +58,7 @@ module lottery::migration_tests {
 
         let pool_opt = treasury_multi::get_pool(lottery_id);
         assert!(option::is_some(&pool_opt), 4);
-        let pool = option::extract(pool_opt);
+        let pool = test_utils::unwrap(pool_opt);
         assert!(pool.prize_balance == 500, pool.prize_balance);
         assert!(pool.operations_balance == 0, pool.operations_balance);
         assert!(treasury_multi::jackpot_balance() == 0, treasury_multi::jackpot_balance());
@@ -72,7 +73,7 @@ module lottery::migration_tests {
         setup_environment(lottery);
 
         let blueprint = registry::new_blueprint(100, 1_000);
-        let metadata = vector::empty<u8>();
+        let mut metadata = vector::empty<u8>();
         let lottery_id = registry::create_lottery(
             lottery,
             signer::address_of(lottery),

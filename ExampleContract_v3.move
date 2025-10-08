@@ -80,7 +80,8 @@ module example::example {
             num_confirmations
         );
 
-        let random_num_list = &mut borrow_global_mut<RandomNumberList>(@example).random_numbers;
+        let state = borrow_global_mut<RandomNumberList>(@example);
+        let random_num_list = &mut state.random_numbers;
         table::add(random_num_list, nonce, vector[]);
     }
 
@@ -101,7 +102,8 @@ module example::example {
             rng_count,
             client_seed
         );
-        let random_num_list = &mut borrow_global_mut<RandomNumberList>(@example).random_numbers;
+        let state = borrow_global_mut<RandomNumberList>(@example);
+        let random_num_list = &mut state.random_numbers;
         let random_num = table::borrow_mut(random_num_list, nonce);
         *random_num = verified_num;
     }

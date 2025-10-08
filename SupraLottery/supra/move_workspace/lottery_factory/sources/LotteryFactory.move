@@ -68,11 +68,13 @@ module lottery_factory::registry {
     }
 
 
+    #[view]
     public fun is_initialized(): bool {
         exists<FactoryState>(@lottery_factory)
     }
 
 
+    #[view]
     public fun new_blueprint(ticket_price: u64, jackpot_share_bps: u16): LotteryBlueprint {
         LotteryBlueprint { ticket_price, jackpot_share_bps }
     }
@@ -86,7 +88,7 @@ module lottery_factory::registry {
         metadata: vector<u8>,
     ): u64 acquires FactoryState, hub::HubState {
         ensure_admin(caller);
-        let state = borrow_global_mut<FactoryState>(@lottery_factory);
+        let mut state = borrow_global_mut<FactoryState>(@lottery_factory);
         let lottery_id = hub::register_lottery(caller, owner, lottery, metadata);
         table::add(
             &mut state.lotteries,
@@ -105,32 +107,34 @@ module lottery_factory::registry {
         blueprint: LotteryBlueprint,
     ) acquires FactoryState {
         ensure_admin(caller);
-        let state = borrow_global_mut<FactoryState>(@lottery_factory);
+        let mut state = borrow_global_mut<FactoryState>(@lottery_factory);
         if (!table::contains(&state.lotteries, lottery_id)) {
             abort E_UNKNOWN_LOTTERY;
         };
-        let info = table::borrow_mut(&mut state.lotteries, lottery_id);
+        let mut info = table::borrow_mut(&mut state.lotteries, lottery_id);
         info.blueprint = blueprint;
     }
 
 
     public entry fun set_admin(caller: &signer, new_admin: address) acquires FactoryState {
         ensure_admin(caller);
-        let state = borrow_global_mut<FactoryState>(@lottery_factory);
+        let mut state = borrow_global_mut<FactoryState>(@lottery_factory);
         state.admin = new_admin;
     }
 
 
+    #[view]
     public fun get_lottery(lottery_id: u64): option::Option<LotteryInfo> acquires FactoryState {
         let state = borrow_state();
         if (!table::contains(&state.lotteries, lottery_id)) {
             option::none()
         } else {
             option::some(*table::borrow(&state.lotteries, lottery_id))
-        };
+        }
     }
 
 
+    #[view]
     public fun lottery_count(): u64 acquires FactoryState {
         table::length(&borrow_state().lotteries)
     }

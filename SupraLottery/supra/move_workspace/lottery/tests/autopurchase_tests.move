@@ -7,6 +7,7 @@ module lottery::autopurchase_tests {
     use lottery::instances;
     use lottery::rounds;
     use lottery::treasury_multi;
+    use lottery::test_utils;
     use lottery::treasury_v1;
     use lottery_factory::registry;
     use vrf_hub::hub;
@@ -73,7 +74,7 @@ module lottery::autopurchase_tests {
         autopurchase::configure_plan(buyer, lottery_id, 2, true);
         autopurchase::deposit(buyer, lottery_id, TICKET_PRICE * 3);
 
-        let summary_before = option::extract(autopurchase::get_lottery_summary(lottery_id));
+        let summary_before = test_utils::unwrap(autopurchase::get_lottery_summary(lottery_id));
         let balance_before = summary_before.total_balance;
         let total_players = summary_before.total_players;
         let active_players = summary_before.active_players;
@@ -81,7 +82,7 @@ module lottery::autopurchase_tests {
         assert!(total_players == 1, 10);
         assert!(active_players == 1, 11);
 
-        let players = option::extract(autopurchase::list_players(lottery_id));
+        let players = test_utils::unwrap(autopurchase::list_players(lottery_id));
         assert!(vector::length(&players) == 1, 12);
         assert!(*vector::borrow(&players, 0) == @player1, 13);
 
@@ -92,7 +93,7 @@ module lottery::autopurchase_tests {
 
         autopurchase::execute(lottery_admin, lottery_id, @player1);
 
-        let plan_after_first = option::extract(autopurchase::get_plan(lottery_id, @player1));
+        let plan_after_first = test_utils::unwrap(autopurchase::get_plan(lottery_id, @player1));
         let balance = plan_after_first.balance;
         let tickets_per_draw = plan_after_first.tickets_per_draw;
         let active = plan_after_first.active;
@@ -100,11 +101,11 @@ module lottery::autopurchase_tests {
         assert!(tickets_per_draw == 2, 1);
         assert!(active, 2);
 
-        let snapshot = option::extract(rounds::get_round_snapshot(lottery_id));
+        let snapshot = test_utils::unwrap(rounds::get_round_snapshot(lottery_id));
         let ticket_count = snapshot.ticket_count;
         assert!(ticket_count == 2, 3);
 
-        let summary_mid = option::extract(autopurchase::get_lottery_summary(lottery_id));
+        let summary_mid = test_utils::unwrap(autopurchase::get_lottery_summary(lottery_id));
         let balance_mid = summary_mid.total_balance;
         let total_players_mid = summary_mid.total_players;
         let active_players_mid = summary_mid.active_players;
@@ -114,16 +115,16 @@ module lottery::autopurchase_tests {
 
 
         autopurchase::execute(lottery_admin, lottery_id, @player1);
-        let plan_after_second = option::extract(autopurchase::get_plan(lottery_id, @player1));
+        let plan_after_second = test_utils::unwrap(autopurchase::get_plan(lottery_id, @player1));
         let final_balance = plan_after_second.balance;
         assert!(final_balance == 0, 4);
 
-        let summary_final = option::extract(autopurchase::get_lottery_summary(lottery_id));
+        let summary_final = test_utils::unwrap(autopurchase::get_lottery_summary(lottery_id));
         let balance_final = summary_final.total_balance;
         assert!(balance_final == 0, 19);
 
         let pool_opt = treasury_multi::get_pool(lottery_id);
-        let pool_snapshot = option::extract(pool_opt);
+        let pool_snapshot = test_utils::unwrap(pool_opt);
         let prize_balance = pool_snapshot.prize_balance;
         let operations_balance = pool_snapshot.operations_balance;
         assert!(prize_balance == 210, 5);
@@ -181,11 +182,11 @@ module lottery::autopurchase_tests {
         let balance_after = treasury_v1::balance_of(@player3);
         assert!(balance_after == balance_before + 120, 0);
 
-        let plan = option::extract(autopurchase::get_plan(lottery_id, @player3));
+        let plan = test_utils::unwrap(autopurchase::get_plan(lottery_id, @player3));
         let balance = plan.balance;
         assert!(balance == 380, 1);
 
-        let summary = option::extract(autopurchase::get_lottery_summary(lottery_id));
+        let summary = test_utils::unwrap(autopurchase::get_lottery_summary(lottery_id));
         let total_balance = summary.total_balance;
         assert!(total_balance == 380, 2);
     }

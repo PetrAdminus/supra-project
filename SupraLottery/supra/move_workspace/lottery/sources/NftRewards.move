@@ -72,11 +72,13 @@ module lottery::nft_rewards {
     }
 
 
+    #[view]
     public fun is_initialized(): bool {
         exists<BadgeAuthority>(@lottery)
     }
 
 
+    #[view]
     public fun admin(): address acquires BadgeAuthority {
         borrow_authority().admin
     }
@@ -141,6 +143,7 @@ module lottery::nft_rewards {
     }
 
 
+    #[view]
     public fun has_badge(owner: address, badge_id: u64): bool acquires BadgeAuthority {
         let state = borrow_authority();
         if (!table::contains(&state.users, owner)) {
@@ -151,6 +154,7 @@ module lottery::nft_rewards {
     }
 
 
+    #[view]
     public fun list_badges(owner: address): vector<u64> acquires BadgeAuthority {
         let state = borrow_authority();
         if (!table::contains(&state.users, owner)) {
@@ -161,6 +165,7 @@ module lottery::nft_rewards {
     }
 
 
+    #[view]
     public fun get_badge(owner: address, badge_id: u64): option::Option<WinnerBadgeData> acquires BadgeAuthority {
         let state = borrow_authority();
         if (!table::contains(&state.users, owner)) {
@@ -171,7 +176,7 @@ module lottery::nft_rewards {
             option::none<WinnerBadgeData>()
         } else {
             option::some(*table::borrow(&collection.badges, badge_id))
-        };
+        }
     }
 
 
@@ -183,7 +188,7 @@ module lottery::nft_rewards {
         if (!table::contains(users, owner)) {
             return option::none<WinnerBadgeData>();
         };
-        let collection = table::borrow_mut(users, owner);
+        let mut collection = table::borrow_mut(users, owner);
         if (!table::contains(&collection.badges, badge_id)) {
             return option::none<WinnerBadgeData>();
         };
@@ -206,7 +211,7 @@ module lottery::nft_rewards {
 
     fun remove_badge_id(ids: &mut vector<u64>, badge_id: u64) {
         let len = vector::length(ids);
-        let i = 0;
+        let mut i = 0;
         while (i < len) {
             if (*vector::borrow(ids, i) == badge_id) {
                 vector::remove(ids, i);
@@ -239,9 +244,9 @@ module lottery::nft_rewards {
     }
 
     fun clone_bytes(data: &vector<u8>): vector<u8> {
-        let out = vector::empty<u8>();
+        let mut out = vector::empty<u8>();
         let len = vector::length(data);
-        let i = 0;
+        let mut i = 0;
         while (i < len) {
             vector::push_back(&mut out, *vector::borrow(data, i));
             i = i + 1;
@@ -250,9 +255,9 @@ module lottery::nft_rewards {
     }
 
     fun clone_u64_vector(data: &vector<u64>): vector<u64> {
-        let out = vector::empty<u64>();
+        let mut out = vector::empty<u64>();
         let len = vector::length(data);
-        let i = 0;
+        let mut i = 0;
         while (i < len) {
             vector::push_back(&mut out, *vector::borrow(data, i));
             i = i + 1;

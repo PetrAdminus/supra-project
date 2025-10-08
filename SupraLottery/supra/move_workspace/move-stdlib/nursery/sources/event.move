@@ -49,6 +49,18 @@ module std::event {
         handle_ref.counter = handle_ref.counter + 1;
     }
 
+    /// Emit одноразовое событие, созданное атрибутом `#[event]`.
+    ///
+    /// Среда выполнения Supra пока не предоставляет публичного API для
+    /// создания эфемерных дескрипторов, которые использует апстримная
+    /// стандартная библиотека, поэтому временно мы просто отбрасываем
+    /// полезную нагрузку, проверяя способности типа. Это позволяет
+    /// компилировать Move 1-код, пока нативная подсистема событий
+    /// перехватывает данные собственными средствами.
+    public fun emit<T: drop + store>(msg: T) {
+        let _ = msg;
+    }
+
     /// Return the GUIID associated with this EventHandle
     public fun guid<T: drop + store>(handle_ref: &EventHandle<T>): &GUID {
         &handle_ref.guid.guid

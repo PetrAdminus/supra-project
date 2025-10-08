@@ -5,6 +5,7 @@ module lottery::treasury_multi_tests {
     use std::signer;
     use lottery::treasury_multi;
     use lottery::treasury_v1;
+    use lottery::test_utils;
 
     fun init_token(lottery_admin: &signer) {
         account::create_account_for_test(@jackpot_pool);
@@ -30,14 +31,14 @@ module lottery::treasury_multi_tests {
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 6_000, 2_000, 2_000);
         treasury_multi::record_allocation(lottery_admin, 1, 1_000);
 
-        let pool = option::extract(treasury_multi::get_pool(1));
+        let pool = test_utils::unwrap(treasury_multi::get_pool(1));
         let prize_balance = pool.prize_balance;
         let operations_balance = pool.operations_balance;
         assert!(prize_balance == 600, 1);
         assert!(operations_balance == 200, 2);
         assert!(treasury_multi::jackpot_balance() == 200, 3);
 
-        let config = option::extract(treasury_multi::get_config(1));
+        let config = test_utils::unwrap(treasury_multi::get_config(1));
         let prize_bps = config.prize_bps;
         let jackpot_bps = config.jackpot_bps;
         let operations_bps = config.operations_bps;
@@ -49,7 +50,7 @@ module lottery::treasury_multi_tests {
         assert!(vector::length(&ids) == 1, 7);
         assert!(*vector::borrow(&ids, 0) == 1, 8);
 
-        let summary = option::extract(treasury_multi::get_lottery_summary(1));
+        let summary = test_utils::unwrap(treasury_multi::get_lottery_summary(1));
         let summary_config = summary.config;
         let summary_pool = summary.pool;
         let s_prize = summary_config.prize_bps;
@@ -83,7 +84,7 @@ module lottery::treasury_multi_tests {
         let paid = treasury_multi::distribute_prize(lottery_admin, 1, signer::address_of(winner));
         assert!(paid == 140, 0);
 
-        let pool = option::extract(treasury_multi::get_pool(1));
+        let pool = test_utils::unwrap(treasury_multi::get_pool(1));
         let prize_balance = pool.prize_balance;
         let operations_balance = pool.operations_balance;
         assert!(prize_balance == 0, 1);
@@ -93,7 +94,7 @@ module lottery::treasury_multi_tests {
 
         assert!(winner_balance == 940, 3);
 
-        let summary_after_prize = option::extract(treasury_multi::get_lottery_summary(1));
+        let summary_after_prize = test_utils::unwrap(treasury_multi::get_lottery_summary(1));
         let after_pool = summary_after_prize.pool;
         let after_prize_balance = after_pool.prize_balance;
         let after_ops_balance = after_pool.operations_balance;
@@ -117,7 +118,7 @@ module lottery::treasury_multi_tests {
         assert!(treasury_v1::balance_of(@operations_pool) == 200, 1);
 
 
-        let pool = option::extract(treasury_multi::get_pool(1));
+        let pool = test_utils::unwrap(treasury_multi::get_pool(1));
         let operations_balance = pool.operations_balance;
         let prize_balance = pool.prize_balance;
         assert!(operations_balance == 0, 2);
@@ -128,7 +129,7 @@ module lottery::treasury_multi_tests {
         assert!(treasury_v1::balance_of(signer::address_of(winner)) == 4_200, 4);
         assert!(treasury_multi::jackpot_balance() == 0, 5);
 
-        let summary_after_ops = option::extract(treasury_multi::get_lottery_summary(1));
+        let summary_after_ops = test_utils::unwrap(treasury_multi::get_lottery_summary(1));
         let post_pool = summary_after_ops.pool;
         let post_prize = post_pool.prize_balance;
         let post_ops = post_pool.operations_balance;

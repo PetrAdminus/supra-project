@@ -39,8 +39,8 @@ module std::compare {
     /// > used in the Diem framework. However, should this functionality be needed in specification, a customized
     /// > native abstraction is needed in the prover framework.
     public fun cmp_bcs_bytes(v1: &vector<u8>, v2: &vector<u8>): u8 {
-        let i1 = vector::length(v1);
-        let i2 = vector::length(v2);
+        let mut i1 = vector::length(v1);
+        let mut i2 = vector::length(v2);
         let len_cmp = cmp_u64(i1, i2);
 
         // BCS uses little endian encoding for all integer types, so we choose to compare from left

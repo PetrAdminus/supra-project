@@ -6,6 +6,7 @@ module lottery::vip_tests {
     use lottery::rounds;
     use lottery::treasury_multi;
     use lottery::treasury_v1;
+    use lottery::test_utils;
     use lottery::vip;
     use lottery_factory::registry;
     use vrf_hub::hub;
@@ -72,7 +73,7 @@ module lottery::vip_tests {
         setup_token(lottery_admin, player);
 
         vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, VIP_BONUS_TICKETS);
-        let summary_before = option::extract(vip::get_lottery_summary(lottery_id));
+        let summary_before = test_utils::unwrap(vip::get_lottery_summary(lottery_id));
         let total_members = summary_before.total_members;
         let active_members = summary_before.active_members;
         let total_revenue = summary_before.total_revenue;
@@ -82,13 +83,13 @@ module lottery::vip_tests {
 
         vip::subscribe(player, lottery_id);
         let player_addr = signer::address_of(player);
-        let subscription = option::extract(vip::get_subscription(lottery_id, player_addr));
+        let subscription = test_utils::unwrap(vip::get_subscription(lottery_id, player_addr));
         let is_active = subscription.is_active;
         let bonus_tickets = subscription.bonus_tickets;
         assert!(is_active, 3);
         assert!(bonus_tickets == VIP_BONUS_TICKETS, 4);
 
-        let treasury_summary = option::extract(treasury_multi::get_lottery_summary(lottery_id));
+        let treasury_summary = test_utils::unwrap(treasury_multi::get_lottery_summary(lottery_id));
         let pool = treasury_summary.pool;
         let prize_balance = pool.prize_balance;
         let operations_balance = pool.operations_balance;
@@ -96,11 +97,11 @@ module lottery::vip_tests {
         assert!(operations_balance == VIP_PRICE, 6);
 
         rounds::buy_ticket(player, lottery_id);
-        let round_snapshot = option::extract(rounds::get_round_snapshot(lottery_id));
+        let round_snapshot = test_utils::unwrap(rounds::get_round_snapshot(lottery_id));
         let ticket_count = round_snapshot.ticket_count;
         assert!(ticket_count == 1 + VIP_BONUS_TICKETS, 7);
 
-        let summary_after = option::extract(vip::get_lottery_summary(lottery_id));
+        let summary_after = test_utils::unwrap(vip::get_lottery_summary(lottery_id));
         let members_after = summary_after.total_members;
         let active_after = summary_after.active_members;
         let revenue_after = summary_after.total_revenue;
@@ -134,11 +135,11 @@ module lottery::vip_tests {
 
         vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, 1);
         vip::subscribe_for(gift_admin, lottery_id, signer::address_of(recipient));
-        let subscription = option::extract(vip::get_subscription(lottery_id, signer::address_of(recipient)));
+        let subscription = test_utils::unwrap(vip::get_subscription(lottery_id, signer::address_of(recipient)));
         assert!(subscription.is_active, 12);
 
         vip::cancel_for(lottery_admin, lottery_id, signer::address_of(recipient));
-        let after_cancel = option::extract(vip::get_subscription(lottery_id, signer::address_of(recipient)));
+        let after_cancel = test_utils::unwrap(vip::get_subscription(lottery_id, signer::address_of(recipient)));
         assert!(!after_cancel.is_active, 13);
     }
 }

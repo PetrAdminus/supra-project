@@ -99,10 +99,12 @@ module lottery::referrals {
         );
     }
 
+    #[view]
     public fun is_initialized(): bool {
         exists<ReferralState>(@lottery)
     }
 
+    #[view]
     public fun admin(): address acquires ReferralState {
         borrow_state().admin
     }
@@ -118,7 +120,7 @@ module lottery::referrals {
         lottery_id: u64,
         referrer_bps: u64,
         referee_bps: u64,
-    ) acquires ReferralState, treasury_multi::TreasuryState {
+    ) acquires ReferralState {
         ensure_admin(caller);
         if (referrer_bps + referee_bps > BASIS_POINT_DENOMINATOR) {
             abort E_INVALID_CONFIG;
@@ -127,7 +129,7 @@ module lottery::referrals {
         if (!option::is_some(&treasury_config_opt)) {
             abort E_TREASURY_CONFIG_MISSING;
         };
-        let share_config = option::extract(treasury_config_opt);
+        let share_config = *option::borrow(&treasury_config_opt);
         let operations_bps = share_config.operations_bps;
         if (referrer_bps + referee_bps > operations_bps) {
             abort E_INVALID_CONFIG;
@@ -197,6 +199,7 @@ module lottery::referrals {
         };
     }
 
+    #[view]
     public fun total_registered(): u64 acquires ReferralState {
         borrow_state().total_registered
     }
@@ -211,7 +214,7 @@ module lottery::referrals {
             option::some(*table::borrow(&state.referrers, player))
         } else {
             option::none<address>()
-        };
+        }
     }
 
     #[view]
@@ -224,7 +227,7 @@ module lottery::referrals {
             option::some(*table::borrow(&state.configs, lottery_id))
         } else {
             option::none<ReferralConfig>()
-        };
+        }
     }
 
     #[view]
@@ -237,7 +240,7 @@ module lottery::referrals {
             option::some(*table::borrow(&state.stats, lottery_id))
         } else {
             option::none<ReferralStats>()
-        };
+        }
     }
 
     #[view]
@@ -253,7 +256,7 @@ module lottery::referrals {
         lottery_id: u64,
         buyer: address,
         amount: u64,
-    ) acquires ReferralState, treasury_multi::TreasuryState {
+    ) acquires ReferralState {
         if (!exists<ReferralState>(@lottery)) {
             return;
         };
@@ -281,18 +284,18 @@ module lottery::referrals {
         if (!option::is_some(&summary_opt)) {
             return;
         };
-        let summary = option::extract(summary_opt);
+        let summary = *option::borrow(&summary_opt);
         let pool = summary.pool;
         let operations_balance = pool.operations_balance;
         if (operations_balance == 0) {
             return;
         };
 
-        let available = operations_balance;
+        let mut available = operations_balance;
         let desired_referrer = math64::mul_div(amount, referrer_bps, BASIS_POINT_DENOMINATOR);
         let desired_referee = math64::mul_div(amount, referee_bps, BASIS_POINT_DENOMINATOR);
-        let referrer_paid = 0;
-        let referee_paid = 0;
+        let mut referrer_paid = 0;
+        let mut referee_paid = 0;
 
         if (desired_referrer > 0 && available > 0) {
             let pay_referrer = if (desired_referrer > available) { available } else { desired_referrer };
@@ -368,7 +371,7 @@ module lottery::referrals {
 
     fun record_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
         let len = vector::length(ids);
-        let idx = 0;
+        let mut idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
                 return;
@@ -379,9 +382,9 @@ module lottery::referrals {
     }
 
     fun copy_u64_vector(values: &vector<u64>): vector<u64> {
-        let out = vector::empty<u64>();
+        let mut out = vector::empty<u64>();
         let len = vector::length(values);
-        let idx = 0;
+        let mut idx = 0;
         while (idx < len) {
             vector::push_back(&mut out, *vector::borrow(values, idx));
             idx = idx + 1;

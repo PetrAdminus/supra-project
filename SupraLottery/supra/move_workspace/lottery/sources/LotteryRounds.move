@@ -116,10 +116,12 @@ module lottery::rounds {
         );
     }
 
+    #[view]
     public fun is_initialized(): bool {
         exists<RoundCollection>(@lottery)
     }
 
+    #[view]
     public fun admin(): address acquires RoundCollection {
         borrow_state().admin
     }
@@ -131,7 +133,7 @@ module lottery::rounds {
     }
 
     public entry fun buy_ticket(caller: &signer, lottery_id: u64)
-    acquires RoundCollection, instances::LotteryCollection, treasury_multi::TreasuryState {
+    acquires RoundCollection, instances::LotteryCollection {
         let buyer = signer::address_of(caller);
         let state = borrow_state_mut();
         let (round, blueprint) = prepare_purchase(state, lottery_id);
@@ -146,7 +148,7 @@ module lottery::rounds {
         lottery_id: u64,
         buyer: address,
         ticket_count: u64,
-    ): u64 acquires RoundCollection, instances::LotteryCollection, treasury_multi::TreasuryState {
+    ): u64 acquires RoundCollection, instances::LotteryCollection {
         if (ticket_count == 0) {
             abort E_INVALID_TICKET_COUNT;
         };
@@ -230,7 +232,7 @@ module lottery::rounds {
         if (!table::contains(&state.rounds, lottery_id)) {
             abort E_NO_PENDING_REQUEST;
         };
-        let round = table::borrow_mut(&mut state.rounds, lottery_id);
+        let mut round = table::borrow_mut(&mut state.rounds, lottery_id);
         if (!option::is_some(&round.pending_request)) {
             abort E_NO_PENDING_REQUEST;
         };
@@ -281,6 +283,7 @@ module lottery::rounds {
         );
     }
 
+    #[view]
     public fun get_round_snapshot(lottery_id: u64): option::Option<RoundSnapshot> acquires RoundCollection {
         if (!exists<RoundCollection>(@lottery)) {
             return option::none<RoundSnapshot>();
@@ -296,9 +299,10 @@ module lottery::rounds {
                 has_pending_request: option::is_some(&round.pending_request),
                 next_ticket_id: round.next_ticket_id,
             })
-        };
+        }
     }
 
+    #[view]
     public fun pending_request_id(lottery_id: u64): option::Option<u64> acquires RoundCollection {
         if (!exists<RoundCollection>(@lottery)) {
             return option::none<u64>();
@@ -312,8 +316,8 @@ module lottery::rounds {
                 option::some(*option::borrow(&round.pending_request))
             } else {
                 option::none<u64>()
-            };
-        };
+            }
+        }
     }
 
     fun prepare_purchase(
@@ -324,7 +328,7 @@ module lottery::rounds {
         if (!option::is_some(&info_opt)) {
             abort E_INSTANCE_MISSING;
         };
-        let info = option::extract(info_opt);
+        let info = *option::borrow(&info_opt);
         let blueprint = info.blueprint;
         if (!instances::is_instance_active(lottery_id)) {
             abort E_INSTANCE_INACTIVE;
@@ -351,7 +355,7 @@ module lottery::rounds {
         ticket_price: u64,
         jackpot_share_bps: u16,
         ticket_count: u64,
-    ): u64 acquires instances::LotteryCollection, treasury_multi::TreasuryState {
+    ): u64 acquires instances::LotteryCollection {
         let jackpot_bps = (jackpot_share_bps as u64);
         let jackpot_contribution = math64::mul_div(ticket_price, jackpot_bps, BASIS_POINT_DENOMINATOR);
         let issued = 0;
@@ -448,7 +452,7 @@ module lottery::rounds {
             abort E_INSTANCE_MISSING;
         };
         if (table::contains(&state.rounds, lottery_id)) {
-            let round = table::borrow_mut(&mut state.rounds, lottery_id);
+            let mut round = table::borrow_mut(&mut state.rounds, lottery_id);
             round.tickets = tickets;
             round.draw_scheduled = draw_scheduled;
             round.next_ticket_id = next_ticket_id;
@@ -466,8 +470,8 @@ module lottery::rounds {
         if (vector::length(randomness) < 8) {
             abort E_RANDOM_BYTES_TOO_SHORT;
         };
-        let prefix = vector::empty<u8>();
-        let i = 0;
+        let mut prefix = vector::empty<u8>();
+        let mut i = 0;
         while (i < 8) {
             let byte = *vector::borrow(randomness, i);
             vector::push_back(&mut prefix, byte);
@@ -477,9 +481,9 @@ module lottery::rounds {
     }
 
     fun clone_bytes(data: &vector<u8>): vector<u8> {
-        let buffer = vector::empty<u8>();
+        let mut buffer = vector::empty<u8>();
         let len = vector::length(data);
-        let i = 0;
+        let mut i = 0;
         while (i < len) {
             let byte = *vector::borrow(data, i);
             vector::push_back(&mut buffer, byte);
