@@ -2,7 +2,7 @@ module lottery::vip {
     use std::option;
     use std::signer;
     use std::vector;
-    use aptos_std::table;
+    use vrf_hub::table;
     use std::event;
     use std::math64;
     use std::timestamp;
@@ -20,7 +20,7 @@ module lottery::vip {
 
     const SOURCE_VIP_SUBSCRIPTION: vector<u8> = b"vip_subscription";
 
-    public struct VipConfig has copy, drop, store {
+    struct VipConfig has copy, drop, store {
         price: u64,
         duration_secs: u64,
         bonus_tickets: u64,
@@ -34,7 +34,7 @@ module lottery::vip {
     struct VipLottery has store {
         config: VipConfig,
         subscriptions: table::Table<address, VipSubscription>,
-        members: vector::Vector<address>,
+        members: vector<address>,
         total_revenue: u64,
         bonus_tickets_issued: u64,
     }
@@ -42,7 +42,7 @@ module lottery::vip {
     struct VipState has key {
         admin: address,
         lotteries: table::Table<u64, VipLottery>,
-        lottery_ids: vector::Vector<u64>,
+        lottery_ids: vector<u64>,
         config_events: event::EventHandle<VipConfigUpdatedEvent>,
         subscribed_events: event::EventHandle<VipSubscribedEvent>,
         cancelled_events: event::EventHandle<VipCancelledEvent>,
@@ -80,13 +80,13 @@ module lottery::vip {
         bonus_tickets: u64,
     }
 
-    public struct VipSubscriptionView has copy, drop, store {
+    struct VipSubscriptionView has copy, drop, store {
         expiry_ts: u64,
         is_active: bool,
         bonus_tickets: u64,
     }
 
-    public struct VipLotterySummary has copy, drop, store {
+    struct VipLotterySummary has copy, drop, store {
         config: VipConfig,
         total_members: u64,
         active_members: u64,
@@ -416,7 +416,7 @@ module lottery::vip {
         };
     }
 
-    fun record_lottery_id(ids: &mut vector::Vector<u64>, lottery_id: u64) {
+    fun record_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
         let len = vector::length(ids);
         let idx = 0;
         while (idx < len) {
@@ -428,7 +428,7 @@ module lottery::vip {
         vector::push_back(ids, lottery_id);
     }
 
-    fun record_member(members: &mut vector::Vector<address>, member: address) {
+    fun record_member(members: &mut vector<address>, member: address) {
         let len = vector::length(members);
         let idx = 0;
         while (idx < len) {
@@ -440,7 +440,7 @@ module lottery::vip {
         vector::push_back(members, member);
     }
 
-    fun copy_u64_vector(values: &vector::Vector<u64>): vector<u64> {
+    fun copy_u64_vector(values: &vector<u64>): vector<u64> {
         let out = vector::empty<u64>();
         let len = vector::length(values);
         let idx = 0;
@@ -451,7 +451,7 @@ module lottery::vip {
         out
     }
 
-    fun copy_address_vector(values: &vector::Vector<address>): vector<address> {
+    fun copy_address_vector(values: &vector<address>): vector<address> {
         let out = vector::empty<address>();
         let len = vector::length(values);
         let idx = 0;

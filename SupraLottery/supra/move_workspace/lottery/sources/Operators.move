@@ -2,7 +2,7 @@ module lottery::operators {
     use std::option;
     use std::signer;
     use std::vector;
-    use aptos_std::table;
+    use vrf_hub::table;
     use std::event;
 
     const E_ALREADY_INIT: u64 = 1;
@@ -15,7 +15,7 @@ module lottery::operators {
     struct LotteryOperators has key {
         admin: address,
         entries: table::Table<u64, LotteryOperatorEntry>,
-        lottery_ids: vector::Vector<u64>,
+        lottery_ids: vector<u64>,
         admin_events: event::EventHandle<AdminUpdatedEvent>,
         owner_events: event::EventHandle<OwnerUpdatedEvent>,
         grant_events: event::EventHandle<OperatorGrantedEvent>,
@@ -25,7 +25,7 @@ module lottery::operators {
     struct LotteryOperatorEntry has store {
         owner: address,
         operators: table::Table<address, bool>,
-        operator_list: vector::Vector<address>,
+        operator_list: vector<address>,
     }
 
     #[event]
@@ -286,7 +286,7 @@ module lottery::operators {
         borrow_global_mut<LotteryOperators>(@lottery)
     }
 
-    fun record_lottery_id(ids: &mut vector::Vector<u64>, lottery_id: u64) {
+    fun record_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
         let len = vector::length(ids);
         let idx = 0;
         while (idx < len) {
@@ -298,7 +298,7 @@ module lottery::operators {
         vector::push_back(ids, lottery_id);
     }
 
-    fun record_operator(operators: &mut vector::Vector<address>, operator: address) {
+    fun record_operator(operators: &mut vector<address>, operator: address) {
         let len = vector::length(operators);
         let idx = 0;
         while (idx < len) {
@@ -310,7 +310,7 @@ module lottery::operators {
         vector::push_back(operators, operator);
     }
 
-    fun remove_operator(operators: &mut vector::Vector<address>, operator: address) {
+    fun remove_operator(operators: &mut vector<address>, operator: address) {
         let len = vector::length(operators);
         let idx = 0;
         while (idx < len) {
@@ -325,7 +325,7 @@ module lottery::operators {
         };
     }
 
-    fun copy_u64_vector(values: &vector::Vector<u64>): vector<u64> {
+    fun copy_u64_vector(values: &vector<u64>): vector<u64> {
         let out = vector::empty<u64>();
         let len = vector::length(values);
         let idx = 0;
@@ -336,7 +336,7 @@ module lottery::operators {
         out
     }
 
-    fun copy_address_vector(values: &vector::Vector<address>): vector<address> {
+    fun copy_address_vector(values: &vector<address>): vector<address> {
         let out = vector::empty<address>();
         let len = vector::length(values);
         let idx = 0;

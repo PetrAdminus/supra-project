@@ -4,14 +4,12 @@ version = "0.0.1"
 
 [dependencies]
 MoveStdlib = { local = "../move-stdlib" }
-AptosStdlib = { local = "../aptos-stdlib" }
 vrf_hub = { local = "../vrf_hub" }
 lottery_factory = { local = "../lottery_factory" }
 SupraVrf = { local = "../SupraVrf" }
 
 [addresses]
 MoveStdlib = "0x1"
-AptosStdlib = "0x1"
 std = "0x1"
 SupraVrf = "0x1"
 lottery = "0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490"

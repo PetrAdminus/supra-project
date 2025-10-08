@@ -4,7 +4,7 @@ module lottery::history {
     use std::option;
     use std::signer;
     use std::vector;
-    use aptos_std::table;
+    use vrf_hub::table;
     use std::event;
     use std::timestamp;
 
@@ -25,7 +25,7 @@ module lottery::history {
         record_events: event::EventHandle<DrawRecordedEvent>,
     }
 
-    public struct DrawRecord has copy, drop, store {
+    struct DrawRecord has copy, drop, store {
         request_id: u64,
         winner: address,
         ticket_index: u64,

@@ -2,7 +2,7 @@ module lottery::autopurchase {
     use std::option;
     use std::signer;
     use std::vector;
-    use aptos_std::table;
+    use vrf_hub::table;
     use std::event;
     use std::math64;
     use lottery::instances;
@@ -28,14 +28,14 @@ module lottery::autopurchase {
 
     struct LotteryPlans has store {
         plans: table::Table<address, AutopurchasePlan>,
-        players: vector::Vector<address>,
+        players: vector<address>,
         total_balance: u64,
     }
 
     struct AutopurchaseState has key {
         admin: address,
         lotteries: table::Table<u64, LotteryPlans>,
-        lottery_ids: vector::Vector<u64>,
+        lottery_ids: vector<u64>,
         deposit_events: event::EventHandle<AutopurchaseDepositEvent>,
         config_events: event::EventHandle<AutopurchaseConfigUpdatedEvent>,
         executed_events: event::EventHandle<AutopurchaseExecutedEvent>,
@@ -393,7 +393,7 @@ module lottery::autopurchase {
         };
     }
 
-    fun copy_u64_vector(values: &vector::Vector<u64>): vector<u64> {
+    fun copy_u64_vector(values: &vector<u64>): vector<u64> {
         let out = vector::empty<u64>();
         let len = vector::length(values);
         let idx = 0;
@@ -404,7 +404,7 @@ module lottery::autopurchase {
         out
     }
 
-    fun copy_address_vector(values: &vector::Vector<address>): vector<address> {
+    fun copy_address_vector(values: &vector<address>): vector<address> {
         let out = vector::empty<address>();
         let len = vector::length(values);
         let idx = 0;

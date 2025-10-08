@@ -5,7 +5,7 @@ module lottery::referrals {
     use std::option;
     use std::signer;
     use std::vector;
-    use aptos_std::table;
+    use vrf_hub::table;
     use std::event;
     use std::math64;
     use lottery::treasury_multi;
@@ -36,7 +36,7 @@ module lottery::referrals {
         configs: table::Table<u64, ReferralConfig>,
         stats: table::Table<u64, ReferralStats>,
         referrers: table::Table<address, address>,
-        lottery_ids: vector::Vector<u64>,
+        lottery_ids: vector<u64>,
         total_registered: u64,
         config_events: event::EventHandle<ReferralConfigUpdatedEvent>,
         register_events: event::EventHandle<ReferralRegisteredEvent>,
@@ -366,7 +366,7 @@ module lottery::referrals {
         };
     }
 
-    fun record_lottery_id(ids: &mut vector::Vector<u64>, lottery_id: u64) {
+    fun record_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
         let len = vector::length(ids);
         let idx = 0;
         while (idx < len) {
@@ -378,7 +378,7 @@ module lottery::referrals {
         vector::push_back(ids, lottery_id);
     }
 
-    fun copy_u64_vector(values: &vector::Vector<u64>): vector<u64> {
+    fun copy_u64_vector(values: &vector<u64>): vector<u64> {
         let out = vector::empty<u64>();
         let len = vector::length(values);
         let idx = 0;

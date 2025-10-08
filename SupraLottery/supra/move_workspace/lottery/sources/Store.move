@@ -4,7 +4,7 @@ module lottery::store {
     use std::event;
     use std::math64;
     use std::signer;
-    use aptos_std::table;
+    use vrf_hub::table;
     use lottery::instances;
     use lottery::treasury_multi;
     use lottery::treasury_v1;
@@ -21,7 +21,7 @@ module lottery::store {
     const SOURCE_STORE: vector<u8> = b"store";
 
 
-    public struct StoreItem has copy, drop, store {
+    struct StoreItem has copy, drop, store {
         price: u64,
         metadata: vector<u8>,
         available: bool,
@@ -36,13 +36,13 @@ module lottery::store {
 
     struct LotteryStore has store {
         items: table::Table<u64, StoreRecord>,
-        item_ids: vector::Vector<u64>,
+        item_ids: vector<u64>,
     }
 
     struct StoreState has key {
         admin: address,
         lotteries: table::Table<u64, LotteryStore>,
-        lottery_ids: vector::Vector<u64>,
+        lottery_ids: vector<u64>,
         admin_events: event::EventHandle<AdminUpdatedEvent>,
         item_events: event::EventHandle<ItemConfiguredEvent>,
         purchase_events: event::EventHandle<ItemPurchasedEvent>,
@@ -73,7 +73,7 @@ module lottery::store {
         total_price: u64,
     }
 
-    public struct ItemWithStats has copy, drop, store {
+    struct ItemWithStats has copy, drop, store {
         item: StoreItem,
         sold: u64,
     }
@@ -265,7 +265,7 @@ module lottery::store {
     }
 
 
-    public fun list_lottery_ids(): vector::Vector<u64> acquires StoreState {
+    public fun list_lottery_ids(): vector<u64> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
             vector::empty<u64>()
         } else {
@@ -275,7 +275,7 @@ module lottery::store {
     }
 
 
-    public fun list_item_ids(lottery_id: u64): vector::Vector<u64> acquires StoreState {
+    public fun list_item_ids(lottery_id: u64): vector<u64> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
             return vector::empty<u64>();
         };
@@ -288,7 +288,7 @@ module lottery::store {
     }
 
 
-    public fun get_lottery_summary(lottery_id: u64): option::Option<vector::Vector<ItemWithStats>>
+    public fun get_lottery_summary(lottery_id: u64): option::Option<vector<ItemWithStats>>
     acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
             return option::none();
@@ -360,7 +360,7 @@ module lottery::store {
         result
     }
 
-    fun copy_vec_u64(source: &vector::Vector<u64>): vector::Vector<u64> {
+    fun copy_vec_u64(source: &vector<u64>): vector<u64> {
         let result = vector::empty<u64>();
         let i = 0;
         let len = vector::length(source);
