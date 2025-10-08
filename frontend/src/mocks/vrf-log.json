@@ -1,0 +1,91 @@
+{
+  "lottery_id": 0,
+  "limit": 25,
+  "round": {
+    "snapshot": {
+      "lottery_id": 0,
+      "round_id": 3,
+      "ticket_count": 128,
+      "next_ticket_id": 129,
+      "draw_scheduled": true
+    },
+    "pending_request_id": null,
+    "requests": [
+      {
+        "sequence_number": 58,
+        "event_type": "lottery::DrawRequestIssuedEvent",
+        "timestamp": "2024-05-24T10:15:00Z",
+        "data": {
+          "lottery_id": 0,
+          "round_id": 3,
+          "request_id": "0xabc123",
+          "ticket_count": 128
+        }
+      },
+      {
+        "sequence_number": 59,
+        "event_type": "lottery::DrawRequestIssuedEvent",
+        "timestamp": "2024-05-23T10:00:00Z",
+        "data": {
+          "lottery_id": 0,
+          "round_id": 2,
+          "request_id": "0xreqPrev",
+          "ticket_count": 96
+        }
+      }
+    ],
+    "fulfillments": [
+      {
+        "sequence_number": 60,
+        "event_type": "lottery::DrawFulfilledEvent",
+        "timestamp": "2024-05-24T10:16:00Z",
+        "data": {
+          "lottery_id": 0,
+          "round_id": 3,
+          "winner_index": 42,
+          "request_id": "0xabc123",
+          "randomness": "0x445566"
+        }
+      },
+      {
+        "sequence_number": 61,
+        "event_type": "lottery::DrawFulfilledEvent",
+        "timestamp": "2024-05-23T10:05:00Z",
+        "data": {
+          "lottery_id": 0,
+          "round_id": 2,
+          "winner_index": 17,
+          "request_id": "0xreqPrev",
+          "randomness": "0x112233"
+        }
+      }
+    ]
+  },
+  "hub": {
+    "requests": [
+      {
+        "sequence_number": 12,
+        "event_type": "vrf_hub::RandomnessRequestedEvent",
+        "timestamp": "2024-05-24T10:15:01Z",
+        "data": {
+          "lottery_id": 0,
+          "request_id": "0xabc123",
+          "seed": "0x9988"
+        }
+      }
+    ],
+    "fulfillments": [
+      {
+        "sequence_number": 14,
+        "event_type": "vrf_hub::RandomnessFulfilledEvent",
+        "timestamp": "2024-05-24T10:15:58Z",
+        "data": {
+          "lottery_id": 0,
+          "request_id": "0xabc123",
+          "randomness": "0x445566",
+          "proof_hash": "0xdeadbeef"
+        }
+      }
+    ]
+  }
+}

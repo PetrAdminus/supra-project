@@ -36,6 +36,26 @@ COMMAND_MAP: Dict[str, Tuple[str, str]] = {
         "supra.automation.auto_draw_runner",
         "Проверить готовность и при необходимости выполнить manual_draw",
     ),
+    "set-minimum-balance": (
+        "supra.scripts.set_minimum_balance",
+        "Обновить минимальный баланс клиента dVRF",
+    ),
+    "configure-treasury-distribution": (
+        "supra.scripts.configure_treasury_distribution",
+        "Настроить распределение призовых долей",
+    ),
+    "configure-vrf-gas": (
+        "supra.scripts.configure_vrf_gas",
+        "Обновить лимиты газа для подписки dVRF",
+    ),
+    "configure-vrf-request": (
+        "supra.scripts.configure_vrf_request",
+        "Настроить параметры запроса случайности",
+    ),
+    "vrf-audit": (
+        "supra.scripts.testnet_vrf_audit",
+        "Выгрузить события VRF и состояние раунда для панели честности",
+    ),
 }
 
 

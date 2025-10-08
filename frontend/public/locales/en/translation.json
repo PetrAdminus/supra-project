@@ -1,0 +1,480 @@
+{
+  "admin": {
+    "accessDenied": {
+      "description": "This section is available only for administrators. Switch the role in the header.",
+      "title": "Access restricted"
+    },
+    "clientSnapshot": {
+      "errorFallback": "Failed to record client snapshot.",
+      "labels": {
+        "maxGasLimit": "Max gas limit",
+        "maxGasPrice": "Max gas price",
+        "minBalanceLimit": "Min balance limit snapshot"
+      },
+      "saving": "Saving...",
+      "submit": "Record client snapshot",
+      "subtitle": "maxGasPrice / maxGasLimit / minBalance",
+      "success": "Transaction {{hash}} submitted at {{time}}",
+      "title": "Client whitelist snapshot"
+    },
+    "commands": {
+      "count": "Available commands: {{value}}",
+      "empty": "No CLI commands available for this mode.",
+      "error": "Failed to load command list.",
+      "loading": "Loading commands...",
+      "moduleLabel": "Module",
+      "subtitle": "Helpers exposed via the REST API",
+      "title": "Supra CLI commands"
+    },
+    "common": {
+      "configured": "Configured",
+      "lastUpdate": "Last update: {{value}}",
+      "loading": "Loading...",
+      "notConfigured": "Not configured"
+    },
+    "consumerSnapshot": {
+      "errorFallback": "Failed to record consumer snapshot.",
+      "labels": {
+        "callbackGasLimit": "Callback gas limit",
+        "callbackGasPrice": "Callback gas price"
+      },
+      "saving": "Saving...",
+      "submit": "Record consumer snapshot",
+      "subtitle": "Callback parameters",
+      "success": "Transaction {{hash}} submitted at {{time}}",
+      "title": "Consumer whitelist snapshot"
+    },
+    "gas": {
+      "errorFallback": "Failed to update gas config.",
+      "labels": {
+        "maxGasFee": "Max gas fee",
+        "minBalance": "Min balance"
+      },
+      "lastUpdate": "Last update: {{value}}",
+      "saving": "Saving...",
+      "submit": "Save gas config",
+      "subtitle": "Client parameters",
+      "success": "Transaction {{hash}} submitted at {{time}}",
+      "title": "Gas configuration"
+    },
+    "plan": {
+      "items": {
+        "first": "Run the dVRF subscription flow (addContractToWhitelist, depositFundClient, configure_vrf_request).",
+        "second": "Replace mock SupraClient calls with real RPC/CLI requests.",
+        "third": "Connect StarKey and run end-to-end ticket purchase."
+      },
+      "subtitle": "Next actions after approval",
+      "title": "Operational plan"
+    },
+    "title": "Administration",
+    "treasury": {
+      "controls": {
+        "balances": {
+          "jackpot": "Jackpot balance: {{value}} SUPRA",
+          "marketing": "Marketing balance: {{value}} SUPRA",
+          "prize": "Current prize balance: {{value}} SUPRA",
+          "treasury": "Treasury balance: {{value}} SUPRA"
+        },
+        "errorFallback": "Failed to update treasury settings.",
+        "labels": {
+          "salesEnabled": "Ticket sales enabled",
+          "ticketPrice": "Ticket price (SUPRA)",
+          "treasuryAddress": "Treasury address"
+        },
+        "lastUpdate": "Last update: {{value}}",
+        "saving": "Saving...",
+        "submit": "Update treasury settings",
+        "subtitle": "Ticket price, wallet, and sales toggle",
+        "success": "Transaction {{hash}} submitted at {{time}}",
+        "title": "Treasury controls"
+      },
+      "distribution": {
+        "errorFallback": "Failed to update treasury distribution.",
+        "labels": {
+          "jackpot": "Jackpot share (bp)",
+          "marketing": "Marketing share (bp)",
+          "prize": "Current prize share (bp)",
+          "treasury": "Treasury share (bp)"
+        },
+        "lastUpdate": "Last update: {{value}}",
+        "saving": "Saving...",
+        "submit": "Update distribution",
+        "subtitle": "Percent split in basis points",
+        "success": "Transaction {{hash}} submitted at {{time}}",
+        "title": "Treasury distribution",
+        "totalBp": "Total: {{value}} / 10000 bp"
+      }
+    },
+    "vrf": {
+      "errorFallback": "Failed to update VRF config.",
+      "labels": {
+        "callbackGasLimit": "Callback gas limit",
+        "callbackGasPrice": "Callback gas price",
+        "clientSeed": "Client seed",
+        "maxGasLimit": "Max gas limit",
+        "maxGasPrice": "Max gas price",
+        "requestedRngCount": "Requested RNG count"
+      },
+      "lastUpdate": "Last update: {{value}}",
+      "saving": "Saving...",
+      "submit": "Save VRF config",
+      "subtitle": "Request limits",
+      "success": "Transaction {{hash}} submitted at {{time}}",
+      "title": "VRF configuration"
+    },
+    "whitelisting": {
+      "account": "Account: {{account}}",
+      "error": "Failed to fetch whitelisting status. Try again later.",
+      "hint": "Wait for Supra confirmation before executing deposit or configure_vrf commands. After access arrives the forms below will submit real transactions through SupraClient.",
+      "lastCheck": "Last check: {{value}}",
+      "loading": "Checking whitelisting...",
+      "profile": "Profile: {{profile}}",
+      "status": "Whitelisted: {{value}}",
+      "statusNo": "No",
+      "statusYes": "Yes",
+      "subtitle": "dVRF access configuration",
+      "title": "Whitelisting status"
+    }
+  },
+  "dashboard": {
+    "card": {
+      "current": {
+        "badge": "VRF subscription: {{id}}",
+        "empty": "No active lotteries yet. Configure a draw in the admin panel.",
+        "jackpotLabel": "Jackpot",
+        "nextDrawLabel": "Next processing",
+        "subtitle": "Round {{round}}",
+        "ticketPriceLabel": "Ticket price",
+        "ticketsSoldLabel": "Tickets sold",
+        "title": "Current draw"
+      },
+      "vrf": {
+        "hint": "While we wait for whitelisting, VRF actions stay disabled. After Supra confirms access we will enable real calls.",
+        "lastFulfillmentLabel": "Last fulfillment: {{value}}",
+        "lastRequestLabel": "Last request: {{value}}",
+        "pendingLabel": "VRF pending",
+        "pendingNo": "No",
+        "pendingYes": "Yes",
+        "subtitleIdle": "No active request",
+        "subtitlePending": "Request in progress",
+        "title": "VRF status"
+      }
+    },
+    "error": {
+      "description": "Failed to fetch lottery state. Ensure the correct API mode is selected.",
+      "title": "No data"
+    },
+    "loading": "Loading data...",
+    "selector": {
+      "empty": "No lotteries configured yet.",
+      "label": "Select lottery",
+      "lotteryName": "Lottery #{{id}}",
+      "ticketPrice": "Ticket price: {{value}}"
+    },
+    "title": "Lottery overview"
+  },
+  "fairness": {
+    "empty": {
+      "body": "Create a lottery or refresh the page after registering a draw.",
+      "title": "No lotteries yet"
+    },
+    "error": {
+      "logBody": "Check the Supra API connection and try again.",
+      "logTitle": "Unable to load the VRF log",
+      "statusBody": "Make sure the Supra API is reachable and the configuration is valid.",
+      "statusTitle": "Lottery data unavailable"
+    },
+    "events": {
+      "empty": "No events yet.",
+      "requestId": "Request ID",
+      "roundId": "Round",
+      "showRaw": "Show raw payload",
+      "timestamp": "Timestamp"
+    },
+    "filters": {
+      "eventType": "Event type",
+      "eventTypeAll": "All events",
+      "reset": "Clear search",
+      "resetShort": "Clear",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Search by event type, request, round or payload",
+      "title": "VRF log filters"
+    },
+    "hub": {
+      "fulfillments": "Hub fulfillments",
+      "requests": "Hub requests",
+      "subtitle": "dVRF events on the hub level",
+      "title": "VRF hub"
+    },
+    "limitLabel": "Event limit:",
+    "loading": {
+      "body": "Fetching events and snapshots from the Supra API...",
+      "title": "Loading VRF log"
+    },
+    "round": {
+      "fulfillments": "Round fulfillments",
+      "pending": "Pending request: {{value}}",
+      "pendingNone": "none",
+      "requests": "Lottery randomness requests",
+      "snapshotTitle": "Round snapshot",
+      "subtitle": "Lottery #{{id}}",
+      "title": "Lottery rounds log"
+    },
+    "subtitle": "Track VRF requests and draw resolution steps for every lottery.",
+    "title": "Fairness panel"
+  },
+  "chat": {
+    "panel": {
+      "title": "Community chat",
+      "subtitle": "Discuss lotteries and share results with other players.",
+      "messagesTitle": "Messages",
+      "loading": "Loading messages...",
+      "error": "Failed to load chat messages.",
+      "empty": "No messages yet. Be the first to say hi!",
+      "sendPlaceholder": "Write a message...",
+      "sendButton": "Send",
+      "sending": "Sending...",
+      "connectHint": "Connect your Supra wallet to join the conversation.",
+      "sendError": "Failed to send the message. Try again later.",
+      "unknownUser": "Anonymous"
+    },
+    "announcements": {
+      "title": "Announcements",
+      "loading": "Loading announcements...",
+      "empty": "No announcements yet."
+    }
+  },
+  "layout": {
+    "locale": {
+      "en": "English",
+      "ru": "Russian"
+    },
+    "localeLabel": "Language",
+    "mode": {
+      "mock": "Mock",
+      "supra": "Supra testnet"
+    },
+    "modeLabel": "Mode",
+    "nav": {
+      "admin": "Administration",
+      "dashboard": "Dashboard",
+      "fairness": "Fairness",
+      "logs": "Logs",
+      "progress": "Progress",
+      "tickets": "Tickets",
+      "profile": "Profile"
+    },
+    "role": {
+      "admin": "Administrator",
+      "user": "User"
+    },
+    "roleLabel": "Role",
+    "subtitle": "Control panel for the lottery and dVRF before Supra testnet integration",
+    "title": "Supra Lottery"
+  },
+  "logs": {
+    "card": {
+      "events": {
+        "actionHide": "Hide errors",
+        "actionShow": "Show errors",
+        "empty": "No events yet. Data will appear after the Supra integration.",
+        "error": "Failed to fetch the log. Check the selected API mode.",
+        "hiddenErrors": "Errors are hidden ({{count}}). Change the filter to view all events.",
+        "loading": "Loading events...",
+        "subtitle": "History of actions",
+        "title": "Mock events"
+      },
+      "plan": {
+        "items": {
+          "first": "Update Storybook scenarios to cover cases.",
+          "second": "Prepare CLI export once whitelisting is granted.",
+          "third": "Plan how to import real logs (CSV/JSON) into the UI."
+        },
+        "title": "Next steps"
+      }
+    },
+    "table": {
+      "headers": {
+        "details": "Details",
+        "event": "Event",
+        "round": "Round",
+        "status": "Status",
+        "time": "Time"
+      },
+      "status": {
+        "failed": "Failure",
+        "retry": "Retry",
+        "success": "Success"
+      },
+      "types": {
+        "DrawHandled": "Draw handled",
+        "DrawRequested": "Draw requested",
+        "TicketBought": "Ticket purchased",
+        "TicketRefunded": "Ticket refunded"
+      }
+    },
+    "title": "Event log"
+  },
+  "progress": {
+    "achievements": {
+      "empty": "There are no achievements for this address yet.",
+      "error": "Failed to load achievements. Please try again.",
+      "loading": "Loading achievements…",
+      "locked": "Achievement not unlocked yet",
+      "metadata": "Notes: {{value}}",
+      "progressValue": "Progress: {{value}}",
+      "title": "Achievements",
+      "unlockedAt": "Unlocked: {{date}}"
+    },
+    "checklist": {
+      "completeAction": "Mark as completed",
+      "completedAt": "Completed: {{date}}",
+      "dayLabel": "Day {{index}}",
+      "empty": "No checklist tasks are configured yet.",
+      "error": "Failed to load the checklist. Please try again.",
+      "loading": "Loading checklist…",
+      "metadata": "Notes: {{value}}",
+      "reward": {
+        "kind": "{{kind, select, ticket{Ticket} bonus{Bonus} badge{Badge} other{{kind}}}}",
+        "none": "No reward"
+      },
+      "rewardLabel": "Reward: {{label}}",
+      "rewardValue": "Reward details: {{value}}",
+      "title": "Daily checklist"
+    },
+    "connectHint": "Connect your Supra wallet to see personalised tasks and rewards.",
+    "generic": {
+      "unknownDate": "unknown date"
+    },
+    "subtitle": "Track your daily checklist and account achievements.",
+    "title": "Progress & Rewards",
+    "wallet": {
+      "hint": "Once a wallet is connected, we will show the checklist and achievement status for your address.",
+      "title": "Wallet required"
+    }
+  },
+  "tickets": {
+    "form": {
+      "disabledSupra": "Ticket purchases are disabled in Supra mode. Complete wallet onboarding to enable them.",
+      "errorInvalidNumbers": "Enter numbers separated by commas (e.g. 7, 11, 23, 45).",
+      "errorLotteryUnavailable": "Select a lottery before purchasing a ticket.",
+      "errorRoundUnavailable": "Current round is unknown. Refresh Supra status or try again later.",
+      "errorTicketPriceUnavailable": "Ticket price is unavailable in Supra mode. Check the monitoring API.",
+      "label": "Ticket numbers",
+      "pending": "Submitting...",
+      "placeholder": "e.g. 7, 11, 23, 45",
+      "priceLabel": "Price: {{value}} ",
+      "submit": "Buy ticket (mock)",
+      "submitSupraDisabled": "Buy ticket (Supra disabled)",
+      "success": "Ticket {{ticketId}} added to history. After whitelisting we will switch to real transactions."
+    },
+    "historyCard": {
+      "empty": "No tickets yet. Add one in mock mode.",
+      "error": "Failed to load ticket history. Try again later.",
+      "loading": "Loading history...",
+      "lotteryLabel": "Lottery #{{id}}",
+      "noLotterySelected": "Select a lottery to view ticket history.",
+      "numbersUnavailable": "Ticket numbers are not exposed by the Supra API yet.",
+      "subtitle": "Recent operations",
+      "supraReadonly": "Supra mode currently shows registered ticket addresses only.",
+      "title": "Ticket history"
+    },
+    "purchaseCard": {
+      "badgeLoading": "Round loading...",
+      "badgeLottery": "Lottery #{{id}}",
+      "badgeNoLotteries": "No lottery selected",
+      "badgeRound": "Round {{round}}",
+      "hintMock": "Until we get whitelisting we polish the UX in mock mode. Once Supra confirms access we will connect StarKey and real transactions.",
+      "hintSupra": "Supra API is connected in read-only mode. Ticket purchases will be enabled after wallet whitelisting is approved.",
+      "loading": "Loading current draw...",
+      "noLottery": "Select a lottery to purchase tickets.",
+      "subtitleMock": "Working in mock mode",
+      "subtitleSupra": "Supra mode (read-only)",
+      "title": "Buy ticket"
+    },
+    "status": {
+      "confirmed": "Confirmed",
+      "lost": "Lost",
+      "pending": "Pending",
+      "won": "Won"
+    },
+    "title": "Tickets"
+  },
+  "wallet": {
+    "connect": "Connect",
+    "copy": {
+      "copied": "Copied",
+      "default": "Copy address",
+      "error": "Copy failed"
+    },
+    "disconnect": "Disconnect",
+    "error": {
+      "dismiss": "Dismiss"
+    },
+    "hint": "Switch to Supra testnet mode to connect.",
+    "installHint": "Install or unlock the {{provider}} wallet to continue.",
+    "meta": {
+      "chainId": "Chain ID: {{value}}",
+      "lastConnected": "Last connection: {{value}}"
+    },
+    "providerComingSoon": "{{provider}} support will be available soon.",
+    "providerLabel": "Provider",
+    "status": {
+      "connected": "Connected",
+      "connecting": "Connecting...",
+      "disconnected": "Not connected"
+    },
+    "statusLabel": "Status"
+  },
+  "profile": {
+    "title": "Player profile",
+    "subtitle": "Manage your public data, social links and NFT avatar for Supra lotteries.",
+    "status": {
+      "connectTitle": "Wallet not connected",
+      "connectSubtitle": "Profile sync is available after connecting a Supra wallet.",
+      "connectHint": "Connect your Supra wallet to view or edit profile data.",
+      "loading": "Loading profile...",
+      "error": "Failed to load the profile. Try again later."
+    },
+    "form": {
+      "title": "Profile details",
+      "subtitle": "Changes are stored on the Supra backend and reused across lotteries.",
+      "nickname": "Nickname",
+      "nicknamePlaceholder": "Enter display name",
+      "telegram": "Telegram",
+      "twitter": "Twitter",
+      "avatar": {
+        "title": "Avatar",
+        "kindLabel": "Avatar type",
+        "kind": {
+          "none": "Without avatar",
+          "external": "External URL/IPFS",
+          "crystara": "Crystara NFT"
+        },
+        "valueLabel": "Avatar identifier",
+        "valuePlaceholder": "ipfs://hash or NFT identifier",
+        "hint": "Use Crystara identifiers or external URLs/IPFS links to show your avatar."
+      },
+      "settingsLabel": "Additional settings",
+      "settingsPlaceholder": "{\"autoBuy\": true}",
+      "settingsHint": "Optional JSON with feature flags or preferences for automation.",
+      "settingsError": "Enter valid JSON in the settings field.",
+      "saving": "Saving...",
+      "submit": "Save profile",
+      "reset": "Reset changes",
+      "submitError": "Failed to save the profile.",
+      "submitSuccess": "Profile updated."
+    },
+    "meta": {
+      "title": "Profile metadata",
+      "subtitle": "Readonly fields synced from the Supra backend.",
+      "address": "Wallet address",
+      "created": "Created at",
+      "updated": "Updated at",
+      "avatarKind": "Avatar type",
+      "avatarValue": "Avatar identifier",
+      "avatarEmpty": "Not specified",
+      "empty": "The profile will be created after the first save."
+    }
+  }
+}

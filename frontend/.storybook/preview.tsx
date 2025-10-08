@@ -1,9 +1,14 @@
-import React from 'react';
-import type { Preview } from '@storybook/react-vite';
-import { AppQueryProvider } from '../src/app/providers/QueryProvider';
-import { resetUiStore, useUiStore } from '../src/store/uiStore';
-import { locales, type Locale } from '../src/i18n/locales';
-import '../src/index.css';
+import React from "react";
+import type { Preview } from "@storybook/react-vite";
+import i18next from "i18next";
+import { I18nextProvider } from "react-i18next";
+import { AppQueryProvider } from "../src/app/providers/QueryProvider";
+import { resetUiStore, useUiStore } from "../src/store/uiStore";
+import { locales, type Locale } from "../src/i18n/locales";
+import { initI18n } from "../src/i18n/initI18n";
+import "../src/index.css";
+
+void initI18n();
 
 function StoreInitializer({ locale, children }: { locale: Locale; children: React.ReactNode }) {
   const initializedRef = React.useRef(false);
@@ -55,9 +60,11 @@ const preview: Preview = {
       const locale = (context.globals.locale ?? 'ru') as Locale;
       return (
         <AppQueryProvider>
-          <StoreInitializer locale={locale}>
-            <Story />
-          </StoreInitializer>
+          <I18nextProvider i18n={i18next}>
+            <StoreInitializer locale={locale}>
+              <Story />
+            </StoreInitializer>
+          </I18nextProvider>
         </AppQueryProvider>
       );
     },

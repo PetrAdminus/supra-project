@@ -23,6 +23,7 @@ export function TicketList({ tickets }: TicketListProps): ReactElement {
         <li key={ticket.ticketId} className={`ticket-list__item ticket-list__item--${ticket.status}`}>
           <div>
             <span className="ticket-list__id">{ticket.ticketId}</span>
+            <span className="ticket-list__meta">{t("tickets.historyCard.lotteryLabel", { id: ticket.lotteryId })}</span>
             <span className="ticket-list__meta">{t("tickets.purchaseCard.badgeRound", { round: ticket.round })}</span>
           </div>
           <div className="ticket-list__numbers">

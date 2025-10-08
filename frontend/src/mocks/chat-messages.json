@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "room": "global",
+    "senderAddress": "0xabc123",
+    "body": "Привет! Кто участвует в ежедневной лотерее?",
+    "metadata": { "locale": "ru" },
+    "createdAt": "2024-04-01T09:00:00Z"
+  },
+  {
+    "id": 2,
+    "room": "global",
+    "senderAddress": "0x1f4b",
+    "body": "Я купил билет, жду розыгрыш",
+    "metadata": { "locale": "ru" },
+    "createdAt": "2024-04-01T09:05:00Z"
+  },
+  {
+    "id": 3,
+    "room": "global",
+    "senderAddress": "0xffeedd",
+    "body": "У кого есть стратегия на быстрые лотереи?",
+    "metadata": { "locale": "ru" },
+    "createdAt": "2024-04-01T09:10:00Z"
+  }
+]

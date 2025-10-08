@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { appConfig } from "../config/appConfig";
 import type { ApiMode } from "../config/appConfig";
-import type { Locale } from "../i18n/locales";
+import { defaultLocale, type Locale } from "../i18n/locales";
 
 type UserRole = "user" | "admin";
 
@@ -10,7 +10,7 @@ const initialState = {
   apiMode: appConfig.apiMode,
   showEventErrors: true,
   role: "user" as UserRole,
-  locale: "ru" as Locale,
+  locale: defaultLocale,
 };
 
 interface UiState {

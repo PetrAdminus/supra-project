@@ -1,10 +1,6 @@
 import type { Locale } from "./locales";
 
-type Messages = typeof en;
-
-type Params = Record<string, string | number>;
-
-const en = {
+export const en = {
   layout: {
     title: "Supra Lottery",
     subtitle: "Control panel for the lottery and dVRF before Supra testnet integration",
@@ -18,6 +14,9 @@ const en = {
     nav: {
       dashboard: "Dashboard",
       tickets: "Tickets",
+      fairness: "Fairness",
+      progress: "Progress",
+      profile: "Profile",
       admin: "Administration",
       logs: "Logs",
     },
@@ -63,6 +62,12 @@ const en = {
       title: "No data",
       description: "Failed to fetch lottery state. Ensure the correct API mode is selected.",
     },
+    selector: {
+      label: "Select lottery",
+      empty: "No lotteries configured yet.",
+      lotteryName: "Lottery #{{id}}",
+      ticketPrice: "Ticket price: {{value}}",
+    },
     card: {
       current: {
         title: "Current draw",
@@ -72,6 +77,7 @@ const en = {
         ticketsSoldLabel: "Tickets sold",
         ticketPriceLabel: "Ticket price",
         nextDrawLabel: "Next processing",
+        empty: "No active lotteries yet. Configure a draw in the admin panel.",
       },
       vrf: {
         title: "VRF status",
@@ -86,6 +92,128 @@ const en = {
       },
     },
   },
+  fairness: {
+    title: "Fairness panel",
+    subtitle: "Track VRF requests and draw resolution steps for every lottery.",
+    limitLabel: "Event limit:",
+    filters: {
+      title: "VRF log filters",
+      eventType: "Event type",
+      eventTypeAll: "All events",
+      searchLabel: "Search",
+      searchPlaceholder: "Search by event type, request, round or payload",
+      reset: "Clear search",
+      resetShort: "Clear",
+    },
+    loading: {
+      title: "Loading VRF log",
+      body: "Fetching events and snapshots from the Supra API...",
+    },
+    error: {
+      statusTitle: "Lottery data unavailable",
+      statusBody: "Make sure the Supra API is reachable and the configuration is valid.",
+      logTitle: "Unable to load the VRF log",
+      logBody: "Check the Supra API connection and try again.",
+    },
+    empty: {
+      title: "No lotteries yet",
+      body: "Create a lottery or refresh the page after registering a draw.",
+    },
+    round: {
+      title: "Lottery rounds log",
+      subtitle: "Lottery #{{id}}",
+      pending: "Pending request: {{value}}",
+      pendingNone: "none",
+      snapshotTitle: "Round snapshot",
+      requests: "Lottery randomness requests",
+      fulfillments: "Round fulfillments",
+    },
+    hub: {
+      title: "VRF hub",
+      subtitle: "dVRF events on the hub level",
+      requests: "Hub requests",
+      fulfillments: "Hub fulfillments",
+    },
+    events: {
+      empty: "No events yet.",
+      showRaw: "Show raw payload",
+      timestamp: "Timestamp",
+      requestId: "Request ID",
+      roundId: "Round",
+    },
+  },
+  chat: {
+    panel: {
+      title: "Community chat",
+      subtitle: "Discuss lotteries and share results with other players.",
+      messagesTitle: "Messages",
+      loading: "Loading messages...",
+      error: "Failed to load chat messages.",
+      empty: "No messages yet. Be the first to say hi!",
+      sendPlaceholder: "Write a message...",
+      sendButton: "Send",
+      sending: "Sending...",
+      connectHint: "Connect your Supra wallet to join the conversation.",
+      sendError: "Failed to send the message. Try again later.",
+      unknownUser: "Anonymous",
+    },
+    announcements: {
+      title: "Announcements",
+      loading: "Loading announcements...",
+      empty: "No announcements yet.",
+    },
+  },
+  profile: {
+    title: "Player profile",
+    subtitle: "Manage your public data, social links and NFT avatar for Supra lotteries.",
+    status: {
+      connectTitle: "Wallet not connected",
+      connectSubtitle: "Profile sync is available after connecting a Supra wallet.",
+      connectHint: "Connect your Supra wallet to view or edit profile data.",
+      loading: "Loading profile...",
+      error: "Failed to load the profile. Try again later.",
+    },
+    form: {
+      title: "Profile details",
+      subtitle: "Changes are stored on the Supra backend and reused across lotteries.",
+      nickname: "Nickname",
+      nicknamePlaceholder: "Enter display name",
+      telegram: "Telegram",
+      twitter: "Twitter",
+      avatar: {
+        title: "Avatar",
+        kindLabel: "Avatar type",
+        kind: {
+          none: "Without avatar",
+          external: "External URL/IPFS",
+          crystara: "Crystara NFT",
+        },
+        valueLabel: "Avatar identifier",
+        valuePlaceholder: "ipfs://hash or NFT identifier",
+        hint: "Use Crystara identifiers or external URLs/IPFS links to show your avatar.",
+      },
+      settingsLabel: "Additional settings",
+      settingsPlaceholder: '{"autoBuy": true}',
+      settingsHint: "Optional JSON with feature flags or preferences for automation.",
+      settingsError: "Enter valid JSON in the settings field.",
+      saving: "Saving...",
+      submit: "Save profile",
+      reset: "Reset changes",
+      submitError: "Failed to save the profile.",
+      submitSuccess: "Profile updated.",
+    },
+    meta: {
+      title: "Profile metadata",
+      subtitle: "Readonly fields synced from the Supra backend.",
+      address: "Wallet address",
+      created: "Created at",
+      updated: "Updated at",
+      avatarKind: "Avatar type",
+      avatarValue: "Avatar identifier",
+      avatarEmpty: "Not specified",
+      empty: "The profile will be created after the first save.",
+    },
+  },
   tickets: {
     title: "Tickets",
     purchaseCard: {
@@ -93,8 +221,11 @@ const en = {
       subtitleMock: "Working in mock mode",
       subtitleSupra: "Supra mode (read-only)",
       badgeRound: "Round {{round}}",
+      badgeLottery: "Lottery #{{id}}",
+      badgeNoLotteries: "No lottery selected",
       badgeLoading: "Round loading...",
       loading: "Loading current draw...",
+      noLottery: "Select a lottery to purchase tickets.",
       hintMock:
         "Until we get whitelisting we polish the UX in mock mode. Once Supra confirms access we will connect StarKey and real transactions.",
       hintSupra:
@@ -106,8 +237,10 @@ const en = {
       loading: "Loading history...",
       error: "Failed to load ticket history. Try again later.",
       empty: "No tickets yet. Add one in mock mode.",
+      noLotterySelected: "Select a lottery to view ticket history.",
       numbersUnavailable: "Ticket numbers are not exposed by the Supra API yet.",
       supraReadonly: "Supra mode currently shows registered ticket addresses only.",
+      lotteryLabel: "Lottery #{{id}}",
     },
     form: {
       label: "Ticket numbers",
@@ -116,6 +249,7 @@ const en = {
       pending: "Submitting...",
       submit: "Buy ticket (mock)",
       errorInvalidNumbers: "Enter numbers separated by commas (e.g. 7, 11, 23, 45).",
+      errorLotteryUnavailable: "Select a lottery before purchasing a ticket.",
       errorRoundUnavailable: "Current round is unknown. Refresh Supra status or try again later.",
       errorTicketPriceUnavailable: "Ticket price is unavailable in Supra mode. Check the monitoring API.",
       success: "Ticket {{ticketId}} added to history. After whitelisting we will switch to real transactions.",
@@ -127,6 +261,44 @@ const en = {
       confirmed: "Confirmed",
       won: "Won",
       lost: "Lost",
+    },
+  },
+  progress: {
+    title: "Progress and rewards",
+    subtitle: "Track your daily checklist and achievements.",
+    connectHint: "Connect your Supra wallet to view personalised tasks and rewards.",
+    wallet: {
+      title: "Connect wallet",
+      hint: "As soon as you connect your wallet, we will show the checklist and achievements for your address.",
+    },
+    checklist: {
+      title: "Daily checklist",
+      loading: "Loading checklist...",
+      error: "Failed to load the checklist. Please refresh the page.",
+      empty: "Checklist tasks are not configured yet.",
+      dayLabel: "Day {{index}}",
+      rewardLabel: "Reward: {{label}}",
+      rewardValue: "Reward details: {{value}}",
+      reward: {
+        kind: "{{kind, select, ticket{Ticket} bonus{Bonus} badge{Badge} other{{kind}}}}",
+        none: "No reward",
+      },
+      completeAction: "Mark as completed",
+      completedAt: "Completed at: {{date}}",
+      metadata: "Extra details: {{value}}",
+    },
+    achievements: {
+      title: "Achievements",
+      loading: "Loading achievements...",
+      error: "Failed to load achievements. Please refresh the page.",
+      empty: "No achievements configured yet.",
+      locked: "Achievement not unlocked yet",
+      progressValue: "Current progress: {{value}}",
+      metadata: "Extra details: {{value}}",
+      unlockedAt: "Unlocked: {{date}}",
+    },
+    generic: {
+      unknownDate: "unknown date",
     },
   },
   logs: {
@@ -311,7 +483,7 @@ const en = {
   },
 } as const;
 
-const ru: Messages = {
+export const ru = {
   layout: {
     title: "Supra Lottery",
     subtitle: "Панель управления лотереей и dVRF до интеграции с Supra testnet",
@@ -325,6 +497,9 @@ const ru: Messages = {
     nav: {
       dashboard: "Главная",
       tickets: "Билеты",
+      fairness: "Панель честности",
+      progress: "Прогресс",
+      profile: "Профиль",
       admin: "Администрирование",
       logs: "Логи",
     },
@@ -370,6 +545,12 @@ const ru: Messages = {
       title: "Нет данных",
       description: "Не удалось получить состояние лотереи. Проверьте выбранный режим API.",
     },
+    selector: {
+      label: "Выбор лотереи",
+      empty: "Активных лотерей пока нет.",
+      lotteryName: "Лотерея №{{id}}",
+      ticketPrice: "Цена билета: {{value}}",
+    },
     card: {
       current: {
         title: "Текущий розыгрыш",
@@ -379,6 +560,7 @@ const ru: Messages = {
         ticketsSoldLabel: "Продано билетов",
         ticketPriceLabel: "Цена билета",
         nextDrawLabel: "Следующая обработка",
+        empty: "Активных лотерей ещё нет. Настройте розыгрыш в админке.",
       },
       vrf: {
         title: "Статус VRF",
@@ -393,6 +575,128 @@ const ru: Messages = {
       },
     },
   },
+  fairness: {
+    title: "Панель честности",
+    subtitle: "Следите за запросами VRF и шагами выбора победителя в реальном времени.",
+    limitLabel: "Количество событий:",
+    filters: {
+      title: "Фильтры журнала VRF",
+      eventType: "Тип события",
+      eventTypeAll: "Все события",
+      searchLabel: "Поиск",
+      searchPlaceholder: "Поиск по типу, запросу, раунду или данным",
+      reset: "Очистить поиск",
+      resetShort: "Сбросить",
+    },
+    loading: {
+      title: "Загрузка журнала VRF",
+      body: "Получаем события и снепшоты с Supra API...",
+    },
+    error: {
+      statusTitle: "Нет данных о лотереях",
+      statusBody: "Убедитесь, что Supra API доступен и выбрана корректная конфигурация.",
+      logTitle: "Не удалось загрузить журнал VRF",
+      logBody: "Проверьте подключение к Supra API и повторите попытку.",
+    },
+    empty: {
+      title: "Лотереи пока не созданы",
+      body: "Создайте лотерею или обновите страницу после регистрации розыгрыша.",
+    },
+    round: {
+      title: "Журнал раундов",
+      subtitle: "Лотерея №{{id}}",
+      pending: "Активный запрос: {{value}}",
+      pendingNone: "нет",
+      snapshotTitle: "Снепшот раунда",
+      requests: "Запросы случайности (лотерея)",
+      fulfillments: "Завершения раунда",
+    },
+    hub: {
+      title: "VRF-хаб",
+      subtitle: "События dVRF на уровне хаба",
+      requests: "Запросы VRF-хаба",
+      fulfillments: "Ответы VRF-хаба",
+    },
+    events: {
+      empty: "Событий пока нет.",
+      showRaw: "Показать исходные данные",
+      timestamp: "Время",
+      requestId: "Request ID",
+      roundId: "Раунд",
+    },
+  },
+  chat: {
+    panel: {
+      title: "Чат сообщества",
+      subtitle: "Обсуждайте розыгрыши и делитесь результатами с другими участниками.",
+      messagesTitle: "Сообщения",
+      loading: "Загружаем сообщения...",
+      error: "Не удалось загрузить чат.",
+      empty: "Сообщений пока нет — начните разговор!",
+      sendPlaceholder: "Напишите сообщение...",
+      sendButton: "Отправить",
+      sending: "Отправляем...",
+      connectHint: "Подключите Supra-кошелёк, чтобы общаться в чате.",
+      sendError: "Не удалось отправить сообщение. Попробуйте снова.",
+      unknownUser: "Аноним",
+    },
+    announcements: {
+      title: "Объявления",
+      loading: "Загружаем объявления...",
+      empty: "Объявлений пока нет.",
+    },
+  },
+  profile: {
+    title: "Профиль игрока",
+    subtitle: "Управляйте никнеймом, соцсетями и NFT-аватаром для лотерей Supra.",
+    status: {
+      connectTitle: "Кошелёк не подключён",
+      connectSubtitle: "Синхронизация профиля доступна после подключения Supra-кошелька.",
+      connectHint: "Подключите Supra-кошелёк, чтобы загрузить или обновить профиль.",
+      loading: "Загрузка профиля...",
+      error: "Не удалось загрузить профиль. Повторите попытку позже.",
+    },
+    form: {
+      title: "Данные профиля",
+      subtitle: "Изменения сохраняются на Supra-бэкенде и используются всеми лотереями.",
+      nickname: "Никнейм",
+      nicknamePlaceholder: "Введите отображаемое имя",
+      telegram: "Telegram",
+      twitter: "Twitter",
+      avatar: {
+        title: "Аватар",
+        kindLabel: "Тип аватара",
+        kind: {
+          none: "Без аватара",
+          external: "Внешний URL/IPFS",
+          crystara: "NFT Crystara",
+        },
+        valueLabel: "Идентификатор аватара",
+        valuePlaceholder: "ipfs://hash или идентификатор NFT",
+        hint: "Используйте идентификаторы Crystara или внешние URL/IPFS для отображения аватара.",
+      },
+      settingsLabel: "Дополнительные настройки",
+      settingsPlaceholder: '{"autoBuy": true}',
+      settingsHint: "Необязательный JSON с настройками автоматизации и предпочтениями.",
+      settingsError: "Введите корректный JSON в поле настроек.",
+      saving: "Сохранение...",
+      submit: "Сохранить профиль",
+      reset: "Сбросить изменения",
+      submitError: "Не удалось сохранить профиль.",
+      submitSuccess: "Профиль обновлён.",
+    },
+    meta: {
+      title: "Метаданные профиля",
+      subtitle: "Поля только для чтения, синхронизированные с Supra-бэкендом.",
+      address: "Адрес кошелька",
+      created: "Создан",
+      updated: "Обновлён",
+      avatarKind: "Тип аватара",
+      avatarValue: "Идентификатор аватара",
+      avatarEmpty: "Не указан",
+      empty: "Профиль будет создан после первого сохранения.",
+    },
+  },
   tickets: {
     title: "Билеты",
     purchaseCard: {
@@ -400,8 +704,11 @@ const ru: Messages = {
       subtitleMock: "Работаем в mock-режиме",
       subtitleSupra: "Supra-режим (только чтение)",
       badgeRound: "Раунд {{round}}",
+      badgeLottery: "Лотерея №{{id}}",
+      badgeNoLotteries: "Лотерея не выбрана",
       badgeLoading: "Раунд загружается...",
       loading: "Загрузка данных о текущем розыгрыше...",
+      noLottery: "Выберите лотерею, чтобы купить билет.",
       hintMock:
         "До получения whitelisting остаёмся на моках и оттачиваем UX. Как только Supra подтвердит доступ, подключим StarKey и реальные транзакции.",
       hintSupra:
@@ -413,8 +720,10 @@ const ru: Messages = {
       loading: "Загрузка истории...",
       error: "Не удалось получить историю покупок. Попробуйте позже.",
       empty: "Пока нет билетов. Добавьте запись в mock-режиме.",
+      noLotterySelected: "Выберите лотерею, чтобы увидеть историю билетов.",
       numbersUnavailable: "Supra API пока не возвращает номера билетов.",
       supraReadonly: "В Supra-режиме отображаются только адреса зарегистрированных билетов.",
+      lotteryLabel: "Лотерея №{{id}}",
     },
     form: {
       label: "Номера билета",
@@ -423,6 +732,7 @@ const ru: Messages = {
       pending: "Отправка...",
       submit: "Купить билет (mock)",
       errorInvalidNumbers: "Введите номера через запятую (например, 7, 11, 23, 45).",
+      errorLotteryUnavailable: "Выберите лотерею перед покупкой билета.",
       errorRoundUnavailable: "Текущий раунд неизвестен. Обновите статус Supra или повторите позже.",
       errorTicketPriceUnavailable: "Цена билета недоступна в Supra-режиме. Проверьте мониторинговый API.",
       success: "Билет {{ticketId}} добавлен в историю. После whitelisting переключим форму на реальные транзакции.",
@@ -434,6 +744,44 @@ const ru: Messages = {
       confirmed: "Подтверждён",
       won: "Выигрыш",
       lost: "Проигрыш",
+    },
+  },
+  progress: {
+    title: "Прогресс и награды",
+    subtitle: "Следите за ежедневными заданиями и достижениями вашего адреса.",
+    connectHint: "Подключите кошелёк Supra, чтобы увидеть индивидуальные задания и награды.",
+    wallet: {
+      title: "Подключите кошелёк",
+      hint: "Как только вы подключите кошелёк, мы покажем чек-лист и список достижений для вашего адреса.",
+    },
+    checklist: {
+      title: "Ежедневный чек-лист",
+      loading: "Загружаем чек-лист...",
+      error: "Не удалось загрузить чек-лист. Попробуйте обновить страницу.",
+      empty: "Задания чек-листа пока не настроены.",
+      dayLabel: "День {{index}}",
+      rewardLabel: "Награда: {{label}}",
+      rewardValue: "Детали награды: {{value}}",
+      reward: {
+        kind: "{{kind, select, ticket{Билет} bonus{Бонус} badge{Значок} other{{kind}}}}",
+        none: "Без награды",
+      },
+      completeAction: "Отметить выполненным",
+      completedAt: "Выполнено: {{date}}",
+      metadata: "Дополнительно: {{value}}",
+    },
+    achievements: {
+      title: "Достижения",
+      loading: "Загружаем достижения...",
+      error: "Не удалось загрузить достижения. Попробуйте обновить страницу.",
+      empty: "У этого адреса пока нет доступных достижений.",
+      locked: "Достижение ещё не получено",
+      progressValue: "Текущий прогресс: {{value}}",
+      metadata: "Дополнительно: {{value}}",
+      unlockedAt: "Получено: {{date}}",
+    },
+    generic: {
+      unknownDate: "дата неизвестна",
     },
   },
   logs: {
@@ -618,33 +966,19 @@ const ru: Messages = {
   },
 } as const;
 
-const messages: Record<Locale, Messages> = {
+export type Messages = typeof en;
+
+export const dictionaries = {
   en,
   ru,
-};
+} satisfies Record<Locale, Messages>;
 
-function getMessage(dictionary: Messages, key: string): unknown {
-  return key.split('.').reduce<unknown>((value, segment) => {
-    if (value && typeof value === 'object') {
-      return (value as Record<string, unknown>)[segment];
-    }
-    return undefined;
-  }, dictionary);
-}
+export const resources = Object.fromEntries(
+  Object.entries(dictionaries).map(([locale, dictionary]) => [
+    locale,
+    { translation: dictionary },
+  ]),
+) as Record<Locale, { translation: Messages }>;
 
-export function translate(locale: Locale, key: string, params?: Params): string {
-  const template = getMessage(messages[locale], key) ?? getMessage(messages.en, key) ?? key;
-  if (typeof template !== 'string') {
-    return key;
-  }
-
-  if (!params) {
-    return template;
-  }
-
-  return template.replace(/\{\{(\w+)\}\}/g, (_, token) => {
-    const replacement = params[token];
-    return replacement !== undefined ? String(replacement) : '';
-  });
-}
+export type TranslationResources = typeof resources;
 

@@ -9,6 +9,9 @@ import "./ShellLayout.css";
 const navItems = [
   { to: "/", role: "user" as const, labelKey: "layout.nav.dashboard" },
   { to: "/tickets", role: "user" as const, labelKey: "layout.nav.tickets" },
+  { to: "/fairness", role: "user" as const, labelKey: "layout.nav.fairness" },
+  { to: "/profile", role: "user" as const, labelKey: "layout.nav.profile" },
+  { to: "/progress", role: "user" as const, labelKey: "layout.nav.progress" },
   { to: "/admin", role: "admin" as const, labelKey: "layout.nav.admin" },
   { to: "/logs", role: "user" as const, labelKey: "layout.nav.logs" },
 ] as const;

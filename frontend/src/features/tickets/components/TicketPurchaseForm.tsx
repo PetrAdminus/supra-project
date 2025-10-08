@@ -6,6 +6,7 @@ import { useUiStore } from "../../../store/uiStore";
 import './TicketPurchaseForm.css';
 
 interface TicketPurchaseFormProps {
+  lotteryId: number | null;
   round: number | null;
   ticketPrice: string | null;
 }
@@ -29,7 +30,7 @@ function parseNumbers(raw: string): number[] | null {
   return numbers;
 }
 
-export function TicketPurchaseForm({ round, ticketPrice }: TicketPurchaseFormProps): ReactElement {
+export function TicketPurchaseForm({ lotteryId, round, ticketPrice }: TicketPurchaseFormProps): ReactElement {
   const mutation = usePurchaseTicket();
   const [numbersInput, setNumbersInput] = useState("7, 11, 23, 45");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -41,6 +42,10 @@ export function TicketPurchaseForm({ round, ticketPrice }: TicketPurchaseFormPro
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isSupraMode) {
+      return;
+    }
+    if (lotteryId === null) {
+      setErrorMessage(t("tickets.form.errorLotteryUnavailable"));
       return;
     }
     if (round === null) {
@@ -60,7 +65,7 @@ export function TicketPurchaseForm({ round, ticketPrice }: TicketPurchaseFormPro
 
     setErrorMessage(null);
     mutation.mutate(
-      { round, numbers: parsed },
+      { lotteryId, round, numbers: parsed },
       {
         onSuccess: () => {
           setNumbersInput("");
@@ -76,7 +81,7 @@ export function TicketPurchaseForm({ round, ticketPrice }: TicketPurchaseFormPro
       ? t("tickets.form.pending")
       : t("tickets.form.submit");
   const submitDisabled =
-    isSupraMode || mutation.isPending || round === null || ticketPrice === null;
+    isSupraMode || mutation.isPending || lotteryId === null || round === null || ticketPrice === null;
 
   return (
     <form className="ticket-form" onSubmit={handleSubmit}>

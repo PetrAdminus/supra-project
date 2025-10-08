@@ -1,0 +1,480 @@
+{
+  "admin": {
+    "accessDenied": {
+      "description": "Раздел доступен только администраторам. Переключите роль в шапке.",
+      "title": "Доступ ограничен"
+    },
+    "clientSnapshot": {
+      "errorFallback": "Не удалось зафиксировать client snapshot.",
+      "labels": {
+        "maxGasLimit": "Max gas limit",
+        "maxGasPrice": "Max gas price",
+        "minBalanceLimit": "Min balance limit snapshot"
+      },
+      "saving": "Сохранение...",
+      "submit": "Зафиксировать client snapshot",
+      "subtitle": "maxGasPrice / maxGasLimit / minBalance",
+      "success": "Транзакция {{hash}} отправлена в {{time}}",
+      "title": "Снимок client whitelist"
+    },
+    "commands": {
+      "count": "Доступно команд: {{value}}",
+      "empty": "Команды недоступны. Проверьте API.",
+      "error": "Не удалось получить список команд.",
+      "loading": "Загрузка списка команд...",
+      "moduleLabel": "Модуль",
+      "subtitle": "Скрипты, доступные через REST API",
+      "title": "Команды Supra CLI"
+    },
+    "common": {
+      "configured": "Настроено",
+      "lastUpdate": "Последнее обновление: {{value}}",
+      "loading": "Загрузка...",
+      "notConfigured": "Не настроено"
+    },
+    "consumerSnapshot": {
+      "errorFallback": "Не удалось зафиксировать consumer snapshot.",
+      "labels": {
+        "callbackGasLimit": "Callback gas limit",
+        "callbackGasPrice": "Callback gas price"
+      },
+      "saving": "Сохранение...",
+      "submit": "Зафиксировать consumer snapshot",
+      "subtitle": "Параметры callback",
+      "success": "Транзакция {{hash}} отправлена в {{time}}",
+      "title": "Снимок consumer whitelist"
+    },
+    "gas": {
+      "errorFallback": "Не удалось обновить конфигурацию газа.",
+      "labels": {
+        "maxGasFee": "Max gas fee",
+        "minBalance": "Min balance"
+      },
+      "lastUpdate": "Последнее обновление: {{value}}",
+      "saving": "Сохранение...",
+      "submit": "Сохранить конфигурацию газа",
+      "subtitle": "Параметры клиента",
+      "success": "Транзакция {{hash}} отправлена в {{time}}",
+      "title": "Настройка газа"
+    },
+    "plan": {
+      "items": {
+        "first": "Пройти сценарий dVRF (addContractToWhitelist, depositFundClient, configure_vrf_request).",
+        "second": "Заменить mock SupraClient на реальные RPC/CLI вызовы.",
+        "third": "Подключить StarKey и прогнать покупку билета end-to-end."
+      },
+      "subtitle": "Шаги после подтверждения",
+      "title": "Операционный план"
+    },
+    "title": "Администрирование",
+    "treasury": {
+      "controls": {
+        "balances": {
+          "jackpot": "Баланс джекпота: {{value}} SUPRA",
+          "marketing": "Баланс маркетинга: {{value}} SUPRA",
+          "prize": "Баланс текущего приза: {{value}} SUPRA",
+          "treasury": "Баланс казны: {{value}} SUPRA"
+        },
+        "errorFallback": "Не удалось обновить настройки казны.",
+        "labels": {
+          "salesEnabled": "Продажи билетов включены",
+          "ticketPrice": "Цена билета (SUPRA)",
+          "treasuryAddress": "Адрес казны"
+        },
+        "lastUpdate": "Последнее обновление: {{value}}",
+        "saving": "Сохраняем...",
+        "submit": "Обновить настройки казны",
+        "subtitle": "Цена билета, кошелёк и переключатель продаж",
+        "success": "Транзакция {{hash}} отправлена {{time}}",
+        "title": "Настройки казны"
+      },
+      "distribution": {
+        "errorFallback": "Не удалось обновить распределение казны.",
+        "labels": {
+          "jackpot": "Доля джекпота (bp)",
+          "marketing": "Доля маркетинга (bp)",
+          "prize": "Доля текущего приза (bp)",
+          "treasury": "Доля казны (bp)"
+        },
+        "lastUpdate": "Последнее обновление: {{value}}",
+        "saving": "Сохраняем...",
+        "submit": "Обновить распределение",
+        "subtitle": "Доли в базисных пунктах",
+        "success": "Транзакция {{hash}} отправлена {{time}}",
+        "title": "Распределение казны",
+        "totalBp": "Итого: {{value}} / 10000 bp"
+      }
+    },
+    "vrf": {
+      "errorFallback": "Не удалось обновить конфигурацию VRF.",
+      "labels": {
+        "callbackGasLimit": "Callback gas limit",
+        "callbackGasPrice": "Callback gas price",
+        "clientSeed": "Client seed",
+        "maxGasLimit": "Max gas limit",
+        "maxGasPrice": "Max gas price",
+        "requestedRngCount": "Requested RNG count"
+      },
+      "lastUpdate": "Последнее обновление: {{value}}",
+      "saving": "Сохранение...",
+      "submit": "Сохранить конфигурацию VRF",
+      "subtitle": "Лимиты на запрос",
+      "success": "Транзакция {{hash}} отправлена в {{time}}",
+      "title": "Настройка VRF"
+    },
+    "whitelisting": {
+      "account": "Аккаунт: {{account}}",
+      "error": "Не удалось получить статус whitelisting. Повторите позже.",
+      "hint": "Ждём подтверждения Supra, прежде чем отправлять deposit или configure_vrf_request. После доступа формы ниже будут слать реальные транзакции через SupraClient.",
+      "lastCheck": "Последняя проверка: {{value}}",
+      "loading": "Проверяем whitelisting...",
+      "profile": "Профиль: {{profile}}",
+      "status": "В белом списке: {{value}}",
+      "statusNo": "Нет",
+      "statusYes": "Да",
+      "subtitle": "Настройки доступа к dVRF",
+      "title": "Статус whitelisting"
+    }
+  },
+  "dashboard": {
+    "card": {
+      "current": {
+        "badge": "VRF подписка: {{id}}",
+        "empty": "Активных лотерей ещё нет. Настройте розыгрыш в админке.",
+        "jackpotLabel": "Джекпот",
+        "nextDrawLabel": "Следующая обработка",
+        "subtitle": "Раунд {{round}}",
+        "ticketPriceLabel": "Цена билета",
+        "ticketsSoldLabel": "Продано билетов",
+        "title": "Текущий розыгрыш"
+      },
+      "vrf": {
+        "hint": "Пока ждём whitelisting, действия VRF отключены. После подтверждения Supra включим реальные вызовы.",
+        "lastFulfillmentLabel": "Последнее выполнение: {{value}}",
+        "lastRequestLabel": "Последний запрос: {{value}}",
+        "pendingLabel": "VRF pending",
+        "pendingNo": "Нет",
+        "pendingYes": "Да",
+        "subtitleIdle": "Запрос не активен",
+        "subtitlePending": "Запрос в обработке",
+        "title": "Статус VRF"
+      }
+    },
+    "error": {
+      "description": "Не удалось получить состояние лотереи. Проверьте выбранный режим API.",
+      "title": "Нет данных"
+    },
+    "loading": "Загрузка данных...",
+    "selector": {
+      "empty": "Активных лотерей пока нет.",
+      "label": "Выбор лотереи",
+      "lotteryName": "Лотерея №{{id}}",
+      "ticketPrice": "Цена билета: {{value}}"
+    },
+    "title": "Обзор лотереи"
+  },
+  "fairness": {
+    "empty": {
+      "body": "Создайте лотерею или обновите страницу после регистрации розыгрыша.",
+      "title": "Лотереи пока не созданы"
+    },
+    "error": {
+      "logBody": "Проверьте подключение к Supra API и повторите попытку.",
+      "logTitle": "Не удалось загрузить журнал VRF",
+      "statusBody": "Убедитесь, что Supra API доступен и выбрана корректная конфигурация.",
+      "statusTitle": "Нет данных о лотереях"
+    },
+    "events": {
+      "empty": "Событий пока нет.",
+      "requestId": "Request ID",
+      "roundId": "Раунд",
+      "showRaw": "Показать исходные данные",
+      "timestamp": "Время"
+    },
+    "filters": {
+      "eventType": "Тип события",
+      "eventTypeAll": "Все события",
+      "reset": "Очистить поиск",
+      "resetShort": "Сбросить",
+      "searchLabel": "Поиск",
+      "searchPlaceholder": "Поиск по типу, запросу, раунду или данным",
+      "title": "Фильтры журнала VRF"
+    },
+    "hub": {
+      "fulfillments": "Ответы VRF-хаба",
+      "requests": "Запросы VRF-хаба",
+      "subtitle": "События dVRF на уровне хаба",
+      "title": "VRF-хаб"
+    },
+    "limitLabel": "Количество событий:",
+    "loading": {
+      "body": "Получаем события и снепшоты с Supra API...",
+      "title": "Загрузка журнала VRF"
+    },
+    "round": {
+      "fulfillments": "Завершения раунда",
+      "pending": "Активный запрос: {{value}}",
+      "pendingNone": "нет",
+      "requests": "Запросы случайности (лотерея)",
+      "snapshotTitle": "Снепшот раунда",
+      "subtitle": "Лотерея №{{id}}",
+      "title": "Журнал раундов"
+    },
+    "subtitle": "Следите за запросами VRF и шагами выбора победителя в реальном времени.",
+    "title": "Панель честности"
+  },
+  "chat": {
+    "panel": {
+      "title": "Чат сообщества",
+      "subtitle": "Обсуждайте розыгрыши и делитесь результатами с другими участниками.",
+      "messagesTitle": "Сообщения",
+      "loading": "Загружаем сообщения...",
+      "error": "Не удалось загрузить чат.",
+      "empty": "Сообщений пока нет — начните разговор!",
+      "sendPlaceholder": "Напишите сообщение...",
+      "sendButton": "Отправить",
+      "sending": "Отправляем...",
+      "connectHint": "Подключите Supra-кошелёк, чтобы общаться в чате.",
+      "sendError": "Не удалось отправить сообщение. Попробуйте снова.",
+      "unknownUser": "Аноним"
+    },
+    "announcements": {
+      "title": "Объявления",
+      "loading": "Загружаем объявления...",
+      "empty": "Объявлений пока нет."
+    }
+  },
+  "layout": {
+    "locale": {
+      "en": "English",
+      "ru": "Русский"
+    },
+    "localeLabel": "Язык",
+    "mode": {
+      "mock": "Mock",
+      "supra": "Supra testnet"
+    },
+    "modeLabel": "Режим",
+    "nav": {
+      "admin": "Администрирование",
+      "dashboard": "Главная",
+      "fairness": "Панель честности",
+      "logs": "Логи",
+      "progress": "Прогресс",
+      "tickets": "Билеты",
+      "profile": "Профиль"
+    },
+    "role": {
+      "admin": "Администратор",
+      "user": "Пользователь"
+    },
+    "roleLabel": "Роль",
+    "subtitle": "Панель управления лотереей и dVRF до интеграции с Supra testnet",
+    "title": "Supra Lottery"
+  },
+  "logs": {
+    "card": {
+      "events": {
+        "actionHide": "Скрывать ошибки",
+        "actionShow": "Показывать ошибки",
+        "empty": "Событий пока нет. Данные появятся после интеграции с Supra.",
+        "error": "Не удалось получить журнал. Проверьте выбранный режим API.",
+        "hiddenErrors": "Ошибки скрыты ({{count}}). Измените фильтр, чтобы увидеть все события.",
+        "loading": "Загрузка событий...",
+        "subtitle": "История обращений",
+        "title": "Mock-события"
+      },
+      "plan": {
+        "items": {
+          "first": "Обновляем Storybook-сценарии для кейсов.",
+          "second": "Готовим экспорт событий из CLI после whitelisting.",
+          "third": "Продумываем импорт реальных логов (CSV/JSON) в интерфейс."
+        },
+        "title": "Следующие шаги"
+      }
+    },
+    "table": {
+      "headers": {
+        "details": "Описание",
+        "event": "Событие",
+        "round": "Раунд",
+        "status": "Статус",
+        "time": "Время"
+      },
+      "status": {
+        "failed": "Ошибка",
+        "retry": "Повтор",
+        "success": "Успех"
+      },
+      "types": {
+        "DrawHandled": "Результат обработан",
+        "DrawRequested": "Запрошен розыгрыш",
+        "TicketBought": "Покупка билета",
+        "TicketRefunded": "Возврат билета"
+      }
+    },
+    "title": "Журнал событий"
+  },
+  "progress": {
+    "achievements": {
+      "empty": "У этого адреса пока нет доступных достижений.",
+      "error": "Не удалось загрузить достижения. Попробуйте обновить страницу.",
+      "loading": "Загружаем достижения...",
+      "locked": "Достижение ещё не получено",
+      "metadata": "Дополнительно: {{value}}",
+      "progressValue": "Текущий прогресс: {{value}}",
+      "title": "Достижения",
+      "unlockedAt": "Получено: {{date}}"
+    },
+    "checklist": {
+      "completeAction": "Отметить выполненным",
+      "completedAt": "Выполнено: {{date}}",
+      "dayLabel": "День {{index}}",
+      "empty": "Задания чек-листа пока не настроены.",
+      "error": "Не удалось загрузить чек-лист. Попробуйте обновить страницу.",
+      "loading": "Загружаем чек-лист...",
+      "metadata": "Дополнительно: {{value}}",
+      "reward": {
+        "kind": "{{kind, select, ticket{Билет} bonus{Бонус} badge{Значок} other{{kind}}}}",
+        "none": "Без награды"
+      },
+      "rewardLabel": "Награда: {{label}}",
+      "rewardValue": "Детали награды: {{value}}",
+      "title": "Ежедневный чек-лист"
+    },
+    "connectHint": "Подключите кошелёк Supra, чтобы увидеть индивидуальные задания и награды.",
+    "generic": {
+      "unknownDate": "дата неизвестна"
+    },
+    "subtitle": "Следите за ежедневными заданиями и достижениями вашего адреса.",
+    "title": "Прогресс и награды",
+    "wallet": {
+      "hint": "Как только вы подключите кошелёк, мы покажем чек-лист и список достижений для вашего адреса.",
+      "title": "Подключите кошелёк"
+    }
+  },
+  "tickets": {
+    "form": {
+      "disabledSupra": "Покупка билетов в Supra-режиме отключена. Завершите онбординг кошелька, чтобы включить её.",
+      "errorInvalidNumbers": "Введите номера через запятую (например, 7, 11, 23, 45).",
+      "errorLotteryUnavailable": "Выберите лотерею перед покупкой билета.",
+      "errorRoundUnavailable": "Текущий раунд неизвестен. Обновите статус Supra или повторите позже.",
+      "errorTicketPriceUnavailable": "Цена билета недоступна в Supra-режиме. Проверьте мониторинговый API.",
+      "label": "Номера билета",
+      "pending": "Отправка...",
+      "placeholder": "например, 7, 11, 23, 45",
+      "priceLabel": "Цена: {{value}} ",
+      "submit": "Купить билет (mock)",
+      "submitSupraDisabled": "Купить билет (Supra отключено)",
+      "success": "Билет {{ticketId}} добавлен в историю. После whitelisting переключим форму на реальные транзакции."
+    },
+    "historyCard": {
+      "empty": "Пока нет билетов. Добавьте запись в mock-режиме.",
+      "error": "Не удалось получить историю покупок. Попробуйте позже.",
+      "loading": "Загрузка истории...",
+      "lotteryLabel": "Лотерея №{{id}}",
+      "noLotterySelected": "Выберите лотерею, чтобы увидеть историю билетов.",
+      "numbersUnavailable": "Supra API пока не возвращает номера билетов.",
+      "subtitle": "Последние операции",
+      "supraReadonly": "В Supra-режиме отображаются только адреса зарегистрированных билетов.",
+      "title": "История билетов"
+    },
+    "purchaseCard": {
+      "badgeLoading": "Раунд загружается...",
+      "badgeLottery": "Лотерея №{{id}}",
+      "badgeNoLotteries": "Лотерея не выбрана",
+      "badgeRound": "Раунд {{round}}",
+      "hintMock": "До получения whitelisting остаёмся на моках и оттачиваем UX. Как только Supra подтвердит доступ, подключим StarKey и реальные транзакции.",
+      "hintSupra": "Supra API подключён в режиме только чтения. Покупка билетов станет доступна после подтверждения whitelisting кошелька.",
+      "loading": "Загрузка данных о текущем розыгрыше...",
+      "noLottery": "Выберите лотерею, чтобы купить билет.",
+      "subtitleMock": "Работаем в mock-режиме",
+      "subtitleSupra": "Supra-режим (только чтение)",
+      "title": "Покупка билета"
+    },
+    "status": {
+      "confirmed": "Подтверждён",
+      "lost": "Проигрыш",
+      "pending": "В обработке",
+      "won": "Выигрыш"
+    },
+    "title": "Билеты"
+  },
+  "wallet": {
+    "connect": "Подключить",
+    "copy": {
+      "copied": "Скопировано",
+      "default": "Скопировать адрес",
+      "error": "Не удалось скопировать"
+    },
+    "disconnect": "Отключить",
+    "error": {
+      "dismiss": "Скрыть"
+    },
+    "hint": "Переключитесь в режим Supra testnet, чтобы подключиться.",
+    "installHint": "Установите или разблокируйте кошелёк {{provider}}, чтобы продолжить.",
+    "meta": {
+      "chainId": "ID сети: {{value}}",
+      "lastConnected": "Последнее подключение: {{value}}"
+    },
+    "providerComingSoon": "Поддержка {{provider}} появится позднее.",
+    "providerLabel": "Провайдер",
+    "status": {
+      "connected": "Подключён",
+      "connecting": "Подключение...",
+      "disconnected": "Не подключён"
+    },
+    "statusLabel": "Статус"
+  },
+  "profile": {
+    "title": "Профиль игрока",
+    "subtitle": "Управляйте никнеймом, соцсетями и NFT-аватаром для лотерей Supra.",
+    "status": {
+      "connectTitle": "Кошелёк не подключён",
+      "connectSubtitle": "Синхронизация профиля доступна после подключения Supra-кошелька.",
+      "connectHint": "Подключите Supra-кошелёк, чтобы загрузить или обновить профиль.",
+      "loading": "Загрузка профиля...",
+      "error": "Не удалось загрузить профиль. Повторите попытку позже."
+    },
+    "form": {
+      "title": "Данные профиля",
+      "subtitle": "Изменения сохраняются на Supra-бэкенде и используются всеми лотереями.",
+      "nickname": "Никнейм",
+      "nicknamePlaceholder": "Введите отображаемое имя",
+      "telegram": "Telegram",
+      "twitter": "Twitter",
+      "avatar": {
+        "title": "Аватар",
+        "kindLabel": "Тип аватара",
+        "kind": {
+          "none": "Без аватара",
+          "external": "Внешний URL/IPFS",
+          "crystara": "NFT Crystara"
+        },
+        "valueLabel": "Идентификатор аватара",
+        "valuePlaceholder": "ipfs://hash или идентификатор NFT",
+        "hint": "Используйте идентификаторы Crystara или внешние URL/IPFS для отображения аватара."
+      },
+      "settingsLabel": "Дополнительные настройки",
+      "settingsPlaceholder": "{\"autoBuy\": true}",
+      "settingsHint": "Необязательный JSON с настройками автоматизации и предпочтениями.",
+      "settingsError": "Введите корректный JSON в поле настроек.",
+      "saving": "Сохранение...",
+      "submit": "Сохранить профиль",
+      "reset": "Сбросить изменения",
+      "submitError": "Не удалось сохранить профиль.",
+      "submitSuccess": "Профиль обновлён."
+    },
+    "meta": {
+      "title": "Метаданные профиля",
+      "subtitle": "Поля только для чтения, синхронизированные с Supra-бэкендом.",
+      "address": "Адрес кошелька",
+      "created": "Создан",
+      "updated": "Обновлён",
+      "avatarKind": "Тип аватара",
+      "avatarValue": "Идентификатор аватара",
+      "avatarEmpty": "Не указан",
+      "empty": "Профиль будет создан после первого сохранения."
+    }
+  }
+}

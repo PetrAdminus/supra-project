@@ -47,6 +47,16 @@ def parse_args() -> argparse.Namespace:
         help="адрес контракта лотереи (0x...)",
     )
     parser.add_argument(
+        "--hub-addr",
+        default=os.environ.get("HUB_ADDR"),
+        help="адрес VRF-хаба (по умолчанию равен LOTTERY_ADDR)",
+    )
+    parser.add_argument(
+        "--factory-addr",
+        default=os.environ.get("FACTORY_ADDR"),
+        help="адрес фабрики лотерей (по умолчанию равен LOTTERY_ADDR)",
+    )
+    parser.add_argument(
         "--deposit-addr",
         default=os.environ.get("DEPOSIT_ADDR"),
         help="адрес модуля deposit (0x...)",
@@ -97,6 +107,11 @@ def parse_args() -> argparse.Namespace:
         help="окно запросов для формулы min_balance",
     )
     parser.add_argument(
+        "--lottery-ids",
+        default=os.environ.get("LOTTERY_IDS"),
+        help="список идентификаторов лотерей (через запятую или JSON)",
+    )
+    parser.add_argument(
         "--fail-on-low",
         action="store_true",
         help="возвращать код 1, если баланс ниже расчётного min_balance",
@@ -114,6 +129,10 @@ def parse_args() -> argparse.Namespace:
         parser.error("Требуется --lottery-addr или переменная LOTTERY_ADDR")
     if not args.deposit_addr:
         parser.error("Требуется --deposit-addr или переменная DEPOSIT_ADDR")
+    if not args.hub_addr:
+        args.hub_addr = args.lottery_addr
+    if not args.factory_addr:
+        args.factory_addr = args.lottery_addr
     if args.max_gas_price is None or args.max_gas_limit is None or args.verification_gas is None:
         parser.error(
             "Нужны max_gas_price, max_gas_limit и verification_gas (через аргументы или переменные окружения)"

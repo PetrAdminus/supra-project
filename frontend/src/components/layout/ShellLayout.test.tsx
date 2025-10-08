@@ -1,10 +1,10 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ShellLayout } from "./ShellLayout";
 import { resetUiStore, useUiStore } from "../../store/uiStore";
+import { renderWithProviders } from "../../testing/renderWithProviders";
 
 vi.mock("../../features/wallet/useWallet", () => ({
   useWallet: () => ({
@@ -16,15 +16,12 @@ vi.mock("../../features/wallet/useWallet", () => ({
 }));
 
 function renderShell(path = "/") {
-  const queryClient = new QueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[path]}>
-        <ShellLayout>
-          <div data-testid="layout-child">Child</div>
-        </ShellLayout>
-      </MemoryRouter>
-    </QueryClientProvider>,
+  return renderWithProviders(
+    <MemoryRouter initialEntries={[path]}>
+      <ShellLayout>
+        <div data-testid="layout-child">Child</div>
+      </ShellLayout>
+    </MemoryRouter>,
   );
 }
 

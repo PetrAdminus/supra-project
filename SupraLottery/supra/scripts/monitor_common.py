@@ -38,6 +38,16 @@ def add_monitor_arguments(parser: ArgumentParser, include_fail_on_low: bool = Tr
         help="адрес контракта лотереи (0x...)",
     )
     parser.add_argument(
+        "--hub-addr",
+        default=os.environ.get("HUB_ADDR"),
+        help="адрес VRF-хаба (по умолчанию совпадает с контрактом)",
+    )
+    parser.add_argument(
+        "--factory-addr",
+        default=os.environ.get("FACTORY_ADDR"),
+        help="адрес фабрики лотерей (по умолчанию совпадает с контрактом)",
+    )
+    parser.add_argument(
         "--deposit-addr",
         default=os.environ.get("DEPOSIT_ADDR"),
         help="адрес модуля deposit (0x...)",
@@ -87,6 +97,11 @@ def add_monitor_arguments(parser: ArgumentParser, include_fail_on_low: bool = Tr
         default=env_default("MIN_BALANCE_WINDOW", int),
         help="окно запросов для формулы min_balance",
     )
+    parser.add_argument(
+        "--lottery-ids",
+        default=os.environ.get("LOTTERY_IDS"),
+        help="список идентификаторов лотерей (через запятую или JSON)",
+    )
     if include_fail_on_low:
         parser.add_argument(
             "--fail-on-low",
@@ -108,6 +123,8 @@ def build_monitor_args(ns: Namespace, include_fail_on_low: bool = True) -> List[
     monitor_args: List[str] = []
     append_arg(monitor_args, "--profile", getattr(ns, "profile", None))
     append_arg(monitor_args, "--lottery-addr", getattr(ns, "lottery_addr", None))
+    append_arg(monitor_args, "--hub-addr", getattr(ns, "hub_addr", None))
+    append_arg(monitor_args, "--factory-addr", getattr(ns, "factory_addr", None))
     append_arg(monitor_args, "--deposit-addr", getattr(ns, "deposit_addr", None))
     append_arg(monitor_args, "--client-addr", getattr(ns, "client_addr", None))
     append_arg(monitor_args, "--supra-cli-bin", getattr(ns, "supra_cli_bin", None))
@@ -122,6 +139,7 @@ def build_monitor_args(ns: Namespace, include_fail_on_low: bool = True) -> List[
         append_arg(monitor_args, "--margin", str(ns.margin))
     if getattr(ns, "window", None) is not None:
         append_arg(monitor_args, "--window", str(ns.window))
+    append_arg(monitor_args, "--lottery-ids", getattr(ns, "lottery_ids", None))
     if include_fail_on_low and getattr(ns, "fail_on_low", False):
         monitor_args.append("--fail-on-low")
     return monitor_args

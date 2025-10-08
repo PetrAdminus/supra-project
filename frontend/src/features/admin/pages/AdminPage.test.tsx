@@ -1,8 +1,8 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AdminPage } from "./AdminPage";
 import { resetUiStore, useUiStore } from "../../../store/uiStore";
+import { renderWithProviders } from "../../../testing/renderWithProviders";
 
 vi.mock("../hooks/useWhitelistStatus", () => ({
   useWhitelistStatus: () => ({
@@ -86,14 +86,7 @@ vi.mock("../hooks/useSupraCommands", () => ({
   }),
 }));
 
-const renderPage = () => {
-  const queryClient = new QueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <AdminPage />
-    </QueryClientProvider>,
-  );
-};
+const renderPage = () => renderWithProviders(<AdminPage />);
 
 describe("AdminPage", () => {
   it("renders access guard for non-admin role", () => {

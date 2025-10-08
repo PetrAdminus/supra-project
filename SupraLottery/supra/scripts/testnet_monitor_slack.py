@@ -63,24 +63,53 @@ build_monitor_args = common.build_monitor_args
 run_monitor = common.run_monitor
 
 
+def _truthy(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return False
+
+
+def _pick_primary_lottery(report: dict) -> Optional[dict]:
+    lotteries = report.get("lotteries")
+    if not isinstance(lotteries, list):
+        return None
+    # Сначала выбираем активную лотерею, если есть соответствующая регистрация
+    for entry in lotteries:
+        registration = entry.get("registration") if isinstance(entry, dict) else None
+        if isinstance(registration, dict) and _truthy(registration.get("active")):
+            return entry
+    return lotteries[0] if lotteries else None
+
+
 def format_message(ns: argparse.Namespace, report: dict, monitor_rc: int) -> str:
     balance = int(report["deposit"]["balance"])
     min_balance = int(report["calculation"]["min_balance"])
     status_emoji = "✅" if balance >= min_balance else "⚠️"
-    draw_status = report["lottery"]["status"]
-    if isinstance(draw_status, list) and draw_status:
-        draw_info = draw_status[0]
-    else:
-        draw_info = draw_status
+    primary_lottery = _pick_primary_lottery(report)
     draw_summary = ""
-    if isinstance(draw_info, dict):
-        draw_summary = " | ".join(
-            [
-                f"draw_scheduled={draw_info.get('draw_scheduled')}",
-                f"pending_request={draw_info.get('pending_request')}",
-                f"tickets={draw_info.get('ticket_count')}",
-            ]
-        )
+    if isinstance(primary_lottery, dict):
+        lottery_id = primary_lottery.get("lottery_id")
+        round_section = primary_lottery.get("round")
+        if isinstance(round_section, dict):
+            snapshot = round_section.get("snapshot")
+            pending = round_section.get("pending_request_id")
+        else:
+            snapshot = None
+            pending = None
+        parts = []
+        if lottery_id is not None:
+            parts.append(f"lottery_id={lottery_id}")
+        if isinstance(snapshot, dict):
+            parts.append(f"tickets={snapshot.get('ticket_count')}")
+            parts.append(f"scheduled={snapshot.get('draw_scheduled')}")
+            parts.append(f"has_pending={snapshot.get('has_pending_request')}")
+        if pending is not None:
+            parts.append(f"pending_request_id={pending}")
+        draw_summary = " | ".join(filter(None, (str(item) for item in parts)))
     profile = ns.profile or "<не задан>"
     base = (
         f"{status_emoji} {ns.title}\n"

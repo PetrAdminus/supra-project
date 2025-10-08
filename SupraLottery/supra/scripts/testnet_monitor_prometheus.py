@@ -94,27 +94,53 @@ def to_int(value: object) -> int:
     return int(str(value))
 
 
+def _truthy(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return False
+
+
+def _pick_primary_lottery(report: Dict[str, object]) -> Optional[Dict[str, object]]:
+    lotteries = report.get("lotteries")
+    if not isinstance(lotteries, list):
+        return None
+    for entry in lotteries:
+        if not isinstance(entry, dict):
+            continue
+        registration = entry.get("registration")
+        if isinstance(registration, dict) and _truthy(registration.get("active")):
+            return entry
+    return next((entry for entry in lotteries if isinstance(entry, dict)), None)
+
+
 def extract_draw_info(report: Dict[str, object]) -> Dict[str, int]:
-    status = report.get("lottery", {}).get("status")
-    if isinstance(status, list) and status:
-        status = status[0]
-    if isinstance(status, dict):
-        return {
-            "draw_scheduled": 1 if status.get("draw_scheduled") else 0,
-            "pending_request": 1 if status.get("pending_request") else 0,
-            "ticket_count": to_int(status.get("ticket_count", 0)),
-        }
-    return {"draw_scheduled": 0, "pending_request": 0, "ticket_count": 0}
+    lottery = _pick_primary_lottery(report)
+    if not isinstance(lottery, dict):
+        return {"draw_scheduled": 0, "pending_request": 0, "ticket_count": 0}
+    round_section = lottery.get("round")
+    if not isinstance(round_section, dict):
+        return {"draw_scheduled": 0, "pending_request": 0, "ticket_count": 0}
+    snapshot = round_section.get("snapshot")
+    pending_id = round_section.get("pending_request_id")
+    if not isinstance(snapshot, dict):
+        snapshot = {}
+    draw_scheduled = _truthy(snapshot.get("draw_scheduled"))
+    has_pending = _truthy(snapshot.get("has_pending_request")) or pending_id is not None
+    ticket_count = snapshot.get("ticket_count", 0)
+    return {
+        "draw_scheduled": 1 if draw_scheduled else 0,
+        "pending_request": 1 if has_pending else 0,
+        "ticket_count": to_int(ticket_count),
+    }
 
 
 def extract_rng_count(report: Dict[str, object]) -> int:
-    config = report.get("lottery", {}).get("vrf_request_config")
-    if isinstance(config, list) and config:
-        config = config[0]
-    if isinstance(config, dict):
-        value = config.get("rng_count")
-        if value is not None:
-            return to_int(value)
+    # В мульти-лотерейной архитектуре параметры VRF управляются через VRF-хаб и payload.
+    # Пока отдельной view-функции нет, поэтому возвращаем 0 и оставляем метрику для совместимости.
     return 0
 
 
@@ -131,13 +157,21 @@ def format_metrics(ns: argparse.Namespace, report: Dict[str, object], monitor_rc
     per_request_fee = to_int(calculation.get("per_request_fee", 0))
     window = to_int(calculation.get("request_window", 30))
 
+    addresses = report.get("addresses", {}) if isinstance(report.get("addresses"), dict) else {}
+    lottery_addr = str(addresses.get("lottery") or ns.lottery_addr or "")
+    client_addr = str(addresses.get("client") or ns.client_addr or lottery_addr)
+    deposit_addr = str(addresses.get("deposit") or getattr(ns, "deposit_addr", ""))
+    hub_addr = addresses.get("hub")
+
     labels: Dict[str, str] = {
         "profile": ns.profile or "<unknown>",
-        "lottery_addr": ns.lottery_addr or "",
-        "client_addr": ns.client_addr or (ns.lottery_addr or ""),
+        "lottery_addr": lottery_addr,
+        "client_addr": client_addr,
     }
-    if getattr(ns, "deposit_addr", None):
-        labels["deposit_addr"] = ns.deposit_addr
+    if deposit_addr:
+        labels["deposit_addr"] = deposit_addr
+    if hub_addr:
+        labels["hub_addr"] = str(hub_addr)
     labels.update(extra_labels)
 
     label_string = format_labels(labels)

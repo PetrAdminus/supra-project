@@ -1,8 +1,8 @@
 #[test_only]
 module lottery::lottery_tests {
-    use 0x1::account;
-    use 0x1::event;
-    use 0x1::timestamp;
+    use std::account;
+    use std::event;
+    use std::timestamp;
     use std::option;
     use std::hash;
     use std::string;

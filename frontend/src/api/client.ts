@@ -1,15 +1,26 @@
 import type {
   AdminConfig,
   AdminMutationResult,
+  AccountProfile,
+  AccountProfileUpdate,
+  AchievementStatus,
+  AchievementUnlockInput,
+  Announcement,
+  ChecklistCompleteInput,
+  ChecklistStatus,
+  ChatMessage,
   LotteryEvent,
+  LotteryVrfLog,
   LotteryStatus,
+  PostAnnouncementInput,
+  PostChatMessageInput,
   PurchaseTicketInput,
   RecordClientWhitelistInput,
   RecordConsumerWhitelistInput,
+  SupraCommandInfo,
   TicketPurchase,
   TreasuryBalances,
   TreasuryConfig,
-  SupraCommandInfo,
   UpdateGasConfigInput,
   UpdateTreasuryControlsInput,
   UpdateTreasuryDistributionInput,
@@ -18,38 +29,60 @@ import type {
 } from "./types";
 import type { LotteryApi } from "./interface";
 import {
+  completeChecklistTaskMock,
+  fetchAccountProfileMock,
+  fetchAchievementsStatusMock,
   fetchAdminConfigMock,
+  fetchAnnouncementsMock,
+  fetchChecklistStatusMock,
   fetchEventsMock,
   fetchLotteryStatusMock,
+  fetchLotteryVrfLogMock,
   fetchTicketsMock,
   fetchTreasuryBalancesMock,
   fetchTreasuryConfigMock,
   fetchWhitelistStatusMock,
   listCommandsMock,
+  postAnnouncementMock,
+  postChatMessageMock,
   purchaseTicketMock,
   recordClientWhitelistSnapshotMock,
   recordConsumerWhitelistSnapshotMock,
+  unlockAchievementMock,
   updateGasConfigMock,
   updateTreasuryControlsMock,
   updateTreasuryDistributionMock,
   updateVrfConfigMock,
+  upsertAccountProfileMock,
+  fetchChatMessagesMock,
 } from "./mockClient";
 import {
+  completeChecklistTaskSupra,
+  fetchAccountProfileSupra,
+  fetchAchievementsSupra,
   fetchAdminConfigSupra,
+  fetchChecklistSupra,
+  fetchChatMessagesSupra,
   fetchLotteryEventsSupra,
   fetchLotteryStatusSupra,
+  fetchLotteryVrfLogSupra,
   fetchTicketsSupra,
   fetchTreasuryBalancesSupra,
   fetchTreasuryConfigSupra,
   fetchWhitelistStatusSupra,
   listSupraCommandsSupra,
+  fetchAnnouncementsSupra,
+  postAnnouncementSupra,
+  postChatMessageSupra,
   purchaseTicketSupra,
   recordClientWhitelistSnapshotSupra,
   recordConsumerWhitelistSnapshotSupra,
+  unlockAchievementSupra,
   updateGasConfigSupra,
   updateTreasuryControlsSupra,
   updateTreasuryDistributionSupra,
   updateVrfConfigSupra,
+  upsertAccountProfileSupra,
 } from "./supraClient";
 import { useUiStore } from "../store/uiStore";
 import type { ApiMode } from "../config/appConfig";
@@ -60,6 +93,12 @@ const mockApi: LotteryApi = {
   fetchTickets: fetchTicketsMock,
   fetchEvents: fetchEventsMock,
   purchaseTicket: purchaseTicketMock,
+  fetchAccountProfile: fetchAccountProfileMock,
+  upsertAccountProfile: upsertAccountProfileMock,
+  fetchChecklist: fetchChecklistStatusMock,
+  completeChecklist: completeChecklistTaskMock,
+  fetchAchievements: fetchAchievementsStatusMock,
+  unlockAchievement: unlockAchievementMock,
   fetchAdminConfig: fetchAdminConfigMock,
   fetchTreasuryConfig: fetchTreasuryConfigMock,
   fetchTreasuryBalances: fetchTreasuryBalancesMock,
@@ -70,6 +109,11 @@ const mockApi: LotteryApi = {
   recordClientWhitelistSnapshot: recordClientWhitelistSnapshotMock,
   recordConsumerWhitelistSnapshot: recordConsumerWhitelistSnapshotMock,
   listCommands: listCommandsMock,
+  fetchLotteryVrfLog: fetchLotteryVrfLogMock,
+  fetchChatMessages: fetchChatMessagesMock,
+  postChatMessage: postChatMessageMock,
+  fetchAnnouncements: fetchAnnouncementsMock,
+  postAnnouncement: postAnnouncementMock,
 };
 
 const supraApi: LotteryApi = {
@@ -78,6 +122,12 @@ const supraApi: LotteryApi = {
   fetchTickets: fetchTicketsSupra,
   fetchEvents: fetchLotteryEventsSupra,
   purchaseTicket: purchaseTicketSupra,
+  fetchAccountProfile: fetchAccountProfileSupra,
+  upsertAccountProfile: upsertAccountProfileSupra,
+  fetchChecklist: fetchChecklistSupra,
+  completeChecklist: completeChecklistTaskSupra,
+  fetchAchievements: fetchAchievementsSupra,
+  unlockAchievement: unlockAchievementSupra,
   fetchAdminConfig: fetchAdminConfigSupra,
   fetchTreasuryConfig: fetchTreasuryConfigSupra,
   fetchTreasuryBalances: fetchTreasuryBalancesSupra,
@@ -88,6 +138,11 @@ const supraApi: LotteryApi = {
   recordClientWhitelistSnapshot: recordClientWhitelistSnapshotSupra,
   recordConsumerWhitelistSnapshot: recordConsumerWhitelistSnapshotSupra,
   listCommands: listSupraCommandsSupra,
+  fetchLotteryVrfLog: fetchLotteryVrfLogSupra,
+  fetchChatMessages: fetchChatMessagesSupra,
+  postChatMessage: postChatMessageSupra,
+  fetchAnnouncements: fetchAnnouncementsSupra,
+  postAnnouncement: postAnnouncementSupra,
 };
 
 const apiByMode: Record<ApiMode, LotteryApi> = {
@@ -121,6 +176,41 @@ export async function fetchLotteryEvents(): Promise<LotteryEvent[]> {
 
 export async function purchaseTicket(input: PurchaseTicketInput): Promise<TicketPurchase> {
   return getApi().purchaseTicket(input);
+}
+
+export async function fetchAccountProfile(address: string): Promise<AccountProfile | null> {
+  return getApi().fetchAccountProfile(address);
+}
+
+export async function upsertAccountProfile(
+  address: string,
+  input: AccountProfileUpdate,
+): Promise<AccountProfile> {
+  return getApi().upsertAccountProfile(address, input);
+}
+
+export async function fetchChecklist(address: string): Promise<ChecklistStatus> {
+  return getApi().fetchChecklist(address);
+}
+
+export async function completeChecklist(
+  address: string,
+  code: string,
+  input?: ChecklistCompleteInput,
+): Promise<ChecklistStatus["tasks"][number]> {
+  return getApi().completeChecklist(address, code, input);
+}
+
+export async function fetchAchievements(address: string): Promise<AchievementStatus> {
+  return getApi().fetchAchievements(address);
+}
+
+export async function unlockAchievement(
+  address: string,
+  code: string,
+  input?: AchievementUnlockInput,
+): Promise<AchievementStatus["achievements"][number]> {
+  return getApi().unlockAchievement(address, code, input);
 }
 
 export async function fetchAdminConfig(): Promise<AdminConfig> {
@@ -173,6 +263,35 @@ export async function recordConsumerWhitelistSnapshot(
 
 export async function listCommands(): Promise<SupraCommandInfo[]> {
   return getApi().listCommands();
+}
+
+export async function fetchLotteryVrfLog(
+  lotteryId: number,
+  limit?: number,
+): Promise<LotteryVrfLog> {
+  return getApi().fetchLotteryVrfLog(lotteryId, limit);
+}
+
+export async function fetchChatMessages(
+  room?: string,
+  limit?: number,
+): Promise<ChatMessage[]> {
+  return getApi().fetchChatMessages(room, limit);
+}
+
+export async function postChatMessage(input: PostChatMessageInput): Promise<ChatMessage> {
+  return getApi().postChatMessage(input);
+}
+
+export async function fetchAnnouncements(
+  limit?: number,
+  lotteryId?: string | null,
+): Promise<Announcement[]> {
+  return getApi().fetchAnnouncements(limit, lotteryId);
+}
+
+export async function postAnnouncement(input: PostAnnouncementInput): Promise<Announcement> {
+  return getApi().postAnnouncement(input);
 }
 
 export function getCurrentApi(): LotteryApi {

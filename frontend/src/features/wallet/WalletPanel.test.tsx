@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WalletPanel } from "./WalletPanel";
 import { resetUiStore, useUiStore } from "../../store/uiStore";
 import type { WalletInfo } from "./walletSupra";
+import { renderWithProviders } from "../../testing/renderWithProviders";
 
 const connectMock = vi.fn(() => Promise.resolve());
 const disconnectMock = vi.fn(() => Promise.resolve());
@@ -48,7 +49,7 @@ describe("WalletPanel", () => {
   it("disables connect when Supra mode is inactive", async () => {
     useUiStore.getState().setApiMode("mock");
 
-    render(<WalletPanel />);
+    renderWithProviders(<WalletPanel />);
 
     const connectButton = screen.getByTestId("wallet-connect-button");
     expect(connectButton).toBeDisabled();
@@ -57,7 +58,7 @@ describe("WalletPanel", () => {
   it("allows connection in Supra mode", async () => {
     useUiStore.getState().setApiMode("supra");
 
-    render(<WalletPanel />);
+    renderWithProviders(<WalletPanel />);
 
     const connectButton = screen.getByTestId("wallet-connect-button");
     expect(connectButton).toBeEnabled();
@@ -84,7 +85,7 @@ describe("WalletPanel", () => {
       clearError: clearErrorMock,
     });
 
-    render(<WalletPanel />);
+    renderWithProviders(<WalletPanel />);
 
     expect(screen.getByText(/0x1234/)).toBeInTheDocument();
     const copyButton = screen.getByTestId("wallet-copy-button");

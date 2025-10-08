@@ -1,5 +1,6 @@
-﻿import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { EventTable } from "./EventTable";
+import { renderWithProviders } from "../../../testing/renderWithProviders";
 
 const events = [
   {
@@ -24,14 +25,14 @@ const events = [
 
 describe("EventTable", () => {
   it("отображает события", () => {
-    render(<EventTable events={events} />);
+    renderWithProviders(<EventTable events={events} />);
 
     expect(screen.getByText("Покупка билета")).toBeInTheDocument();
     expect(screen.getByText("Ошибка")).toBeInTheDocument();
   });
 
   it("показывает время и описание", () => {
-    render(<EventTable events={events} />);
+    renderWithProviders(<EventTable events={events} />);
 
     expect(screen.getByText("Создан запрос")).toBeInTheDocument();
     expect(screen.getByText("Покупка тестового билета")).toBeInTheDocument();

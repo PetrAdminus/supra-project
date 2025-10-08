@@ -1,13 +1,14 @@
 // sources/Lottery.move
 module lottery::main_v2 {
+    friend lottery::migration;
     use std::string;
-    use 0x1::bcs;
+    use std::bcs;
     use std::option;
     use std::hash;
-    use 0x1::timestamp;
-    use 0x1::signer;
-    use 0x1::vector;
-    use 0x1::event;
+    use std::timestamp;
+    use std::signer;
+    use std::vector;
+    use std::event;
     use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::supra_vrf;
     use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::deposit;
     use lottery::treasury_v1;
@@ -195,12 +196,57 @@ module lottery::main_v2 {
         requester: address,
     }
 
+    public(friend) fun export_state_for_migration():
+        (vector<address>, bool, u64, option::Option<u64>, u64) acquires LotteryData {
+        let lottery = borrow_global<LotteryData>(@lottery);
+        let tickets = clone_addresses(&lottery.tickets);
+        let pending = copy_option_u64(&lottery.pending_request);
+        (
+            tickets,
+            lottery.draw_scheduled,
+            lottery.next_ticket_id,
+            pending,
+            lottery.jackpot_amount,
+        )
+    }
+
+    public(friend) fun clear_state_after_migration() acquires LotteryData {
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
+        clear_addresses(&mut lottery.tickets);
+        lottery.jackpot_amount = 0;
+        lottery.draw_scheduled = false;
+        lottery.next_ticket_id = 1;
+        lottery.pending_request = option::none();
+    }
+
+    public fun is_initialized(): bool {
+        exists<LotteryData>(@lottery)
+    }
+
+    fun clone_addresses(source: &vector<address>): vector<address> {
+        let result = vector::empty<address>();
+        let len = vector::length(source);
+        let i = 0;
+        while (i < len) {
+            let value = *vector::borrow(source, i);
+            vector::push_back(&mut result, value);
+            i = i + 1;
+        };
+        result
+    }
+
+    fun clear_addresses(tickets: &mut vector<address>) {
+        while (vector::length(tickets) > 0) {
+            vector::pop_back(tickets);
+        };
+    }
+
     fun copy_option_address(opt: &option::Option<address>): option::Option<address> {
         if (option::is_some(opt)) {
             option::some(*option::borrow(opt))
         } else {
             option::none()
-        }
+        };
     }
 
     fun copy_option_u64(opt: &option::Option<u64>): option::Option<u64> {
@@ -208,7 +254,7 @@ module lottery::main_v2 {
             option::some(*option::borrow(opt))
         } else {
             option::none()
-        }
+        };
     }
 
     fun build_request_envelope(
@@ -226,7 +272,7 @@ module lottery::main_v2 {
             callback_gas_limit: lottery.callback_gas_limit,
             verification_gas_value: lottery.verification_gas_value,
             requester,
-        }
+        };
     }
 
     fun encode_request_envelope(envelope: &VrfRequestEnvelope): vector<u8> {
@@ -301,7 +347,7 @@ module lottery::main_v2 {
         // If 5+ tickets and draw not scheduled - mark as ready for draw
         if (vector::length(&lottery.tickets) >= 5 && !lottery.draw_scheduled) {
             lottery.draw_scheduled = true;
-        }
+        };
     }
 
     public entry fun create_subscription(sender: &signer, initial_deposit: u64) acquires LotteryData {
@@ -1021,7 +1067,7 @@ module lottery::main_v2 {
             })
         } else {
             option::none()
-        }
+        };
     }
 
     #[test_only]
@@ -1036,7 +1082,7 @@ module lottery::main_v2 {
             })
         } else {
             option::none()
-        }
+        };
     }
 
     #[test_only]
@@ -1051,7 +1097,7 @@ module lottery::main_v2 {
             })
         } else {
             option::none()
-        }
+        };
     }
 
     #[test_only]
@@ -1259,7 +1305,7 @@ module lottery::main_v2 {
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             vector::length(&lottery.tickets)
-        }
+        };
     }
 
     #[view]
@@ -1269,7 +1315,7 @@ module lottery::main_v2 {
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             lottery.jackpot_amount
-        }
+        };
     }
 
     #[view]
@@ -1279,7 +1325,7 @@ module lottery::main_v2 {
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             option::is_some(&lottery.pending_request)
-        }
+        };
     }
 
     #[view]
@@ -1289,7 +1335,7 @@ module lottery::main_v2 {
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             lottery.max_gas_fee
-        }
+        };
     }
 
     #[view]
@@ -1299,7 +1345,7 @@ module lottery::main_v2 {
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             (lottery.max_gas_price, lottery.max_gas_limit)
-        }
+        };
     }
 
     #[view]
@@ -1309,7 +1355,7 @@ module lottery::main_v2 {
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             lottery.verification_gas_value
-        }
+        };
     }
 
     #[view]
@@ -1319,7 +1365,7 @@ module lottery::main_v2 {
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             (lottery.callback_gas_price, lottery.callback_gas_limit)
-        }
+        };
     }
 
     #[view]
@@ -1329,7 +1375,7 @@ module lottery::main_v2 {
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             (lottery.rng_request_count, lottery.rng_response_count)
-        }
+        };
     }
 
     #[view]
@@ -1342,7 +1388,7 @@ module lottery::main_v2 {
                 jackpot_amount: 0,
                 rng_request_count: 0,
                 rng_response_count: 0,
-            }
+            };
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             LotteryStatus {
@@ -1352,8 +1398,8 @@ module lottery::main_v2 {
                 jackpot_amount: lottery.jackpot_amount,
                 rng_request_count: lottery.rng_request_count,
                 rng_response_count: lottery.rng_response_count,
-            }
-        }
+            };
+        };
     }
 
     #[view]
@@ -1371,7 +1417,7 @@ module lottery::main_v2 {
                 i = i + 1;
             };
             tickets
-        }
+        };
     }
 
     #[view]
@@ -1380,7 +1426,7 @@ module lottery::main_v2 {
             WhitelistStatus {
                 aggregator: option::none(),
                 consumers: vector::empty<address>(),
-            }
+            };
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             let consumers = vector::empty<address>();
@@ -1399,7 +1445,7 @@ module lottery::main_v2 {
             };
 
             WhitelistStatus { aggregator, consumers }
-        }
+        };
     }
 
     #[view]
@@ -1413,8 +1459,8 @@ module lottery::main_v2 {
                 option::some(snapshot)
             } else {
                 option::none()
-            }
-        }
+            };
+        };
     }
 
     #[view]
@@ -1428,8 +1474,8 @@ module lottery::main_v2 {
                 option::some(snapshot.min_balance_limit)
             } else {
                 option::none()
-            }
-        }
+            };
+        };
     }
 
     #[view]
@@ -1443,8 +1489,8 @@ module lottery::main_v2 {
                 option::some(snapshot)
             } else {
                 option::none()
-            }
-        }
+            };
+        };
     }
 
     #[view]
@@ -1458,8 +1504,8 @@ module lottery::main_v2 {
                 option::some(config)
             } else {
                 option::none()
-            }
-        }
+            };
+        };
     }
 
     fun ensure_gas_configured(lottery: &LotteryData) {
@@ -1608,7 +1654,7 @@ module lottery::main_v2 {
         } else {
             assert!(a <= U64_MAX / b, abort_code);
             a * b
-        }
+        };
     }
 
     fun safe_add_u128(a: u128, b: u128, abort_code: u64): u128 {
@@ -1622,7 +1668,7 @@ module lottery::main_v2 {
         } else {
             assert!(a <= U128_MAX / b, abort_code);
             a * b
-        }
+        };
     }
 
     fun ensure_payload_hash_matches(
@@ -1673,7 +1719,7 @@ module lottery::main_v2 {
                 i = i + 1;
             };
             equal
-        }
+        };
     }
 
     fun first_u64_from_bytes(bytes: &vector<u8>): u64 {

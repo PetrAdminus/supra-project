@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { act } from "react";
 import { TicketPurchaseForm } from "./TicketPurchaseForm";
 import { resetUiStore, useUiStore } from "../../../store/uiStore";
+import { renderWithProviders } from "../../../testing/renderWithProviders";
 
 const mutateMock = vi.fn();
 
@@ -28,7 +29,7 @@ describe("TicketPurchaseForm", () => {
 
   it("показывает ошибку при пустом вводе", async () => {
     const user = userEvent.setup();
-    render(<TicketPurchaseForm round={17} ticketPrice="5.000" />);
+    renderWithProviders(<TicketPurchaseForm lotteryId={0} round={17} ticketPrice="5.000" />);
 
     const input = screen.getByLabelText("Номера билета");
     await user.clear(input);
@@ -41,7 +42,7 @@ describe("TicketPurchaseForm", () => {
 
   it("отправляет корректные номера", async () => {
     const user = userEvent.setup();
-    render(<TicketPurchaseForm round={18} ticketPrice="10.000" />);
+    renderWithProviders(<TicketPurchaseForm lotteryId={1} round={18} ticketPrice="10.000" />);
 
     const input = screen.getByLabelText("Номера билета");
     await user.clear(input);
@@ -50,7 +51,7 @@ describe("TicketPurchaseForm", () => {
     await user.click(button);
 
     expect(mutateMock).toHaveBeenCalledWith(
-      { round: 18, numbers: [1, 5, 9] },
+      { lotteryId: 1, round: 18, numbers: [1, 5, 9] },
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
   });
@@ -61,7 +62,7 @@ describe("TicketPurchaseForm", () => {
       useUiStore.getState().setApiMode("supra");
     });
 
-    render(<TicketPurchaseForm round={19} ticketPrice="10.000" />);
+    renderWithProviders(<TicketPurchaseForm lotteryId={2} round={19} ticketPrice="10.000" />);
 
     const button = screen.getByRole("button", { name: /Supra отключено/i });
     expect(button).toBeDisabled();

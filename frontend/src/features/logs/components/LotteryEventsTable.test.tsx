@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, beforeEach } from "vitest";
 import type { LotteryEvent } from "../../../api/types";
 import { resetUiStore } from "../../../store/uiStore";
 import { LotteryEventsTable } from "./LotteryEventsTable";
+import { renderWithProviders } from "../../../testing/renderWithProviders";
 
 describe("LotteryEventsTable", () => {
   beforeEach(() => {
@@ -40,7 +41,7 @@ describe("LotteryEventsTable", () => {
   ];
 
   it("отображает строки таблицы с типом и статусом", () => {
-    render(<LotteryEventsTable events={events} />);
+    renderWithProviders(<LotteryEventsTable events={events} />);
 
     expect(screen.getByText("Покупка билета")).toBeInTheDocument();
     expect(screen.getByText("Результат обработан")).toBeInTheDocument();
@@ -51,7 +52,7 @@ describe("LotteryEventsTable", () => {
   });
 
   it("показывает детали и хеш транзакции", () => {
-    render(<LotteryEventsTable events={events} />);
+    renderWithProviders(<LotteryEventsTable events={events} />);
 
     expect(screen.getByText(/недостаточно средств/i)).toBeInTheDocument();
     expect(screen.getByText("0xeee555")).toBeInTheDocument();
@@ -59,7 +60,7 @@ describe("LotteryEventsTable", () => {
   });
 
   it("добавляет подписи data-label для мобильного представления", () => {
-    render(<LotteryEventsTable events={events} />);
+    renderWithProviders(<LotteryEventsTable events={events} />);
 
     const eventCell = screen.getByText("Покупка билета").closest("td");
     const roundCell = screen.getByText("18").closest("td");

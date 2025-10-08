@@ -1,14 +1,16 @@
 module lottery::treasury_v1 {
+    friend lottery::autopurchase;
     friend lottery::main_v2;
+    friend lottery::treasury_multi;
     use std::option;
     use std::string;
-    use 0x1::event;
-    use 0x1::vector;
-    use 0x1::object;
-    use 0x1::fungible_asset;
-    use 0x1::primary_fungible_store;
-    use 0x1::signer;
-    use 0x1::math64;
+    use std::event;
+    use std::vector;
+    use std::object;
+    use std::fungible_asset;
+    use std::primary_fungible_store;
+    use std::signer;
+    use std::math64;
 
     const E_NOT_OWNER: u64 = 1;
     const E_ALREADY_INITIALIZED: u64 = 2;
@@ -96,7 +98,7 @@ module lottery::treasury_v1 {
             community: @lottery,
             team: @lottery,
             partners: @lottery,
-        }
+        };
     }
 
     fun emit_config() acquires Vaults {
@@ -347,7 +349,7 @@ module lottery::treasury_v1 {
             *supply_ref
         } else {
             0
-        }
+        };
     }
 
     #[view]

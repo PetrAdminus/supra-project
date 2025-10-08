@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from .monitor_common import (
     MonitorError,
@@ -14,6 +14,45 @@ from .monitor_common import (
 )
 
 DEFAULT_MIN_TICKETS = 5
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return False
+
+
+def _pick_primary_lottery(report: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    lotteries = report.get("lotteries")
+    if not isinstance(lotteries, list):
+        return None
+    for entry in lotteries:
+        if not isinstance(entry, dict):
+            continue
+        registration = entry.get("registration")
+        if isinstance(registration, dict) and _truthy(registration.get("active")):
+            return entry
+    return next((entry for entry in lotteries if isinstance(entry, dict)), None)
+
+
+def _extract_round(report: Dict[str, Any]) -> tuple[Dict[str, Any], Optional[Any], Optional[Dict[str, Any]]]:
+    lottery = _pick_primary_lottery(report)
+    if not isinstance(lottery, dict):
+        return {}, None, None
+    round_section = lottery.get("round")
+    if isinstance(round_section, dict):
+        snapshot = round_section.get("snapshot")
+        pending_id = round_section.get("pending_request_id")
+    else:
+        snapshot = None
+        pending_id = None
+    if not isinstance(snapshot, dict):
+        snapshot = {}
+    return snapshot, pending_id, lottery
 
 
 def _as_bool(value: Any) -> bool:
@@ -96,12 +135,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def evaluate(report: Dict[str, Any], ns: argparse.Namespace) -> List[str]:
     reasons: List[str] = []
-    lottery = report.get("lottery", {})
-    status = lottery.get("status", {})
-    whitelist = lottery.get("whitelist_status", {})
+    snapshot, pending_request_id, lottery_entry = _extract_round(report)
     deposit = report.get("deposit", {})
 
-    ticket_value = status.get("ticket_count") or status.get("tickets")
+    ticket_value = snapshot.get("ticket_count")
     if ticket_value is None:
         reasons.append("Не удалось определить количество билетов")
     else:
@@ -111,10 +148,13 @@ def evaluate(report: Dict[str, Any], ns: argparse.Namespace) -> List[str]:
                 f"Недостаточно билетов: требуется >= {ns.min_tickets}, сейчас {ticket_count}"
             )
 
-    if not ns.skip_draw_scheduled and not _as_bool(status.get("draw_scheduled", False)):
+    if not ns.skip_draw_scheduled and not _as_bool(snapshot.get("draw_scheduled", False)):
         reasons.append("Розыгрыш ещё не запланирован (draw_scheduled=false)")
 
-    if not ns.allow_pending_request and _as_bool(status.get("pending_request", False)):
+    has_pending_flag = _as_bool(snapshot.get("has_pending_request", False))
+    if pending_request_id is not None:
+        has_pending_flag = True
+    if not ns.allow_pending_request and has_pending_flag:
         reasons.append("Есть активный запрос VRF (pending_request=true)")
 
     if not ns.skip_min_balance:
@@ -122,7 +162,7 @@ def evaluate(report: Dict[str, Any], ns: argparse.Namespace) -> List[str]:
         if min_reached is None or not _as_bool(min_reached):
             reasons.append("Минимальный баланс депозита не достигнут")
 
-    aggregators = whitelist.get("aggregators", []) or []
+    aggregators = deposit.get("whitelisted_contracts", []) or []
     if ns.require_aggregator and not aggregators:
         reasons.append("Whitelist агрегаторов пуст")
 
@@ -142,12 +182,10 @@ def build_summary(
 ) -> Dict[str, Any]:
     """Собрать краткое резюме проверки готовности."""
 
-    lottery = report.get("lottery", {})
-    status = lottery.get("status", {})
-    whitelist = lottery.get("whitelist_status", {}) or {}
+    snapshot, pending_request_id, lottery_entry = _extract_round(report)
     deposit = report.get("deposit", {}) or {}
 
-    ticket_value = status.get("ticket_count") or status.get("tickets")
+    ticket_value = snapshot.get("ticket_count")
     ticket_count: Any
     if ticket_value is None:
         ticket_count = None
@@ -157,15 +195,16 @@ def build_summary(
         except MonitorError:
             ticket_count = None
 
-    aggregators = list(whitelist.get("aggregators", []) or [])
+    aggregators = list(deposit.get("whitelisted_contracts", []) or [])
 
     summary: Dict[str, Any] = {
         "ready": not reasons,
         "reasons": reasons,
         "ticket_count": ticket_count,
         "min_tickets_required": ns.min_tickets,
-        "draw_scheduled": _as_bool(status.get("draw_scheduled", False)),
-        "pending_request": _as_bool(status.get("pending_request", False)),
+        "draw_scheduled": _as_bool(snapshot.get("draw_scheduled", False)),
+        "pending_request": _as_bool(snapshot.get("has_pending_request", False)) or pending_request_id is not None,
+        "pending_request_id": pending_request_id,
         "min_balance_reached": _as_bool(deposit.get("min_balance_reached", False)),
         "aggregators": [str(value) for value in aggregators],
     }

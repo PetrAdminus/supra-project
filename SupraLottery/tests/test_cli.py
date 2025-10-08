@@ -15,6 +15,7 @@ class CliTestCase(unittest.TestCase):
         self.assertIn("manual-draw", output)
         self.assertIn("set-minimum-balance", output)
         self.assertIn("configure-treasury-distribution", output)
+        self.assertIn("vrf-audit", output)
 
     def test_calc_min_balance_subcommand(self) -> None:
         buf = io.StringIO()

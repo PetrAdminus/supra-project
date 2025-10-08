@@ -7,7 +7,7 @@
 - React Router, React Query, Zustand для состояния и работы с API
 - Liquid glass UI (см. глобальные токены в `src/index.css` и стилевые модули в `src/components/layout`)
 - Storybook 9 (Vite builder) для визуальных сценариев
-- Собственный лёгкий i18n-слой (`src/i18n`) с переключением языка
+- i18next + react-i18next (`src/i18n`), экспорт словарей в JSON и переключение языка через Zustand
 - Vitest + Testing Library для unit-тестов
 - Husky + lint-staged, ESLint (flat config), Prettier
 
@@ -24,6 +24,7 @@ pnpm install
 - `pnpm run storybook` — Storybook (порт 6006)
 - `pnpm run test` — Vitest (jsdom)
 - `pnpm run build` / `pnpm run preview` — production-сборка и предпросмотр
+- `pnpm run i18n:extract` — выгрузка словарей в `public/locales/<locale>/translation.json`
 
 ## Настройки окружения
 
@@ -57,6 +58,9 @@ src/
 +- features/
    +- admin/           # формы конфигураций и whitelisting
    +- dashboard/
+   +- chat/            # real-time чат, объявления
+   +- progress/
+   +- fairness/
    +- logs/
    +- tickets/
    +- wallet/
@@ -68,6 +72,10 @@ src/
 
 - По умолчанию интерфейс стартует в режиме `mock` и подставляет данные из `src/mocks/*`. Переключение режима доступно в шапке (ShellLayout).
 - В режиме `supra` используем `src/api/supraClient.ts` для HTTP-запросов к FastAPI и `src/features/wallet/walletSupra.ts` для управления StarKey-кошельком.
+- Страница `/fairness` отображает VRF-журнал выбранной лотереи (снепшот раунда, события хаба и лимит событий), поддерживает фильтрацию по типу события и текстовый поиск как в mock-режиме, так и при подключении к Supra API.
+- На дашборде добавлен чат сообщества с блоком объявлений: сообщения подгружаются из `/chat/messages`, подписка в Supra-режиме работает через WebSocket, а в mock-режиме используется локальный стор.
+- Страница `/progress` показывает чек-листы и достижения аккаунта: данные подгружаются из FastAPI (`/progress/*`), можно отмечать задания выполненными, а макеты поддерживают мок-режим.
+- Страница `/profile` позволяет менять никнейм, соцсети, NFT-аватар и JSON-настройки через эндпоинты `/accounts/*` в mock- и Supra-режимах.
 - При появлении свежих ответов CLI обновим JSON-моки, сторисы и тесты.
 - Конфигурация лежит в `.storybook/` (подключены провайдеры и Zustand).
 - Для edge-кейсов используем аргументы `mockData` / `mockError`, чтобы быстро воспроизводить загрузку или ошибки.

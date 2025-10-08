@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { describe, expect, it, beforeEach, vi } from "vitest";
@@ -6,6 +6,7 @@ import type { LotteryEvent } from "../../../api/types";
 import { resetUiStore } from "../../../store/uiStore";
 import { LogsPage } from "./LogsPage";
 import { useLotteryEvents } from "../hooks/useLotteryEvents";
+import { renderWithProviders } from "../../../testing/renderWithProviders";
 
 vi.mock("../hooks/useLotteryEvents");
 
@@ -27,7 +28,7 @@ describe("LogsPage", () => {
       fetchStatus: "fetching",
     } as unknown as UseQueryResult<LotteryEvent[]>);
 
-    render(<LogsPage />);
+    renderWithProviders(<LogsPage />);
 
     expect(screen.getByText("Загрузка событий...")).toBeInTheDocument();
   });
@@ -42,7 +43,7 @@ describe("LogsPage", () => {
       fetchStatus: "idle",
     } as unknown as UseQueryResult<LotteryEvent[]>);
 
-    render(<LogsPage />);
+    renderWithProviders(<LogsPage />);
 
     expect(screen.getByText("Не удалось получить журнал. Проверьте выбранный режим API.")).toBeInTheDocument();
   });
@@ -80,7 +81,7 @@ describe("LogsPage", () => {
       fetchStatus: "idle",
     } as unknown as UseQueryResult<LotteryEvent[]>);
 
-    render(<LogsPage />);
+    renderWithProviders(<LogsPage />);
 
     expect(screen.getByText("Скрывать ошибки")).toBeInTheDocument();
     expect(screen.getByText(/Ошибка транзакции/)).toBeInTheDocument();
@@ -116,7 +117,7 @@ describe("LogsPage", () => {
       fetchStatus: "idle",
     } as unknown as UseQueryResult<LotteryEvent[]>);
 
-    render(<LogsPage />);
+    renderWithProviders(<LogsPage />);
 
     expect(screen.getByText("Скрывать ошибки")).toBeInTheDocument();
     expect(screen.getByText("Возврат билета")).toBeInTheDocument();
@@ -150,7 +151,7 @@ describe("LogsPage", () => {
       fetchStatus: "idle",
     } as unknown as UseQueryResult<LotteryEvent[]>);
 
-    render(<LogsPage />);
+    renderWithProviders(<LogsPage />);
 
     expect(
       screen.getByText("Не удалось получить журнал. Проверьте выбранный режим API."),

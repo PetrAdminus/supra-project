@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import type { TicketPurchase } from "../../../api/types";
 import { TicketList } from "./TicketList";
+import { renderWithProviders } from "../../../testing/renderWithProviders";
 
 describe("TicketList", () => {
   const tickets: TicketPurchase[] = [
@@ -23,7 +24,7 @@ describe("TicketList", () => {
   ];
 
   it("показывает билеты и статусы", () => {
-    render(<TicketList tickets={tickets} />);
+    renderWithProviders(<TicketList tickets={tickets} />);
 
     expect(screen.getByText("TICK-TEST-001")).toBeInTheDocument();
     expect(screen.getByText("Подтверждён")).toBeInTheDocument();
@@ -32,7 +33,7 @@ describe("TicketList", () => {
   });
 
   it("отображает номера билета", () => {
-    render(<TicketList tickets={tickets} />);
+    renderWithProviders(<TicketList tickets={tickets} />);
 
     expect(screen.getAllByText("2")).not.toHaveLength(0);
     expect(screen.getAllByText("7")).not.toHaveLength(0);
@@ -50,7 +51,7 @@ describe("TicketList", () => {
       },
     ];
 
-    render(<TicketList tickets={withoutNumbers} />);
+    renderWithProviders(<TicketList tickets={withoutNumbers} />);
 
     expect(screen.getByText("Supra API пока не возвращает номера билетов.")).toBeInTheDocument();
   });

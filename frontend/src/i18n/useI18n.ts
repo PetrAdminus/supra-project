@@ -1,7 +1,7 @@
-import { useCallback } from 'react';
-import { useUiStore } from '../store/uiStore';
-import { translate } from './messages';
-import type { Locale } from './locales';
+import { useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { useUiStore } from "../store/uiStore";
+import type { Locale } from "./locales";
 
 type TranslateParams = Record<string, string | number>;
 
@@ -15,13 +15,27 @@ type UseI18nResult = {
 
 export function useI18n(): UseI18nResult {
   const locale = useUiStore((state) => state.locale);
-  const setLocale = useUiStore((state) => state.setLocale);
+  const setLocaleStore = useUiStore((state) => state.setLocale);
+  const { t, i18n } = useTranslation();
 
-  const t = useCallback<TranslateFn>(
-    (key, params) => translate(locale, key, params),
-    [locale],
+  useEffect(() => {
+    if (i18n.language !== locale) {
+      void i18n.changeLanguage(locale);
+    }
+  }, [i18n, locale]);
+
+  const setLocale = useCallback(
+    (nextLocale: Locale) => {
+      setLocaleStore(nextLocale);
+    },
+    [setLocaleStore],
   );
 
-  return { locale, setLocale, t };
+  const translate = useCallback<TranslateFn>(
+    (key, params) => t(key, params as Record<string, unknown>),
+    [t],
+  );
+
+  return { locale, setLocale, t: translate };
 }
 

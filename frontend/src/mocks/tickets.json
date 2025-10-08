@@ -1,6 +1,7 @@
 ﻿[
   {
     "ticketId": "TICK-2025-001",
+    "lotteryId": 0,
     "round": 17,
     "numbers": [3, 12, 27, 41],
     "purchaseTime": "2025-09-22T11:05:00Z",
@@ -9,6 +10,7 @@
   },
   {
     "ticketId": "TICK-2025-002",
+    "lotteryId": 0,
     "round": 17,
     "numbers": [7, 19, 24, 39],
     "purchaseTime": "2025-09-22T11:10:00Z",
@@ -17,6 +19,7 @@
   },
   {
     "ticketId": "TICK-2025-003",
+    "lotteryId": 0,
     "round": 16,
     "numbers": [5, 11, 33, 42],
     "purchaseTime": "2025-09-15T09:45:00Z",

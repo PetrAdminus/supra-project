@@ -6,15 +6,21 @@ import os
 import subprocess
 import sys
 import time
-from typing import Dict, List, Mapping, MutableMapping, Optional
+from typing import Any, Dict, List, Mapping, MutableMapping, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware import Middleware
 from pydantic import BaseModel, Field
 import uvicorn
 
 from . import cli
+from .accounts import get_config_from_env as get_accounts_config
+from .accounts import init_engine as init_accounts_engine
+from .accounts import router as accounts_router
+from .progress import router as progress_router
+from .realtime import router as realtime_router
+from .support import router as support_router
 from .lib.monitoring import (
     CliError,
     ConfigError,
@@ -22,8 +28,13 @@ from .lib.monitoring import (
     gather_data,
     monitor_config_from_env,
 )
+from .lib.vrf_audit import gather_vrf_log
 
 app = FastAPI(title="Supra Lottery API", version="0.1.0")
+app.include_router(accounts_router)
+app.include_router(realtime_router)
+app.include_router(support_router)
+app.include_router(progress_router)
 
 
 def _parse_cors_origins(raw: Optional[str]) -> List[str]:
@@ -63,6 +74,8 @@ _configure_cors()
 _QUERY_TO_ENV: Dict[str, str] = {
     "profile": "PROFILE",
     "lottery_addr": "LOTTERY_ADDR",
+    "hub_addr": "HUB_ADDR",
+    "factory_addr": "FACTORY_ADDR",
     "deposit_addr": "DEPOSIT_ADDR",
     "client_addr": "CLIENT_ADDR",
     "supra_cli_bin": "SUPRA_CLI_BIN",
@@ -72,6 +85,7 @@ _QUERY_TO_ENV: Dict[str, str] = {
     "verification_gas": "VERIFICATION_GAS_VALUE",
     "margin": "MIN_BALANCE_MARGIN",
     "window": "MIN_BALANCE_WINDOW",
+    "lottery_ids": "LOTTERY_IDS",
 }
 
 
@@ -102,6 +116,12 @@ def _load_base_config() -> None:
 
     app.state.cache_ttl_seconds = max(0.0, cache_ttl)
     app.state.status_cache = None
+
+
+@app.on_event("startup")
+def _init_accounts() -> None:
+    config = get_accounts_config()
+    init_accounts_engine(config)
 
 
 def _resolve_config(overrides: Mapping[str, str] | None = None) -> MonitorConfig:
@@ -233,6 +253,22 @@ async def read_status(
         _store_cached_status(config, data)
 
     return data
+
+
+@app.get("/lotteries/{lottery_id}/vrf-log", tags=["fairness"])
+async def read_vrf_log(
+    lottery_id: int,
+    limit: int = Query(50, ge=1, le=500),
+    config: MonitorConfig = Depends(get_monitor_config),
+) -> Dict[str, Any]:
+    """Возвращает события VRF и состояние раунда для панели честности."""
+
+    try:
+        return gather_vrf_log(config, lottery_id=lottery_id, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except CliError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
 @app.get("/commands", response_model=List[CommandInfo], tags=["commands"])

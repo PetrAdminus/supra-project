@@ -51,46 +51,7 @@ class MonitorJsonTests(unittest.TestCase):
     def test_gather_data_aggregates_all_views(self) -> None:
         """gather_data should combine CLI results and calculation output."""
 
-        mapping: Dict[str, Any] = {
-            "0xabc::main_v2::get_lottery_status": {"tickets": 5},
-            "0xabc::main_v2::get_vrf_request_config": {"rng_count": 1},
-            "0xabc::main_v2::get_whitelist_status": {"aggregators": ["0xagg"]},
-            "0xabc::main_v2::get_ticket_price": "100",
-            "0xabc::main_v2::get_registered_tickets": ["0x111", "0x222"],
-            "0xabc::main_v2::get_client_whitelist_snapshot": {
-                "max_gas_price": "1000",
-                "max_gas_limit": "500000",
-                "min_balance_limit": "7500000000",
-            },
-            "0xabc::main_v2::get_min_balance_limit_snapshot": "7500000000",
-            "0xabc::main_v2::get_consumer_whitelist_snapshot": {
-                "callback_gas_price": "50",
-                "callback_gas_limit": "250000",
-            },
-            "0xabc::treasury_v1::get_config": [2000, 3000, 2500, 2500, 0, 0, 0],
-            "0xabc::treasury_v1::get_recipients": [
-                "0xtreasury",
-                "0xmarketing",
-                "0xcommunity",
-                "0xteam",
-                "0xpartners",
-            ],
-            "0xabc::treasury_v1::treasury_balance": ["123456"],
-            "0xabc::treasury_v1::total_supply": "987654321",
-            "0xabc::treasury_v1::metadata_summary": {
-                "name": "Lottery Token",
-                "symbol": "LOT",
-                "decimals": 6,
-            },
-            "0xdef::deposit::checkClientFund": ["600"],
-            "0xdef::deposit::checkMinBalanceClient": ["500"],
-            "0xdef::deposit::isMinimumBalanceReached": [True],
-            "0xdef::deposit::getContractDetails": {"callback_gas_limit": "500000"},
-            "0xdef::deposit::getSubscriptionInfoByClient": {"active": True},
-            "0xdef::deposit::listAllWhitelistedContractByClient": ["0xabc"],
-            "0xdef::deposit::checkMaxGasPriceClient": ["1000"],
-            "0xdef::deposit::checkMaxGasLimitClient": ["500000"],
-        }
+        config = monitor_lib.monitor_config_from_namespace(self.args)
 
         def fake_run_cli(args: Namespace, command: Any) -> Dict[str, Any]:  # pylint: disable=unused-argument
             try:
@@ -98,9 +59,183 @@ class MonitorJsonTests(unittest.TestCase):
             except ValueError as exc:  # pragma: no cover - defensive branch
                 raise AssertionError(f"Missing --function-id in {command}") from exc
             function_id = command[function_idx]
-            if function_id not in mapping:
-                raise AssertionError(f"Unexpected function id: {function_id}")
-            return {"result": mapping[function_id]}
+
+            if function_id.endswith("::is_initialized"):
+                return {"result": [True]}
+            if function_id == f"{config.referrals_prefix}::list_lottery_ids":
+                return {"result": [0]}
+            if function_id == f"{config.referrals_prefix}::get_lottery_config":
+                return {"result": [{"referrer_bps": 300, "referee_bps": 200}]}
+            if function_id == f"{config.referrals_prefix}::get_lottery_stats":
+                return {
+                    "result": [
+                        {
+                            "rewarded_purchases": 2,
+                            "total_referrer_rewards": 60,
+                            "total_referee_rewards": 40,
+                        }
+                    ]
+                }
+            if function_id == f"{config.hub_prefix}::lottery_count":
+                return {"result": [1]}
+            if function_id == f"{config.hub_prefix}::peek_next_lottery_id":
+                return {"result": ["1"]}
+            if function_id == f"{config.hub_prefix}::callback_sender":
+                return {"result": ["0xcallback"]}
+            if function_id == f"{config.hub_prefix}::get_registration":
+                return {"result": [{"owner": "0xowner", "lottery": "0xcontract"}]}
+            if function_id == f"{config.factory_prefix}::get_lottery":
+                return {
+                    "result": [
+                        {
+                            "owner": "0xowner",
+                            "lottery": "0xcontract",
+                            "blueprint": {"ticket_price": 100, "jackpot_share_bps": 2000},
+                        }
+                    ]
+                }
+            if function_id == f"{config.instances_prefix}::get_lottery_info":
+                return {
+                    "result": [
+                        {
+                            "owner": "0xowner",
+                            "lottery": "0xcontract",
+                            "blueprint": {"ticket_price": 100, "jackpot_share_bps": 2000},
+                        }
+                    ]
+                }
+            if function_id == f"{config.instances_prefix}::get_instance_stats":
+                return {"result": [{"tickets_sold": 5, "jackpot_accumulated": 42, "active": True}]}
+            if function_id == f"{config.rounds_prefix}::get_round_snapshot":
+                return {"result": [{"ticket_count": 3, "ticket_price": 100}]}
+            if function_id == f"{config.rounds_prefix}::pending_request_id":
+                return {"result": [None]}
+            if function_id == f"{config.treasury_prefix}::get_config":
+                return {"result": [{"prize_bps": 7000, "jackpot_bps": 2000, "operations_bps": 1000}]}
+            if function_id == f"{config.treasury_prefix}::get_pool":
+                return {"result": [{"prize_balance": 210, "operations_balance": 30}]}
+            if function_id == f"{config.treasury_prefix}::jackpot_balance":
+                return {"result": [60]}
+            if function_id == f"{config.autopurchase_prefix}::list_lottery_ids":
+                return {"result": [0]}
+            if function_id == f"{config.autopurchase_prefix}::get_lottery_summary":
+                return {
+                    "result": [
+                        {
+                            "total_balance": 300,
+                            "total_players": 1,
+                            "active_players": 1,
+                        }
+                    ]
+                }
+            if function_id == f"{config.autopurchase_prefix}::list_players":
+                return {"result": [["0xplayer1"]]}
+            if function_id == f"{config.operators_prefix}::list_lottery_ids":
+                return {"result": [0]}
+            if function_id == f"{config.operators_prefix}::get_owner":
+                return {"result": ["0xmanager"]}
+            if function_id == f"{config.operators_prefix}::list_operators":
+                return {"result": [["0xoperator1", "0xoperator2"]]}
+            if function_id == f"{config.metadata_prefix}::list_lottery_ids":
+                return {"result": [0]}
+            if function_id == f"{config.metadata_prefix}::get_metadata":
+                return {
+                    "result": [
+                        {
+                            "title": b"Daily Lottery",
+                            "description": b"Description",
+                            "image_uri": b"https://img/lottery.png",
+                            "website_uri": b"https://example/lottery",
+                            "rules_uri": b"https://example/lottery/rules",
+                        }
+                    ]
+                }
+            if function_id == f"{config.history_prefix}::is_initialized":
+                return {"result": [True]}
+            if function_id == f"{config.history_prefix}::list_lottery_ids":
+                return {"result": [0]}
+            if function_id == f"{config.history_prefix}::get_history":
+                return {
+                    "result": [
+                        [
+                            {
+                                "request_id": 42,
+                                "winner": "0xwinner",
+                                "ticket_index": 0,
+                                "prize_amount": 140,
+                                "random_bytes": [5, 0, 0, 0, 0, 0, 0, 0],
+                                "payload": b"log",
+                                "timestamp_seconds": 1_234_567_890,
+                            }
+                        ]
+                    ]
+                }
+            if function_id == f"{config.history_prefix}::latest_record":
+                return {
+                    "result": [
+                        {
+                            "request_id": 42,
+                            "winner": "0xwinner",
+                            "ticket_index": 0,
+                            "prize_amount": 140,
+                            "random_bytes": [5, 0, 0, 0, 0, 0, 0, 0],
+                            "payload": b"log",
+                            "timestamp_seconds": 1_234_567_890,
+                        }
+                    ]
+                }
+            if function_id == f"{config.vip_prefix}::list_lottery_ids":
+                return {"result": [0]}
+            if function_id == f"{config.vip_prefix}::get_lottery_summary":
+                return {
+                    "result": [
+                        {
+                            "config": {
+                                "price": 250,
+                                "duration_secs": 1000,
+                                "bonus_tickets": 2,
+                            },
+                            "total_members": 1,
+                            "active_members": 1,
+                            "total_revenue": 250,
+                            "bonus_tickets_issued": 4,
+                        }
+                    ]
+                }
+            if function_id == f"{config.vip_prefix}::list_players":
+                return {"result": [["0xvip1"]]}
+            if function_id == f"{config.treasury_fa_prefix}::treasury_balance":
+                return {"result": ["123456"]}
+            if function_id == f"{config.treasury_fa_prefix}::total_supply":
+                return {"result": "987654321"}
+            if function_id == f"{config.treasury_fa_prefix}::metadata_summary":
+                return {
+                    "result": {
+                        "name": "Lottery Token",
+                        "symbol": "LOT",
+                        "decimals": 6,
+                    }
+                }
+            if function_id == f"{config.deposit_prefix}::checkClientFund":
+                return {"result": ["600"]}
+            if function_id == f"{config.deposit_prefix}::checkMinBalanceClient":
+                return {"result": ["500"]}
+            if function_id == f"{config.deposit_prefix}::isMinimumBalanceReached":
+                return {"result": [True]}
+            if function_id == f"{config.deposit_prefix}::getContractDetails":
+                return {"result": {"callback_gas_limit": "500000"}}
+            if function_id == f"{config.deposit_prefix}::getSubscriptionInfoByClient":
+                return {"result": {"active": True}}
+            if function_id == f"{config.deposit_prefix}::listAllWhitelistedContractByClient":
+                return {"result": ["0xabc"]}
+            if function_id == f"{config.deposit_prefix}::checkMaxGasPriceClient":
+                return {"result": ["1000"]}
+            if function_id == f"{config.deposit_prefix}::checkMaxGasLimitClient":
+                return {"result": ["500000"]}
+            if function_id == f"{config.hub_prefix}::get_registration":
+                return {"result": [{"owner": "0xowner", "lottery": "0xcontract"}]}
+
+            raise AssertionError(f"Unexpected function id: {function_id}")
 
         calc_payload = {
             "max_gas_price": "1000",
@@ -113,8 +248,6 @@ class MonitorJsonTests(unittest.TestCase):
             "request_window": 30,
         }
 
-        config = monitor_lib.monitor_config_from_namespace(self.args)
-
         with patch.object(monitor_lib, "run_cli", side_effect=fake_run_cli), patch.object(
             monitor_lib, "calculate", return_value=FakeCalculation(calc_payload)
         ):
@@ -125,38 +258,143 @@ class MonitorJsonTests(unittest.TestCase):
         self.assertEqual(report["deposit"]["min_balance"], "500")
         self.assertTrue(report["deposit"]["min_balance_reached"])
         self.assertEqual(report["calculation"], calc_payload)
-        self.assertEqual(report["lottery"]["status"], {"tickets": 5})
+        self.assertEqual(report["hub"]["configured_lottery_ids"], [0])
+        self.assertEqual(len(report["lotteries"]), 1)
+        self.assertEqual(report["lotteries"][0]["lottery_id"], 0)
+        self.assertEqual(report["lotteries"][0]["registration"], {"owner": "0xowner", "lottery": "0xcontract"})
+        self.assertEqual(report["lotteries"][0]["round"]["snapshot"], {"ticket_count": 3, "ticket_price": 100})
         self.assertEqual(
-            report["lottery"]["client_whitelist_snapshot"],
+            report["lotteries"][0]["metadata"],
             {
-                "max_gas_price": "1000",
-                "max_gas_limit": "500000",
-                "min_balance_limit": "7500000000",
+                "title": b"Daily Lottery",
+                "description": b"Description",
+                "image_uri": b"https://img/lottery.png",
+                "website_uri": b"https://example/lottery",
+                "rules_uri": b"https://example/lottery/rules",
             },
         )
         self.assertEqual(
-            report["lottery"]["consumer_whitelist_snapshot"],
-            {"callback_gas_price": "50", "callback_gas_limit": "250000"},
-        )
-        self.assertEqual(report["lottery"]["min_balance_snapshot"], "7500000000")
-        self.assertEqual(
-            report["treasury"],
+            report["lotteries"][0]["latest_history"],
             {
-                "config": [2000, 3000, 2500, 2500, 0, 0, 0],
-                "recipients": [
-                    "0xtreasury",
-                    "0xmarketing",
-                    "0xcommunity",
-                    "0xteam",
-                    "0xpartners",
+                "request_id": 42,
+                "winner": "0xwinner",
+                "ticket_index": 0,
+                "prize_amount": 140,
+                "random_bytes": [5, 0, 0, 0, 0, 0, 0, 0],
+                "payload": b"log",
+                "timestamp_seconds": 1_234_567_890,
+            },
+        )
+        self.assertEqual(report["treasury"]["token_balance"], "123456")
+        self.assertEqual(report["treasury"]["metadata"], {"name": "Lottery Token", "symbol": "LOT", "decimals": 6})
+        self.assertEqual(
+            report["autopurchase"],
+            {
+                "initialized": True,
+                "lotteries": [
+                    {
+                        "lottery_id": 0,
+                        "summary": {
+                            "total_balance": 300,
+                            "total_players": 1,
+                            "active_players": 1,
+                        },
+                        "players": ["0xplayer1"],
+                    }
                 ],
-                "balance": "123456",
-                "total_supply": "987654321",
-                "metadata": {
-                    "name": "Lottery Token",
-                    "symbol": "LOT",
-                    "decimals": 6,
-                },
+            },
+        )
+        self.assertEqual(
+            report["metadata"],
+            {
+                "initialized": True,
+                "lotteries": [
+                    {
+                        "lottery_id": 0,
+                        "metadata": {
+                            "title": b"Daily Lottery",
+                            "description": b"Description",
+                            "image_uri": b"https://img/lottery.png",
+                            "website_uri": b"https://example/lottery",
+                            "rules_uri": b"https://example/lottery/rules",
+                        },
+                    }
+                ],
+            },
+        )
+        self.assertEqual(
+            report["operators"],
+            {
+                "initialized": True,
+                "lotteries": [
+                    {
+                        "lottery_id": 0,
+                        "owner": "0xmanager",
+                        "operators": ["0xoperator1", "0xoperator2"],
+                    }
+                ],
+            },
+        )
+        self.assertEqual(
+            report["history"],
+            {
+                "initialized": True,
+                "lotteries": [
+                    {
+                        "lottery_id": 0,
+                        "records": [
+                            {
+                                "request_id": 42,
+                                "winner": "0xwinner",
+                                "ticket_index": 0,
+                                "prize_amount": 140,
+                                "random_bytes": [5, 0, 0, 0, 0, 0, 0, 0],
+                                "payload": b"log",
+                                "timestamp_seconds": 1_234_567_890,
+                            }
+                        ],
+                    }
+                ],
+            },
+        )
+        self.assertEqual(
+            report["referrals"],
+            {
+                "initialized": True,
+                "lotteries": [
+                    {
+                        "lottery_id": 0,
+                        "config": {"referrer_bps": 300, "referee_bps": 200},
+                        "stats": {
+                            "rewarded_purchases": 2,
+                            "total_referrer_rewards": 60,
+                            "total_referee_rewards": 40,
+                        },
+                    }
+                ],
+            },
+        )
+        self.assertEqual(
+            report["vip"],
+            {
+                "initialized": True,
+                "lotteries": [
+                    {
+                        "lottery_id": 0,
+                        "summary": {
+                            "config": {
+                                "price": 250,
+                                "duration_secs": 1000,
+                                "bonus_tickets": 2,
+                            },
+                            "total_members": 1,
+                            "active_members": 1,
+                            "total_revenue": 250,
+                            "bonus_tickets_issued": 4,
+                        },
+                        "players": ["0xvip1"],
+                    }
+                ],
             },
         )
 
