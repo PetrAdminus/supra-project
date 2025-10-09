@@ -88,6 +88,31 @@ module lottery::metadata {
         }
     }
 
+    #[view]
+    /// test-view: возвращает (title, description, image_uri, website_uri, rules_uri)
+    public fun get_metadata_view(
+        lottery_id: u64,
+    ): option::Option<(
+        vector<u8>,
+        vector<u8>,
+        vector<u8>,
+        vector<u8>,
+        vector<u8>,
+    )> acquires MetadataRegistry {
+        let state = borrow_state();
+        if (!table::contains(&state.entries, lottery_id)) {
+            return option::none();
+        };
+        let stored = table::borrow(&state.entries, lottery_id);
+        option::some((
+            clone_bytes(&stored.title),
+            clone_bytes(&stored.description),
+            clone_bytes(&stored.image_uri),
+            clone_bytes(&stored.website_uri),
+            clone_bytes(&stored.rules_uri),
+        ))
+    }
+
     public fun list_lottery_ids(): vector<u64> acquires MetadataRegistry {
         let state = borrow_state();
         let len = vector::length(&state.lottery_ids);

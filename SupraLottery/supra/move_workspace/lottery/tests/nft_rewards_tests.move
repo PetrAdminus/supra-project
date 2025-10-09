@@ -15,12 +15,12 @@ module lottery::nft_rewards_tests {
         let badges = nft_rewards::list_badges(owner_addr);
         assert!(vector::length(&badges) == 1, 1);
         assert!(*vector::borrow(&badges, 0) == 1, 2);
-        let info_opt = nft_rewards::get_badge(owner_addr, 1);
+        let info_opt = nft_rewards::get_badge_view(owner_addr, 1);
         assert!(option::is_some(&info_opt), 3);
-        let info = test_utils::unwrap(info_opt);
-        assert!(info.lottery_id == 1, 4);
-        assert!(info.draw_id == 7, 5);
-        assert!(info.minted_by == signer::address_of(admin), 6);
+        let (lottery_id, draw_id, minted_by, _) = test_utils::unwrap(info_opt);
+        assert!(lottery_id == 1, 4);
+        assert!(draw_id == 7, 5);
+        assert!(minted_by == signer::address_of(admin), 6);
     }
 
     #[test(admin = @lottery, owner = @0x456)]

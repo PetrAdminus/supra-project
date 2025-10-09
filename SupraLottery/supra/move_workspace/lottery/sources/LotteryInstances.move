@@ -153,7 +153,7 @@ module lottery::instances {
 
 
     public entry fun set_instance_active(caller: &signer, lottery_id: u64, active: bool)
-    acquires LotteryCollection, hub::HubState {
+    acquires LotteryCollection {
         ensure_admin(caller);
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
@@ -171,21 +171,19 @@ module lottery::instances {
     }
 
 
-    public entry fun create_instance(caller: &signer, lottery_id: u64) acquires LotteryCollection, hub::HubState, registry::FactoryState {
+    public entry fun create_instance(caller: &signer, lottery_id: u64) acquires LotteryCollection {
         ensure_admin(caller);
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         if (table::contains(&state.instances, lottery_id)) {
             abort E_INSTANCE_EXISTS;
         };
 
-        let registration_opt = hub::get_registration(lottery_id);
+        let registration_opt = hub::get_registration_view(lottery_id);
         if (!option::is_some(&registration_opt)) {
             abort E_REGISTRATION_INACTIVE;
         };
-        let registration = *option::borrow(&registration_opt);
-        let reg_owner = registration.owner;
-        let reg_lottery = registration.lottery;
-        let active = registration.active;
+        let registration = option::destroy_some(registration_opt);
+        let (reg_owner, reg_lottery, _metadata, active) = registration;
         if (!active) {
             abort E_REGISTRATION_INACTIVE;
         };
@@ -228,7 +226,7 @@ module lottery::instances {
     }
 
 
-    public entry fun sync_blueprint(caller: &signer, lottery_id: u64) acquires LotteryCollection, registry::FactoryState {
+    public entry fun sync_blueprint(caller: &signer, lottery_id: u64) acquires LotteryCollection {
         ensure_admin(caller);
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
@@ -285,6 +283,26 @@ module lottery::instances {
 
 
     #[view]
+    /// test-view: возвращает (owner, lottery, ticket_price, jackpot_share_bps)
+    public fun get_lottery_info_view(
+        lottery_id: u64,
+    ): option::Option<(address, address, u64, u16)> acquires LotteryCollection {
+        let info_opt = get_lottery_info(lottery_id);
+        if (!option::is_some(&info_opt)) {
+            option::none()
+        } else {
+            let info_ref = option::borrow(&info_opt);
+            option::some((
+                info_ref.owner,
+                info_ref.lottery,
+                info_ref.blueprint.ticket_price,
+                info_ref.blueprint.jackpot_share_bps,
+            ))
+        }
+    }
+
+
+    #[view]
     public fun get_instance_stats(lottery_id: u64): option::Option<InstanceStats> acquires LotteryCollection {
         let state = borrow_state();
         if (!table::contains(&state.instances, lottery_id)) {
@@ -296,6 +314,25 @@ module lottery::instances {
                 jackpot_accumulated: instance.jackpot_accumulated,
                 active: instance.active,
             })
+        }
+    }
+
+
+    #[view]
+    /// test-view: возвращает (tickets_sold, jackpot_accumulated, active)
+    public fun get_instance_stats_view(
+        lottery_id: u64,
+    ): option::Option<(u64, u64, bool)> acquires LotteryCollection {
+        let stats_opt = get_instance_stats(lottery_id);
+        if (!option::is_some(&stats_opt)) {
+            option::none()
+        } else {
+            let stats_ref = option::borrow(&stats_opt);
+            option::some((
+                stats_ref.tickets_sold,
+                stats_ref.jackpot_accumulated,
+                stats_ref.active,
+            ))
         }
     }
 

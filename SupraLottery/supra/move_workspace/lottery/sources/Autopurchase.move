@@ -2,6 +2,7 @@ module lottery::autopurchase {
     use std::option;
     use std::signer;
     use std::vector;
+    use std::u128;
     use vrf_hub::table;
     use std::event;
     use std::math64;
@@ -123,7 +124,7 @@ module lottery::autopurchase {
         lottery_id: u64,
         tickets_per_draw: u64,
         active: bool,
-    ) acquires AutopurchaseState, instances::LotteryCollection {
+    ) acquires AutopurchaseState {
         ensure_lottery_known(lottery_id);
         if (active && tickets_per_draw == 0) {
             abort E_TICKETS_PER_DRAW_ZERO;
@@ -150,7 +151,7 @@ module lottery::autopurchase {
     }
 
     public entry fun deposit(caller: &signer, lottery_id: u64, amount: u64)
-    acquires AutopurchaseState, instances::LotteryCollection {
+    acquires AutopurchaseState {
         if (amount == 0) {
             abort E_INVALID_AMOUNT;
         };
@@ -184,7 +185,7 @@ module lottery::autopurchase {
     }
 
     public entry fun execute(caller: &signer, lottery_id: u64, player: address)
-    acquires AutopurchaseState, instances::LotteryCollection, rounds::RoundCollection {
+    acquires AutopurchaseState {
         ensure_executor(caller, player);
         ensure_lottery_known(lottery_id);
         let state = borrow_state_mut();
@@ -234,7 +235,7 @@ module lottery::autopurchase {
         caller: &signer,
         lottery_id: u64,
         amount: u64,
-    ) acquires AutopurchaseState, instances::LotteryCollection, treasury_v1::TokenState {
+    ) acquires AutopurchaseState {
         if (amount == 0) {
             abort E_INVALID_AMOUNT;
         };
@@ -332,7 +333,37 @@ module lottery::autopurchase {
         option::some(copy_address_vector(&plans.players))
     }
 
-    fun ensure_lottery_known(lottery_id: u64) acquires instances::LotteryCollection {
+    #[view]
+    /// test-view: возвращает баланс плана как u128
+    public fun get_plan_balance(player: address, lottery_id: u64): u128
+    acquires AutopurchaseState {
+        let plan_opt = get_plan(lottery_id, player);
+        if (!option::is_some(&plan_opt)) {
+            abort E_PLAN_NOT_FOUND;
+        };
+        let plan_ref = option::borrow(&plan_opt);
+        u128::from_u64(plan_ref.balance)
+    }
+
+
+    #[view]
+    /// test-view: возвращает (total_players, active_players, total_balance)
+    public fun get_lottery_summary_view(lottery_id: u64): (u64, u64, u128)
+    acquires AutopurchaseState {
+        let summary_opt = get_lottery_summary(lottery_id);
+        if (!option::is_some(&summary_opt)) {
+            abort E_UNKNOWN_LOTTERY;
+        };
+        let summary_ref = option::borrow(&summary_opt);
+        (
+            summary_ref.total_players,
+            summary_ref.active_players,
+            u128::from_u64(summary_ref.total_balance),
+        )
+    }
+
+
+    fun ensure_lottery_known(lottery_id: u64) {
         if (!instances::contains_instance(lottery_id)) {
             abort E_UNKNOWN_LOTTERY;
         };

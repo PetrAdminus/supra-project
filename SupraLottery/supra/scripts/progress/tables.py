@@ -9,6 +9,7 @@ from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..accounts.tables import Base
+from .._sqla_utils import metadata_property
 
 
 def _utcnow() -> datetime:
@@ -29,15 +30,15 @@ class ChecklistTask(Base):
     reward_value: Mapped[dict[str, Any]] = mapped_column(
         MutableDict.as_mutable(JSON), default=dict
     )
-    metadata: Mapped[dict[str, Any]] = mapped_column(
-        MutableDict.as_mutable(JSON), default=dict
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", MutableDict.as_mutable(JSON), default=dict
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=_utcnow, onupdate=_utcnow)
 
     progress_entries: Mapped[list["ChecklistProgress"]] = relationship(
-        back_populates="task", cascade="all, delete-orphan"
+        back_populates="task", cascade="all, delete-orphan", lazy="selectin"
     )
 
 
@@ -51,11 +52,13 @@ class ChecklistProgress(Base):
     task_id: Mapped[int] = mapped_column(ForeignKey("checklist_tasks.id"), index=True)
     completed_at: Mapped[datetime] = mapped_column(default=_utcnow)
     reward_claimed: Mapped[bool] = mapped_column(Boolean, default=False)
-    metadata: Mapped[dict[str, Any]] = mapped_column(
-        MutableDict.as_mutable(JSON), default=dict
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", MutableDict.as_mutable(JSON), default=dict
     )
 
-    task: Mapped[ChecklistTask] = relationship(back_populates="progress_entries")
+    task: Mapped[ChecklistTask] = relationship(
+        back_populates="progress_entries", lazy="joined"
+    )
 
 
 class Achievement(Base):
@@ -68,15 +71,15 @@ class Achievement(Base):
     title: Mapped[str] = mapped_column(String(240))
     description: Mapped[str] = mapped_column(String(1024))
     points: Mapped[int] = mapped_column(Integer, default=0)
-    metadata: Mapped[dict[str, Any]] = mapped_column(
-        MutableDict.as_mutable(JSON), default=dict
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", MutableDict.as_mutable(JSON), default=dict
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=_utcnow, onupdate=_utcnow)
 
     progress_entries: Mapped[list["AchievementProgress"]] = relationship(
-        back_populates="achievement", cascade="all, delete-orphan"
+        back_populates="achievement", cascade="all, delete-orphan", lazy="selectin"
     )
 
 
@@ -90,11 +93,13 @@ class AchievementProgress(Base):
     achievement_id: Mapped[int] = mapped_column(ForeignKey("achievements.id"), index=True)
     progress_value: Mapped[int] = mapped_column(Integer, default=0)
     unlocked_at: Mapped[datetime | None] = mapped_column(default=None)
-    metadata: Mapped[dict[str, Any]] = mapped_column(
-        MutableDict.as_mutable(JSON), default=dict
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", MutableDict.as_mutable(JSON), default=dict
     )
 
-    achievement: Mapped[Achievement] = relationship(back_populates="progress_entries")
+    achievement: Mapped[Achievement] = relationship(
+        back_populates="progress_entries", lazy="joined"
+    )
 
 
 __all__ = [
@@ -103,3 +108,10 @@ __all__ = [
     "Achievement",
     "AchievementProgress",
 ]
+
+
+# Восстанавливаем ожидаемые публичные свойства ``metadata``.
+ChecklistTask.metadata = metadata_property()
+ChecklistProgress.metadata = metadata_property()
+Achievement.metadata = metadata_property()
+AchievementProgress.metadata = metadata_property()

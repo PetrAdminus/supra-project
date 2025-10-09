@@ -164,7 +164,7 @@ module lottery::jackpot {
     }
 
     public entry fun request_randomness(caller: &signer, payload: vector<u8>)
-    acquires JackpotState, hub::HubState {
+    acquires JackpotState {
         ensure_admin(caller);
         let state = borrow_state_mut();
         if (!state.draw_scheduled) {
@@ -189,12 +189,9 @@ module lottery::jackpot {
         caller: &signer,
         request_id: u64,
         randomness: vector<u8>,
-    ) acquires JackpotState, hub::HubState {
+    ) acquires JackpotState {
         hub::ensure_callback_sender(caller);
-        let record = hub::consume_request(request_id);
-        let record_copy = record;
-        let recorded_lottery = record_copy.lottery_id;
-        let payload = record_copy.payload;
+        let (recorded_lottery, payload) = hub::consume_request(request_id);
 
         let state = borrow_state_mut();
         if (recorded_lottery != state.lottery_id) {
@@ -259,6 +256,22 @@ module lottery::jackpot {
             draw_scheduled: state.draw_scheduled,
             has_pending_request: option::is_some(&state.pending_request),
         })
+    }
+
+    #[view]
+    /// test-view: возвращает (ticket_count, draw_scheduled, has_pending_request)
+    public fun get_snapshot_view(): option::Option<(u64, bool, bool)> acquires JackpotState {
+        let snapshot_opt = get_snapshot();
+        if (option::is_some(&snapshot_opt)) {
+            let snapshot_ref = option::borrow(&snapshot_opt);
+            option::some((
+                snapshot_ref.ticket_count,
+                snapshot_ref.draw_scheduled,
+                snapshot_ref.has_pending_request,
+            ))
+        } else {
+            option::none<(u64, bool, bool)>()
+        }
     }
 
     #[view]

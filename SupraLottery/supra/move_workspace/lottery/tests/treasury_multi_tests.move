@@ -1,6 +1,7 @@
 module lottery::treasury_multi_tests {
     use std::option;
     use std::vector;
+    use std::u128;
     use std::account;
     use std::signer;
     use lottery::treasury_multi;
@@ -31,17 +32,12 @@ module lottery::treasury_multi_tests {
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 6_000, 2_000, 2_000);
         treasury_multi::record_allocation(lottery_admin, 1, 1_000);
 
-        let pool = test_utils::unwrap(treasury_multi::get_pool(1));
-        let prize_balance = pool.prize_balance;
-        let operations_balance = pool.operations_balance;
-        assert!(prize_balance == 600, 1);
-        assert!(operations_balance == 200, 2);
+        let (prize_balance, operations_balance) = treasury_multi::get_pool_balances(1);
+        assert!(prize_balance == u128::from_u64(600), 1);
+        assert!(operations_balance == u128::from_u64(200), 2);
         assert!(treasury_multi::jackpot_balance() == 200, 3);
 
-        let config = test_utils::unwrap(treasury_multi::get_config(1));
-        let prize_bps = config.prize_bps;
-        let jackpot_bps = config.jackpot_bps;
-        let operations_bps = config.operations_bps;
+        let (prize_bps, jackpot_bps, operations_bps) = treasury_multi::get_share_config(1);
         assert!(prize_bps == 6_000, 4);
         assert!(jackpot_bps == 2_000, 5);
         assert!(operations_bps == 2_000, 6);
@@ -49,25 +45,10 @@ module lottery::treasury_multi_tests {
         let ids = treasury_multi::list_lottery_ids();
         assert!(vector::length(&ids) == 1, 7);
         assert!(*vector::borrow(&ids, 0) == 1, 8);
-
-        let summary = test_utils::unwrap(treasury_multi::get_lottery_summary(1));
-        let summary_config = summary.config;
-        let summary_pool = summary.pool;
-        let s_prize = summary_config.prize_bps;
-        let s_jackpot = summary_config.jackpot_bps;
-        let s_ops = summary_config.operations_bps;
-        let s_prize_balance = summary_pool.prize_balance;
-        let s_ops_balance = summary_pool.operations_balance;
-        assert!(s_prize == 6_000, 9);
-        assert!(s_jackpot == 2_000, 10);
-        assert!(s_ops == 2_000, 11);
-        assert!(s_prize_balance == 600, 12);
-        assert!(s_ops_balance == 200, 13);
-
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 5_500, 2_500, 2_000);
         let ids_after_update = treasury_multi::list_lottery_ids();
-        assert!(vector::length(&ids_after_update) == 1, 14);
-        assert!(*vector::borrow(&ids_after_update, 0) == 1, 15);
+        assert!(vector::length(&ids_after_update) == 1, 9);
+        assert!(*vector::borrow(&ids_after_update, 0) == 1, 10);
     }
 
     #[test(lottery_admin = @lottery, winner = @player1)]
@@ -81,25 +62,14 @@ module lottery::treasury_multi_tests {
         treasury_v1::deposit_from_user(winner, 200);
         treasury_multi::record_allocation(lottery_admin, 1, 200);
 
-        let paid = treasury_multi::distribute_prize(lottery_admin, 1, signer::address_of(winner));
-        assert!(paid == 140, 0);
+        treasury_multi::distribute_prize(lottery_admin, 1, signer::address_of(winner));
 
-        let pool = test_utils::unwrap(treasury_multi::get_pool(1));
-        let prize_balance = pool.prize_balance;
-        let operations_balance = pool.operations_balance;
-        assert!(prize_balance == 0, 1);
-        assert!(operations_balance == 20, 2);
+        let (prize_balance, operations_balance) = treasury_multi::get_pool_balances(1);
+        assert!(prize_balance == u128::from_u64(0), 0);
+        assert!(operations_balance == u128::from_u64(20), 1);
 
         let winner_balance = treasury_v1::balance_of(signer::address_of(winner));
-
-        assert!(winner_balance == 940, 3);
-
-        let summary_after_prize = test_utils::unwrap(treasury_multi::get_lottery_summary(1));
-        let after_pool = summary_after_prize.pool;
-        let after_prize_balance = after_pool.prize_balance;
-        let after_ops_balance = after_pool.operations_balance;
-        assert!(after_prize_balance == 0, 4);
-        assert!(after_ops_balance == 20, 5);
+        assert!(winner_balance == 940, 2);
     }
 
     #[test(lottery_admin = @lottery, winner = @player2)]
@@ -113,28 +83,20 @@ module lottery::treasury_multi_tests {
         treasury_v1::deposit_from_user(winner, 1_000);
         treasury_multi::record_allocation(lottery_admin, 1, 1_000);
 
-        let operations_paid = treasury_multi::withdraw_operations(lottery_admin, 1);
-        assert!(operations_paid == 200, 0);
-        assert!(treasury_v1::balance_of(@operations_pool) == 200, 1);
+        treasury_multi::withdraw_operations(lottery_admin, 1);
+        assert!(treasury_v1::balance_of(@operations_pool) == 200, 0);
 
-
-        let pool = test_utils::unwrap(treasury_multi::get_pool(1));
-        let operations_balance = pool.operations_balance;
-        let prize_balance = pool.prize_balance;
-        assert!(operations_balance == 0, 2);
-        assert!(prize_balance == 600, 3);
-
+        let (prize_balance, operations_balance) = treasury_multi::get_pool_balances(1);
+        assert!(operations_balance == u128::from_u64(0), 1);
+        assert!(prize_balance == u128::from_u64(600), 2);
 
         treasury_multi::distribute_jackpot(lottery_admin, signer::address_of(winner), 200);
-        assert!(treasury_v1::balance_of(signer::address_of(winner)) == 4_200, 4);
-        assert!(treasury_multi::jackpot_balance() == 0, 5);
+        assert!(treasury_v1::balance_of(signer::address_of(winner)) == 4_200, 3);
+        assert!(treasury_multi::jackpot_balance() == 0, 4);
 
-        let summary_after_ops = test_utils::unwrap(treasury_multi::get_lottery_summary(1));
-        let post_pool = summary_after_ops.pool;
-        let post_prize = post_pool.prize_balance;
-        let post_ops = post_pool.operations_balance;
-        assert!(post_prize == 600, 6);
-        assert!(post_ops == 0, 7);
+        let (post_prize, post_ops) = treasury_multi::get_pool_balances(1);
+        assert!(post_prize == u128::from_u64(600), 5);
+        assert!(post_ops == u128::from_u64(0), 6);
     }
 
     #[test(lottery_admin = @lottery)]

@@ -179,6 +179,29 @@ module lottery::nft_rewards {
         }
     }
 
+    #[view]
+    /// test-view: возвращает (lottery_id, draw_id, minted_by, metadata_uri)
+    public fun get_badge_view(
+        owner: address,
+        badge_id: u64,
+    ): option::Option<(u64, u64, address, vector<u8>)> acquires BadgeAuthority {
+        let state = borrow_authority();
+        if (!table::contains(&state.users, owner)) {
+            return option::none();
+        };
+        let collection = table::borrow(&state.users, owner);
+        if (!table::contains(&collection.badges, badge_id)) {
+            return option::none();
+        };
+        let data = table::borrow(&collection.badges, badge_id);
+        option::some((
+            data.lottery_id,
+            data.draw_id,
+            data.minted_by,
+            clone_bytes(&data.metadata_uri),
+        ))
+    }
+
 
     fun remove_badge_internal(
         users: &mut table::Table<address, UserBadges>,

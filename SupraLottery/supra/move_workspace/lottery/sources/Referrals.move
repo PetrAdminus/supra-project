@@ -244,6 +244,24 @@ module lottery::referrals {
     }
 
     #[view]
+    /// test-view: возвращает (rewarded_purchases, total_referrer_rewards, total_referee_rewards)
+    public fun get_lottery_stats_view(
+        lottery_id: u64,
+    ): option::Option<(u64, u64, u64)> acquires ReferralState {
+        let stats_opt = get_lottery_stats(lottery_id);
+        if (option::is_some(&stats_opt)) {
+            let stats_ref = option::borrow(&stats_opt);
+            option::some((
+                stats_ref.rewarded_purchases,
+                stats_ref.total_referrer_rewards,
+                stats_ref.total_referee_rewards,
+            ))
+        } else {
+            option::none<(u64, u64, u64)>()
+        }
+    }
+
+    #[view]
     public fun list_lottery_ids(): vector<u64> acquires ReferralState {
         if (!exists<ReferralState>(@lottery)) {
             return vector::empty<u64>();

@@ -37,10 +37,10 @@ module lottery::metadata_tests {
         assert!(vector::length(&ids) == 1, 0);
         assert!(*vector::borrow(&ids, 0) == 1, 1);
 
-        let stored_opt = metadata::get_metadata(1);
-        let stored = test_utils::unwrap(stored_opt);
-        assert!(vector_equals(&stored.title, &b"Daily Lottery"), 2);
-        assert!(vector_equals(&stored.description, &b"First description"), 3);
+        let stored_opt = metadata::get_metadata_view(1);
+        let (title, description, _, _, _) = test_utils::unwrap(stored_opt);
+        assert!(vector_equals(&title, &b"Daily Lottery"), 2);
+        assert!(vector_equals(&description, &b"First description"), 3);
 
         let updated = metadata::new_metadata(
             b"Daily Lottery",
@@ -55,10 +55,10 @@ module lottery::metadata_tests {
         assert!(vector::length(&updated_ids) == 1, 4);
         assert!(*vector::borrow(&updated_ids, 0) == 1, 5);
 
-        let updated_opt = metadata::get_metadata(1);
-        let updated_stored = test_utils::unwrap(updated_opt);
-        assert!(vector_equals(&updated_stored.description, &b"Updated description"), 6);
-        assert!(vector_equals(&updated_stored.image_uri, &b"https://img.example/lottery-v2.png"), 7);
+        let updated_opt = metadata::get_metadata_view(1);
+        let (_, updated_description, updated_image_uri, _, _) = test_utils::unwrap(updated_opt);
+        assert!(vector_equals(&updated_description, &b"Updated description"), 6);
+        assert!(vector_equals(&updated_image_uri, &b"https://img.example/lottery-v2.png"), 7);
     }
 
     #[test(lottery_admin = @lottery)]

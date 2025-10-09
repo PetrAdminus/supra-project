@@ -83,13 +83,9 @@ module lottery::referrals_tests {
 
         assert!(buyer_balance == 4_906, 1);
 
-        let stats_opt = referrals::get_lottery_stats(lottery_id);
-        let stats = test_utils::unwrap(stats_opt);
-        let referrals::ReferralStats {
-            rewarded_purchases,
-            total_referrer_rewards,
-            total_referee_rewards,
-        } = stats;
+        let stats_view_opt = referrals::get_lottery_stats_view(lottery_id);
+        let stats_view = test_utils::unwrap(stats_view_opt);
+        let (rewarded_purchases, total_referrer_rewards, total_referee_rewards) = stats_view;
         assert!(rewarded_purchases == 1, 2);
         assert!(total_referrer_rewards == 8, 3);
         assert!(total_referee_rewards == 6, 4);

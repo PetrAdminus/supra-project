@@ -2,6 +2,7 @@ module lottery::migration_tests {
     use std::option;
     use std::signer;
     use std::vector;
+    use std::u128;
     use lottery::instances;
     use lottery::main_v2;
     use lottery::migration;
@@ -41,30 +42,32 @@ module lottery::migration_tests {
 
         migration::migrate_from_legacy(lottery, lottery_id, 9_000, 1_000, 0);
 
-        let stats_opt = instances::get_instance_stats(lottery_id);
+        let stats_opt = instances::get_instance_stats_view(lottery_id);
         assert!(option::is_some(&stats_opt), 0);
         let stats = test_utils::unwrap(stats_opt);
-        assert!(stats.tickets_sold == 2, stats.tickets_sold);
-        assert!(stats.jackpot_accumulated == 0, stats.jackpot_accumulated);
-        assert!(stats.active, 6);
+        let (tickets_sold, jackpot_accumulated, active) = stats;
+        assert!(tickets_sold == 2, tickets_sold);
+        assert!(jackpot_accumulated == 0, jackpot_accumulated);
+        assert!(active, 6);
 
-        let snapshot_opt = rounds::get_round_snapshot(lottery_id);
+        let snapshot_opt = rounds::get_round_snapshot(lottery_id, 0);
         assert!(option::is_some(&snapshot_opt), 1);
-        let snapshot = test_utils::unwrap(snapshot_opt);
-        assert!(snapshot.ticket_count == 2, snapshot.ticket_count);
-        assert!(snapshot.draw_scheduled, 2);
-        assert!(!snapshot.has_pending_request, 3);
-        assert!(snapshot.next_ticket_id == 2, snapshot.next_ticket_id);
+        let (ticket_count, draw_scheduled, has_pending_request, next_ticket_id) =
+            test_utils::unwrap(snapshot_opt);
+        assert!(ticket_count == 2, ticket_count);
+        assert!(draw_scheduled, 2);
+        assert!(!has_pending_request, 3);
+        assert!(next_ticket_id == 2, next_ticket_id);
 
-        let pool_opt = treasury_multi::get_pool(lottery_id);
-        assert!(option::is_some(&pool_opt), 4);
-        let pool = test_utils::unwrap(pool_opt);
-        assert!(pool.prize_balance == 500, pool.prize_balance);
-        assert!(pool.operations_balance == 0, pool.operations_balance);
+        let (prize_balance, operations_balance) = treasury_multi::get_pool_balances(lottery_id);
+        assert!(prize_balance == u128::from_u64(500), 4);
+        assert!(operations_balance == u128::from_u64(0), 5);
         assert!(treasury_multi::jackpot_balance() == 0, treasury_multi::jackpot_balance());
 
-        let config_opt = treasury_multi::get_config(lottery_id);
-        assert!(option::is_some(&config_opt), 5);
+        let (prize_bps, jackpot_bps, operations_bps) = treasury_multi::get_share_config(lottery_id);
+        assert!(prize_bps == 9_000, prize_bps);
+        assert!(jackpot_bps == 1_000, jackpot_bps);
+        assert!(operations_bps == 0, operations_bps);
         assert!(main_v2::get_jackpot_amount() == 0, main_v2::get_jackpot_amount());
     }
 

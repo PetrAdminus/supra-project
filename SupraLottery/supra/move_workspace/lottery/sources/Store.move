@@ -270,6 +270,28 @@ module lottery::store {
 
 
     #[view]
+    /// test-view: возвращает (price, available, stock, sold, metadata)
+    public fun get_item_with_stats_view(
+        lottery_id: u64,
+        item_id: u64,
+    ): option::Option<(u64, bool, option::Option<u64>, u64, vector<u8>)> acquires StoreState {
+        let stats_opt = get_item_with_stats(lottery_id, item_id);
+        if (!option::is_some(&stats_opt)) {
+            option::none()
+        } else {
+            let stats_ref = option::borrow(&stats_opt);
+            option::some((
+                stats_ref.item.price,
+                stats_ref.item.available,
+                copy_option_u64(&stats_ref.item.stock),
+                stats_ref.sold,
+                copy_vec_u8(&stats_ref.item.metadata),
+            ))
+        }
+    }
+
+
+    #[view]
     public fun list_lottery_ids(): vector<u64> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
             vector::empty<u64>()
@@ -365,6 +387,14 @@ module lottery::store {
             i = i + 1;
         };
         result
+    }
+
+    fun copy_option_u64(value: &option::Option<u64>): option::Option<u64> {
+        if (option::is_some(value)) {
+            option::some(*option::borrow(value))
+        } else {
+            option::none()
+        }
     }
 
     fun copy_vec_u64(source: &vector<u64>): vector<u64> {

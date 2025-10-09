@@ -159,6 +159,40 @@ module lottery::history {
     }
 
     #[view]
+    /// test-view: возвращает кортежи (request_id, winner, ticket_index, prize_amount, random_bytes, payload, timestamp_seconds)
+    public fun get_history_view(
+        lottery_id: u64,
+    ): option::Option<vector<(u64, address, u64, u64, vector<u8>, vector<u8>, u64)>>
+    acquires HistoryCollection {
+        let history_opt = get_history(lottery_id);
+        if (!option::is_some(&history_opt)) {
+            option::none()
+        } else {
+            let records = option::destroy_some(history_opt);
+            let len = vector::length(&records);
+            let index = 0;
+            let result = vector::empty<(u64, address, u64, u64, vector<u8>, vector<u8>, u64)>();
+            while (index < len) {
+                let record_ref = vector::borrow(&records, index);
+                vector::push_back(
+                    &mut result,
+                    (
+                        record_ref.request_id,
+                        record_ref.winner,
+                        record_ref.ticket_index,
+                        record_ref.prize_amount,
+                        clone_u8_vector(&record_ref.random_bytes),
+                        clone_u8_vector(&record_ref.payload),
+                        record_ref.timestamp_seconds,
+                    ),
+                );
+                index = index + 1;
+            };
+            option::some(result)
+        }
+    }
+
+    #[view]
     public fun latest_record(lottery_id: u64): option::Option<DrawRecord> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
             return option::none<DrawRecord>();
@@ -174,6 +208,28 @@ module lottery::history {
                 let last_index = vector::length(&history.records) - 1;
                 option::some(*vector::borrow(&history.records, last_index))
             }
+        }
+    }
+
+    #[view]
+    /// test-view: возвращает (request_id, winner, ticket_index, prize_amount, random_bytes, payload, timestamp_seconds)
+    public fun latest_record_view(
+        lottery_id: u64,
+    ): option::Option<(u64, address, u64, u64, vector<u8>, vector<u8>, u64)> acquires HistoryCollection {
+        let record_opt = latest_record(lottery_id);
+        if (!option::is_some(&record_opt)) {
+            option::none()
+        } else {
+            let record = option::destroy_some(record_opt);
+            option::some((
+                record.request_id,
+                record.winner,
+                record.ticket_index,
+                record.prize_amount,
+                record.random_bytes,
+                record.payload,
+                record.timestamp_seconds,
+            ))
         }
     }
 
@@ -229,6 +285,17 @@ module lottery::history {
 
     fun clone_u64_vector(values: &vector<u64>) : vector<u64> {
         let result = vector::empty<u64>();
+        let len = vector::length(values);
+        let index = 0;
+        while (index < len) {
+            vector::push_back(&mut result, *vector::borrow(values, index));
+            index = index + 1;
+        };
+        result
+    }
+
+    fun clone_u8_vector(values: &vector<u8>) : vector<u8> {
+        let result = vector::empty<u8>();
         let len = vector::length(values);
         let index = 0;
         while (index < len) {

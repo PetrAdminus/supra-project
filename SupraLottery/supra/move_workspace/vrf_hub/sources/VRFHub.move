@@ -1,5 +1,6 @@
 module vrf_hub::hub {
     friend lottery::rounds;
+    friend lottery::jackpot;
     friend vrf_hub::hub_tests;
     use std::option;
     use std::signer;
@@ -293,14 +294,15 @@ module vrf_hub::hub {
     }
 
 
-    public(friend) fun consume_request(request_id: u64): RequestRecord acquires HubState {
+    public(friend) fun consume_request(request_id: u64): (u64, vector<u8>) acquires HubState {
         let state = borrow_global_mut<HubState>(@vrf_hub);
         if (!table::contains(&state.requests, request_id)) {
             abort E_UNKNOWN_REQUEST;
         };
         let record = table::remove(&mut state.requests, request_id);
         remove_pending_request_id(&mut state.pending_request_ids, request_id);
-        record
+        let RequestRecord { lottery_id, payload } = record;
+        (lottery_id, payload)
     }
 
 
@@ -357,6 +359,37 @@ module vrf_hub::hub {
         if (addr != state.admin) {
             abort E_NOT_AUTHORIZED;
         };
+    }
+
+    #[view]
+    /// test-view: возвращает (owner, lottery, metadata, active)
+    public fun get_registration_view(
+        lottery_id: u64,
+    ): option::Option<(address, address, vector<u8>, bool)> acquires HubState {
+        let registration_opt = get_registration(lottery_id);
+        if (!option::is_some(&registration_opt)) {
+            return option::none<(address, address, vector<u8>, bool)>();
+        };
+        let registration_ref = option::borrow(&registration_opt);
+        option::some((
+            registration_ref.owner,
+            registration_ref.lottery,
+            clone_bytes(&registration_ref.metadata),
+            registration_ref.active,
+        ))
+    }
+
+    #[view]
+    /// test-view: возвращает (lottery_id, payload)
+    public fun get_request_view(
+        request_id: u64,
+    ): option::Option<(u64, vector<u8>)> acquires HubState {
+        let request_opt = get_request(request_id);
+        if (!option::is_some(&request_opt)) {
+            return option::none<(u64, vector<u8>)>();
+        };
+        let request_ref = option::borrow(&request_opt);
+        option::some((request_ref.lottery_id, clone_bytes(&request_ref.payload)))
     }
 
     fun clone_bytes(data: &vector<u8>): vector<u8> {

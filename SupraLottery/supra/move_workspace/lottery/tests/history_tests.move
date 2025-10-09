@@ -90,24 +90,34 @@ module lottery::history_tests {
 
         rounds::fulfill_draw(aggregator, request_id, randomness);
 
-        let history_opt = history::get_history(lottery_id);
-        let records = test_utils::unwrap(history_opt);
+        let history_opt = history::get_history_view(lottery_id);
+        let mut records = test_utils::unwrap(history_opt);
         assert!(vector::length(&records) == 1, 0);
-        let record = *vector::borrow(&records, 0);
-        assert!(record.request_id == request_id, 1);
-        assert!(record.winner == signer::address_of(buyer), 2);
-        assert!(record.ticket_index == 0, 3);
-        assert!(record.prize_amount > 0, 4);
-        assert!(vector::length(&record.random_bytes) == 8, 5);
-        assert!(record.payload == b"log", 6);
+        let record = vector::swap_remove(&mut records, 0);
+        let (
+            recorded_request_id,
+            recorded_winner,
+            recorded_ticket_index,
+            recorded_prize_amount,
+            random_bytes,
+            payload,
+            _timestamp,
+        ) = record;
+        assert!(recorded_request_id == request_id, 1);
+        assert!(recorded_winner == signer::address_of(buyer), 2);
+        assert!(recorded_ticket_index == 0, 3);
+        assert!(recorded_prize_amount > 0, 4);
+        assert!(vector::length(&random_bytes) == 8, 5);
+        assert!(payload == b"log", 6);
 
         let ids = history::list_lottery_ids();
         assert!(vector::length(&ids) == 1, 7);
         assert!(*vector::borrow(&ids, 0) == lottery_id, 8);
 
-        let latest_opt = history::latest_record(lottery_id);
+        let latest_opt = history::latest_record_view(lottery_id);
         let latest = test_utils::unwrap(latest_opt);
-        assert!(latest.request_id == record.request_id, 9);
+        let (latest_request_id, _, _, _, _, _, _) = latest;
+        assert!(latest_request_id == recorded_request_id, 9);
     }
 
     #[test(
@@ -162,16 +172,16 @@ module lottery::history_tests {
 
         rounds::fulfill_draw(aggregator, request_id, randomness);
 
-        let records_before = test_utils::unwrap(history::get_history(lottery_id));
+        let records_before = test_utils::unwrap(history::get_history_view(lottery_id));
         assert!(vector::length(&records_before) == 1, 0);
 
         history::clear_history(lottery_admin, lottery_id);
 
-        let records_after_opt = history::get_history(lottery_id);
+        let records_after_opt = history::get_history_view(lottery_id);
         let records_after = test_utils::unwrap(records_after_opt);
         assert!(vector::is_empty(&records_after), 1);
 
-        let latest_opt = history::latest_record(lottery_id);
+        let latest_opt = history::latest_record_view(lottery_id);
         assert!(option::is_none(&latest_opt), 2);
     }
 }

@@ -1,6 +1,8 @@
 """FastAPI-роутер подсистемы прогресса."""
 from __future__ import annotations
 
+from typing import Any, Dict
+
 from fastapi import APIRouter, HTTPException, status
 
 from .schemas import (
@@ -28,6 +30,14 @@ from .service import (
 from .tables import Achievement, AchievementProgress, ChecklistProgress, ChecklistTask
 
 router = APIRouter(prefix="/progress", tags=["progress"])
+
+
+def _model_dump(payload: Any) -> Dict[str, Any]:
+    """Возвращает словарь из pydantic-модели без предупреждений V2."""
+
+    if hasattr(payload, "model_dump"):
+        return getattr(payload, "model_dump")()
+    return getattr(payload, "dict")()
 
 
 def _task_to_response(task: ChecklistTask) -> ChecklistTaskResponse:
@@ -82,7 +92,7 @@ def _achievement_progress_to_response(
 
 @router.put("/checklist/{code}", response_model=ChecklistTaskResponse)
 def put_checklist_task(code: str, payload: ChecklistTaskPayload) -> ChecklistTaskResponse:
-    data = payload.dict()
+    data = _model_dump(payload)
     data["code"] = code
     task = upsert_checklist_task(data)
     return _task_to_response(task)
@@ -119,7 +129,7 @@ def complete_checklist(
 
 @router.put("/achievements/{code}", response_model=AchievementResponse)
 def put_achievement(code: str, payload: AchievementPayload) -> AchievementResponse:
-    data = payload.dict()
+    data = _model_dump(payload)
     data["code"] = code
     achievement = upsert_achievement(data)
     return _achievement_to_response(achievement)

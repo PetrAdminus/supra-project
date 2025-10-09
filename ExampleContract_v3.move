@@ -43,7 +43,12 @@ module example::example {
 
         let resource_signer_cap = borrow_global<ResourceSignerCap>(@example);
         let resource_signer = account::create_signer_with_capability(&resource_signer_cap.signer_cap);
-        deposit::addContractToWhitelist(&resource_signer, @example, CALLBACK_GAS_PRICE, CALLBACK_GAS_LIMIT)
+        deposit::add_contract_to_whitelist(
+            &resource_signer,
+            @example,
+            CALLBACK_GAS_PRICE,
+            CALLBACK_GAS_LIMIT,
+        )
     }
 
     /// Deposit fund to supra deposit module
@@ -53,7 +58,7 @@ module example::example {
         let resource_address = get_resource_address();
         // First I need to transfer amount to resource account, and the then from this wallet I will transfer it to supra deposit fund
         aptos_account::transfer(sender, resource_address, amount);
-        deposit::depositFundClient(&resource_signer, amount);
+        deposit::deposit_fund_client(&resource_signer, amount);
     }
 
     /// Make request

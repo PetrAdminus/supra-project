@@ -1,7 +1,7 @@
 """FastAPI-маршруты real-time сервиса (чат и объявления)."""
 from __future__ import annotations
 
-from typing import Iterator, List
+from typing import Any, Dict, Iterator, List
 
 from fastapi import APIRouter, Depends, Query, WebSocket
 from starlette.websockets import WebSocketDisconnect
@@ -20,6 +20,25 @@ from .schemas import (
 from .service import AnnouncementInput, MessageInput, RealtimeService
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+
+def _model_dump(payload: Any, *, mode: str | None = None) -> Dict[str, Any]:
+    """Вернуть словарь из Pydantic-модели или готового словаря."""
+
+    if hasattr(payload, "model_dump"):
+        dumper = getattr(payload, "model_dump")
+        if mode is None:
+            return dumper()
+        return dumper(mode=mode)
+
+    if hasattr(payload, "dict"):
+        return getattr(payload, "dict")()
+
+    if isinstance(payload, dict):
+        return payload
+
+    msg = f"Unsupported payload type for model dump: {type(payload)!r}"
+    raise TypeError(msg)
 
 
 def _ensure_engine() -> None:
@@ -65,7 +84,7 @@ async def post_message(
     )
     await run_in_threadpool(session.commit)
     view = ChatMessageView.model_validate(message)
-    connection_manager.broadcast(view.room, view.model_dump(mode="json"))
+    connection_manager.broadcast(view.room, _model_dump(view, mode="json"))
     return view
 
 
@@ -97,7 +116,7 @@ async def post_announcement(
     )
     await run_in_threadpool(session.commit)
     view = AnnouncementView.model_validate(announcement)
-    connection_manager.broadcast("announcements", view.model_dump(mode="json"))
+    connection_manager.broadcast("announcements", _model_dump(view, mode="json"))
     return view
 
 

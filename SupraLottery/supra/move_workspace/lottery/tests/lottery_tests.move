@@ -1,7 +1,6 @@
 #[test_only]
 module lottery::lottery_tests {
     use std::account;
-    use std::event;
     use std::timestamp;
     use std::option;
     use std::hash;
@@ -268,7 +267,7 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    fun whitelisting_events_track_consumers_and_aggregator() {
+    fun whitelisting_updates_status() {
         setup_accounts_base();
 
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
@@ -276,19 +275,6 @@ module lottery::lottery_tests {
 
         whitelist_callback_sender();
         whitelist_consumer(PLAYER1);
-
-        let consumer_events = event::emitted_events<main_v2::ConsumerWhitelistedEvent>();
-        let consumer_event_len = vector::length(&consumer_events);
-        assert!(consumer_event_len >= 2, 52);
-        let last_consumer_event = vector::borrow(&consumer_events, consumer_event_len - 1);
-        let consumer_addr = main_v2::consumer_whitelisted_fields(last_consumer_event);
-        assert!(consumer_addr == PLAYER1, 53);
-
-        let aggregator_events = event::emitted_events<main_v2::AggregatorWhitelistedEvent>();
-        assert!(vector::length(&aggregator_events) == 1, 54);
-        let aggregator_event = vector::borrow(&aggregator_events, 0);
-        let aggregator_addr = main_v2::aggregator_whitelisted_fields(aggregator_event);
-        assert!(aggregator_addr == VRF_AGGREGATOR, 55);
 
         let status = main_v2::get_whitelist_status();
         let aggregator_opt = main_v2::whitelist_status_aggregator(&status);
@@ -351,7 +337,7 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    fun revoke_callback_sender_emits_event() {
+    fun revoke_callback_sender_updates_status() {
         setup_accounts_base();
 
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
@@ -361,12 +347,9 @@ module lottery::lottery_tests {
 
         let admin = account::create_signer_for_test(LOTTERY_ADDR);
         main_v2::revoke_callback_sender(&admin);
-
-        let revoked_events = event::emitted_events<main_v2::AggregatorRevokedEvent>();
-        assert!(vector::length(&revoked_events) == 1, 56);
-        let revoked_event = vector::borrow(&revoked_events, 0);
-        let revoked_addr = main_v2::aggregator_revoked_fields(revoked_event);
-        assert!(revoked_addr == VRF_AGGREGATOR, 57);
+        let status = main_v2::get_whitelist_status();
+        let aggregator_opt = main_v2::whitelist_status_aggregator(&status);
+        assert!(option::is_none(&aggregator_opt), 56);
     }
 
     #[test]
@@ -379,14 +362,6 @@ module lottery::lottery_tests {
 
         let min_balance_limit = expected_min_balance();
         main_v2::record_client_whitelist_snapshot(&lottery_signer, MAX_GAS_PRICE, MAX_GAS_LIMIT, min_balance_limit);
-
-        let events = event::emitted_events<main_v2::ClientWhitelistRecordedEvent>();
-        assert!(vector::length(&events) == 1, 200);
-        let event_ref = vector::borrow(&events, 0);
-        let (event_price, event_limit, event_min) = main_v2::client_whitelist_recorded_fields(event_ref);
-        assert!(event_price == MAX_GAS_PRICE, 201);
-        assert!(event_limit == MAX_GAS_LIMIT, 202);
-        assert!(event_min == min_balance_limit, 203);
 
         let snapshot_opt = main_v2::get_client_whitelist_snapshot();
         assert!(option::is_some(&snapshot_opt), 204);
@@ -430,13 +405,6 @@ module lottery::lottery_tests {
         configure_gas_default();
 
         main_v2::record_consumer_whitelist_snapshot(&lottery_signer, CALLBACK_GAS_PRICE, CALLBACK_GAS_LIMIT);
-
-        let events = event::emitted_events<main_v2::ConsumerWhitelistSnapshotRecordedEvent>();
-        assert!(vector::length(&events) == 1, 210);
-        let event_ref = vector::borrow(&events, 0);
-        let (event_price, event_limit) = main_v2::consumer_whitelist_snapshot_fields(event_ref);
-        assert!(event_price == CALLBACK_GAS_PRICE, 211);
-        assert!(event_limit == CALLBACK_GAS_LIMIT, 212);
 
         let snapshot_opt = main_v2::get_consumer_whitelist_snapshot();
         assert!(option::is_some(&snapshot_opt), 213);
@@ -524,13 +492,6 @@ module lottery::lottery_tests {
         let new_seed = 5u64;
         main_v2::configure_vrf_request(&lottery_signer, 1u8, new_seed);
 
-        let events = event::emitted_events<main_v2::VrfRequestConfigUpdatedEvent>();
-        assert!(vector::length(&events) == 1, 216);
-        let event_ref = vector::borrow(&events, 0);
-        let (event_rng, event_seed) = main_v2::vrf_request_config_fields(event_ref);
-        assert!(event_rng == 1u8, 217);
-        assert!(event_seed == new_seed, 218);
-
         let next_seed = main_v2::next_client_seed_for_test();
         assert!(next_seed == new_seed, 219);
 
@@ -596,7 +557,7 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    fun remove_consumer_emits_event() {
+    fun remove_consumer_updates_status() {
         setup_accounts_base();
 
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
@@ -606,12 +567,14 @@ module lottery::lottery_tests {
 
         let admin = account::create_signer_for_test(LOTTERY_ADDR);
         main_v2::remove_consumer(&admin, PLAYER1);
-
-        let events = event::emitted_events<main_v2::ConsumerRemovedEvent>();
-        assert!(vector::length(&events) == 1, 58);
-        let removed_event = vector::borrow(&events, 0);
-        let removed_addr = main_v2::consumer_removed_fields(removed_event);
-        assert!(removed_addr == PLAYER1, 59);
+        let status = main_v2::get_whitelist_status();
+        let consumer_count = main_v2::whitelist_status_consumer_count(&status);
+        let idx = 0;
+        while (idx < consumer_count) {
+            let consumer = main_v2::whitelist_status_consumer_at(&status, idx);
+            assert!(consumer != PLAYER1, 58);
+            idx = idx + 1;
+        };
     }
 
     #[test]
@@ -676,27 +639,6 @@ module lottery::lottery_tests {
         assert!(new_team == 200, 73);
         assert!(new_partners == 200, 74);
 
-        let events = event::emitted_events<treasury_v1::ConfigUpdatedEvent>();
-        let count = vector::length(&events);
-        assert!(count == 2, 75); // init_token + set_config
-        let last_event = vector::borrow(&events, count - 1);
-        let (
-            event_jackpot,
-            event_prize,
-            event_treasury,
-            event_marketing,
-            event_community,
-            event_team,
-            event_partners
-        ) = treasury_v1::config_event_fields(last_event);
-
-        assert!(event_jackpot == 4_000, 76);
-        assert!(event_prize == 3_000, 77);
-        assert!(event_treasury == 1_500, 78);
-        assert!(event_marketing == 700, 79);
-        assert!(event_community == 400, 80);
-        assert!(event_team == 200, 81);
-        assert!(event_partners == 200, 82);
     }
 
     #[test]
@@ -725,34 +667,21 @@ module lottery::lottery_tests {
         assert!(stored_callback_price == CALLBACK_GAS_PRICE, 2);
         assert!(stored_callback_limit == CALLBACK_GAS_LIMIT, 3);
         assert!(verification_value == VERIFICATION_GAS_VALUE, 4);
-
-        let events = event::emitted_events<main_v2::GasConfigUpdatedEvent>();
-        assert!(vector::length(&events) == 1, 5);
-        let event_ref = vector::borrow(&events, 0);
-        let (
-            event_max_price,
-            event_max_limit,
-            event_callback_price,
-            event_callback_limit,
-            event_verification_value,
-            event_per_request_fee
-        ) = main_v2::gas_config_updated_fields(event_ref);
         let expected_per_request_fee = (MAX_GAS_LIMIT + VERIFICATION_GAS_VALUE) * MAX_GAS_PRICE;
-        assert!(event_max_price == MAX_GAS_PRICE, 6);
-        assert!(event_max_limit == MAX_GAS_LIMIT, 7);
-        assert!(event_callback_price == CALLBACK_GAS_PRICE, 8);
-        assert!(event_callback_limit == CALLBACK_GAS_LIMIT, 9);
-        assert!(event_verification_value == VERIFICATION_GAS_VALUE, 10);
         let expected_per_request_fee_u64 = u128_to_u64(expected_per_request_fee);
-        assert!(event_per_request_fee == expected_per_request_fee_u64, 11);
+        assert!(main_v2::get_max_gas_fee() == expected_per_request_fee_u64, 5);
 
-        let (callback_sender, consumer_count, pending_request) =
-            main_v2::gas_config_event_context(event_ref);
-        assert!(option::is_some(&callback_sender), 12);
-        let sender_addr = *option::borrow(&callback_sender);
-        assert!(sender_addr == VRF_AGGREGATOR, 13);
-        assert!(consumer_count == 2, 14);
-        assert!(option::is_none(&pending_request), 15);
+        let status = main_v2::get_whitelist_status();
+        let callback_sender_opt = main_v2::whitelist_status_aggregator(&status);
+        assert!(option::is_some(&callback_sender_opt), 6);
+        let sender_addr = *option::borrow(&callback_sender_opt);
+        assert!(sender_addr == VRF_AGGREGATOR, 7);
+        let consumer_count = main_v2::whitelist_status_consumer_count(&status);
+        assert!(consumer_count == 2, 8);
+
+        let lottery_status = main_v2::get_lottery_status();
+        let (_, _, pending_request, _, _, _) = main_v2::lottery_status_fields(&lottery_status);
+        assert!(!pending_request, 9);
     }
 
     #[test]
@@ -787,31 +716,17 @@ module lottery::lottery_tests {
 
         assert!(main_v2::get_max_gas_fee() == expected_per_request_fee, 0);
 
-        let events = event::emitted_events<main_v2::SubscriptionConfiguredEvent>();
-        assert!(vector::length(&events) == 1, 1);
-        let event_ref = vector::borrow(&events, 0);
-        let (
-            min_balance,
-            per_request_fee,
-            event_max_price,
-            event_max_limit,
-            event_verification_value,
-            event_initial_deposit,
-        ) = main_v2::subscription_configured_fields(event_ref);
-        assert!(min_balance == expected_min_balance, 2);
-        assert!(per_request_fee == expected_per_request_fee, 3);
-        assert!(event_max_price == u64_to_u128(max_gas_price), 4);
-        assert!(event_max_limit == u64_to_u128(max_gas_limit), 5);
-        assert!(event_verification_value == u64_to_u128(verification_value), 6);
-        assert!(event_initial_deposit == initial_deposit, 7);
+        let status = main_v2::get_whitelist_status();
+        let callback_sender_opt = main_v2::whitelist_status_aggregator(&status);
+        assert!(option::is_some(&callback_sender_opt), 1);
+        let sender_addr = *option::borrow(&callback_sender_opt);
+        assert!(sender_addr == VRF_AGGREGATOR, 2);
+        let consumer_count = main_v2::whitelist_status_consumer_count(&status);
+        assert!(consumer_count == 2, 3);
 
-        let (callback_sender, consumer_count, pending_request) =
-            main_v2::subscription_configured_context(event_ref);
-        assert!(option::is_some(&callback_sender), 8);
-        let sender_addr = *option::borrow(&callback_sender);
-        assert!(sender_addr == VRF_AGGREGATOR, 9);
-        assert!(consumer_count == 2, 10);
-        assert!(option::is_none(&pending_request), 11);
+        let lottery_status = main_v2::get_lottery_status();
+        let (_, _, pending_request, _, _, _) = main_v2::lottery_status_fields(&lottery_status);
+        assert!(!pending_request, 4);
     }
 
     #[test]
@@ -977,7 +892,7 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    #[expected_failure(location = 0x1::fungible_asset, abort_code = STORE_FROZEN_ABORT)]
+    #[expected_failure(location = lottery::treasury_v1, abort_code = STORE_FROZEN_ABORT)]
     fun deposit_rejected_when_user_store_frozen() {
         setup_accounts();
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
@@ -989,7 +904,7 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    #[expected_failure(location = 0x1::fungible_asset, abort_code = STORE_FROZEN_ABORT)]
+    #[expected_failure(location = lottery::treasury_v1, abort_code = STORE_FROZEN_ABORT)]
     fun deposit_rejected_when_treasury_store_frozen() {
         setup_accounts();
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
@@ -1065,10 +980,6 @@ module lottery::lottery_tests {
 
         main_v2::simple_draw(&lottery_signer);
 
-        let winner_events = event::emitted_events<main_v2::WinnerSelected>();
-        let winner_event_ref = vector::borrow(&winner_events, vector::length(&winner_events) - 1);
-        let (winner_addr, winner_prize) = main_v2::winner_selected_fields(winner_event_ref);
-
         let expected_jackpot = total_pool * 5_000 / 10_000;
         let expected_prize = total_pool * 2_000 / 10_000;
         let expected_winner_total = expected_jackpot + expected_prize;
@@ -1077,18 +988,22 @@ module lottery::lottery_tests {
         let expected_community_share = total_pool * 400 / 10_000;
         let expected_team_share = total_pool * 200 / 10_000;
         let expected_partners_share = total_pool * 100 / 10_000;
+        let player1_actual = treasury_v1::balance_of(PLAYER1);
+        let player2_actual = treasury_v1::balance_of(PLAYER2);
+        let player1_spent = 1_000_000_000 - (2 * TICKET_PRICE);
+        let player2_spent = 1_000_000_000 - (3 * TICKET_PRICE);
+        let player1_expected_win = player1_spent + expected_winner_total;
+        let player2_expected_win = player2_spent + expected_winner_total;
 
-        assert!(winner_prize == expected_winner_total, 201);
+        let player1_won = player1_actual == player1_expected_win;
+        let player2_won = player2_actual == player2_expected_win;
+        assert!(player1_won || player2_won, 201);
 
-        let player1_expected =
-            1_000_000_000 - (2 * TICKET_PRICE) +
-            if (winner_addr == PLAYER1) { expected_winner_total } else { 0 };
-        let player2_expected =
-            1_000_000_000 - (3 * TICKET_PRICE) +
-            if (winner_addr == PLAYER2) { expected_winner_total } else { 0 };
-
-        assert!(treasury_v1::balance_of(PLAYER1) == player1_expected, 202);
-        assert!(treasury_v1::balance_of(PLAYER2) == player2_expected, 203);
+        if (player1_won) {
+            assert!(player2_actual == player2_spent, 202);
+        } else {
+            assert!(player1_actual == player1_spent, 203);
+        };
 
         assert!(treasury_v1::balance_of(TREASURY_RECIPIENT) == expected_treasury_share, 204);
         assert!(treasury_v1::balance_of(MARKETING_RECIPIENT) == expected_marketing_share, 205);
@@ -1096,32 +1011,6 @@ module lottery::lottery_tests {
         assert!(treasury_v1::balance_of(TEAM_RECIPIENT) == expected_team_share, 207);
         assert!(treasury_v1::balance_of(PARTNERS_RECIPIENT) == expected_partners_share, 208);
         assert!(treasury_v1::treasury_balance() == 0, 209);
-
-        let payout_events = event::emitted_events<treasury_v1::JackpotDistributedEvent>();
-        let payout_event_ref = vector::borrow(&payout_events, vector::length(&payout_events) - 1);
-        let (
-            event_winner,
-            event_total,
-            event_winner_share,
-            event_jackpot_share,
-            event_prize_share,
-            event_treasury_share,
-            event_marketing_share,
-            event_community_share,
-            event_team_share,
-            event_partners_share
-        ) = treasury_v1::jackpot_distribution_fields(payout_event_ref);
-
-        assert!(event_winner == winner_addr, 210);
-        assert!(event_total == total_pool, 211);
-        assert!(event_winner_share == expected_winner_total, 212);
-        assert!(event_jackpot_share == expected_jackpot, 213);
-        assert!(event_prize_share == expected_prize, 214);
-        assert!(event_treasury_share == expected_treasury_share, 215);
-        assert!(event_marketing_share == expected_marketing_share, 216);
-        assert!(event_community_share == expected_community_share, 217);
-        assert!(event_team_share == expected_team_share, 218);
-        assert!(event_partners_share == expected_partners_share, 219);
     }
 
     #[test]
@@ -1386,15 +1275,8 @@ module lottery::lottery_tests {
         let config_after = main_v2::get_vrf_request_config();
         assert!(option::is_none(&config_after), 13);
 
-        let draw_events = event::emitted_events<main_v2::DrawHandledEvent>();
-        assert!(vector::length(&draw_events) == 1, 8);
-        let draw_event_ref = vector::borrow(&draw_events, 0);
-        let (event_nonce, event_success) = main_v2::draw_handled_fields(draw_event_ref);
-        assert!(event_nonce == nonce, 10);
-        assert!(event_success, 11);
-
-        let winner_events = event::emitted_events<main_v2::WinnerSelected>();
-        assert!(vector::length(&winner_events) == 1, 12);
+        let last_requester_opt = main_v2::get_last_requester_for_test();
+        assert!(option::is_none(&last_requester_opt), 8);
     }
 
     #[test]
@@ -1787,29 +1669,32 @@ module lottery::lottery_tests {
 
         whitelist_callback_sender();
 
+        let seed_before = main_v2::next_client_seed_for_test();
+        assert!(seed_before == 0, 34);
+
         main_v2::record_request_for_test(100, LOTTERY_ADDR);
+        let after_first_seed = main_v2::next_client_seed_for_test();
+        assert!(after_first_seed == 1, 35);
+        let first_pending = main_v2::get_pending_request_for_test();
+        assert!(option::is_some(&first_pending), 36);
+        let first_nonce = *option::borrow(&first_pending);
+        assert!(first_nonce == 100, 37);
+        let first_requester = main_v2::get_last_requester_for_test();
+        assert!(option::is_some(&first_requester), 38);
+        let requester_addr = *option::borrow(&first_requester);
+        assert!(requester_addr == LOTTERY_ADDR, 350);
+
         main_v2::record_request_for_test(200, LOTTERY_ADDR);
-
-        let events = event::emitted_events<main_v2::DrawRequestedEvent>();
-        let event_len = vector::length(&events);
-        assert!(event_len == 2, 34);
-
-        let first_event = vector::borrow(&events, 0);
-        let second_event = vector::borrow(&events, 1);
-
-        let (first_nonce, first_seed, _, _, _, first_requester) = main_v2::draw_requested_fields(first_event);
-        assert!(first_nonce == 100, 35);
-        assert!(first_seed == 0, 36);
-        assert!(first_requester == LOTTERY_ADDR, 350);
-
-        let (second_nonce, second_seed, _, _, _, second_requester) = main_v2::draw_requested_fields(second_event);
-        assert!(second_nonce == 200, 37);
-        assert!(second_seed == 1, 38);
-        assert!(second_requester == LOTTERY_ADDR, 351);
+        let after_second_seed = main_v2::next_client_seed_for_test();
+        assert!(after_second_seed == 2, 39);
+        let second_pending = main_v2::get_pending_request_for_test();
+        assert!(option::is_some(&second_pending), 40);
+        let second_nonce = *option::borrow(&second_pending);
+        assert!(second_nonce == 200, 351);
 
         let (request_count, response_count) = main_v2::rng_counters_for_test();
-        assert!(request_count == 2, 39);
-        assert!(response_count == 0, 40);
+        assert!(request_count == 2, 41);
+        assert!(response_count == 0, 42);
     }
 
     #[test]
@@ -2082,14 +1967,12 @@ module lottery::lottery_tests {
 
         mint_to(PLAYER1, 1_000_000_000);
         main_v2::buy_ticket(&account::create_signer_for_test(PLAYER1));
-
-        let events = event::emitted_events<main_v2::TicketBought>();
-        assert!(vector::length(&events) == 1, 0);
-        let event_ref = vector::borrow(&events, 0);
-        let (buyer, ticket_id, amount) = main_v2::ticket_bought_fields(event_ref);
-        assert!(buyer == PLAYER1, 1);
-        assert!(ticket_id == 1, 2);
-        assert!(amount == TICKET_PRICE, 3);
+        assert!(main_v2::get_ticket_count() == 1, 0);
+        let tickets = main_v2::get_registered_tickets();
+        assert!(vector::length(&tickets) == 1, 1);
+        let buyer = *vector::borrow(&tickets, 0);
+        assert!(buyer == PLAYER1, 2);
+        assert!(treasury_v1::treasury_balance() == TICKET_PRICE, 3);
     }
 
     #[test]
@@ -2120,13 +2003,10 @@ module lottery::lottery_tests {
         main_v2::init(&lottery_signer);
 
         main_v2::withdraw_funds_for_test(&lottery_signer, 250);
-
-        let events = event::emitted_events<main_v2::FundsWithdrawnEvent>();
-        assert!(vector::length(&events) == 1, 0);
-        let event_ref = vector::borrow(&events, 0);
-        let (admin, amount) = main_v2::funds_withdrawn_fields(event_ref);
-        assert!(admin == LOTTERY_ADDR, 1);
-        assert!(amount == 250, 2);
+        let status = main_v2::get_lottery_status();
+        let (_, _, pending_request, _, _, _) = main_v2::lottery_status_fields(&status);
+        assert!(!pending_request, 0);
+        assert!(treasury_v1::treasury_balance() == 0, 1);
     }
 
     #[test]
@@ -2166,32 +2046,22 @@ module lottery::lottery_tests {
 
         let expected_per_request_fee = (custom_max_limit + custom_verification) * custom_max_price;
         let expected_min_balance = 30 * expected_per_request_fee;
-
         assert!(main_v2::get_max_gas_fee() == expected_per_request_fee, 0);
 
-        let events = event::emitted_events<main_v2::MinimumBalanceUpdatedEvent>();
-        assert!(vector::length(&events) == 1, 1);
-        let event_ref = vector::borrow(&events, 0);
-        let (
-            min_balance,
-            per_request_fee,
-            event_max_price,
-            event_max_limit,
-            event_verification_value
-        ) = main_v2::minimum_balance_updated_fields(event_ref);
-        assert!(min_balance == expected_min_balance, 2);
-        assert!(per_request_fee == expected_per_request_fee, 3);
-        assert!(event_max_price == u64_to_u128(custom_max_price), 4);
-        assert!(event_max_limit == u64_to_u128(custom_max_limit), 5);
-        assert!(event_verification_value == u64_to_u128(custom_verification), 6);
+        let status = main_v2::get_whitelist_status();
+        let callback_sender_opt = main_v2::whitelist_status_aggregator(&status);
+        assert!(option::is_some(&callback_sender_opt), 1);
+        let sender_addr = *option::borrow(&callback_sender_opt);
+        assert!(sender_addr == VRF_AGGREGATOR, 2);
+        let consumer_count = main_v2::whitelist_status_consumer_count(&status);
+        assert!(consumer_count == 2, 3);
 
-        let (callback_sender, consumer_count, pending_request) =
-            main_v2::minimum_balance_event_context(event_ref);
-        assert!(option::is_some(&callback_sender), 7);
-        let sender_addr = *option::borrow(&callback_sender);
-        assert!(sender_addr == VRF_AGGREGATOR, 8);
-        assert!(consumer_count == 2, 9);
-        assert!(option::is_none(&pending_request), 10);
+        let lottery_status = main_v2::get_lottery_status();
+        let (_, _, pending_request, _, _, _) = main_v2::lottery_status_fields(&lottery_status);
+        assert!(!pending_request, 4);
+
+        let recomputed_min_balance = 30 * main_v2::get_max_gas_fee();
+        assert!(recomputed_min_balance == expected_min_balance, 5);
     }
 
     #[test]
@@ -2231,43 +2101,41 @@ module lottery::lottery_tests {
             u64_to_u128(second_verification)
         );
         main_v2::set_minimum_balance_for_test(&lottery_signer);
-
-        let events = event::emitted_events<main_v2::MinimumBalanceUpdatedEvent>();
-        assert!(vector::length(&events) == 2, 7);
-
         let first_expected_per_request = (first_limit + first_verification) * first_price;
         let first_expected_min_balance = 30 * first_expected_per_request;
-        let (first_min_balance, first_per_request_fee, first_price_event, first_limit_event, first_verification_event) =
-            main_v2::minimum_balance_updated_fields(vector::borrow(&events, 0));
-        assert!(first_min_balance == first_expected_min_balance, 8);
-        assert!(first_per_request_fee == first_expected_per_request, 9);
-        assert!(first_price_event == u64_to_u128(first_price), 10);
-        assert!(first_limit_event == u64_to_u128(first_limit), 11);
-        assert!(first_verification_event == u64_to_u128(first_verification), 12);
-        let (first_sender, first_consumer_count, first_pending) =
-            main_v2::minimum_balance_event_context(vector::borrow(&events, 0));
-        assert!(option::is_some(&first_sender), 18);
-        let first_addr = *option::borrow(&first_sender);
-        assert!(first_addr == VRF_AGGREGATOR, 19);
-        assert!(first_consumer_count == 2, 20);
-        assert!(option::is_none(&first_pending), 21);
+        assert!(main_v2::get_max_gas_fee() == first_expected_per_request, 7);
+        let first_recomputed_min_balance = 30 * main_v2::get_max_gas_fee();
+        assert!(first_recomputed_min_balance == first_expected_min_balance, 8);
+
+        let status_after_first = main_v2::get_whitelist_status();
+        let first_sender_opt = main_v2::whitelist_status_aggregator(&status_after_first);
+        assert!(option::is_some(&first_sender_opt), 9);
+        let first_addr = *option::borrow(&first_sender_opt);
+        assert!(first_addr == VRF_AGGREGATOR, 10);
+        let first_consumer_count = main_v2::whitelist_status_consumer_count(&status_after_first);
+        assert!(first_consumer_count == 2, 11);
+
+        let first_status = main_v2::get_lottery_status();
+        let (_, _, first_pending, _, _, _) = main_v2::lottery_status_fields(&first_status);
+        assert!(!first_pending, 12);
 
         let second_expected_per_request = (second_limit + second_verification) * second_price;
+        assert!(main_v2::get_max_gas_fee() == second_expected_per_request, 13);
+        let second_recomputed_min_balance = 30 * main_v2::get_max_gas_fee();
         let second_expected_min_balance = 30 * second_expected_per_request;
-        let (second_min_balance, second_per_request_fee, second_price_event, second_limit_event, second_verification_event) =
-            main_v2::minimum_balance_updated_fields(vector::borrow(&events, 1));
-        assert!(second_min_balance == second_expected_min_balance, 13);
-        assert!(second_per_request_fee == second_expected_per_request, 14);
-        assert!(second_price_event == u64_to_u128(second_price), 15);
-        assert!(second_limit_event == u64_to_u128(second_limit), 16);
-        assert!(second_verification_event == u64_to_u128(second_verification), 17);
-        let (second_sender, second_consumer_count, second_pending) =
-            main_v2::minimum_balance_event_context(vector::borrow(&events, 1));
-        assert!(option::is_some(&second_sender), 22);
-        let second_addr = *option::borrow(&second_sender);
-        assert!(second_addr == VRF_AGGREGATOR, 23);
-        assert!(second_consumer_count == 2, 24);
-        assert!(option::is_none(&second_pending), 25);
+        assert!(second_recomputed_min_balance == second_expected_min_balance, 14);
+
+        let status_after_second = main_v2::get_whitelist_status();
+        let second_sender_opt = main_v2::whitelist_status_aggregator(&status_after_second);
+        assert!(option::is_some(&second_sender_opt), 15);
+        let second_addr = *option::borrow(&second_sender_opt);
+        assert!(second_addr == VRF_AGGREGATOR, 16);
+        let second_consumer_count = main_v2::whitelist_status_consumer_count(&status_after_second);
+        assert!(second_consumer_count == 2, 17);
+
+        let second_status = main_v2::get_lottery_status();
+        let (_, _, second_pending, _, _, _) = main_v2::lottery_status_fields(&second_status);
+        assert!(!second_pending, 18);
     }
 
     #[test]

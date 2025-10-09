@@ -8,6 +8,7 @@ module lottery::treasury_multi {
     use std::option;
     use std::signer;
     use std::vector;
+    use std::u128;
     use vrf_hub::table;
     use std::event;
     use std::math64;
@@ -348,6 +349,37 @@ module lottery::treasury_multi {
     public(friend) fun distribute_jackpot_internal(recipient: address, amount: u64)
     acquires TreasuryState {
         distribute_jackpot_impl(borrow_state_mut(), recipient, amount);
+    }
+
+
+    #[view]
+    /// test-view: возвращает (prize_balance, operations_balance) как u128
+    public fun get_pool_balances(lottery_id: u64): (u128, u128) acquires TreasuryState {
+        let pool_opt = get_pool(lottery_id);
+        if (!option::is_some(&pool_opt)) {
+            abort E_POOL_MISSING;
+        };
+        let pool_ref = option::borrow(&pool_opt);
+        (
+            u128::from_u64(pool_ref.prize_balance),
+            u128::from_u64(pool_ref.operations_balance),
+        )
+    }
+
+
+    #[view]
+    /// test-view: возвращает (prize_bps, jackpot_bps, operations_bps)
+    public fun get_share_config(lottery_id: u64): (u64, u64, u64) acquires TreasuryState {
+        let config_opt = get_config(lottery_id);
+        if (!option::is_some(&config_opt)) {
+            abort E_CONFIG_MISSING;
+        };
+        let config_ref = option::borrow(&config_opt);
+        (
+            config_ref.prize_bps,
+            config_ref.jackpot_bps,
+            config_ref.operations_bps,
+        )
     }
 
 

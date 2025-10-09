@@ -86,7 +86,7 @@ module lottery_factory::registry {
         lottery: address,
         blueprint: LotteryBlueprint,
         metadata: vector<u8>,
-    ): u64 acquires FactoryState, hub::HubState {
+    ): u64 acquires FactoryState {
         ensure_admin(caller);
         let state = borrow_global_mut<FactoryState>(@lottery_factory);
         let lottery_id = hub::register_lottery(caller, owner, lottery, metadata);
@@ -130,6 +130,26 @@ module lottery_factory::registry {
             option::none()
         } else {
             option::some(*table::borrow(&state.lotteries, lottery_id))
+        }
+    }
+
+
+    #[view]
+    /// test-view: возвращает owner, lottery, ticket_price, jackpot_share_bps
+    public fun get_lottery_summary(
+        lottery_id: u64,
+    ): option::Option<(address, address, u64, u16)> acquires FactoryState {
+        let state = borrow_state();
+        if (!table::contains(&state.lotteries, lottery_id)) {
+            option::none()
+        } else {
+            let info = table::borrow(&state.lotteries, lottery_id);
+            option::some((
+                info.owner,
+                info.lottery,
+                info.blueprint.ticket_price,
+                info.blueprint.jackpot_share_bps,
+            ))
         }
     }
 
