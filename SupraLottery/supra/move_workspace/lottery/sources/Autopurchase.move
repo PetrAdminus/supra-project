@@ -139,9 +139,11 @@ module lottery::autopurchase {
                 AutopurchasePlan { balance: 0, tickets_per_draw, active },
             );
         } else {
-            let plan = table::borrow_mut(&mut plans.plans, player);
-            plan.tickets_per_draw = tickets_per_draw;
-            plan.active = active;
+            {
+                let plan = table::borrow_mut(&mut plans.plans, player);
+                plan.tickets_per_draw = tickets_per_draw;
+                plan.active = active;
+            };
         };
         event::emit_event(
             &mut state.config_events,
@@ -167,18 +169,23 @@ module lottery::autopurchase {
                 AutopurchasePlan { balance: amount, tickets_per_draw: 0, active: false },
             );
         } else {
-            let plan = table::borrow_mut(&mut plans.plans, player);
-            plan.balance = math64::checked_add(plan.balance, amount);
+            {
+                let plan = table::borrow_mut(&mut plans.plans, player);
+                plan.balance = math64::checked_add(plan.balance, amount);
+            };
         };
         plans.total_balance = math64::checked_add(plans.total_balance, amount);
-        let plan = table::borrow(&plans.plans, player);
+        let new_balance = {
+            let plan_snapshot = table::borrow(&plans.plans, player);
+            plan_snapshot.balance
+        };
         event::emit_event(
             &mut state.deposit_events,
             AutopurchaseDepositEvent {
                 lottery_id,
                 player,
                 amount,
-                new_balance: plan.balance,
+                new_balance,
             },
         );
     }
@@ -192,31 +199,34 @@ module lottery::autopurchase {
         if (!table::contains(&plans.plans, player)) {
             abort E_PLAN_NOT_FOUND;
         };
-        let plan = table::borrow_mut(&mut plans.plans, player);
-        if (!plan.active) {
-            abort E_PLAN_INACTIVE;
+        let (tickets_to_buy, spent, remaining_balance) = {
+            let plan = table::borrow_mut(&mut plans.plans, player);
+            if (!plan.active) {
+                abort E_PLAN_INACTIVE;
+            };
+            if (plan.tickets_per_draw == 0) {
+                abort E_TICKETS_PER_DRAW_ZERO;
+            };
+            let info_opt = instances::get_lottery_info(lottery_id);
+            if (!option::is_some(&info_opt)) {
+                abort E_UNKNOWN_LOTTERY;
+            };
+            let info_ref = option::borrow(&info_opt);
+            let blueprint = registry::lottery_info_blueprint(info_ref);
+            let ticket_price = registry::blueprint_ticket_price(&blueprint);
+            assert!(ticket_price > 0, E_TICKETS_PER_DRAW_ZERO);
+            let affordable = plan.balance / ticket_price;
+            let mut tickets = plan.tickets_per_draw;
+            if (affordable < tickets) {
+                tickets = affordable;
+            };
+            if (tickets == 0) {
+                abort E_INSUFFICIENT_BALANCE;
+            };
+            let spent_local = rounds::record_prepaid_purchase(lottery_id, player, tickets);
+            plan.balance = plan.balance - spent_local;
+            (tickets, spent_local, plan.balance)
         };
-        if (plan.tickets_per_draw == 0) {
-            abort E_TICKETS_PER_DRAW_ZERO;
-        };
-        let info_opt = instances::get_lottery_info(lottery_id);
-        if (!option::is_some(&info_opt)) {
-            abort E_UNKNOWN_LOTTERY;
-        };
-        let info_ref = option::borrow(&info_opt);
-        let blueprint = registry::lottery_info_blueprint(info_ref);
-        let ticket_price = registry::blueprint_ticket_price(&blueprint);
-        assert!(ticket_price > 0, E_TICKETS_PER_DRAW_ZERO);
-        let affordable = plan.balance / ticket_price;
-        let tickets_to_buy = plan.tickets_per_draw;
-        if (affordable < tickets_to_buy) {
-            tickets_to_buy = affordable;
-        };
-        if (tickets_to_buy == 0) {
-            abort E_INSUFFICIENT_BALANCE;
-        };
-        let spent = rounds::record_prepaid_purchase(lottery_id, player, tickets_to_buy);
-        plan.balance = plan.balance - spent;
         plans.total_balance = plans.total_balance - spent;
         event::emit_event(
             &mut state.executed_events,
@@ -225,7 +235,7 @@ module lottery::autopurchase {
                 player,
                 tickets_bought: tickets_to_buy,
                 spent_amount: spent,
-                remaining_balance: plan.balance,
+                remaining_balance,
             },
         );
     }
@@ -245,16 +255,19 @@ module lottery::autopurchase {
         if (!table::contains(&plans.plans, player)) {
             abort E_PLAN_NOT_FOUND;
         };
-        let plan = table::borrow_mut(&mut plans.plans, player);
-        if (plan.balance < amount) {
-            abort E_INSUFFICIENT_BALANCE;
+        let remaining_balance = {
+            let plan = table::borrow_mut(&mut plans.plans, player);
+            if (plan.balance < amount) {
+                abort E_INSUFFICIENT_BALANCE;
+            };
+            plan.balance = plan.balance - amount;
+            plan.balance
         };
-        plan.balance = plan.balance - amount;
         plans.total_balance = plans.total_balance - amount;
         treasury_v1::payout_from_treasury(player, amount);
         event::emit_event(
             &mut state.refund_events,
-            AutopurchaseRefundedEvent { lottery_id, player, amount, remaining_balance: plan.balance },
+            AutopurchaseRefundedEvent { lottery_id, player, amount, remaining_balance },
         );
     }
 
