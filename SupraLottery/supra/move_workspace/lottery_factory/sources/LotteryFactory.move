@@ -51,10 +51,10 @@ module lottery_factory::registry {
     public entry fun init(caller: &signer) {
         let addr = signer::address_of(caller);
         if (addr != @lottery_factory) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         if (exists<FactoryState>(@lottery_factory)) {
-            abort E_ALREADY_INIT;
+            abort E_ALREADY_INIT
         };
         move_to(
             caller,
@@ -109,7 +109,7 @@ module lottery_factory::registry {
         ensure_admin(caller);
         let state = borrow_global_mut<FactoryState>(@lottery_factory);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            abort E_UNKNOWN_LOTTERY;
+            abort E_UNKNOWN_LOTTERY
         };
         let info = table::borrow_mut(&mut state.lotteries, lottery_id);
         info.blueprint = blueprint;
@@ -172,7 +172,8 @@ module lottery_factory::registry {
 
     #[view]
     public fun get_lottery(lottery_id: u64): option::Option<LotteryInfo> acquires FactoryState {
-        let state = borrow_state();
+        ensure_initialized();
+        let state = borrow_global<FactoryState>(@lottery_factory);
         if (!table::contains(&state.lotteries, lottery_id)) {
             option::none()
         } else {
@@ -183,21 +184,23 @@ module lottery_factory::registry {
 
     #[view]
     public fun lottery_count(): u64 acquires FactoryState {
-        table::length(&borrow_state().lotteries)
-    }
-
-    fun borrow_state(): &FactoryState acquires FactoryState {
-        if (!exists<FactoryState>(@lottery_factory)) {
-            abort E_NOT_INITIALIZED;
-        };
-        borrow_global<FactoryState>(@lottery_factory)
+        ensure_initialized();
+        let state = borrow_global<FactoryState>(@lottery_factory);
+        table::length(&state.lotteries)
     }
 
     fun ensure_admin(caller: &signer) acquires FactoryState {
+        ensure_initialized();
         let addr = signer::address_of(caller);
-        let state = borrow_state();
+        let state = borrow_global<FactoryState>(@lottery_factory);
         if (addr != state.admin) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
+        };
+    }
+
+    fun ensure_initialized() {
+        if (!exists<FactoryState>(@lottery_factory)) {
+            abort E_NOT_INITIALIZED
         };
     }
 }

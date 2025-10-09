@@ -22,26 +22,26 @@ module lottery::migration {
         operations_bps: u64,
     ) {
         if (signer::address_of(caller) != @lottery) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         if (!instances::contains_instance(lottery_id)) {
-            abort E_INSTANCE_MISSING;
+            abort E_INSTANCE_MISSING
         };
         let info_opt = registry::get_lottery(lottery_id);
         if (!option::is_some(&info_opt)) {
-            abort E_INSTANCE_MISSING;
+            abort E_INSTANCE_MISSING
         };
 
         let (tickets, draw_scheduled, _next_ticket_id_old, pending_request, jackpot_amount) =
             main_v2::export_state_for_migration();
 
         if (option::is_some(&pending_request)) {
-            abort E_PENDING_REQUEST;
+            abort E_PENDING_REQUEST
         };
 
         let pool_opt = treasury_multi::get_pool(lottery_id);
         if (option::is_some(&pool_opt)) {
-            abort E_ALREADY_MIGRATED;
+            abort E_ALREADY_MIGRATED
         };
 
         treasury_multi::upsert_lottery_config(caller, lottery_id, prize_bps, jackpot_bps, operations_bps);

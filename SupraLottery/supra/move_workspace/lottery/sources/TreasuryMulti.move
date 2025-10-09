@@ -136,10 +136,10 @@ module lottery::treasury_multi {
     ) {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         if (exists<TreasuryState>(@lottery)) {
-            abort E_ALREADY_INITIALIZED;
+            abort E_ALREADY_INITIALIZED
         };
         move_to(
             caller,
@@ -171,13 +171,15 @@ module lottery::treasury_multi {
 
 
     public fun admin(): address acquires TreasuryState {
-        borrow_state().admin
+        ensure_initialized();
+        let state = borrow_global<TreasuryState>(@lottery);
+        state.admin
     }
 
 
     public entry fun set_admin(caller: &signer, new_admin: address) acquires TreasuryState {
         ensure_admin(caller);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TreasuryState>(@lottery);
         let previous = state.admin;
         state.admin = new_admin;
         event::emit_event(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
@@ -190,7 +192,7 @@ module lottery::treasury_multi {
         operations_recipient: address,
     ) acquires TreasuryState {
         ensure_admin(caller);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TreasuryState>(@lottery);
         let previous_jackpot = state.jackpot_recipient;
         let previous_operations = state.operations_recipient;
         state.jackpot_recipient = jackpot_recipient;
@@ -217,7 +219,7 @@ module lottery::treasury_multi {
         ensure_admin(caller);
         let config = LotteryShareConfig { prize_bps, jackpot_bps, operations_bps };
         validate_basis_points(&config);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TreasuryState>(@lottery);
         if (table::contains(&state.configs, lottery_id)) {
             let entry = table::borrow_mut(&mut state.configs, lottery_id);
             *entry = config;
@@ -243,12 +245,16 @@ module lottery::treasury_multi {
         amount: u64,
     ) acquires TreasuryState {
         ensure_admin(caller);
-        apply_allocation(borrow_state_mut(), lottery_id, amount);
+        ensure_initialized();
+        let state = borrow_global_mut<TreasuryState>(@lottery);
+        apply_allocation(state, lottery_id, amount);
     }
 
 
     public(friend) fun record_allocation_internal(lottery_id: u64, amount: u64) acquires TreasuryState {
-        apply_allocation(borrow_state_mut(), lottery_id, amount);
+        ensure_initialized();
+        let state = borrow_global_mut<TreasuryState>(@lottery);
+        apply_allocation(state, lottery_id, amount);
     }
 
 
@@ -258,9 +264,9 @@ module lottery::treasury_multi {
         operations_balance: u64,
         jackpot_balance: u64,
     ) acquires TreasuryState {
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TreasuryState>(@lottery);
         if (table::contains(&state.pools, lottery_id)) {
-            abort E_POOL_ALREADY_EXISTS;
+            abort E_POOL_ALREADY_EXISTS
         };
         table::add(
             &mut state.pools,
@@ -280,7 +286,9 @@ module lottery::treasury_multi {
 
     public(friend) fun distribute_prize_internal(lottery_id: u64, winner: address): u64
     acquires TreasuryState {
-        distribute_prize_impl(borrow_state_mut(), lottery_id, winner)
+        ensure_initialized();
+        let state = borrow_global_mut<TreasuryState>(@lottery);
+        distribute_prize_impl(state, lottery_id, winner)
     }
 
 
@@ -293,7 +301,9 @@ module lottery::treasury_multi {
 
     public(friend) fun withdraw_operations_internal(lottery_id: u64): u64
     acquires TreasuryState {
-        withdraw_operations_impl(borrow_state_mut(), lottery_id)
+        ensure_initialized();
+        let state = borrow_global_mut<TreasuryState>(@lottery);
+        withdraw_operations_impl(state, lottery_id)
     }
 
 
@@ -302,7 +312,9 @@ module lottery::treasury_multi {
         recipient: address,
         amount: u64,
     ) acquires TreasuryState {
-        pay_operations_bonus_impl(borrow_state_mut(), lottery_id, recipient, amount);
+        ensure_initialized();
+        let state = borrow_global_mut<TreasuryState>(@lottery);
+        pay_operations_bonus_impl(state, lottery_id, recipient, amount);
     }
 
 
@@ -312,11 +324,11 @@ module lottery::treasury_multi {
         source: vector<u8>,
     ) acquires TreasuryState {
         if (amount == 0) {
-            return;
+            return
         };
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TreasuryState>(@lottery);
         if (!table::contains(&state.configs, lottery_id)) {
-            abort E_CONFIG_MISSING;
+            abort E_CONFIG_MISSING
         };
         if (table::contains(&state.pools, lottery_id)) {
             let pool = table::borrow_mut(&mut state.pools, lottery_id);
@@ -341,19 +353,23 @@ module lottery::treasury_multi {
         amount: u64,
     ) acquires TreasuryState {
         ensure_admin(caller);
-        distribute_jackpot_impl(borrow_state_mut(), recipient, amount);
+        ensure_initialized();
+        let state = borrow_global_mut<TreasuryState>(@lottery);
+        distribute_jackpot_impl(state, recipient, amount);
     }
 
 
     public(friend) fun distribute_jackpot_internal(recipient: address, amount: u64)
     acquires TreasuryState {
-        distribute_jackpot_impl(borrow_state_mut(), recipient, amount);
+        ensure_initialized();
+        let state = borrow_global_mut<TreasuryState>(@lottery);
+        distribute_jackpot_impl(state, recipient, amount);
     }
 
 
     #[view]
     public fun get_config(lottery_id: u64): option::Option<LotteryShareConfig> acquires TreasuryState {
-        let state = borrow_state();
+        let state = borrow_global<TreasuryState>(@lottery);
         if (!table::contains(&state.configs, lottery_id)) {
             option::none()
         } else {
@@ -364,7 +380,7 @@ module lottery::treasury_multi {
 
     #[view]
     public fun get_pool(lottery_id: u64): option::Option<LotteryPool> acquires TreasuryState {
-        let state = borrow_state();
+        let state = borrow_global<TreasuryState>(@lottery);
         if (!table::contains(&state.pools, lottery_id)) {
             option::none()
         } else {
@@ -375,22 +391,26 @@ module lottery::treasury_multi {
 
     #[view]
     public fun jackpot_balance(): u64 acquires TreasuryState {
-        borrow_state().jackpot_balance
+        ensure_initialized();
+        let state = borrow_global<TreasuryState>(@lottery);
+        state.jackpot_balance
     }
 
 
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires TreasuryState {
-        copy_u64_vector(&borrow_state().lottery_ids)
+        ensure_initialized();
+        let state = borrow_global<TreasuryState>(@lottery);
+        copy_u64_vector(&state.lottery_ids)
     }
 
 
     #[view]
     public fun get_lottery_summary(lottery_id: u64): option::Option<LotterySummary>
     acquires TreasuryState {
-        let state = borrow_state();
+        let state = borrow_global<TreasuryState>(@lottery);
         if (!table::contains(&state.configs, lottery_id)) {
-            return option::none<LotterySummary>();
+            return option::none<LotterySummary>()
         };
         let config = *table::borrow(&state.configs, lottery_id);
         let pool = if (table::contains(&state.pools, lottery_id)) {
@@ -447,13 +467,13 @@ module lottery::treasury_multi {
     fun validate_basis_points(config: &LotteryShareConfig) {
         let sum = config.prize_bps + config.jackpot_bps + config.operations_bps;
         if (sum != BASIS_POINT_DENOMINATOR) {
-            abort E_INVALID_BASIS_POINTS;
+            abort E_INVALID_BASIS_POINTS
         };
     }
 
     fun apply_allocation(state: &mut TreasuryState, lottery_id: u64, amount: u64) {
         if (!table::contains(&state.configs, lottery_id)) {
-            abort E_CONFIG_MISSING;
+            abort E_CONFIG_MISSING
         };
         let config = *table::borrow(&state.configs, lottery_id);
         let prize_amount = math64::mul_div(amount, config.prize_bps, BASIS_POINT_DENOMINATOR);
@@ -487,12 +507,12 @@ module lottery::treasury_multi {
 
     fun distribute_prize_impl(state: &mut TreasuryState, lottery_id: u64, winner: address): u64 {
         if (!table::contains(&state.pools, lottery_id)) {
-            abort E_POOL_MISSING;
+            abort E_POOL_MISSING
         };
         let pool = table::borrow_mut(&mut state.pools, lottery_id);
         let amount = pool.prize_balance;
         if (amount == 0) {
-            return 0;
+            return 0
         };
         pool.prize_balance = 0;
         treasury_v1::payout_from_treasury(winner, amount);
@@ -505,12 +525,12 @@ module lottery::treasury_multi {
 
     fun withdraw_operations_impl(state: &mut TreasuryState, lottery_id: u64): u64 {
         if (!table::contains(&state.pools, lottery_id)) {
-            abort E_POOL_MISSING;
+            abort E_POOL_MISSING
         };
         let pool = table::borrow_mut(&mut state.pools, lottery_id);
         let amount = pool.operations_balance;
         if (amount == 0) {
-            return 0;
+            return 0
         };
         pool.operations_balance = 0;
         let recipient = state.operations_recipient;
@@ -529,14 +549,14 @@ module lottery::treasury_multi {
         amount: u64,
     ) {
         if (amount == 0) {
-            return;
+            return
         };
         if (!table::contains(&state.pools, lottery_id)) {
-            abort E_POOL_MISSING;
+            abort E_POOL_MISSING
         };
         let pool = table::borrow_mut(&mut state.pools, lottery_id);
         if (pool.operations_balance < amount) {
-            abort E_INSUFFICIENT_OPERATIONS;
+            abort E_INSUFFICIENT_OPERATIONS
         };
         pool.operations_balance = pool.operations_balance - amount;
         treasury_v1::payout_from_treasury(recipient, amount);
@@ -548,10 +568,10 @@ module lottery::treasury_multi {
 
     fun distribute_jackpot_impl(state: &mut TreasuryState, recipient: address, amount: u64) {
         if (amount == 0) {
-            return;
+            return
         };
         if (amount > state.jackpot_balance) {
-            abort E_INSUFFICIENT_JACKPOT;
+            abort E_INSUFFICIENT_JACKPOT
         };
         state.jackpot_balance = state.jackpot_balance - amount;
         treasury_v1::payout_from_treasury(recipient, amount);
@@ -566,7 +586,7 @@ module lottery::treasury_multi {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(&state.lottery_ids, idx) == lottery_id) {
-                return;
+                return
             };
             idx = idx + 1;
         };
@@ -584,23 +604,18 @@ module lottery::treasury_multi {
         out
     }
 
-    fun borrow_state(): &TreasuryState acquires TreasuryState {
-        if (!exists<TreasuryState>(@lottery)) {
-            abort E_NOT_INITIALIZED;
-        };
-        borrow_global<TreasuryState>(@lottery)
-    }
-
-    fun borrow_state_mut(): &mut TreasuryState acquires TreasuryState {
-        if (!exists<TreasuryState>(@lottery)) {
-            abort E_NOT_INITIALIZED;
-        };
-        borrow_global_mut<TreasuryState>(@lottery)
-    }
-
     fun ensure_admin(caller: &signer) acquires TreasuryState {
-        if (signer::address_of(caller) != borrow_state().admin) {
-            abort E_NOT_AUTHORIZED;
+        ensure_initialized();
+        let addr = signer::address_of(caller);
+        let state = borrow_global<TreasuryState>(@lottery);
+        if (addr != state.admin) {
+            abort E_NOT_AUTHORIZED
+        };
+    }
+
+    fun ensure_initialized() {
+        if (!exists<TreasuryState>(@lottery)) {
+            abort E_NOT_INITIALIZED
         };
     }
 }

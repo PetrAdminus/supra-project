@@ -1562,3 +1562,65 @@ Output:
 }
 
 
+Local: (2025-10-09 12:58:37.471409167 +00:00)	 Utc: (2025-10-09 12:58:37.471472129 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490::treasury_v1",
+    "9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490::main_v2"
+  ]
+}
+
+
+Local: (2025-10-09 13:06:08.977209290 +00:00)	 Utc: (2025-10-09 13:06:08.977269487 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490::treasury_v1",
+    "9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490::main_v2"
+  ]
+}
+
+
+Local: (2025-10-09 13:06:53.933892962 +00:00)	 Utc: (2025-10-09 13:06:53.934476315 UTC)
+
+CMD:
+Clean
+Output:
+{
+  "Result": "succeeded"
+}
+
+
+Local: (2025-10-09 13:25:39.909182867 +00:00)	 Utc: (2025-10-09 13:25:39.909484292 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Unable to resolve packages for package 'lottery': While resolving dependency 'SupraVrf' in package 'lottery': Unable to resolve package dependency 'SupraVrf': While resolving dependency 'SupraFramework' in package 'SupraVrf': While processing dependency 'SupraFramework': Unable to find package manifest for 'SupraFramework' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_dev/aptos-move/framework/supra-framework\""
+}
+Local: (2025-10-09 14:50:25.336783639 +00:00)	 Utc: (2025-10-09 14:50:25.336845419 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Unable to resolve packages for package 'lottery': While resolving dependency 'SupraVrf' in package 'lottery': Unable to resolve package dependency 'SupraVrf': While resolving dependency 'SupraFramework' in package 'SupraVrf': While processing dependency 'SupraFramework': Unable to find package manifest for 'SupraFramework' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_dev/aptos-move/framework/supra-framework\""
+}
+Local: (2025-10-09 20:15:09.982138338 +00:00)	 Utc: (2025-10-09 20:15:09.982391648 UTC)
+
+CMD:
+Test
+Output:
+{
+  "Result": "Success"
+}
+
+

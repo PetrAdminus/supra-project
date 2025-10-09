@@ -143,14 +143,6 @@ module lottery::treasury_v1 {
 
     const METADATA_ADDRESS: address = @lottery;
 
-    fun borrow_state(): &TokenState {
-        borrow_global<TokenState>(@lottery)
-    }
-
-    fun borrow_state_mut(): &mut TokenState {
-        borrow_global_mut<TokenState>(@lottery)
-    }
-
     fun ensure_store_entry(state: &mut TokenState, account: address): &mut StoreInfo {
         if (!table::contains(&state.stores, account)) {
             table::add(&mut state.stores, account, StoreInfo { balance: 0, frozen: false });
@@ -222,14 +214,14 @@ module lottery::treasury_v1 {
 
     public entry fun register_store(account: &signer) acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TokenState>(@lottery);
         let _ = ensure_store_entry(state, signer::address_of(account));
     }
 
     public entry fun register_store_for(admin: &signer, account: address) acquires TokenState {
         assert!(signer::address_of(admin) == @lottery, E_NOT_OWNER);
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TokenState>(@lottery);
         let _ = ensure_store_entry(state, account);
     }
 
@@ -251,14 +243,14 @@ module lottery::treasury_v1 {
     public entry fun register_stores_for(admin: &signer, accounts: vector<address>) acquires TokenState {
         assert!(signer::address_of(admin) == @lottery, E_NOT_OWNER);
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TokenState>(@lottery);
         register_stores_for_internal(state, &accounts, 0);
     }
 
     public entry fun mint_to(admin: &signer, recipient: address, amount: u64) acquires TokenState {
         assert!(signer::address_of(admin) == @lottery, E_NOT_OWNER);
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TokenState>(@lottery);
         let store = ensure_store_entry(state, recipient);
         assert!(!store.frozen, E_STORE_FROZEN);
         store.balance = store.balance + amount;
@@ -268,7 +260,7 @@ module lottery::treasury_v1 {
     public entry fun burn_from(admin: &signer, owner: address, amount: u64) acquires TokenState {
         assert!(signer::address_of(admin) == @lottery, E_NOT_OWNER);
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TokenState>(@lottery);
         ensure_store_exists(state, owner);
         {
             let store = table::borrow_mut(&mut state.stores, owner);
@@ -286,7 +278,7 @@ module lottery::treasury_v1 {
     ) acquires TokenState {
         assert!(signer::address_of(admin) == @lottery, E_NOT_OWNER);
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TokenState>(@lottery);
         ensure_store_exists(state, from);
         ensure_store_exists(state, to);
         {
@@ -308,7 +300,7 @@ module lottery::treasury_v1 {
     ) acquires TokenState {
         assert!(signer::address_of(admin) == @lottery, E_NOT_OWNER);
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TokenState>(@lottery);
         ensure_store_exists(state, account);
         let store = table::borrow_mut(&mut state.stores, account);
         store.frozen = frozen;
@@ -316,7 +308,7 @@ module lottery::treasury_v1 {
 
     public fun deposit_from_user(user: &signer, amount: u64) acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TokenState>(@lottery);
         let user_addr = signer::address_of(user);
         assert!(store_registered_internal(state, user_addr), E_STORE_NOT_REGISTERED);
         assert!(store_registered_internal(state, @lottery), E_TREASURY_STORE_NOT_REGISTERED);
@@ -333,7 +325,7 @@ module lottery::treasury_v1 {
 
     public(friend) fun payout_from_treasury(recipient: address, amount: u64) acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TokenState>(@lottery);
         assert!(store_registered_internal(state, @lottery), E_TREASURY_STORE_NOT_REGISTERED);
         assert!(store_registered_internal(state, recipient), E_STORE_NOT_REGISTERED);
         {
@@ -359,7 +351,7 @@ module lottery::treasury_v1 {
         assert!(exists<Vaults>(@lottery), E_NOT_INITIALIZED);
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
 
-        let state = borrow_state();
+        let state = borrow_global<TokenState>(@lottery);
         ensure_recipient_store_registered(state, treasury);
         ensure_recipient_store_registered(state, marketing);
         ensure_recipient_store_registered(state, community);
@@ -373,7 +365,7 @@ module lottery::treasury_v1 {
     #[view]
     public fun treasury_balance(): u64 acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_state();
+        let state = borrow_global<TokenState>(@lottery);
         if (!store_registered_internal(state, @lottery)) {
             0
         } else {
@@ -385,7 +377,7 @@ module lottery::treasury_v1 {
     #[view]
     public fun balance_of(account: address): u64 acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_state();
+        let state = borrow_global<TokenState>(@lottery);
         if (!store_registered_internal(state, account)) {
             0
         } else {
@@ -399,7 +391,7 @@ module lottery::treasury_v1 {
         if (!exists<TokenState>(@lottery)) {
             return false
         };
-        let state = borrow_state();
+        let state = borrow_global<TokenState>(@lottery);
         store_registered_internal(state, account)
     }
 
@@ -408,7 +400,7 @@ module lottery::treasury_v1 {
         if (!exists<TokenState>(@lottery)) {
             return false
         };
-        let state = borrow_state();
+        let state = borrow_global<TokenState>(@lottery);
         if (!store_registered_internal(state, account)) {
             false
         } else {
@@ -420,7 +412,7 @@ module lottery::treasury_v1 {
     #[view]
     public fun primary_store_address(account: address): address acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_state();
+        let state = borrow_global<TokenState>(@lottery);
         assert!(store_registered_internal(state, account), E_STORE_NOT_REGISTERED);
         account
     }
@@ -428,7 +420,7 @@ module lottery::treasury_v1 {
     #[view]
     public fun total_supply(): u128 acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        borrow_state().total_supply
+        { let state = borrow_global<TokenState>(@lottery); state.total_supply }
     }
 
     #[view]
@@ -440,7 +432,7 @@ module lottery::treasury_v1 {
     #[view]
     public fun metadata_summary(): (string::String, string::String, u8, string::String, string::String) acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let state = borrow_state();
+        let state = borrow_global<TokenState>(@lottery);
         (
             state.name,
             state.symbol,
@@ -456,7 +448,7 @@ module lottery::treasury_v1 {
             return (false, option::none(), 0)
         };
 
-        let state = borrow_state();
+        let state = borrow_global<TokenState>(@lottery);
         let registered = store_registered_internal(state, account);
         if (!registered) {
             return (false, option::none(), 0)
@@ -472,7 +464,7 @@ module lottery::treasury_v1 {
             return (false, false, option::none(), 0)
         };
 
-        let state = borrow_state();
+        let state = borrow_global<TokenState>(@lottery);
         let registered = store_registered_internal(state, account);
         if (!registered) {
             return (false, false, option::none(), 0)
@@ -588,7 +580,7 @@ module lottery::treasury_v1 {
             return 0
         };
 
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<TokenState>(@lottery);
         assert!(store_registered_internal(state, winner), E_STORE_NOT_REGISTERED);
 
         assert!(exists<Vaults>(@lottery), E_NOT_INITIALIZED);

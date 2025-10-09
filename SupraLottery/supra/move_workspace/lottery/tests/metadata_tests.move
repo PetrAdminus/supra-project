@@ -6,13 +6,13 @@ module lottery::metadata_tests {
 
     fun vector_equals(lhs: &vector<u8>, rhs: &vector<u8>): bool {
         if (vector::length(lhs) != vector::length(rhs)) {
-            return false;
+            return false
         };
         let len = vector::length(lhs);
         let i = 0;
         while (i < len) {
             if (*vector::borrow(lhs, i) != *vector::borrow(rhs, i)) {
-                return false;
+                return false
             };
             i = i + 1;
         };
@@ -30,7 +30,7 @@ module lottery::metadata_tests {
             b"https://example/lottery",
             b"https://example/lottery/rules",
         );
-        metadata::upsert_metadata(lottery_admin, 1, initial);
+        metadata::upsert_metadata_struct(lottery_admin, 1, initial);
 
         let ids = metadata::list_lottery_ids();
         assert!(vector::length(&ids) == 1, 0);
@@ -50,7 +50,7 @@ module lottery::metadata_tests {
             b"https://example/lottery",
             b"https://example/lottery/rules",
         );
-        metadata::upsert_metadata(lottery_admin, 1, updated);
+        metadata::upsert_metadata_struct(lottery_admin, 1, updated);
 
         let updated_ids = metadata::list_lottery_ids();
         assert!(vector::length(&updated_ids) == 1, 4);
@@ -82,6 +82,6 @@ module lottery::metadata_tests {
             b"https://example/weekly",
             b"https://example/weekly/rules",
         );
-        metadata::upsert_metadata(attacker, 7, payload);
+        metadata::upsert_metadata_struct(attacker, 7, payload);
     }
 }

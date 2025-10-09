@@ -10,25 +10,17 @@ module std::timestamp {
 
     const ADMIN: address = @0x1;
 
-    fun borrow_state(): &TimestampState acquires TimestampState {
+    fun ensure_initialized() {
         if (!exists<TimestampState>(ADMIN)) {
             abort E_NOT_AUTHORIZED
         };
-        borrow_global<TimestampState>(ADMIN)
-    }
-
-    fun borrow_state_mut(): &mut TimestampState acquires TimestampState {
-        if (!exists<TimestampState>(ADMIN)) {
-            abort E_NOT_AUTHORIZED
-        };
-        borrow_global_mut<TimestampState>(ADMIN)
     }
 
     public fun now_seconds(): u64 acquires TimestampState {
         if (!exists<TimestampState>(ADMIN)) {
             return 0
         };
-        let state = borrow_state();
+        let state = borrow_global<TimestampState>(ADMIN);
         if (!state.started) {
             0
         } else {
@@ -40,7 +32,7 @@ module std::timestamp {
         if (!exists<TimestampState>(ADMIN)) {
             return 0
         };
-        let state = borrow_state();
+        let state = borrow_global<TimestampState>(ADMIN);
         if (!state.started) {
             0
         } else {
@@ -56,7 +48,7 @@ module std::timestamp {
                 TimestampState { started: true, microseconds: 0 },
             );
         } else {
-            let state = borrow_state_mut();
+            let state = borrow_global_mut<TimestampState>(ADMIN);
             state.started = true;
         };
     }
@@ -69,7 +61,7 @@ module std::timestamp {
                 TimestampState { started: true, microseconds },
             );
         } else {
-            let state = borrow_state_mut();
+            let state = borrow_global_mut<TimestampState>(ADMIN);
             state.started = true;
             state.microseconds = microseconds;
         };

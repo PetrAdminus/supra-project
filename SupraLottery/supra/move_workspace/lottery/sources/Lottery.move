@@ -371,8 +371,8 @@ module lottery::main_v2 {
             callback_sender,
             consumer_count,
             pending_request,
-            callback_gas_price,
-            callback_gas_limit
+            _callback_gas_price,
+            _callback_gas_limit
         ) = {
             let lottery = borrow_global<LotteryData>(@lottery);
             ensure_gas_configured(lottery);

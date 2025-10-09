@@ -1770,3 +1770,35 @@ Output:
 General: {
   "Error": "Move compilation failed: Compilation error"
 }
+Local: (2025-10-09 20:21:08.535882918 +00:00)	 Utc: (2025-10-09 20:21:08.537479010 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: compilation failed"
+}
+Local: (2025-10-09 20:22:58.169867675 +00:00)	 Utc: (2025-10-09 20:22:58.170025594 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: compilation failed"
+}
+Local: (2025-10-09 20:24:19.872211043 +00:00)	 Utc: (2025-10-09 20:24:19.872366757 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}
+Local: (2025-10-09 20:39:01.269506571 +00:00)	 Utc: (2025-10-09 20:39:01.269633781 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}

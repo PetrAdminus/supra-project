@@ -24,6 +24,7 @@ module vrf_hub::hub {
     const E_CALLBACK_NOT_ALLOWED: u64 = 6;
 
     const E_INACTIVE_LOTTERY: u64 = 7;
+    const E_NOT_INITIALIZED: u64 = 8;
 
 
     struct LotteryRegistration has copy, drop, store {
@@ -93,10 +94,10 @@ module vrf_hub::hub {
     public entry fun init(caller: &signer) {
         let addr = signer::address_of(caller);
         if (addr != @vrf_hub) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         if (exists<HubState>(@vrf_hub)) {
-            abort E_ALREADY_INIT;
+            abort E_ALREADY_INIT
         };
         move_to(caller, HubState {
             admin: addr,
@@ -124,13 +125,17 @@ module vrf_hub::hub {
 
     #[view]
     public fun admin(): address acquires HubState {
-        borrow_state().admin
+        ensure_initialized();
+        let state = borrow_global<HubState>(@vrf_hub);
+        state.admin
     }
 
 
     #[view]
     public fun peek_next_lottery_id(): u64 acquires HubState {
-        borrow_state().next_lottery_id
+        ensure_initialized();
+        let state = borrow_global<HubState>(@vrf_hub);
+        state.next_lottery_id
     }
 
 
@@ -169,7 +174,7 @@ module vrf_hub::hub {
         let metadata_event = clone_bytes(&metadata);
         let state = borrow_global_mut<HubState>(@vrf_hub);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            abort E_UNKNOWN_LOTTERY;
+            abort E_UNKNOWN_LOTTERY
         };
         let registration = table::borrow_mut(&mut state.lotteries, lottery_id);
         registration.metadata = metadata;
@@ -188,7 +193,7 @@ module vrf_hub::hub {
         ensure_admin(caller);
         let state = borrow_global_mut<HubState>(@vrf_hub);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            abort E_UNKNOWN_LOTTERY;
+            abort E_UNKNOWN_LOTTERY
         };
         let registration = table::borrow_mut(&mut state.lotteries, lottery_id);
         if (registration.active != active) {
@@ -210,16 +215,19 @@ module vrf_hub::hub {
 
     #[view]
     public fun is_lottery_active(lottery_id: u64): bool acquires HubState {
-        if (!table::contains(&borrow_state().lotteries, lottery_id)) {
-            return false;
+        ensure_initialized();
+        let state = borrow_global<HubState>(@vrf_hub);
+        if (!table::contains(&state.lotteries, lottery_id)) {
+            return false
         };
-        table::borrow(&borrow_state().lotteries, lottery_id).active
+        table::borrow(&state.lotteries, lottery_id).active
     }
 
 
     #[view]
     public fun get_registration(lottery_id: u64): option::Option<LotteryRegistration> acquires HubState {
-        let state = borrow_state();
+        ensure_initialized();
+        let state = borrow_global<HubState>(@vrf_hub);
         if (!table::contains(&state.lotteries, lottery_id)) {
             option::none()
         } else {
@@ -230,19 +238,24 @@ module vrf_hub::hub {
 
     #[view]
     public fun lottery_count(): u64 acquires HubState {
-        table::length(&borrow_state().lotteries)
+        ensure_initialized();
+        let state = borrow_global<HubState>(@vrf_hub);
+        table::length(&state.lotteries)
     }
 
 
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires HubState {
-        clone_ids(&borrow_state().lottery_ids)
+        ensure_initialized();
+        let state = borrow_global<HubState>(@vrf_hub);
+        clone_ids(&state.lottery_ids)
     }
 
 
     #[view]
     public fun list_active_lottery_ids(): vector<u64> acquires HubState {
-        let state = borrow_state();
+        ensure_initialized();
+        let state = borrow_global<HubState>(@vrf_hub);
         let result = vector::empty<u64>();
         let i = 0;
         let len = vector::length(&state.lottery_ids);
@@ -269,18 +282,20 @@ module vrf_hub::hub {
 
     #[view]
     public fun callback_sender(): option::Option<address> acquires HubState {
-        borrow_state().callback_sender
+        ensure_initialized();
+        let state = borrow_global<HubState>(@vrf_hub);
+        state.callback_sender
     }
 
 
     public(friend) fun request_randomness(lottery_id: u64, payload: vector<u8>): u64 acquires HubState {
         let state = borrow_global_mut<HubState>(@vrf_hub);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            abort E_UNKNOWN_LOTTERY;
+            abort E_UNKNOWN_LOTTERY
         };
         let registration = table::borrow(&state.lotteries, lottery_id);
         if (!registration.active) {
-            abort E_INACTIVE_LOTTERY;
+            abort E_INACTIVE_LOTTERY
         };
 
         let request_id = state.next_request_id;
@@ -299,7 +314,7 @@ module vrf_hub::hub {
     public(friend) fun consume_request(request_id: u64): RequestRecord acquires HubState {
         let state = borrow_global_mut<HubState>(@vrf_hub);
         if (!table::contains(&state.requests, request_id)) {
-            abort E_UNKNOWN_REQUEST;
+            abort E_UNKNOWN_REQUEST
         };
         let record = table::remove(&mut state.requests, request_id);
         remove_pending_request_id(&mut state.pending_request_ids, request_id);
@@ -309,7 +324,8 @@ module vrf_hub::hub {
 
     #[view]
     public fun get_request(request_id: u64): option::Option<RequestRecord> acquires HubState {
-        let state = borrow_state();
+        ensure_initialized();
+        let state = borrow_global<HubState>(@vrf_hub);
         if (!table::contains(&state.requests, request_id)) {
             option::none()
         } else {
@@ -320,7 +336,9 @@ module vrf_hub::hub {
 
     #[view]
     public fun list_pending_request_ids(): vector<u64> acquires HubState {
-        clone_ids(&borrow_state().pending_request_ids)
+        ensure_initialized();
+        let state = borrow_global<HubState>(@vrf_hub);
+        clone_ids(&state.pending_request_ids)
     }
 
 
@@ -378,26 +396,30 @@ module vrf_hub::hub {
 
 
     public(friend) fun ensure_callback_sender(caller: &signer) acquires HubState {
+        ensure_initialized();
         let state = borrow_global<HubState>(@vrf_hub);
         if (!option::is_some(&state.callback_sender)) {
-            abort E_CALLBACK_NOT_CONFIGURED;
+            abort E_CALLBACK_NOT_CONFIGURED
         };
         let allowed = *option::borrow(&state.callback_sender);
         let addr = signer::address_of(caller);
         if (addr != allowed) {
-            abort E_CALLBACK_NOT_ALLOWED;
+            abort E_CALLBACK_NOT_ALLOWED
         };
-    }
-
-    fun borrow_state(): &HubState acquires HubState {
-        borrow_global<HubState>(@vrf_hub)
     }
 
     fun ensure_admin(caller: &signer) acquires HubState {
         let addr = signer::address_of(caller);
+        ensure_initialized();
         let state = borrow_global<HubState>(@vrf_hub);
         if (addr != state.admin) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
+        };
+    }
+
+    fun ensure_initialized() {
+        if (!exists<HubState>(@vrf_hub)) {
+            abort E_NOT_INITIALIZED
         };
     }
 
@@ -437,7 +459,7 @@ module vrf_hub::hub {
                     let slot = vector::borrow_mut(ids, i);
                     *slot = last;
                 };
-                return;
+                return
             };
             i = i + 1;
         };

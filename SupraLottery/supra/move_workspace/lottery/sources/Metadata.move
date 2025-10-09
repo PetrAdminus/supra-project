@@ -122,6 +122,27 @@ module lottery::metadata {
     public entry fun upsert_metadata(
         caller: &signer,
         lottery_id: u64,
+        title: vector<u8>,
+        description: vector<u8>,
+        image_uri: vector<u8>,
+        website_uri: vector<u8>,
+        rules_uri: vector<u8>,
+    ) acquires MetadataRegistry {
+        let metadata = LotteryMetadata { title, description, image_uri, website_uri, rules_uri };
+        upsert_metadata_internal(caller, lottery_id, metadata);
+    }
+
+    public fun upsert_metadata_struct(
+        caller: &signer,
+        lottery_id: u64,
+        metadata: LotteryMetadata,
+    ) acquires MetadataRegistry {
+        upsert_metadata_internal(caller, lottery_id, metadata);
+    }
+
+    fun upsert_metadata_internal(
+        caller: &signer,
+        lottery_id: u64,
         metadata: LotteryMetadata,
     ) acquires MetadataRegistry {
         ensure_admin(caller);

@@ -1,4 +1,5 @@
 module lottery::nft_rewards {
+    #[test_only]
     friend lottery::nft_rewards_tests;
     use std::option;
     use std::signer;

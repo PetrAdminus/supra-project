@@ -100,10 +100,10 @@ module lottery::instances {
     public entry fun init(caller: &signer, hub: address) {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         if (exists<LotteryCollection>(@lottery)) {
-            abort E_ALREADY_INIT;
+            abort E_ALREADY_INIT
         };
         move_to(
             caller,
@@ -130,13 +130,17 @@ module lottery::instances {
 
     #[view]
     public fun hub_address(): address acquires LotteryCollection {
-        borrow_state().hub
+        ensure_initialized();
+        let state = borrow_global<LotteryCollection>(@lottery);
+        state.hub
     }
 
 
     #[view]
     public fun admin(): address acquires LotteryCollection {
-        borrow_state().admin
+        ensure_initialized();
+        let state = borrow_global<LotteryCollection>(@lottery);
+        state.admin
     }
 
 
@@ -163,11 +167,11 @@ module lottery::instances {
         ensure_admin(caller);
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
-            abort E_UNKNOWN_INSTANCE;
+            abort E_UNKNOWN_INSTANCE
         };
         let hub_active = hub::is_lottery_active(lottery_id);
         if (hub_active != active) {
-            abort E_STATUS_MISMATCH;
+            abort E_STATUS_MISMATCH
         };
         let instance = table::borrow_mut(&mut state.instances, lottery_id);
         if (instance.active != active) {
@@ -181,31 +185,31 @@ module lottery::instances {
         ensure_admin(caller);
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         if (table::contains(&state.instances, lottery_id)) {
-            abort E_INSTANCE_EXISTS;
+            abort E_INSTANCE_EXISTS
         };
 
         let registration_opt = hub::get_registration(lottery_id);
         if (!option::is_some(&registration_opt)) {
-            abort E_REGISTRATION_INACTIVE;
+            abort E_REGISTRATION_INACTIVE
         };
         let registration_ref = option::borrow(&registration_opt);
         let reg_owner = hub::registration_owner(registration_ref);
         let reg_lottery = hub::registration_lottery(registration_ref);
         let active = hub::registration_active(registration_ref);
         if (!active) {
-            abort E_REGISTRATION_INACTIVE;
+            abort E_REGISTRATION_INACTIVE
         };
 
         let info_opt = registry::get_lottery(lottery_id);
         if (!option::is_some(&info_opt)) {
-            abort E_FACTORY_INFO_MISSING;
+            abort E_FACTORY_INFO_MISSING
         };
         let info_ref = option::borrow(&info_opt);
         let owner = registry::lottery_info_owner(info_ref);
         let lottery_addr = registry::lottery_info_lottery(info_ref);
         let blueprint = registry::lottery_info_blueprint(info_ref);
         if (owner != reg_owner || lottery_addr != reg_lottery) {
-            abort E_REGISTRATION_MISMATCH;
+            abort E_REGISTRATION_MISMATCH
         };
         let ticket_price = registry::blueprint_ticket_price(&blueprint);
         let jackpot_share_bps = registry::blueprint_jackpot_share_bps(&blueprint);
@@ -234,12 +238,12 @@ module lottery::instances {
         ensure_admin(caller);
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
-            abort E_UNKNOWN_INSTANCE;
+            abort E_UNKNOWN_INSTANCE
         };
 
         let info_opt = registry::get_lottery(lottery_id);
         if (!option::is_some(&info_opt)) {
-            abort E_FACTORY_INFO_MISSING;
+            abort E_FACTORY_INFO_MISSING
         };
         let info_ref = option::borrow(&info_opt);
         let owner = registry::lottery_info_owner(info_ref);
@@ -260,19 +264,24 @@ module lottery::instances {
 
     #[view]
     public fun instance_count(): u64 acquires LotteryCollection {
-        table::length(&borrow_state().instances)
+        ensure_initialized();
+        let state = borrow_global<LotteryCollection>(@lottery);
+        table::length(&state.instances)
     }
 
 
     #[view]
     public fun contains_instance(lottery_id: u64): bool acquires LotteryCollection {
-        table::contains(&borrow_state().instances, lottery_id)
+        ensure_initialized();
+        let state = borrow_global<LotteryCollection>(@lottery);
+        table::contains(&state.instances, lottery_id)
     }
 
 
     #[view]
     public fun get_lottery_info(lottery_id: u64): option::Option<registry::LotteryInfo> acquires LotteryCollection {
-        let state = borrow_state();
+        ensure_initialized();
+        let state = borrow_global<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
             option::none()
         } else {
@@ -284,7 +293,8 @@ module lottery::instances {
 
     #[view]
     public fun get_instance_stats(lottery_id: u64): option::Option<InstanceStats> acquires LotteryCollection {
-        let state = borrow_state();
+        ensure_initialized();
+        let state = borrow_global<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
             option::none()
         } else {
@@ -300,7 +310,8 @@ module lottery::instances {
 
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires LotteryCollection {
-        let state = borrow_state();
+        ensure_initialized();
+        let state = borrow_global<LotteryCollection>(@lottery);
         let len = vector::length(&state.lottery_ids);
         let result = vector::empty<u64>();
         let i = 0;
@@ -315,7 +326,8 @@ module lottery::instances {
 
     #[view]
     public fun list_active_lottery_ids(): vector<u64> acquires LotteryCollection {
-        let state = borrow_state();
+        ensure_initialized();
+        let state = borrow_global<LotteryCollection>(@lottery);
         let len = vector::length(&state.lottery_ids);
         let result = vector::empty<u64>();
         let i = 0;
@@ -335,7 +347,8 @@ module lottery::instances {
 
     #[view]
     public fun is_instance_active(lottery_id: u64): bool acquires LotteryCollection {
-        let state = borrow_state();
+        ensure_initialized();
+        let state = borrow_global<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
             false
         } else {
@@ -347,7 +360,7 @@ module lottery::instances {
     public(friend) fun record_ticket_sale(lottery_id: u64, jackpot_contribution: u64) acquires LotteryCollection {
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
-            abort E_UNKNOWN_INSTANCE;
+            abort E_UNKNOWN_INSTANCE
         };
         let instance = table::borrow_mut(&mut state.instances, lottery_id);
         instance.tickets_sold = math64::checked_add(instance.tickets_sold, 1);
@@ -362,24 +375,25 @@ module lottery::instances {
     ) acquires LotteryCollection {
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
-            abort E_UNKNOWN_INSTANCE;
+            abort E_UNKNOWN_INSTANCE
         };
         let instance = table::borrow_mut(&mut state.instances, lottery_id);
         instance.tickets_sold = tickets_sold;
         instance.jackpot_accumulated = jackpot_accumulated;
     }
 
-    fun borrow_state(): &LotteryCollection acquires LotteryCollection {
-        if (!exists<LotteryCollection>(@lottery)) {
-            abort E_NOT_INITIALIZED;
+    fun ensure_admin(caller: &signer) acquires LotteryCollection {
+        ensure_initialized();
+        let addr = signer::address_of(caller);
+        let state = borrow_global<LotteryCollection>(@lottery);
+        if (addr != state.admin) {
+            abort E_NOT_AUTHORIZED
         };
-        borrow_global<LotteryCollection>(@lottery)
     }
 
-    fun ensure_admin(caller: &signer) acquires LotteryCollection {
-        let addr = signer::address_of(caller);
-        if (addr != borrow_state().admin) {
-            abort E_NOT_AUTHORIZED;
+    fun ensure_initialized() {
+        if (!exists<LotteryCollection>(@lottery)) {
+            abort E_NOT_INITIALIZED
         };
     }
 

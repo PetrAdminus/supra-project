@@ -98,10 +98,10 @@ module lottery::vip {
     public entry fun init(caller: &signer) {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         if (exists<VipState>(@lottery)) {
-            abort E_ALREADY_INITIALIZED;
+            abort E_ALREADY_INITIALIZED
         };
         move_to(
             caller,
@@ -123,12 +123,14 @@ module lottery::vip {
     }
 
     public fun admin(): address acquires VipState {
-        borrow_state().admin
+        ensure_initialized();
+        let state = borrow_global<VipState>(@lottery);
+        state.admin
     }
 
     public entry fun set_admin(caller: &signer, new_admin: address) acquires VipState {
         ensure_admin(caller);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<VipState>(@lottery);
         state.admin = new_admin;
     }
 
@@ -142,12 +144,12 @@ module lottery::vip {
         ensure_admin(caller);
         ensure_lottery_known(lottery_id);
         if (price == 0) {
-            abort E_INVALID_PRICE;
+            abort E_INVALID_PRICE
         };
         if (duration_secs == 0) {
-            abort E_INVALID_DURATION;
+            abort E_INVALID_DURATION
         };
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<VipState>(@lottery);
         let config = VipConfig { price, duration_secs, bonus_tickets };
         if (table::contains(&state.lotteries, lottery_id)) {
             let lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
@@ -204,20 +206,21 @@ module lottery::vip {
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return vector::empty<u64>();
+            return vector::empty<u64>()
         };
-        copy_u64_vector(&borrow_state().lottery_ids)
+        let state = borrow_global<VipState>(@lottery);
+        copy_u64_vector(&state.lottery_ids)
     }
 
     #[view]
     public fun get_lottery_summary(lottery_id: u64): option::Option<VipLotterySummary>
     acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return option::none<VipLotterySummary>();
+            return option::none<VipLotterySummary>()
         };
-        let state = borrow_state();
+        let state = borrow_global<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<VipLotterySummary>();
+            return option::none<VipLotterySummary>()
         };
         let lottery = table::borrow(&state.lotteries, lottery_id);
         let total_members = vector::length(&lottery.members);
@@ -247,11 +250,11 @@ module lottery::vip {
     #[view]
     public fun list_players(lottery_id: u64): option::Option<vector<address>> acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return option::none<vector<address>>();
+            return option::none<vector<address>>()
         };
-        let state = borrow_state();
+        let state = borrow_global<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<vector<address>>();
+            return option::none<vector<address>>()
         };
         let lottery = table::borrow(&state.lotteries, lottery_id);
         option::some(copy_address_vector(&lottery.members))
@@ -263,15 +266,15 @@ module lottery::vip {
         player: address,
     ): option::Option<VipSubscriptionView> acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return option::none<VipSubscriptionView>();
+            return option::none<VipSubscriptionView>()
         };
-        let state = borrow_state();
+        let state = borrow_global<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<VipSubscriptionView>();
+            return option::none<VipSubscriptionView>()
         };
         let lottery = table::borrow(&state.lotteries, lottery_id);
         if (!table::contains(&lottery.subscriptions, player)) {
-            return option::none<VipSubscriptionView>();
+            return option::none<VipSubscriptionView>()
         };
         let subscription = table::borrow(&lottery.subscriptions, player);
         let now = timestamp::now_seconds();
@@ -285,15 +288,15 @@ module lottery::vip {
 
     public(friend) fun bonus_tickets_for(lottery_id: u64, player: address): u64 acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return 0;
+            return 0
         };
-        let state = borrow_state();
+        let state = borrow_global<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return 0;
+            return 0
         };
         let lottery = table::borrow(&state.lotteries, lottery_id);
         if (!table::contains(&lottery.subscriptions, player)) {
-            return 0;
+            return 0
         };
         let subscription = table::borrow(&lottery.subscriptions, player);
         let now = timestamp::now_seconds();
@@ -310,11 +313,11 @@ module lottery::vip {
         bonus_tickets: u64,
     ) acquires VipState {
         if (bonus_tickets == 0 || !exists<VipState>(@lottery)) {
-            return;
+            return
         };
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return;
+            return
         };
         let lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
         lottery.bonus_tickets_issued = math64::checked_add(lottery.bonus_tickets_issued, bonus_tickets);
@@ -345,11 +348,11 @@ module lottery::vip {
     ) acquires VipState {
         ensure_lottery_known(lottery_id);
         if (!exists<VipState>(@lottery)) {
-            abort E_NOT_INITIALIZED;
+            abort E_NOT_INITIALIZED
         };
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            abort E_UNKNOWN_LOTTERY;
+            abort E_UNKNOWN_LOTTERY
         };
         let lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
         let config_snapshot = lottery.config;
@@ -403,19 +406,19 @@ module lottery::vip {
         lottery_id: u64,
     ) acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            abort E_NOT_INITIALIZED;
+            abort E_NOT_INITIALIZED
         };
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            abort E_UNKNOWN_LOTTERY;
+            abort E_UNKNOWN_LOTTERY
         };
         let lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
         if (!table::contains(&lottery.subscriptions, player)) {
-            abort E_SUBSCRIPTION_NOT_FOUND;
+            abort E_SUBSCRIPTION_NOT_FOUND
         };
         let caller_is_player = caller_addr == player;
         if (!caller_is_player && caller_addr != state.admin) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         let subscription = table::borrow_mut(&mut lottery.subscriptions, player);
         subscription.expiry_ts = timestamp::now_seconds();
@@ -428,7 +431,7 @@ module lottery::vip {
 
     fun ensure_lottery_known(lottery_id: u64) {
         if (!instances::contains_instance(lottery_id)) {
-            abort E_UNKNOWN_LOTTERY;
+            abort E_UNKNOWN_LOTTERY
         };
     }
 
@@ -437,7 +440,7 @@ module lottery::vip {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
-                return;
+                return
             };
             idx = idx + 1;
         };
@@ -449,7 +452,7 @@ module lottery::vip {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(members, idx) == member) {
-                return;
+                return
             };
             idx = idx + 1;
         };
@@ -478,23 +481,18 @@ module lottery::vip {
         out
     }
 
-    fun borrow_state(): &VipState acquires VipState {
-        if (!exists<VipState>(@lottery)) {
-            abort E_NOT_INITIALIZED;
-        };
-        borrow_global<VipState>(@lottery)
-    }
-
-    fun borrow_state_mut(): &mut VipState acquires VipState {
-        if (!exists<VipState>(@lottery)) {
-            abort E_NOT_INITIALIZED;
-        };
-        borrow_global_mut<VipState>(@lottery)
-    }
-
     fun ensure_admin(caller: &signer) acquires VipState {
-        if (signer::address_of(caller) != borrow_state().admin) {
-            abort E_NOT_AUTHORIZED;
+        ensure_initialized();
+        let addr = signer::address_of(caller);
+        let state = borrow_global<VipState>(@lottery);
+        if (addr != state.admin) {
+            abort E_NOT_AUTHORIZED
+        };
+    }
+
+    fun ensure_initialized() {
+        if (!exists<VipState>(@lottery)) {
+            abort E_NOT_INITIALIZED
         };
     }
 }

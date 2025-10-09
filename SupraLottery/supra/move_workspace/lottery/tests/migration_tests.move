@@ -13,7 +13,7 @@ module lottery::migration_tests {
     use lottery_factory::registry;
     use vrf_hub::hub;
 
-    #[test]
+    #[test(lottery = @lottery, lottery_owner = @player1, lottery_contract = @player2)]
     fun migrate_legacy_state(
         lottery: &signer,
         lottery_owner: &signer,
@@ -74,7 +74,8 @@ module lottery::migration_tests {
         assert!(main_v2::get_jackpot_amount() == 0, main_v2::get_jackpot_amount());
     }
 
-    #[test(expect_failure, abort_code = 3)]
+    #[test(lottery = @lottery)]
+    #[expected_failure(abort_code = migration::E_PENDING_REQUEST)]
     fun migration_rejects_pending_request(lottery: &signer) {
         setup_environment(lottery);
 
