@@ -10,21 +10,21 @@ module std::timestamp {
 
     const ADMIN: address = @0x1;
 
-    fun borrow_state(): &TimestampState {
+    fun borrow_state(): &TimestampState acquires TimestampState {
         if (!exists<TimestampState>(ADMIN)) {
             abort E_NOT_AUTHORIZED
         };
         borrow_global<TimestampState>(ADMIN)
     }
 
-    fun borrow_state_mut(): &mut TimestampState {
+    fun borrow_state_mut(): &mut TimestampState acquires TimestampState {
         if (!exists<TimestampState>(ADMIN)) {
             abort E_NOT_AUTHORIZED
         };
         borrow_global_mut<TimestampState>(ADMIN)
     }
 
-    public fun now_seconds(): u64 {
+    public fun now_seconds(): u64 acquires TimestampState {
         if (!exists<TimestampState>(ADMIN)) {
             return 0
         };
@@ -36,7 +36,7 @@ module std::timestamp {
         }
     }
 
-    public fun now_microseconds(): u64 {
+    public fun now_microseconds(): u64 acquires TimestampState {
         if (!exists<TimestampState>(ADMIN)) {
             return 0
         };
@@ -48,7 +48,7 @@ module std::timestamp {
         }
     }
 
-    public fun set_time_has_started_for_testing(framework: &signer) {
+    public fun set_time_has_started_for_testing(framework: &signer) acquires TimestampState {
         assert!(signer::address_of(framework) == ADMIN, E_NOT_AUTHORIZED);
         if (!exists<TimestampState>(ADMIN)) {
             move_to(
@@ -61,7 +61,7 @@ module std::timestamp {
         };
     }
 
-    public fun set_time_microseconds_for_testing(framework: &signer, microseconds: u64) {
+    public fun set_time_microseconds_for_testing(framework: &signer, microseconds: u64) acquires TimestampState {
         assert!(signer::address_of(framework) == ADMIN, E_NOT_AUTHORIZED);
         if (!exists<TimestampState>(ADMIN)) {
             move_to(

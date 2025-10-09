@@ -395,9 +395,9 @@ module lottery::main_v2 {
         let per_request_fee_u64 = checked_u64_from_u128(per_request_fee, E_MIN_BALANCE_OVERFLOW);
         assert!(initial_deposit >= min_balance, E_INITIAL_DEPOSIT_TOO_LOW);
         if (call_native) {
-            deposit::clientSettingMinimumBalance(sender, min_balance);
-            deposit::depositFundClient(sender, initial_deposit);
-            deposit::addContractToWhitelist(sender, @lottery, callback_gas_price, callback_gas_limit);
+            deposit::client_setting_minimum_balance(sender, min_balance);
+            deposit::deposit_fund(sender, initial_deposit);
+            deposit::add_contract_to_whitelist(sender, @lottery);
         };
         event::emit(SubscriptionConfiguredEvent {
             min_balance,
@@ -489,7 +489,7 @@ module lottery::main_v2 {
         };
         let per_request_fee_u64 = checked_u64_from_u128(per_request_fee, E_MIN_BALANCE_OVERFLOW);
         if (call_native) {
-            deposit::clientSettingMinimumBalance(sender, min_balance);
+            deposit::client_setting_minimum_balance(sender, min_balance);
         };
 
         let lottery = borrow_global_mut<LotteryData>(@lottery);
@@ -702,7 +702,7 @@ module lottery::main_v2 {
         assert!(can_withdraw, E_WITHDRAWAL_PENDING_REQUEST);
 
         if (call_native) {
-            deposit::withdrawFundClient(sender, amount);
+            deposit::withdraw_fund(sender, amount);
         };
 
         event::emit(FundsWithdrawnEvent { admin, amount });
@@ -1565,7 +1565,7 @@ module lottery::main_v2 {
         while (i < len) {
             if (*vector::borrow(consumers, i) == target) {
                 found = true;
-                break;
+                break
             };
             i = i + 1;
         };
@@ -1580,7 +1580,7 @@ module lottery::main_v2 {
             if (*vector::borrow(consumers, i) == target) {
                 vector::swap_remove(consumers, i);
                 removed = true;
-                break;
+                break
             };
             i = i + 1;
         };
@@ -1654,7 +1654,7 @@ module lottery::main_v2 {
         } else {
             assert!(a <= U64_MAX / b, abort_code);
             a * b
-        };
+        }
     }
 
     fun safe_add_u128(a: u128, b: u128, abort_code: u64): u128 {
@@ -1668,7 +1668,7 @@ module lottery::main_v2 {
         } else {
             assert!(a <= U128_MAX / b, abort_code);
             a * b
-        };
+        }
     }
 
     fun ensure_payload_hash_matches(
@@ -1714,7 +1714,7 @@ module lottery::main_v2 {
             while (i < len) {
                 if (*vector::borrow(lhs, i) != *vector::borrow(rhs, i)) {
                     equal = false;
-                    break;
+                    break
                 };
                 i = i + 1;
             };

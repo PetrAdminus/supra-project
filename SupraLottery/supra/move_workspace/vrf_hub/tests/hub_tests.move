@@ -28,9 +28,12 @@ module vrf_hub::hub_tests {
 
         let registration_opt = hub::get_registration(id);
         let registration = option::destroy_some(registration_opt);
-        assert!(registration.owner == OWNER, 0);
-        assert!(registration.lottery == LOTTERY_ADDR, 0);
-        assert!(vector::length(&registration.metadata) == 4, 0);
+        let (owner, lottery, metadata, active) =
+            hub::registration_fields_for_test(&registration);
+        assert!(owner == OWNER, 0);
+        assert!(lottery == LOTTERY_ADDR, 0);
+        assert!(vector::length(&metadata) == 4, 0);
+        assert!(active, 0);
     }
 
     #[test]
@@ -48,8 +51,10 @@ module vrf_hub::hub_tests {
         hub::update_metadata(&hub_signer, id, b"data");
         let registration_opt = hub::get_registration(id);
         let registration = option::destroy_some(registration_opt);
-        assert!(vector::length(&registration.metadata) == 4, 0);
-        assert!(*vector::borrow(&registration.metadata, 0) == 100, 0); // 'd'
+        let (_owner_after, _lottery_after, metadata_after, _active_after) =
+            hub::registration_fields_for_test(&registration);
+        assert!(vector::length(&metadata_after) == 4, 0);
+        assert!(*vector::borrow(&metadata_after, 0) == 100, 0); // 'd'
     }
 
     #[test]
@@ -68,11 +73,13 @@ module vrf_hub::hub_tests {
 
         let record_opt = hub::get_request(request_id);
         let preview = option::destroy_some(record_opt);
-        assert!(preview.lottery_id == lottery_id, 0);
-        assert!(vector::length(&preview.payload) == 7, 0);
+        let (preview_lottery, preview_payload) =
+            hub::request_record_fields_for_test(&preview);
+        assert!(preview_lottery == lottery_id, 0);
+        assert!(vector::length(&preview_payload) == 7, 0);
 
         let record = hub::consume_request(request_id);
-        let hub::RequestRecord { lottery_id: stored_lottery, payload } = record;
+        let (stored_lottery, payload) = hub::request_record_fields_for_test(&record);
         assert!(stored_lottery == lottery_id, 0);
         assert!(vector::length(&payload) == 7, 0);
 

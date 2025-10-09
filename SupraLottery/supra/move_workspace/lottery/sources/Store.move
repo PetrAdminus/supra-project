@@ -82,10 +82,10 @@ module lottery::store {
     public entry fun init(caller: &signer) {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         if (exists<StoreState>(@lottery)) {
-            abort E_ALREADY_INITIALIZED;
+            abort E_ALREADY_INITIALIZED
         };
         move_to(
             caller,
@@ -109,13 +109,14 @@ module lottery::store {
 
     #[view]
     public fun admin() : address acquires StoreState {
-        borrow_state().admin
+        let state = borrow_global<StoreState>(@lottery);
+        state.admin
     }
 
 
     public entry fun set_admin(caller: &signer, new_admin: address) acquires StoreState {
         ensure_admin(caller);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<StoreState>(@lottery);
         let previous = state.admin;
         state.admin = new_admin;
         event::emit_event(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
@@ -134,12 +135,12 @@ module lottery::store {
         ensure_admin(caller);
         ensure_lottery_exists(lottery_id);
         if (price == 0) {
-            abort E_INVALID_STOCK;
+            abort E_INVALID_STOCK
         };
         if (option::is_some(&stock) && *option::borrow(&stock) == 0) {
-            abort E_INVALID_STOCK;
+            abort E_INVALID_STOCK
         };
-        let state_ref = borrow_state_mut();
+        let state_ref = borrow_global_mut<StoreState>(@lottery);
         let store = borrow_or_add_store(state_ref, lottery_id);
         if (table::contains(&store.items, item_id)) {
             let record = table::borrow_mut(&mut store.items, item_id);
@@ -169,13 +170,13 @@ module lottery::store {
     ) acquires StoreState {
         ensure_admin(caller);
         ensure_lottery_exists(lottery_id);
-        let state_ref = borrow_state_mut();
+        let state_ref = borrow_global_mut<StoreState>(@lottery);
         if (!table::contains(&state_ref.lotteries, lottery_id)) {
-            abort E_ITEM_NOT_FOUND;
+            abort E_ITEM_NOT_FOUND
         };
         let store = table::borrow_mut(&mut state_ref.lotteries, lottery_id);
         if (!table::contains(&store.items, item_id)) {
-            abort E_ITEM_NOT_FOUND;
+            abort E_ITEM_NOT_FOUND
         };
         let record = table::borrow_mut(&mut store.items, item_id);
         record.item.available = available;
@@ -201,19 +202,19 @@ module lottery::store {
     ) acquires StoreState {
         assert!(quantity > 0, E_INVALID_QUANTITY);
         ensure_lottery_exists(lottery_id);
-        let state_ref = borrow_state_mut();
+        let state_ref = borrow_global_mut<StoreState>(@lottery);
         let store = borrow_store_mut(state_ref, lottery_id);
         if (!table::contains(&store.items, item_id)) {
-            abort E_ITEM_NOT_FOUND;
+            abort E_ITEM_NOT_FOUND
         };
         let record = table::borrow_mut(&mut store.items, item_id);
         if (!record.item.available) {
-            abort E_ITEM_NOT_FOUND;
+            abort E_ITEM_NOT_FOUND
         };
         let stock_left = if (option::is_some(&record.item.stock)) {
             let remaining = *option::borrow(&record.item.stock);
             if (remaining < quantity) {
-                abort E_INSUFFICIENT_STOCK;
+                abort E_INSUFFICIENT_STOCK
             };
             option::some(remaining - quantity)
         } else {
@@ -234,11 +235,11 @@ module lottery::store {
     #[view]
     public fun get_item(lottery_id: u64, item_id: u64): option::Option<StoreItem> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return option::none();
+            return option::none()
         };
-        let state = borrow_state();
+        let state = borrow_global<StoreState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none();
+            return option::none()
         };
         let store = table::borrow(&state.lotteries, lottery_id);
         if (!table::contains(&store.items, item_id)) {
@@ -253,11 +254,11 @@ module lottery::store {
     public fun get_item_with_stats(lottery_id: u64, item_id: u64): option::Option<ItemWithStats>
     acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return option::none();
+            return option::none()
         };
-        let state = borrow_state();
+        let state = borrow_global<StoreState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none();
+            return option::none()
         };
         let store = table::borrow(&state.lotteries, lottery_id);
         if (!table::contains(&store.items, item_id)) {
@@ -272,20 +273,19 @@ module lottery::store {
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            vector::empty<u64>()
-        } else {
-            let state_ref = borrow_state();
-            copy_vec_u64(&state_ref.lottery_ids)
-        }
+            return vector::empty<u64>()
+        };
+        let state_ref = borrow_global<StoreState>(@lottery);
+        copy_vec_u64(&state_ref.lottery_ids)
     }
 
 
     #[view]
     public fun list_item_ids(lottery_id: u64): vector<u64> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return vector::empty<u64>();
+            return vector::empty<u64>()
         };
-        let state_ref = borrow_state();
+        let state_ref = borrow_global<StoreState>(@lottery);
         if (!table::contains(&state_ref.lotteries, lottery_id)) {
             vector::empty<u64>()
         } else {
@@ -298,11 +298,11 @@ module lottery::store {
     public fun get_lottery_summary(lottery_id: u64): option::Option<vector<ItemWithStats>>
     acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return option::none();
+            return option::none()
         };
-        let state_ref = borrow_state();
+        let state_ref = borrow_global<StoreState>(@lottery);
         if (!table::contains(&state_ref.lotteries, lottery_id)) {
-            return option::none();
+            return option::none()
         };
         let store = table::borrow(&state_ref.lotteries, lottery_id);
         let result = vector::empty<ItemWithStats>();
@@ -320,23 +320,29 @@ module lottery::store {
     }
 
     fun ensure_admin(caller: &signer) acquires StoreState {
-        if (signer::address_of(caller) != borrow_state().admin) {
-            abort E_NOT_AUTHORIZED;
+        if (!exists<StoreState>(@lottery)) {
+            abort E_NOT_INITIALIZED
+        };
+        let state = borrow_global<StoreState>(@lottery);
+        if (signer::address_of(caller) != state.admin) {
+            abort E_NOT_AUTHORIZED
         };
     }
 
     fun ensure_lottery_exists(lottery_id: u64) {
         if (!instances::contains_instance(lottery_id)) {
-            abort E_LOTTERY_NOT_FOUND;
+            abort E_LOTTERY_NOT_FOUND
         };
     }
 
-    fun borrow_state() : &StoreState acquires StoreState {
-        borrow_global<StoreState>(@lottery)
+    #[test_only]
+    public fun item_with_stats_components_for_test(item_stats: &ItemWithStats): (StoreItem, u64) {
+        (item_stats.item, item_stats.sold)
     }
 
-    fun borrow_state_mut() : &mut StoreState acquires StoreState {
-        borrow_global_mut<StoreState>(@lottery)
+    #[test_only]
+    public fun store_item_stock_for_test(item: &StoreItem): option::Option<u64> {
+        item.stock
     }
 
     fun borrow_or_add_store(state: &mut StoreState, lottery_id: u64): &mut LotteryStore {
@@ -351,7 +357,7 @@ module lottery::store {
 
     fun borrow_store_mut(state: &mut StoreState, lottery_id: u64): &mut LotteryStore {
         if (!table::contains(&state.lotteries, lottery_id)) {
-            abort E_NOT_INITIALIZED;
+            abort E_NOT_INITIALIZED
         };
         table::borrow_mut(&mut state.lotteries, lottery_id)
     }

@@ -48,10 +48,10 @@ module lottery::history {
     public entry fun init(caller: &signer) {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         if (exists<HistoryCollection>(@lottery)) {
-            abort E_ALREADY_INITIALIZED;
+            abort E_ALREADY_INITIALIZED
         };
         move_to(
             caller,
@@ -69,18 +69,19 @@ module lottery::history {
     }
 
     public fun admin(): address acquires HistoryCollection {
-        borrow_state().admin
+        let state = borrow_global<HistoryCollection>(@lottery);
+        state.admin
     }
 
     public entry fun set_admin(caller: &signer, new_admin: address) acquires HistoryCollection {
         ensure_admin(caller);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<HistoryCollection>(@lottery);
         state.admin = new_admin;
     }
 
     public entry fun clear_history(caller: &signer, lottery_id: u64) acquires HistoryCollection {
         ensure_admin(caller);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<HistoryCollection>(@lottery);
         if (table::contains(&state.histories, lottery_id)) {
             let history = table::borrow_mut(&mut state.histories, lottery_id);
             clear_records(&mut history.records);
@@ -97,10 +98,10 @@ module lottery::history {
         payload: vector<u8>,
     ) acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return;
+            return
         };
-        let state = borrow_state_mut();
-        let history = borrow_or_create_history(&mut state, lottery_id);
+        let state = borrow_global_mut<HistoryCollection>(@lottery);
+        let history = borrow_or_create_history(state, lottery_id);
         let timestamp_seconds = timestamp::now_seconds();
         let record = DrawRecord {
             request_id,
@@ -129,27 +130,27 @@ module lottery::history {
     #[view]
     public fun has_history(lottery_id: u64): bool acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return false;
+            return false
         };
-        let state = borrow_state();
+        let state = borrow_global<HistoryCollection>(@lottery);
         table::contains(&state.histories, lottery_id)
     }
 
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return vector::empty<u64>();
+            return vector::empty<u64>()
         };
-        let state = borrow_state();
+        let state = borrow_global<HistoryCollection>(@lottery);
         clone_u64_vector(&state.lottery_ids)
     }
 
     #[view]
     public fun get_history(lottery_id: u64): option::Option<vector<DrawRecord>> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return option::none<vector<DrawRecord>>();
+            return option::none<vector<DrawRecord>>()
         };
-        let state = borrow_state();
+        let state = borrow_global<HistoryCollection>(@lottery);
         if (!table::contains(&state.histories, lottery_id)) {
             option::none<vector<DrawRecord>>()
         } else {
@@ -161,9 +162,9 @@ module lottery::history {
     #[view]
     public fun latest_record(lottery_id: u64): option::Option<DrawRecord> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return option::none<DrawRecord>();
+            return option::none<DrawRecord>()
         };
-        let state = borrow_state();
+        let state = borrow_global<HistoryCollection>(@lottery);
         if (!table::contains(&state.histories, lottery_id)) {
             option::none<DrawRecord>()
         } else {
@@ -177,21 +178,14 @@ module lottery::history {
         }
     }
 
-    fun borrow_state() : &HistoryCollection acquires HistoryCollection {
-        borrow_global<HistoryCollection>(@lottery)
-    }
-
-    fun borrow_state_mut(): &mut HistoryCollection acquires HistoryCollection {
-        borrow_global_mut<HistoryCollection>(@lottery)
-    }
-
     fun ensure_admin(caller: &signer) acquires HistoryCollection {
         let addr = signer::address_of(caller);
         if (!exists<HistoryCollection>(@lottery)) {
-            abort E_NOT_INITIALIZED;
+            abort E_NOT_INITIALIZED
         };
-        if (addr != borrow_state().admin) {
-            abort E_NOT_AUTHORIZED;
+        let state = borrow_global<HistoryCollection>(@lottery);
+        if (addr != state.admin) {
+            abort E_NOT_AUTHORIZED
         };
     }
 
@@ -220,9 +214,10 @@ module lottery::history {
         let index = 0;
         while (index < len) {
             if (*vector::borrow(list, index) == lottery_id) {
-                return;
-            };
-            index = index + 1;
+                return
+            } else {
+                index = index + 1;
+            }
         };
         vector::push_back(list, lottery_id);
     }
@@ -247,5 +242,20 @@ module lottery::history {
             index = index + 1;
         };
         result
+    }
+
+    #[test_only]
+    public fun draw_record_fields_for_test(
+        record: &DrawRecord
+    ): (u64, address, u64, u64, vector<u8>, vector<u8>, u64) {
+        (
+            record.request_id,
+            record.winner,
+            record.ticket_index,
+            record.prize_amount,
+            record.random_bytes,
+            record.payload,
+            record.timestamp_seconds,
+        )
     }
 }

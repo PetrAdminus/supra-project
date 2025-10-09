@@ -1650,3 +1650,123 @@ Output:
 General: {
   "Error": "Unexpected error: Failed to run tests: Error parsing package manifest: Required field name 'package' not found"
 }
+Local: (2025-10-09 12:38:00.696238765 +00:00)	 Utc: (2025-10-09 12:38:00.702538801 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-09 12:42:47.056998873 +00:00)	 Utc: (2025-10-09 12:42:47.057077095 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-09 12:45:00.131844014 +00:00)	 Utc: (2025-10-09 12:45:00.131929310 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-09 12:45:36.215128400 +00:00)	 Utc: (2025-10-09 12:45:36.215204565 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-09 12:46:03.916323941 +00:00)	 Utc: (2025-10-09 12:46:03.916409267 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-09 12:46:25.584754872 +00:00)	 Utc: (2025-10-09 12:46:25.584842843 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-09 12:47:19.061170165 +00:00)	 Utc: (2025-10-09 12:47:19.061285691 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-09 12:47:41.711307724 +00:00)	 Utc: (2025-10-09 12:47:41.711389223 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-09 12:48:06.814499716 +00:00)	 Utc: (2025-10-09 12:48:06.814573910 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-09 12:48:27.607520724 +00:00)	 Utc: (2025-10-09 12:48:27.607595199 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-09 12:48:47.529740276 +00:00)	 Utc: (2025-10-09 12:48:47.529816033 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-09 12:49:07.516699501 +00:00)	 Utc: (2025-10-09 12:49:07.516784005 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-09 12:49:54.734121625 +00:00)	 Utc: (2025-10-09 12:49:54.734196530 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-09 12:50:12.148828095 +00:00)	 Utc: (2025-10-09 12:50:12.148922619 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-09 14:27:37.554105775 +00:00)	 Utc: (2025-10-09 14:27:37.554726117 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}

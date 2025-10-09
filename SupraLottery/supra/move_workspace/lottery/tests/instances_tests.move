@@ -1,5 +1,5 @@
+#[test_only]
 module lottery::instances_tests {
-    use std::option;
     use std::vector;
     use lottery::instances;
     use lottery::test_utils;
@@ -32,13 +32,10 @@ module lottery::instances_tests {
         assert!(instances::is_instance_active(lottery_id), 3);
 
         let info = test_utils::unwrap(instances::get_lottery_info(lottery_id));
-        let owner = info.owner;
-        let lottery_addr = info.lottery;
-        let blueprint = info.blueprint;
+        let (owner, lottery_addr, ticket_price, jackpot_share_bps) =
+            registry::lottery_info_fields_for_test(&info);
         assert!(owner == @lottery_owner, 4);
         assert!(lottery_addr == @lottery_contract, 5);
-        let ticket_price = blueprint.ticket_price;
-        let jackpot_share_bps = blueprint.jackpot_share_bps;
         assert!(ticket_price == 10, 6);
         assert!(jackpot_share_bps == 500, 7);
 
@@ -47,9 +44,8 @@ module lottery::instances_tests {
         instances::sync_blueprint(lottery_admin, lottery_id);
 
         let synced_info = test_utils::unwrap(instances::get_lottery_info(lottery_id));
-        let synced_blueprint = synced_info.blueprint;
-        let synced_price = synced_blueprint.ticket_price;
-        let synced_share = synced_blueprint.jackpot_share_bps;
+        let (_owner_sync, _lottery_sync, synced_price, synced_share) =
+            registry::lottery_info_fields_for_test(&synced_info);
         assert!(synced_price == 25, 8);
         assert!(synced_share == 800, 9);
 

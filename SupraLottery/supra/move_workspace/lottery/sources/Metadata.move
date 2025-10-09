@@ -48,10 +48,10 @@ module lottery::metadata {
     public entry fun init(caller: &signer) {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         if (exists<MetadataRegistry>(@lottery)) {
-            abort E_ALREADY_INIT;
+            abort E_ALREADY_INIT
         };
         move_to(
             caller,
@@ -71,16 +71,17 @@ module lottery::metadata {
     }
 
     public fun admin(): address acquires MetadataRegistry {
-        borrow_state().admin
+        let state = borrow_global<MetadataRegistry>(@lottery);
+        state.admin
     }
 
     public fun has_metadata(lottery_id: u64): bool acquires MetadataRegistry {
-        let state = borrow_state();
+        let state = borrow_global<MetadataRegistry>(@lottery);
         table::contains(&state.entries, lottery_id)
     }
 
     public fun get_metadata(lottery_id: u64): option::Option<LotteryMetadata> acquires MetadataRegistry {
-        let state = borrow_state();
+        let state = borrow_global<MetadataRegistry>(@lottery);
         if (!table::contains(&state.entries, lottery_id)) {
             option::none()
         } else {
@@ -89,7 +90,7 @@ module lottery::metadata {
     }
 
     public fun list_lottery_ids(): vector<u64> acquires MetadataRegistry {
-        let state = borrow_state();
+        let state = borrow_global<MetadataRegistry>(@lottery);
         let len = vector::length(&state.lottery_ids);
         let result = vector::empty<u64>();
         let i = 0;
@@ -145,25 +146,35 @@ module lottery::metadata {
         ensure_admin(caller);
         let state = borrow_global_mut<MetadataRegistry>(@lottery);
         if (!table::contains(&state.entries, lottery_id)) {
-            abort E_METADATA_MISSING;
+            abort E_METADATA_MISSING
         };
         table::remove(&mut state.entries, lottery_id);
         remove_lottery_id(&mut state.lottery_ids, lottery_id);
         event::emit_event(&mut state.remove_events, LotteryMetadataRemovedEvent { lottery_id });
     }
 
-    fun borrow_state(): &MetadataRegistry acquires MetadataRegistry {
-        if (!exists<MetadataRegistry>(@lottery)) {
-            abort E_NOT_INITIALIZED;
-        };
-        borrow_global<MetadataRegistry>(@lottery)
-    }
-
     fun ensure_admin(caller: &signer) acquires MetadataRegistry {
         let addr = signer::address_of(caller);
-        if (addr != borrow_state().admin) {
-            abort E_NOT_AUTHORIZED;
+        if (!exists<MetadataRegistry>(@lottery)) {
+            abort E_NOT_INITIALIZED
         };
+        let state = borrow_global<MetadataRegistry>(@lottery);
+        if (addr != state.admin) {
+            abort E_NOT_AUTHORIZED
+        }
+    }
+
+    #[test_only]
+    public fun metadata_fields_for_test(
+        metadata: &LotteryMetadata
+    ): (vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>) {
+        (
+            metadata.title,
+            metadata.description,
+            metadata.image_uri,
+            metadata.website_uri,
+            metadata.rules_uri,
+        )
     }
 
     fun clone_metadata(metadata: &LotteryMetadata): LotteryMetadata {
@@ -193,7 +204,7 @@ module lottery::metadata {
         while (i < len) {
             if (*vector::borrow(ids, i) == lottery_id) {
                 vector::swap_remove(ids, i);
-                return;
+                return
             };
             i = i + 1;
         };

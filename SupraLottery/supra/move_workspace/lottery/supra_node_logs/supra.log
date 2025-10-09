@@ -112,3 +112,33 @@
 [2025-09-13T14:55:37.634609Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
 [2025-09-13T15:09:58.359647Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:33089. Use `tokio-console http://localhost:33089` to view.
 [2025-09-13T15:09:58.359703Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T12:38:00.383034Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:39865. Use `tokio-console http://localhost:39865` to view.
+[2025-10-09T12:38:00.383088Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T12:42:46.748333Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:33697. Use `tokio-console http://localhost:33697` to view.
+[2025-10-09T12:42:46.748382Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T12:44:59.820350Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:41293. Use `tokio-console http://localhost:41293` to view.
+[2025-10-09T12:44:59.820402Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T12:45:35.908695Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:32781. Use `tokio-console http://localhost:32781` to view.
+[2025-10-09T12:45:35.908744Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T12:46:03.605158Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:34699. Use `tokio-console http://localhost:34699` to view.
+[2025-10-09T12:46:03.605204Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T12:46:25.272239Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:42389. Use `tokio-console http://localhost:42389` to view.
+[2025-10-09T12:46:25.272297Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T12:47:18.738219Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:39913. Use `tokio-console http://localhost:39913` to view.
+[2025-10-09T12:47:18.738269Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T12:47:41.392892Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:46039. Use `tokio-console http://localhost:46039` to view.
+[2025-10-09T12:47:41.392940Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T12:48:06.498491Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:43737. Use `tokio-console http://localhost:43737` to view.
+[2025-10-09T12:48:06.498534Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T12:48:27.296751Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:44875. Use `tokio-console http://localhost:44875` to view.
+[2025-10-09T12:48:27.296799Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T12:48:47.221546Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:40131. Use `tokio-console http://localhost:40131` to view.
+[2025-10-09T12:48:47.221604Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T12:49:07.204248Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:42515. Use `tokio-console http://localhost:42515` to view.
+[2025-10-09T12:49:07.204302Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T12:49:54.422052Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:38361. Use `tokio-console http://localhost:38361` to view.
+[2025-10-09T12:49:54.422106Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T12:50:11.739348Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:35017. Use `tokio-console http://localhost:35017` to view.
+[2025-10-09T12:50:11.739389Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.
+[2025-10-09T14:27:36.971189Z+00:00]  INFO supra_logger: Starting console-logger runtime at localhost:45167. Use `tokio-console http://localhost:45167` to view.
+[2025-10-09T14:27:36.971229Z+00:00]  INFO supra::common::verbose: Log level INFO enabled.

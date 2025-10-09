@@ -123,7 +123,7 @@ module lottery::autopurchase {
         lottery_id: u64,
         tickets_per_draw: u64,
         active: bool,
-    ) acquires AutopurchaseState, instances::LotteryCollection {
+    ) acquires AutopurchaseState {
         ensure_lottery_known(lottery_id);
         if (active && tickets_per_draw == 0) {
             abort E_TICKETS_PER_DRAW_ZERO;
@@ -150,7 +150,7 @@ module lottery::autopurchase {
     }
 
     public entry fun deposit(caller: &signer, lottery_id: u64, amount: u64)
-    acquires AutopurchaseState, instances::LotteryCollection {
+    acquires AutopurchaseState {
         if (amount == 0) {
             abort E_INVALID_AMOUNT;
         };
@@ -184,7 +184,7 @@ module lottery::autopurchase {
     }
 
     public entry fun execute(caller: &signer, lottery_id: u64, player: address)
-    acquires AutopurchaseState, instances::LotteryCollection, rounds::RoundCollection {
+    acquires AutopurchaseState {
         ensure_executor(caller, player);
         ensure_lottery_known(lottery_id);
         let state = borrow_state_mut();
@@ -203,9 +203,9 @@ module lottery::autopurchase {
         if (!option::is_some(&info_opt)) {
             abort E_UNKNOWN_LOTTERY;
         };
-        let info = *option::borrow(&info_opt);
-        let blueprint = info.blueprint;
-        let ticket_price = blueprint.ticket_price;
+        let info_ref = option::borrow(&info_opt);
+        let blueprint = registry::lottery_info_blueprint(info_ref);
+        let ticket_price = registry::blueprint_ticket_price(&blueprint);
         assert!(ticket_price > 0, E_TICKETS_PER_DRAW_ZERO);
         let affordable = plan.balance / ticket_price;
         let tickets_to_buy = plan.tickets_per_draw;
@@ -234,7 +234,7 @@ module lottery::autopurchase {
         caller: &signer,
         lottery_id: u64,
         amount: u64,
-    ) acquires AutopurchaseState, instances::LotteryCollection, treasury_v1::TokenState {
+    ) acquires AutopurchaseState {
         if (amount == 0) {
             abort E_INVALID_AMOUNT;
         };
@@ -332,7 +332,7 @@ module lottery::autopurchase {
         option::some(copy_address_vector(&plans.players))
     }
 
-    fun ensure_lottery_known(lottery_id: u64) acquires instances::LotteryCollection {
+    fun ensure_lottery_known(lottery_id: u64) {
         if (!instances::contains_instance(lottery_id)) {
             abort E_UNKNOWN_LOTTERY;
         };
@@ -392,6 +392,16 @@ module lottery::autopurchase {
         if (addr != borrow_state().admin) {
             abort E_NOT_AUTHORIZED;
         };
+    }
+
+    #[test_only]
+    public fun plan_fields_for_test(plan: &AutopurchasePlan): (u64, u64, bool) {
+        (plan.balance, plan.tickets_per_draw, plan.active)
+    }
+
+    #[test_only]
+    public fun summary_fields_for_test(summary: &AutopurchaseLotterySummary): (u64, u64, u64) {
+        (summary.total_balance, summary.total_players, summary.active_players)
     }
 
     fun copy_u64_vector(values: &vector<u64>): vector<u64> {

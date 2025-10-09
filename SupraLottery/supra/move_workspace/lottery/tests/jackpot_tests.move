@@ -1,5 +1,5 @@
+#[test_only]
 module lottery::jackpot_tests {
-    use std::option;
     use std::vector;
     use std::account;
     use std::signer;
@@ -80,7 +80,8 @@ module lottery::jackpot_tests {
         jackpot::fulfill_draw(aggregator, request_id, randomness);
 
         let snapshot = test_utils::unwrap(jackpot::get_snapshot());
-        let jackpot::JackpotSnapshot { ticket_count, draw_scheduled, has_pending_request } = snapshot;
+        let (ticket_count, draw_scheduled, has_pending_request) =
+            jackpot::jackpot_snapshot_fields_for_test(&snapshot);
         assert!(ticket_count == 0, 1);
         assert!(!draw_scheduled, 2);
         assert!(!has_pending_request, 3);

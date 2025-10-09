@@ -1,3 +1,4 @@
+#[test_only]
 module lottery::referrals_tests {
     use std::option;
     use std::vector;
@@ -85,11 +86,8 @@ module lottery::referrals_tests {
 
         let stats_opt = referrals::get_lottery_stats(lottery_id);
         let stats = test_utils::unwrap(stats_opt);
-        let referrals::ReferralStats {
-            rewarded_purchases,
-            total_referrer_rewards,
-            total_referee_rewards,
-        } = stats;
+        let (rewarded_purchases, total_referrer_rewards, total_referee_rewards) =
+            referrals::referral_stats_for_test(&stats);
         assert!(rewarded_purchases == 1, 2);
         assert!(total_referrer_rewards == 8, 3);
         assert!(total_referee_rewards == 6, 4);

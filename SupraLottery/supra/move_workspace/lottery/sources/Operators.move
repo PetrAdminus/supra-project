@@ -58,10 +58,10 @@ module lottery::operators {
     public entry fun init(caller: &signer) {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         if (exists<LotteryOperators>(@lottery)) {
-            abort E_ALREADY_INIT;
+            abort E_ALREADY_INIT
         };
         move_to(
             caller,
@@ -78,14 +78,13 @@ module lottery::operators {
     }
 
     #[view]
-    #[view]
     public fun is_initialized(): bool {
         exists<LotteryOperators>(@lottery)
     }
 
     public entry fun set_admin(caller: &signer, new_admin: address) acquires LotteryOperators {
         ensure_admin(caller);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<LotteryOperators>(@lottery);
         let previous = state.admin;
         state.admin = new_admin;
         event::emit_event(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
@@ -93,7 +92,7 @@ module lottery::operators {
 
     public entry fun set_owner(caller: &signer, lottery_id: u64, owner: address) acquires LotteryOperators {
         ensure_admin(caller);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<LotteryOperators>(@lottery);
         if (!table::contains(&state.entries, lottery_id)) {
             table::add(
                 &mut state.entries,
@@ -113,7 +112,7 @@ module lottery::operators {
                     next: option::some(owner),
                 },
             );
-            return;
+            return
         };
 
         let entry = table::borrow_mut(&mut state.entries, lottery_id);
@@ -134,10 +133,10 @@ module lottery::operators {
     public entry fun grant_operator(caller: &signer, lottery_id: u64, operator: address)
     acquires LotteryOperators {
         ensure_can_manage(caller, lottery_id);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<LotteryOperators>(@lottery);
         let entry = table::borrow_mut(&mut state.entries, lottery_id);
         if (table::contains(&entry.operators, operator)) {
-            abort E_OPERATOR_EXISTS;
+            abort E_OPERATOR_EXISTS
         };
         table::add(&mut entry.operators, operator, true);
         record_operator(&mut entry.operator_list, operator);
@@ -154,10 +153,10 @@ module lottery::operators {
     public entry fun revoke_operator(caller: &signer, lottery_id: u64, operator: address)
     acquires LotteryOperators {
         ensure_can_manage(caller, lottery_id);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<LotteryOperators>(@lottery);
         let entry = table::borrow_mut(&mut state.entries, lottery_id);
         if (!table::contains(&entry.operators, operator)) {
-            abort E_OPERATOR_MISSING;
+            abort E_OPERATOR_MISSING
         };
         table::remove(&mut entry.operators, operator);
         remove_operator(&mut entry.operator_list, operator);
@@ -174,11 +173,11 @@ module lottery::operators {
     #[view]
     public fun get_owner(lottery_id: u64): option::Option<address> acquires LotteryOperators {
         if (!exists<LotteryOperators>(@lottery)) {
-            return option::none<address>();
+            return option::none<address>()
         };
-        let state = borrow_state();
+        let state = borrow_global<LotteryOperators>(@lottery);
         if (!table::contains(&state.entries, lottery_id)) {
-            return option::none<address>();
+            return option::none<address>()
         };
         let entry = table::borrow(&state.entries, lottery_id);
         option::some(entry.owner)
@@ -187,11 +186,11 @@ module lottery::operators {
     #[view]
     public fun is_operator(lottery_id: u64, operator: address): bool acquires LotteryOperators {
         if (!exists<LotteryOperators>(@lottery)) {
-            return false;
+            return false
         };
-        let state = borrow_state();
+        let state = borrow_global<LotteryOperators>(@lottery);
         if (!table::contains(&state.entries, lottery_id)) {
-            return false;
+            return false
         };
         let entry = table::borrow(&state.entries, lottery_id);
         table::contains(&entry.operators, operator)
@@ -200,18 +199,18 @@ module lottery::operators {
     #[view]
     public fun can_manage(lottery_id: u64, actor: address): bool acquires LotteryOperators {
         if (!exists<LotteryOperators>(@lottery)) {
-            return false;
+            return false
         };
-        let state = borrow_state();
+        let state = borrow_global<LotteryOperators>(@lottery);
         if (state.admin == actor) {
-            return true;
+            return true
         };
         if (!table::contains(&state.entries, lottery_id)) {
-            return false;
+            return false
         };
         let entry = table::borrow(&state.entries, lottery_id);
         if (entry.owner == actor) {
-            return true;
+            return true
         };
         table::contains(&entry.operators, actor)
     }
@@ -219,9 +218,9 @@ module lottery::operators {
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires LotteryOperators {
         if (!exists<LotteryOperators>(@lottery)) {
-            return vector::empty<u64>();
+            return vector::empty<u64>()
         };
-        let state = borrow_state();
+        let state = borrow_global<LotteryOperators>(@lottery);
         copy_u64_vector(&state.lottery_ids)
     }
 
@@ -229,11 +228,11 @@ module lottery::operators {
     public fun list_operators(lottery_id: u64): option::Option<vector<address>>
     acquires LotteryOperators {
         if (!exists<LotteryOperators>(@lottery)) {
-            return option::none<vector<address>>();
+            return option::none<vector<address>>()
         };
-        let state = borrow_state();
+        let state = borrow_global<LotteryOperators>(@lottery);
         if (!table::contains(&state.entries, lottery_id)) {
-            return option::none<vector<address>>();
+            return option::none<vector<address>>()
         };
         let entry = table::borrow(&state.entries, lottery_id);
         option::some(copy_address_vector(&entry.operator_list))
@@ -241,50 +240,37 @@ module lottery::operators {
 
     public fun ensure_authorized(caller: &signer, lottery_id: u64) acquires LotteryOperators {
         if (!can_manage(lottery_id, signer::address_of(caller))) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
     }
 
     fun ensure_admin(caller: &signer) acquires LotteryOperators {
         let addr = signer::address_of(caller);
         if (!exists<LotteryOperators>(@lottery)) {
-            abort E_NOT_INITIALIZED;
+            abort E_NOT_INITIALIZED
         };
-        if (addr != borrow_state().admin) {
-            abort E_NOT_AUTHORIZED;
+        let state = borrow_global<LotteryOperators>(@lottery);
+        if (addr != state.admin) {
+            abort E_NOT_AUTHORIZED
         };
     }
 
     fun ensure_can_manage(caller: &signer, lottery_id: u64) acquires LotteryOperators {
         if (!exists<LotteryOperators>(@lottery)) {
-            abort E_NOT_INITIALIZED;
+            abort E_NOT_INITIALIZED
         };
         let addr = signer::address_of(caller);
-        if (addr == borrow_state().admin) {
-            return;
+        let state = borrow_global<LotteryOperators>(@lottery);
+        if (state.admin == addr) {
+            return
         };
-        let state = borrow_state();
         if (!table::contains(&state.entries, lottery_id)) {
-            abort E_UNKNOWN_LOTTERY;
+            abort E_UNKNOWN_LOTTERY
         };
         let entry = table::borrow(&state.entries, lottery_id);
         if (entry.owner != addr && !table::contains(&entry.operators, addr)) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
-    }
-
-    fun borrow_state(): &LotteryOperators acquires LotteryOperators {
-        if (!exists<LotteryOperators>(@lottery)) {
-            abort E_NOT_INITIALIZED;
-        };
-        borrow_global<LotteryOperators>(@lottery)
-    }
-
-    fun borrow_state_mut(): &mut LotteryOperators acquires LotteryOperators {
-        if (!exists<LotteryOperators>(@lottery)) {
-            abort E_NOT_INITIALIZED;
-        };
-        borrow_global_mut<LotteryOperators>(@lottery)
     }
 
     fun record_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
@@ -292,7 +278,7 @@ module lottery::operators {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
-                return;
+                return
             };
             idx = idx + 1;
         };
@@ -304,7 +290,7 @@ module lottery::operators {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(operators, idx) == operator) {
-                return;
+                return
             };
             idx = idx + 1;
         };
@@ -320,7 +306,7 @@ module lottery::operators {
                     vector::swap(operators, idx, len - 1);
                 };
                 vector::pop_back(operators);
-                return;
+                return
             };
             idx = idx + 1;
         };

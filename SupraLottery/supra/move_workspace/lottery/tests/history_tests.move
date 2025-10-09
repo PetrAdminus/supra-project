@@ -1,3 +1,4 @@
+#[test_only]
 module lottery::history_tests {
     use std::option;
     use std::vector;
@@ -40,7 +41,7 @@ module lottery::history_tests {
         vrf_admin = @vrf_hub,
         factory_admin = @lottery_factory,
         lottery_admin = @lottery,
-        buyer = @player6,
+        buyer = @player3,
         aggregator = @0x55,
     )]
     fun records_draw_history(
@@ -94,12 +95,21 @@ module lottery::history_tests {
         let records = test_utils::unwrap(history_opt);
         assert!(vector::length(&records) == 1, 0);
         let record = *vector::borrow(&records, 0);
-        assert!(record.request_id == request_id, 1);
-        assert!(record.winner == signer::address_of(buyer), 2);
-        assert!(record.ticket_index == 0, 3);
-        assert!(record.prize_amount > 0, 4);
-        assert!(vector::length(&record.random_bytes) == 8, 5);
-        assert!(record.payload == b"log", 6);
+        let (
+            stored_request,
+            winner_addr,
+            ticket_index,
+            prize_amount,
+            random_bytes,
+            payload,
+            _timestamp,
+        ) = history::draw_record_fields_for_test(&record);
+        assert!(stored_request == request_id, 1);
+        assert!(winner_addr == signer::address_of(buyer), 2);
+        assert!(ticket_index == 0, 3);
+        assert!(prize_amount > 0, 4);
+        assert!(vector::length(&random_bytes) == 8, 5);
+        assert!(payload == b"log", 6);
 
         let ids = history::list_lottery_ids();
         assert!(vector::length(&ids) == 1, 7);
@@ -107,14 +117,16 @@ module lottery::history_tests {
 
         let latest_opt = history::latest_record(lottery_id);
         let latest = test_utils::unwrap(latest_opt);
-        assert!(latest.request_id == record.request_id, 9);
+        let (latest_request, _, _, _, _, _, _) =
+            history::draw_record_fields_for_test(&latest);
+        assert!(latest_request == stored_request, 9);
     }
 
     #[test(
         vrf_admin = @vrf_hub,
         factory_admin = @lottery_factory,
         lottery_admin = @lottery,
-        buyer = @player7,
+        buyer = @player4,
         aggregator = @0x56,
     )]
     fun clear_history_resets_records(

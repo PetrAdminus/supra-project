@@ -1,11 +1,17 @@
 module lottery::instances {
     friend lottery::migration;
     friend lottery::rounds;
+    friend lottery::autopurchase;
+    friend lottery::vip;
+    friend lottery::store;
+    friend lottery::referrals;
+    friend lottery::history;
     use std::option;
     use std::signer;
     use vrf_hub::table;
     use std::event;
     use std::math64;
+    use std::vector;
     use lottery_factory::registry;
     use vrf_hub::hub;
 
@@ -153,7 +159,7 @@ module lottery::instances {
 
 
     public entry fun set_instance_active(caller: &signer, lottery_id: u64, active: bool)
-    acquires LotteryCollection, hub::HubState {
+    acquires LotteryCollection {
         ensure_admin(caller);
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
@@ -171,7 +177,7 @@ module lottery::instances {
     }
 
 
-    public entry fun create_instance(caller: &signer, lottery_id: u64) acquires LotteryCollection, hub::HubState, registry::FactoryState {
+    public entry fun create_instance(caller: &signer, lottery_id: u64) acquires LotteryCollection {
         ensure_admin(caller);
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         if (table::contains(&state.instances, lottery_id)) {
@@ -182,10 +188,10 @@ module lottery::instances {
         if (!option::is_some(&registration_opt)) {
             abort E_REGISTRATION_INACTIVE;
         };
-        let registration = *option::borrow(&registration_opt);
-        let reg_owner = registration.owner;
-        let reg_lottery = registration.lottery;
-        let active = registration.active;
+        let registration_ref = option::borrow(&registration_opt);
+        let reg_owner = hub::registration_owner(registration_ref);
+        let reg_lottery = hub::registration_lottery(registration_ref);
+        let active = hub::registration_active(registration_ref);
         if (!active) {
             abort E_REGISTRATION_INACTIVE;
         };
@@ -194,25 +200,21 @@ module lottery::instances {
         if (!option::is_some(&info_opt)) {
             abort E_FACTORY_INFO_MISSING;
         };
-        let info = *option::borrow(&info_opt);
-        let owner = info.owner;
-        let lottery_addr = info.lottery;
-        let blueprint = info.blueprint;
+        let info_ref = option::borrow(&info_opt);
+        let owner = registry::lottery_info_owner(info_ref);
+        let lottery_addr = registry::lottery_info_lottery(info_ref);
+        let blueprint = registry::lottery_info_blueprint(info_ref);
         if (owner != reg_owner || lottery_addr != reg_lottery) {
             abort E_REGISTRATION_MISMATCH;
         };
-        let ticket_price = blueprint.ticket_price;
-        let jackpot_share_bps = blueprint.jackpot_share_bps;
+        let ticket_price = registry::blueprint_ticket_price(&blueprint);
+        let jackpot_share_bps = registry::blueprint_jackpot_share_bps(&blueprint);
 
         table::add(
             &mut state.instances,
             lottery_id,
             InstanceState {
-                info: registry::LotteryInfo {
-                    owner,
-                    lottery: lottery_addr,
-                    blueprint: registry::LotteryBlueprint { ticket_price, jackpot_share_bps },
-                },
+                info: registry::make_lottery_info(owner, lottery_addr, blueprint),
                 tickets_sold: 0,
                 jackpot_accumulated: 0,
                 active: true,
@@ -228,7 +230,7 @@ module lottery::instances {
     }
 
 
-    public entry fun sync_blueprint(caller: &signer, lottery_id: u64) acquires LotteryCollection, registry::FactoryState {
+    public entry fun sync_blueprint(caller: &signer, lottery_id: u64) acquires LotteryCollection {
         ensure_admin(caller);
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
@@ -239,19 +241,15 @@ module lottery::instances {
         if (!option::is_some(&info_opt)) {
             abort E_FACTORY_INFO_MISSING;
         };
-        let info_sync = *option::borrow(&info_opt);
-        let owner = info_sync.owner;
-        let lottery_addr = info_sync.lottery;
-        let blueprint = info_sync.blueprint;
-        let ticket_price = blueprint.ticket_price;
-        let jackpot_share_bps = blueprint.jackpot_share_bps;
+        let info_ref = option::borrow(&info_opt);
+        let owner = registry::lottery_info_owner(info_ref);
+        let lottery_addr = registry::lottery_info_lottery(info_ref);
+        let blueprint = registry::lottery_info_blueprint(info_ref);
+        let ticket_price = registry::blueprint_ticket_price(&blueprint);
+        let jackpot_share_bps = registry::blueprint_jackpot_share_bps(&blueprint);
 
         let instance = table::borrow_mut(&mut state.instances, lottery_id);
-        instance.info = registry::LotteryInfo {
-            owner,
-            lottery: lottery_addr,
-            blueprint: registry::LotteryBlueprint { ticket_price, jackpot_share_bps },
-        };
+        instance.info = registry::make_lottery_info(owner, lottery_addr, blueprint);
 
         event::emit_event(
             &mut state.blueprint_events,
@@ -383,5 +381,10 @@ module lottery::instances {
         if (addr != borrow_state().admin) {
             abort E_NOT_AUTHORIZED;
         };
+    }
+
+    #[test_only]
+    public fun instance_stats_for_test(stats: &InstanceStats): (u64, u64, bool) {
+        (stats.tickets_sold, stats.jackpot_accumulated, stats.active)
     }
 }

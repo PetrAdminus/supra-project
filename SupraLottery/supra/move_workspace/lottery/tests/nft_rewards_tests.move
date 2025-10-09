@@ -1,3 +1,4 @@
+#[test_only]
 module lottery::nft_rewards_tests {
     use std::option;
     use std::vector;
@@ -18,9 +19,11 @@ module lottery::nft_rewards_tests {
         let info_opt = nft_rewards::get_badge(owner_addr, 1);
         assert!(option::is_some(&info_opt), 3);
         let info = test_utils::unwrap(info_opt);
-        assert!(info.lottery_id == 1, 4);
-        assert!(info.draw_id == 7, 5);
-        assert!(info.minted_by == signer::address_of(admin), 6);
+        let (lottery_id, draw_id, _metadata, minted_by) =
+            nft_rewards::badge_fields_for_test(&info);
+        assert!(lottery_id == 1, 4);
+        assert!(draw_id == 7, 5);
+        assert!(minted_by == signer::address_of(admin), 6);
     }
 
     #[test(admin = @lottery, owner = @0x456)]

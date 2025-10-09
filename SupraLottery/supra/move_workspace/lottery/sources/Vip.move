@@ -1,4 +1,5 @@
 module lottery::vip {
+    friend lottery::rounds;
     use std::option;
     use std::signer;
     use std::vector;
@@ -137,7 +138,7 @@ module lottery::vip {
         price: u64,
         duration_secs: u64,
         bonus_tickets: u64,
-    ) acquires VipState, instances::LotteryCollection {
+    ) acquires VipState {
         ensure_admin(caller);
         ensure_lottery_known(lottery_id);
         if (price == 0) {
@@ -172,7 +173,7 @@ module lottery::vip {
     }
 
     public entry fun subscribe(caller: &signer, lottery_id: u64)
-    acquires VipState, instances::LotteryCollection {
+    acquires VipState {
         let player = signer::address_of(caller);
         subscribe_internal(caller, lottery_id, player);
     }
@@ -181,7 +182,7 @@ module lottery::vip {
         caller: &signer,
         lottery_id: u64,
         player: address,
-    ) acquires VipState, instances::LotteryCollection {
+    ) acquires VipState {
         ensure_admin(caller);
         subscribe_internal(caller, lottery_id, player);
     }
@@ -323,11 +324,25 @@ module lottery::vip {
         );
     }
 
+    #[test_only]
+    public fun subscription_fields_for_test(
+        subscription: &VipSubscriptionView
+    ): (u64, bool, u64) {
+        (subscription.expiry_ts, subscription.is_active, subscription.bonus_tickets)
+    }
+
+    #[test_only]
+    public fun summary_fields_for_test(
+        summary: &VipLotterySummary
+    ): (VipConfig, u64, u64, u64, u64) {
+        (summary.config, summary.total_members, summary.active_members, summary.total_revenue, summary.bonus_tickets_issued)
+    }
+
     fun subscribe_internal(
         payer: &signer,
         lottery_id: u64,
         player: address,
-    ) acquires VipState, instances::LotteryCollection {
+    ) acquires VipState {
         ensure_lottery_known(lottery_id);
         if (!exists<VipState>(@lottery)) {
             abort E_NOT_INITIALIZED;
@@ -411,7 +426,7 @@ module lottery::vip {
         );
     }
 
-    fun ensure_lottery_known(lottery_id: u64) acquires instances::LotteryCollection {
+    fun ensure_lottery_known(lottery_id: u64) {
         if (!instances::contains_instance(lottery_id)) {
             abort E_UNKNOWN_LOTTERY;
         };

@@ -1,3 +1,4 @@
+#[test_only]
 module lottery::migration_tests {
     use std::option;
     use std::signer;
@@ -44,23 +45,28 @@ module lottery::migration_tests {
         let stats_opt = instances::get_instance_stats(lottery_id);
         assert!(option::is_some(&stats_opt), 0);
         let stats = test_utils::unwrap(stats_opt);
-        assert!(stats.tickets_sold == 2, stats.tickets_sold);
-        assert!(stats.jackpot_accumulated == 0, stats.jackpot_accumulated);
-        assert!(stats.active, 6);
+        let (tickets_sold, jackpot_accumulated, active) =
+            instances::instance_stats_for_test(&stats);
+        assert!(tickets_sold == 2, tickets_sold);
+        assert!(jackpot_accumulated == 0, jackpot_accumulated);
+        assert!(active, 6);
 
         let snapshot_opt = rounds::get_round_snapshot(lottery_id);
         assert!(option::is_some(&snapshot_opt), 1);
         let snapshot = test_utils::unwrap(snapshot_opt);
-        assert!(snapshot.ticket_count == 2, snapshot.ticket_count);
-        assert!(snapshot.draw_scheduled, 2);
-        assert!(!snapshot.has_pending_request, 3);
-        assert!(snapshot.next_ticket_id == 2, snapshot.next_ticket_id);
+        let (ticket_count, draw_scheduled, has_pending_request, next_ticket_id) =
+            rounds::round_snapshot_fields_for_test(&snapshot);
+        assert!(ticket_count == 2, ticket_count);
+        assert!(draw_scheduled, 2);
+        assert!(!has_pending_request, 3);
+        assert!(next_ticket_id == 2, next_ticket_id);
 
         let pool_opt = treasury_multi::get_pool(lottery_id);
         assert!(option::is_some(&pool_opt), 4);
         let pool = test_utils::unwrap(pool_opt);
-        assert!(pool.prize_balance == 500, pool.prize_balance);
-        assert!(pool.operations_balance == 0, pool.operations_balance);
+        let (prize_balance, operations_balance) = treasury_multi::pool_balances_for_test(&pool);
+        assert!(prize_balance == 500, prize_balance);
+        assert!(operations_balance == 0, operations_balance);
         assert!(treasury_multi::jackpot_balance() == 0, treasury_multi::jackpot_balance());
 
         let config_opt = treasury_multi::get_config(lottery_id);

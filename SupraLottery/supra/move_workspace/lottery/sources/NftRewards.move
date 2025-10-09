@@ -54,10 +54,10 @@ module lottery::nft_rewards {
     public entry fun init(caller: &signer) {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         if (exists<BadgeAuthority>(@lottery)) {
-            abort E_ALREADY_INITIALIZED;
+            abort E_ALREADY_INITIALIZED
         };
         move_to(
             caller,
@@ -80,13 +80,14 @@ module lottery::nft_rewards {
 
     #[view]
     public fun admin(): address acquires BadgeAuthority {
-        borrow_authority().admin
+        let state = borrow_global<BadgeAuthority>(@lottery);
+        state.admin
     }
 
 
     public entry fun set_admin(caller: &signer, new_admin: address) acquires BadgeAuthority {
         ensure_admin(caller);
-        let state = borrow_authority_mut();
+        let state = borrow_global_mut<BadgeAuthority>(@lottery);
         state.admin = new_admin;
     }
 
@@ -99,7 +100,7 @@ module lottery::nft_rewards {
         metadata_uri: vector<u8>,
     ) acquires BadgeAuthority {
         ensure_admin(caller);
-        let state = borrow_authority_mut();
+        let state = borrow_global_mut<BadgeAuthority>(@lottery);
         let badge_id = state.next_badge_id;
         state.next_badge_id = badge_id + 1;
         let metadata_for_event = clone_bytes(&metadata_uri);
@@ -130,14 +131,14 @@ module lottery::nft_rewards {
     public entry fun burn_badge(caller: &signer, owner: address, badge_id: u64)
     acquires BadgeAuthority {
         let caller_addr = signer::address_of(caller);
-        let state = borrow_authority_mut();
+        let state = borrow_global_mut<BadgeAuthority>(@lottery);
         let is_admin = caller_addr == state.admin;
         if (!is_admin && caller_addr != owner) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         let removed = remove_badge_internal(&mut state.users, owner, badge_id);
         if (!option::is_some(&removed)) {
-            abort E_BADGE_NOT_FOUND;
+            abort E_BADGE_NOT_FOUND
         };
         event::emit_event(&mut state.burn_events, BadgeBurnedEvent { badge_id, owner });
     }
@@ -145,9 +146,12 @@ module lottery::nft_rewards {
 
     #[view]
     public fun has_badge(owner: address, badge_id: u64): bool acquires BadgeAuthority {
-        let state = borrow_authority();
+        if (!exists<BadgeAuthority>(@lottery)) {
+            return false
+        };
+        let state = borrow_global<BadgeAuthority>(@lottery);
         if (!table::contains(&state.users, owner)) {
-            return false;
+            return false
         };
         let collection = table::borrow(&state.users, owner);
         table::contains(&collection.badges, badge_id)
@@ -156,9 +160,12 @@ module lottery::nft_rewards {
 
     #[view]
     public fun list_badges(owner: address): vector<u64> acquires BadgeAuthority {
-        let state = borrow_authority();
+        if (!exists<BadgeAuthority>(@lottery)) {
+            return vector::empty<u64>()
+        };
+        let state = borrow_global<BadgeAuthority>(@lottery);
         if (!table::contains(&state.users, owner)) {
-            return vector::empty<u64>();
+            return vector::empty<u64>()
         };
         let collection = table::borrow(&state.users, owner);
         clone_u64_vector(&collection.badge_ids)
@@ -167,9 +174,12 @@ module lottery::nft_rewards {
 
     #[view]
     public fun get_badge(owner: address, badge_id: u64): option::Option<WinnerBadgeData> acquires BadgeAuthority {
-        let state = borrow_authority();
+        if (!exists<BadgeAuthority>(@lottery)) {
+            return option::none<WinnerBadgeData>()
+        };
+        let state = borrow_global<BadgeAuthority>(@lottery);
         if (!table::contains(&state.users, owner)) {
-            return option::none<WinnerBadgeData>();
+            return option::none<WinnerBadgeData>()
         };
         let collection = table::borrow(&state.users, owner);
         if (!table::contains(&collection.badges, badge_id)) {
@@ -180,17 +190,25 @@ module lottery::nft_rewards {
     }
 
 
+    #[test_only]
+    public fun badge_fields_for_test(
+        badge: &WinnerBadgeData
+    ): (u64, u64, vector<u8>, address) {
+        (badge.lottery_id, badge.draw_id, badge.metadata_uri, badge.minted_by)
+    }
+
+
     fun remove_badge_internal(
         users: &mut table::Table<address, UserBadges>,
         owner: address,
         badge_id: u64,
     ): option::Option<WinnerBadgeData> {
         if (!table::contains(users, owner)) {
-            return option::none<WinnerBadgeData>();
+            return option::none<WinnerBadgeData>()
         };
         let collection = table::borrow_mut(users, owner);
         if (!table::contains(&collection.badges, badge_id)) {
-            return option::none<WinnerBadgeData>();
+            return option::none<WinnerBadgeData>()
         };
         let data = table::remove(&mut collection.badges, badge_id);
         remove_badge_id(&mut collection.badge_ids, badge_id);
@@ -215,31 +233,21 @@ module lottery::nft_rewards {
         while (i < len) {
             if (*vector::borrow(ids, i) == badge_id) {
                 vector::remove(ids, i);
-                return;
-            };
-            i = i + 1;
+                return
+            } else {
+                i = i + 1;
+            }
         };
-    }
-
-    fun borrow_authority(): &BadgeAuthority acquires BadgeAuthority {
-        if (!exists<BadgeAuthority>(@lottery)) {
-            abort E_NOT_INITIALIZED;
-        };
-        borrow_global<BadgeAuthority>(@lottery)
-    }
-
-    fun borrow_authority_mut(): &mut BadgeAuthority acquires BadgeAuthority {
-        if (!exists<BadgeAuthority>(@lottery)) {
-            abort E_NOT_INITIALIZED;
-        };
-        borrow_global_mut<BadgeAuthority>(@lottery)
     }
 
     fun ensure_admin(caller: &signer) acquires BadgeAuthority {
         let addr = signer::address_of(caller);
-        let state = borrow_authority();
+        if (!exists<BadgeAuthority>(@lottery)) {
+            abort E_NOT_INITIALIZED
+        };
+        let state = borrow_global<BadgeAuthority>(@lottery);
         if (addr != state.admin) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
     }
 

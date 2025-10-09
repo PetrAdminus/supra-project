@@ -27,17 +27,20 @@ module lottery_factory::factory_tests {
 
         let info_opt = registry::get_lottery(lottery_id);
         let info = option::destroy_some(info_opt);
-        assert!(info.owner == OWNER, 0);
-        assert!(info.lottery == LOTTERY_ADDR, 0);
-        assert!(info.blueprint.ticket_price == 10, 0);
+        let (owner, lottery, ticket_price, _) = registry::lottery_info_fields_for_test(&info);
+        assert!(owner == OWNER, 0);
+        assert!(lottery == LOTTERY_ADDR, 0);
+        assert!(ticket_price == 10, 0);
 
         let new_blueprint = registry::new_blueprint(25, 150);
         registry::update_blueprint(&factory_signer, lottery_id, new_blueprint);
 
         let updated_opt = registry::get_lottery(lottery_id);
         let updated = option::destroy_some(updated_opt);
-        assert!(updated.blueprint.ticket_price == 25, 0);
-        assert!(updated.blueprint.jackpot_share_bps == 150, 0);
+        let (_owner2, _lottery2, updated_price, updated_share) =
+            registry::lottery_info_fields_for_test(&updated);
+        assert!(updated_price == 25, 0);
+        assert!(updated_share == 150, 0);
     }
 
     fun setup_accounts() {

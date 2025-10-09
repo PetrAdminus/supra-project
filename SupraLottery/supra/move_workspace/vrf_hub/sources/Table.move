@@ -4,7 +4,7 @@ module vrf_hub::table {
     const E_KEY_EXISTS: u64 = 1;
     const E_KEY_NOT_FOUND: u64 = 2;
 
-    struct Table<phantom K: copy + drop, V: store> has store {
+    struct Table<K: copy + drop, V: store> has store {
         keys: vector<K>,
         values: vector<V>,
     }

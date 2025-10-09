@@ -86,7 +86,7 @@ module lottery_factory::registry {
         lottery: address,
         blueprint: LotteryBlueprint,
         metadata: vector<u8>,
-    ): u64 acquires FactoryState, hub::HubState {
+    ): u64 acquires FactoryState {
         ensure_admin(caller);
         let state = borrow_global_mut<FactoryState>(@lottery_factory);
         let lottery_id = hub::register_lottery(caller, owner, lottery, metadata);
@@ -120,6 +120,53 @@ module lottery_factory::registry {
         ensure_admin(caller);
         let state = borrow_global_mut<FactoryState>(@lottery_factory);
         state.admin = new_admin;
+    }
+
+    public fun make_lottery_info(
+        owner: address,
+        lottery: address,
+        blueprint: LotteryBlueprint,
+    ): LotteryInfo {
+        LotteryInfo { owner, lottery, blueprint }
+    }
+
+    public fun copy_lottery_info(info: &LotteryInfo): LotteryInfo {
+        *info
+    }
+
+    public fun lottery_info_owner(info: &LotteryInfo): address {
+        info.owner
+    }
+
+    public fun lottery_info_lottery(info: &LotteryInfo): address {
+        info.lottery
+    }
+
+    public fun lottery_info_blueprint(info: &LotteryInfo): LotteryBlueprint {
+        info.blueprint
+    }
+
+    public fun blueprint_ticket_price(blueprint: &LotteryBlueprint): u64 {
+        blueprint.ticket_price
+    }
+
+    public fun blueprint_jackpot_share_bps(blueprint: &LotteryBlueprint): u16 {
+        blueprint.jackpot_share_bps
+    }
+
+    public fun copy_blueprint(blueprint: &LotteryBlueprint): LotteryBlueprint {
+        *blueprint
+    }
+
+    #[test_only]
+    public fun lottery_info_fields_for_test(info: &LotteryInfo): (address, address, u64, u16) {
+        let blueprint = info.blueprint;
+        (
+            info.owner,
+            info.lottery,
+            blueprint.ticket_price,
+            blueprint.jackpot_share_bps,
+        )
     }
 
 

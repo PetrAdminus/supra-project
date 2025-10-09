@@ -1,5 +1,5 @@
+#[test_only]
 module lottery::rounds_tests {
-    use std::option;
     use std::vector;
     use std::signer;
     use std::account;
@@ -63,19 +63,16 @@ module lottery::rounds_tests {
 
         let stats_opt = instances::get_instance_stats(lottery_id);
         let stats_snapshot = test_utils::unwrap(stats_opt);
-        let tickets_sold = stats_snapshot.tickets_sold;
-        let jackpot_accumulated = stats_snapshot.jackpot_accumulated;
-        let active = stats_snapshot.active;
+        let (tickets_sold, jackpot_accumulated, active) =
+            instances::instance_stats_for_test(&stats_snapshot);
         assert!(tickets_sold == 1, 0);
         assert!(jackpot_accumulated == 20, 1);
         assert!(active, 2);
 
         let snapshot_opt = rounds::get_round_snapshot(lottery_id);
         let snapshot_data = test_utils::unwrap(snapshot_opt);
-        let ticket_count = snapshot_data.ticket_count;
-        let draw_scheduled = snapshot_data.draw_scheduled;
-        let has_pending_request = snapshot_data.has_pending_request;
-        let next_ticket_id = snapshot_data.next_ticket_id;
+        let (ticket_count, draw_scheduled, has_pending_request, next_ticket_id) =
+            rounds::round_snapshot_fields_for_test(&snapshot_data);
         assert!(ticket_count == 1, 3);
         assert!(!draw_scheduled, 4);
         assert!(!has_pending_request, 5);
@@ -83,8 +80,8 @@ module lottery::rounds_tests {
 
         let pool_opt = treasury_multi::get_pool(lottery_id);
         let pool_snapshot = test_utils::unwrap(pool_opt);
-        let prize_balance = pool_snapshot.prize_balance;
-        let operations_balance = pool_snapshot.operations_balance;
+        let (prize_balance, operations_balance) =
+            treasury_multi::pool_balances_for_test(&pool_snapshot);
         assert!(prize_balance == 70, 7);
         assert!(operations_balance == 10, 8);
         assert!(treasury_multi::jackpot_balance() == 20, 9);
@@ -163,14 +160,14 @@ module lottery::rounds_tests {
         rounds::schedule_draw(lottery_admin, lottery_id);
 
         let scheduled_snapshot = test_utils::unwrap(rounds::get_round_snapshot(lottery_id));
-        let is_scheduled = scheduled_snapshot.draw_scheduled;
+        let (_count_sched, is_scheduled, _pending_sched, _next_sched) =
+            rounds::round_snapshot_fields_for_test(&scheduled_snapshot);
         assert!(is_scheduled, 0);
 
         rounds::reset_round(lottery_admin, lottery_id);
         let reset_snapshot = test_utils::unwrap(rounds::get_round_snapshot(lottery_id));
-        let ticket_count = reset_snapshot.ticket_count;
-        let draw_scheduled = reset_snapshot.draw_scheduled;
-        let next_ticket_id = reset_snapshot.next_ticket_id;
+        let (ticket_count, draw_scheduled, _pending_reset, next_ticket_id) =
+            rounds::round_snapshot_fields_for_test(&reset_snapshot);
         assert!(ticket_count == 0, 1);
         assert!(!draw_scheduled, 2);
         assert!(next_ticket_id == 0, 3);
@@ -232,10 +229,8 @@ module lottery::rounds_tests {
 
         let snapshot_opt = rounds::get_round_snapshot(lottery_id);
         let snapshot_values = test_utils::unwrap(snapshot_opt);
-        let ticket_count = snapshot_values.ticket_count;
-        let draw_scheduled = snapshot_values.draw_scheduled;
-        let has_pending_request = snapshot_values.has_pending_request;
-        let next_ticket_id = snapshot_values.next_ticket_id;
+        let (ticket_count, draw_scheduled, has_pending_request, next_ticket_id) =
+            rounds::round_snapshot_fields_for_test(&snapshot_values);
         assert!(ticket_count == 0, 0);
         assert!(!draw_scheduled, 1);
         assert!(!has_pending_request, 2);
@@ -247,8 +242,8 @@ module lottery::rounds_tests {
 
         assert!(treasury_v1::treasury_balance() == 60, 5);
         let pool = test_utils::unwrap(treasury_multi::get_pool(lottery_id));
-        let prize_balance = pool.prize_balance;
-        let operations_balance = pool.operations_balance;
+        let (prize_balance, operations_balance) =
+            treasury_multi::pool_balances_for_test(&pool);
         assert!(prize_balance == 0, 6);
         assert!(operations_balance == 20, 7);
         assert!(treasury_multi::jackpot_balance() == 40, 8);

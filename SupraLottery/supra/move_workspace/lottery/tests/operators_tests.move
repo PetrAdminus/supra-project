@@ -1,5 +1,5 @@
+#[test_only]
 module lottery::operators_tests {
-    use std::option;
     use std::vector;
     use std::signer;
     use lottery::operators;

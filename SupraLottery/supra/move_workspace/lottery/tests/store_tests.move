@@ -1,3 +1,4 @@
+#[test_only]
 module lottery::store_tests {
     use std::option;
     use std::account;
@@ -84,16 +85,15 @@ module lottery::store_tests {
         store::purchase(buyer, lottery_id, 1, 2);
 
         let item_stats = test_utils::unwrap(store::get_item_with_stats(lottery_id, 1));
-        let item = item_stats.item;
-        let sold = item_stats.sold;
-        let stock = item.stock;
+        let (item, sold) = store::item_with_stats_components_for_test(&item_stats);
+        let stock = store::store_item_stock_for_test(&item);
         assert!(sold == 2, 0);
         let remaining = test_utils::unwrap(stock);
         assert!(remaining == ITEM_STOCK - 2, 1);
 
         let summary = test_utils::unwrap(treasury_multi::get_lottery_summary(lottery_id));
-        let pool = summary.pool;
-        let operations_balance = pool.operations_balance;
+        let (_config, pool) = treasury_multi::summary_components_for_test(&summary);
+        let (_prize_balance, operations_balance) = treasury_multi::pool_balances_for_test(&pool);
         assert!(operations_balance == ITEM_PRICE * 2, 2);
     }
 

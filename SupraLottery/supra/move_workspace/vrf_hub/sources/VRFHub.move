@@ -1,5 +1,8 @@
 module vrf_hub::hub {
     friend lottery::rounds;
+    friend lottery::jackpot;
+    friend lottery::instances;
+    #[test_only]
     friend vrf_hub::hub_tests;
     use std::option;
     use std::signer;
@@ -332,6 +335,45 @@ module vrf_hub::hub {
             &mut state.fulfill_events,
             RandomnessFulfilledEvent { request_id, lottery_id, randomness: randomness_for_event },
         );
+    }
+
+    public fun request_record_lottery_id(record: &RequestRecord): u64 {
+        record.lottery_id
+    }
+
+    public fun request_record_payload(record: &RequestRecord): vector<u8> {
+        clone_bytes(&record.payload)
+    }
+
+    public fun registration_owner(registration: &LotteryRegistration): address {
+        registration.owner
+    }
+
+    public fun registration_lottery(registration: &LotteryRegistration): address {
+        registration.lottery
+    }
+
+    public fun registration_active(registration: &LotteryRegistration): bool {
+        registration.active
+    }
+
+    #[test_only]
+    public fun registration_fields_for_test(
+        registration: &LotteryRegistration
+    ): (address, address, vector<u8>, bool) {
+        (
+            registration.owner,
+            registration.lottery,
+            clone_bytes(&registration.metadata),
+            registration.active,
+        )
+    }
+
+    #[test_only]
+    public fun request_record_fields_for_test(
+        record: &RequestRecord
+    ): (u64, vector<u8>) {
+        (record.lottery_id, clone_bytes(&record.payload))
     }
 
 

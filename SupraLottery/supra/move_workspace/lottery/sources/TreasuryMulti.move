@@ -401,6 +401,49 @@ module lottery::treasury_multi {
         option::some(LotterySummary { config, pool })
     }
 
+    public(friend) fun pool_prize_balance(pool: &LotteryPool): u64 {
+        pool.prize_balance
+    }
+
+    public(friend) fun pool_operations_balance(pool: &LotteryPool): u64 {
+        pool.operations_balance
+    }
+
+    public(friend) fun share_config_prize_bps(config: &LotteryShareConfig): u64 {
+        config.prize_bps
+    }
+
+    public(friend) fun share_config_jackpot_bps(config: &LotteryShareConfig): u64 {
+        config.jackpot_bps
+    }
+
+    public(friend) fun share_config_operations_bps(config: &LotteryShareConfig): u64 {
+        config.operations_bps
+    }
+
+    public(friend) fun summary_config(summary: &LotterySummary): LotteryShareConfig {
+        summary.config
+    }
+
+    public(friend) fun summary_pool(summary: &LotterySummary): LotteryPool {
+        summary.pool
+    }
+
+    #[test_only]
+    public fun pool_balances_for_test(pool: &LotteryPool): (u64, u64) {
+        (pool.prize_balance, pool.operations_balance)
+    }
+
+    #[test_only]
+    public fun share_config_bps_for_test(config: &LotteryShareConfig): (u64, u64, u64) {
+        (config.prize_bps, config.jackpot_bps, config.operations_bps)
+    }
+
+    #[test_only]
+    public fun summary_components_for_test(summary: &LotterySummary): (LotteryShareConfig, LotteryPool) {
+        (summary.config, summary.pool)
+    }
+
     fun validate_basis_points(config: &LotteryShareConfig) {
         let sum = config.prize_bps + config.jackpot_bps + config.operations_bps;
         if (sum != BASIS_POINT_DENOMINATOR) {

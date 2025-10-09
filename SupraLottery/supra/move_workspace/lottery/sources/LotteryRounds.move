@@ -6,7 +6,6 @@ module lottery::rounds {
     use std::vector;
     use vrf_hub::table;
     use std::event;
-    use std::bcs;
     use std::math64;
     use lottery::history;
     use lottery::instances;
@@ -97,10 +96,10 @@ module lottery::rounds {
     public entry fun init(caller: &signer) {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         if (exists<RoundCollection>(@lottery)) {
-            abort E_ALREADY_INITIALIZED;
+            abort E_ALREADY_INITIALIZED
         };
         move_to(
             caller,
@@ -123,64 +122,65 @@ module lottery::rounds {
 
     #[view]
     public fun admin(): address acquires RoundCollection {
-        borrow_state().admin
+        let state = borrow_global<RoundCollection>(@lottery);
+        state.admin
     }
 
     public entry fun set_admin(caller: &signer, new_admin: address) acquires RoundCollection {
         ensure_admin(caller);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<RoundCollection>(@lottery);
         state.admin = new_admin;
     }
 
     public entry fun buy_ticket(caller: &signer, lottery_id: u64)
-    acquires RoundCollection, instances::LotteryCollection {
+    acquires RoundCollection {
         let buyer = signer::address_of(caller);
-        let state = borrow_state_mut();
-        let (round, blueprint) = prepare_purchase(state, lottery_id);
-        let ticket_price = blueprint.ticket_price;
-        let jackpot_share_bps = blueprint.jackpot_share_bps;
+        let state = borrow_global_mut<RoundCollection>(@lottery);
+        let blueprint = prepare_purchase(state, lottery_id);
+        let ticket_price = registry::blueprint_ticket_price(&blueprint);
+        let jackpot_share_bps = registry::blueprint_jackpot_share_bps(&blueprint);
 
         treasury_v1::deposit_from_user(caller, ticket_price);
-        let _ = complete_purchase(state, round, lottery_id, buyer, ticket_price, jackpot_share_bps, 1);
+        let _ = complete_purchase(state, lottery_id, buyer, ticket_price, jackpot_share_bps, 1);
     }
 
     public(friend) fun record_prepaid_purchase(
         lottery_id: u64,
         buyer: address,
         ticket_count: u64,
-    ): u64 acquires RoundCollection, instances::LotteryCollection {
+    ): u64 acquires RoundCollection {
         if (ticket_count == 0) {
-            abort E_INVALID_TICKET_COUNT;
+            abort E_INVALID_TICKET_COUNT
         };
-        let state = borrow_state_mut();
-        let (round, blueprint) = prepare_purchase(state, lottery_id);
-        let ticket_price = blueprint.ticket_price;
-        let jackpot_share_bps = blueprint.jackpot_share_bps;
-        complete_purchase(state, round, lottery_id, buyer, ticket_price, jackpot_share_bps, ticket_count)
+        let state = borrow_global_mut<RoundCollection>(@lottery);
+        let blueprint = prepare_purchase(state, lottery_id);
+        let ticket_price = registry::blueprint_ticket_price(&blueprint);
+        let jackpot_share_bps = registry::blueprint_jackpot_share_bps(&blueprint);
+        complete_purchase(state, lottery_id, buyer, ticket_price, jackpot_share_bps, ticket_count)
     }
 
     public entry fun schedule_draw(caller: &signer, lottery_id: u64)
-    acquires RoundCollection, instances::LotteryCollection {
+    acquires RoundCollection {
         ensure_admin(caller);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<RoundCollection>(@lottery);
         let round = ensure_round(state, lottery_id);
         if (vector::length(&round.tickets) == 0) {
-            abort E_NO_TICKETS;
+            abort E_NO_TICKETS
         };
         if (!instances::is_instance_active(lottery_id)) {
-            abort E_INSTANCE_INACTIVE;
+            abort E_INSTANCE_INACTIVE
         };
         if (option::is_some(&round.pending_request)) {
-            abort E_REQUEST_PENDING;
+            abort E_REQUEST_PENDING
         };
         round.draw_scheduled = true;
         event::emit_event(&mut state.schedule_events, DrawScheduleUpdatedEvent { lottery_id, draw_scheduled: true });
     }
 
     public entry fun reset_round(caller: &signer, lottery_id: u64)
-    acquires RoundCollection, instances::LotteryCollection {
+    acquires RoundCollection {
         ensure_admin(caller);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<RoundCollection>(@lottery);
         let round = ensure_round(state, lottery_id);
         let cleared = vector::length(&round.tickets);
         clear_tickets(&mut round.tickets);
@@ -195,21 +195,21 @@ module lottery::rounds {
         caller: &signer,
         lottery_id: u64,
         payload: vector<u8>,
-    ) acquires RoundCollection, instances::LotteryCollection, hub::HubState {
+    ) acquires RoundCollection {
         ensure_admin(caller);
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<RoundCollection>(@lottery);
         let round = ensure_round(state, lottery_id);
         if (!round.draw_scheduled) {
-            abort E_DRAW_NOT_SCHEDULED;
+            abort E_DRAW_NOT_SCHEDULED
         };
         if (!instances::is_instance_active(lottery_id)) {
-            abort E_INSTANCE_INACTIVE;
+            abort E_INSTANCE_INACTIVE
         };
         if (option::is_some(&round.pending_request)) {
-            abort E_REQUEST_PENDING;
+            abort E_REQUEST_PENDING
         };
         if (vector::length(&round.tickets) == 0) {
-            abort E_NO_TICKETS;
+            abort E_NO_TICKETS
         };
 
         let request_id = hub::request_randomness(lottery_id, payload);
@@ -221,39 +221,38 @@ module lottery::rounds {
         caller: &signer,
         request_id: u64,
         randomness: vector<u8>,
-    ) acquires RoundCollection, instances::LotteryCollection, hub::HubState {
+    ) acquires RoundCollection {
         hub::ensure_callback_sender(caller);
         let record = hub::consume_request(request_id);
-        let record_data = record;
-        let lottery_id = record_data.lottery_id;
-        let payload = record_data.payload;
+        let lottery_id = hub::request_record_lottery_id(&record);
+        let payload = hub::request_record_payload(&record);
 
-        let state = borrow_state_mut();
+        let state = borrow_global_mut<RoundCollection>(@lottery);
         if (!table::contains(&state.rounds, lottery_id)) {
-            abort E_NO_PENDING_REQUEST;
+            abort E_NO_PENDING_REQUEST
         };
-        let round = table::borrow_mut(&mut state.rounds, lottery_id);
-        if (!option::is_some(&round.pending_request)) {
-            abort E_NO_PENDING_REQUEST;
+        let (winner, winner_index) = {
+            let round = table::borrow_mut(&mut state.rounds, lottery_id);
+            if (!option::is_some(&round.pending_request)) {
+                abort E_NO_PENDING_REQUEST
+            };
+            let expected_id = *option::borrow(&round.pending_request);
+            if (expected_id != request_id) {
+                abort E_REQUEST_MISMATCH
+            };
+            let ticket_count = vector::length(&round.tickets);
+            if (ticket_count == 0) {
+                abort E_NO_TICKETS
+            };
+            let random_value = randomness_to_u64(&randomness);
+            let winner_index_inner = math64::mod(random_value, ticket_count);
+            let winner_addr = *vector::borrow(&round.tickets, winner_index_inner);
+            round.draw_scheduled = false;
+            round.next_ticket_id = 0;
+            round.pending_request = option::none<u64>();
+            clear_tickets(&mut round.tickets);
+            (winner_addr, winner_index_inner)
         };
-        let expected_id = *option::borrow(&round.pending_request);
-        if (expected_id != request_id) {
-            abort E_REQUEST_MISMATCH;
-        };
-
-        let ticket_count = vector::length(&round.tickets);
-        if (ticket_count == 0) {
-            abort E_NO_TICKETS;
-        };
-
-        let random_value = randomness_to_u64(&randomness);
-        let winner_index = math64::mod(random_value, ticket_count);
-        let winner = *vector::borrow(&round.tickets, winner_index);
-
-        round.draw_scheduled = false;
-        round.next_ticket_id = 0;
-        round.pending_request = option::none<u64>();
-        clear_tickets(&mut round.tickets);
 
         let prize_amount = treasury_multi::distribute_prize_internal(lottery_id, winner);
         let randomness_for_hub = clone_bytes(&randomness);
@@ -286,9 +285,9 @@ module lottery::rounds {
     #[view]
     public fun get_round_snapshot(lottery_id: u64): option::Option<RoundSnapshot> acquires RoundCollection {
         if (!exists<RoundCollection>(@lottery)) {
-            return option::none<RoundSnapshot>();
+            return option::none<RoundSnapshot>()
         };
-        let state = borrow_state();
+        let state = borrow_global<RoundCollection>(@lottery);
         if (!table::contains(&state.rounds, lottery_id)) {
             option::none<RoundSnapshot>()
         } else {
@@ -305,9 +304,9 @@ module lottery::rounds {
     #[view]
     public fun pending_request_id(lottery_id: u64): option::Option<u64> acquires RoundCollection {
         if (!exists<RoundCollection>(@lottery)) {
-            return option::none<u64>();
+            return option::none<u64>()
         };
-        let state = borrow_state();
+        let state = borrow_global<RoundCollection>(@lottery);
         if (!table::contains(&state.rounds, lottery_id)) {
             option::none<u64>()
         } else {
@@ -323,47 +322,52 @@ module lottery::rounds {
     fun prepare_purchase(
         state: &mut RoundCollection,
         lottery_id: u64,
-    ): (&mut RoundState, registry::LotteryBlueprint) acquires instances::LotteryCollection {
+    ): registry::LotteryBlueprint {
         let info_opt = instances::get_lottery_info(lottery_id);
         if (!option::is_some(&info_opt)) {
-            abort E_INSTANCE_MISSING;
+            abort E_INSTANCE_MISSING
         };
-        let info = *option::borrow(&info_opt);
-        let blueprint = info.blueprint;
+        let info_ref = option::borrow(&info_opt);
+        let blueprint = registry::lottery_info_blueprint(info_ref);
         if (!instances::is_instance_active(lottery_id)) {
-            abort E_INSTANCE_INACTIVE;
+            abort E_INSTANCE_INACTIVE
         };
-        let round = ensure_round(state, lottery_id);
-        ensure_round_available(round);
-        (round, blueprint)
+        {
+            let round = ensure_round(state, lottery_id);
+            ensure_round_available(round);
+        };
+        blueprint
     }
 
     fun ensure_round_available(round: &RoundState) {
         if (round.draw_scheduled) {
-            abort E_DRAW_ALREADY_SCHEDULED;
+            abort E_DRAW_ALREADY_SCHEDULED
         };
         if (option::is_some(&round.pending_request)) {
-            abort E_REQUEST_PENDING;
+            abort E_REQUEST_PENDING
         };
     }
 
     fun complete_purchase(
         state: &mut RoundCollection,
-        round: &mut RoundState,
         lottery_id: u64,
         buyer: address,
         ticket_price: u64,
         jackpot_share_bps: u16,
         ticket_count: u64,
-    ): u64 acquires instances::LotteryCollection {
+    ): u64 {
         let jackpot_bps = math64::from_u16(jackpot_share_bps);
         let jackpot_contribution = math64::mul_div(ticket_price, jackpot_bps, BASIS_POINT_DENOMINATOR);
         let issued = 0;
         let total_amount = 0;
         while (issued < ticket_count) {
-            let ticket_id = round.next_ticket_id;
-            round.next_ticket_id = math64::checked_add(ticket_id, 1);
-            vector::push_back(&mut round.tickets, buyer);
+            let ticket_id = {
+                let round = ensure_round(state, lottery_id);
+                let ticket_id_inner = round.next_ticket_id;
+                round.next_ticket_id = math64::checked_add(ticket_id_inner, 1);
+                vector::push_back(&mut round.tickets, buyer);
+                ticket_id_inner
+            };
             instances::record_ticket_sale(lottery_id, jackpot_contribution);
             event::emit_event(
                 &mut state.ticket_events,
@@ -376,9 +380,13 @@ module lottery::rounds {
         if (bonus_tickets > 0) {
             let bonus_issued = 0;
             while (bonus_issued < bonus_tickets) {
-                let ticket_id = round.next_ticket_id;
-                round.next_ticket_id = math64::checked_add(ticket_id, 1);
-                vector::push_back(&mut round.tickets, buyer);
+                let ticket_id = {
+                    let round = ensure_round(state, lottery_id);
+                    let ticket_id_inner = round.next_ticket_id;
+                    round.next_ticket_id = math64::checked_add(ticket_id_inner, 1);
+                    vector::push_back(&mut round.tickets, buyer);
+                    ticket_id_inner
+                };
                 instances::record_ticket_sale(lottery_id, 0);
                 event::emit_event(
                     &mut state.ticket_events,
@@ -393,23 +401,9 @@ module lottery::rounds {
         total_amount
     }
 
-    fun borrow_state(): &RoundCollection acquires RoundCollection {
-        if (!exists<RoundCollection>(@lottery)) {
-            abort E_NOT_INITIALIZED;
-        };
-        borrow_global<RoundCollection>(@lottery)
-    }
-
-    fun borrow_state_mut(): &mut RoundCollection acquires RoundCollection {
-        if (!exists<RoundCollection>(@lottery)) {
-            abort E_NOT_INITIALIZED;
-        };
-        borrow_global_mut<RoundCollection>(@lottery)
-    }
-
-    fun ensure_round(state: &mut RoundCollection, lottery_id: u64): &mut RoundState acquires instances::LotteryCollection {
+    fun ensure_round(state: &mut RoundCollection, lottery_id: u64): &mut RoundState {
         if (!instances::contains_instance(lottery_id)) {
-            abort E_INSTANCE_MISSING;
+            abort E_INSTANCE_MISSING
         };
         if (!table::contains(&state.rounds, lottery_id)) {
             table::add(
@@ -428,9 +422,13 @@ module lottery::rounds {
 
     fun ensure_admin(caller: &signer) acquires RoundCollection {
         let addr = signer::address_of(caller);
-        if (addr != borrow_state().admin) {
-            abort E_NOT_AUTHORIZED;
+        if (!exists<RoundCollection>(@lottery)) {
+            abort E_NOT_INITIALIZED
         };
+        let state = borrow_global<RoundCollection>(@lottery);
+        if (addr != state.admin) {
+            abort E_NOT_AUTHORIZED
+        }
     }
 
     fun clear_tickets(tickets: &mut vector<address>) {
@@ -446,10 +444,10 @@ module lottery::rounds {
         draw_scheduled: bool,
         next_ticket_id: u64,
         pending_request: option::Option<u64>,
-    ) acquires RoundCollection, instances::LotteryCollection {
-        let state = borrow_state_mut();
+    ) acquires RoundCollection {
+        let state = borrow_global_mut<RoundCollection>(@lottery);
         if (!instances::contains_instance(lottery_id)) {
-            abort E_INSTANCE_MISSING;
+            abort E_INSTANCE_MISSING
         };
         if (table::contains(&state.rounds, lottery_id)) {
             let round = table::borrow_mut(&mut state.rounds, lottery_id);
@@ -457,7 +455,7 @@ module lottery::rounds {
             round.draw_scheduled = draw_scheduled;
             round.next_ticket_id = next_ticket_id;
             round.pending_request = pending_request;
-            return;
+            return
         };
         table::add(
             &mut state.rounds,
@@ -468,16 +466,18 @@ module lottery::rounds {
 
     fun randomness_to_u64(randomness: &vector<u8>): u64 {
         if (vector::length(randomness) < 8) {
-            abort E_RANDOM_BYTES_TOO_SHORT;
+            abort E_RANDOM_BYTES_TOO_SHORT
         };
-        let prefix = vector::empty<u8>();
+        let result = 0u64;
         let i = 0;
         while (i < 8) {
             let byte = *vector::borrow(randomness, i);
-            vector::push_back(&mut prefix, byte);
+            let result_mul = math64::checked_mul(result, 256);
+            let byte_u64 = u8_to_u64(byte);
+            result = math64::checked_add(result_mul, byte_u64);
             i = i + 1;
         };
-        bcs::from_bytes<u64>(prefix)
+        result
     }
 
     fun clone_bytes(data: &vector<u8>): vector<u8> {
@@ -490,5 +490,25 @@ module lottery::rounds {
             i = i + 1;
         };
         buffer
+    }
+
+    fun u8_to_u64(value: u8): u64 {
+        let result = 0u64;
+        let remaining = value;
+        while (remaining > 0) {
+            result = result + 1;
+            remaining = remaining - 1;
+        };
+        result
+    }
+
+    #[test_only]
+    public fun round_snapshot_fields_for_test(snapshot: &RoundSnapshot): (u64, bool, bool, u64) {
+        (
+            snapshot.ticket_count,
+            snapshot.draw_scheduled,
+            snapshot.has_pending_request,
+            snapshot.next_ticket_id,
+        )
     }
 }

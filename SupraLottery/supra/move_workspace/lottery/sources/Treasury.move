@@ -432,9 +432,8 @@ module lottery::treasury_v1 {
     }
 
     #[view]
-    public fun metadata_address(): address acquires TokenState {
+    public fun metadata_address(): address {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
-        let _ = borrow_state();
         METADATA_ADDRESS
     }
 

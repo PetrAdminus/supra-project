@@ -1,3 +1,4 @@
+#[test_only]
 module lottery::test_utils {
     use std::option;
 

@@ -1,5 +1,5 @@
+#[test_only]
 module lottery::vip_tests {
-    use std::option;
     use std::account;
     use std::signer;
     use lottery::instances;
@@ -74,9 +74,8 @@ module lottery::vip_tests {
 
         vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, VIP_BONUS_TICKETS);
         let summary_before = test_utils::unwrap(vip::get_lottery_summary(lottery_id));
-        let total_members = summary_before.total_members;
-        let active_members = summary_before.active_members;
-        let total_revenue = summary_before.total_revenue;
+        let (_config_before, total_members, active_members, total_revenue, _) =
+            vip::summary_fields_for_test(&summary_before);
         assert!(total_members == 0, 0);
         assert!(active_members == 0, 1);
         assert!(total_revenue == 0, 2);
@@ -84,28 +83,25 @@ module lottery::vip_tests {
         vip::subscribe(player, lottery_id);
         let player_addr = signer::address_of(player);
         let subscription = test_utils::unwrap(vip::get_subscription(lottery_id, player_addr));
-        let is_active = subscription.is_active;
-        let bonus_tickets = subscription.bonus_tickets;
+        let (_expiry, is_active, bonus_tickets) =
+            vip::subscription_fields_for_test(&subscription);
         assert!(is_active, 3);
         assert!(bonus_tickets == VIP_BONUS_TICKETS, 4);
 
         let treasury_summary = test_utils::unwrap(treasury_multi::get_lottery_summary(lottery_id));
-        let pool = treasury_summary.pool;
-        let prize_balance = pool.prize_balance;
-        let operations_balance = pool.operations_balance;
+        let (_config_summary, pool) = treasury_multi::summary_components_for_test(&treasury_summary);
+        let (prize_balance, operations_balance) = treasury_multi::pool_balances_for_test(&pool);
         assert!(prize_balance == 0, 5);
         assert!(operations_balance == VIP_PRICE, 6);
 
         rounds::buy_ticket(player, lottery_id);
         let round_snapshot = test_utils::unwrap(rounds::get_round_snapshot(lottery_id));
-        let ticket_count = round_snapshot.ticket_count;
+        let (ticket_count, _, _, _) = rounds::round_snapshot_fields_for_test(&round_snapshot);
         assert!(ticket_count == 1 + VIP_BONUS_TICKETS, 7);
 
         let summary_after = test_utils::unwrap(vip::get_lottery_summary(lottery_id));
-        let members_after = summary_after.total_members;
-        let active_after = summary_after.active_members;
-        let revenue_after = summary_after.total_revenue;
-        let bonus_tickets_issued = summary_after.bonus_tickets_issued;
+        let (_config_after, members_after, active_after, revenue_after, bonus_tickets_issued) =
+            vip::summary_fields_for_test(&summary_after);
         assert!(members_after == 1, 8);
         assert!(active_after == 1, 9);
         assert!(revenue_after == VIP_PRICE, 10);
@@ -136,10 +132,14 @@ module lottery::vip_tests {
         vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, 1);
         vip::subscribe_for(gift_admin, lottery_id, signer::address_of(recipient));
         let subscription = test_utils::unwrap(vip::get_subscription(lottery_id, signer::address_of(recipient)));
-        assert!(subscription.is_active, 12);
+        let (_expiry_before_cancel, is_active_before, _bonus_before) =
+            vip::subscription_fields_for_test(&subscription);
+        assert!(is_active_before, 12);
 
         vip::cancel_for(lottery_admin, lottery_id, signer::address_of(recipient));
         let after_cancel = test_utils::unwrap(vip::get_subscription(lottery_id, signer::address_of(recipient)));
-        assert!(!after_cancel.is_active, 13);
+        let (_expiry_after_cancel, is_active_after, _bonus_after) =
+            vip::subscription_fields_for_test(&after_cancel);
+        assert!(!is_active_after, 13);
     }
 }

@@ -77,6 +77,9 @@ module std::event {
     // ****************** TEST-ONLY FUNCTIONS **************
 
     #[test_only]
+    native public fun emitted_events<T: drop + store>(): vector<T>;
+
+    #[test_only]
     public fun create_guid_wrapper_for_test<T: drop + store>(s: &signer): GUIDWrapper {
         let EventHandle<T> { counter: _, guid } = new_event_handle<T>(s);
         guid
