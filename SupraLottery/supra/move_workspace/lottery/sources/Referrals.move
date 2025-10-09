@@ -112,7 +112,7 @@ module lottery::referrals {
 
     public entry fun set_admin(caller: &signer, new_admin: address) acquires ReferralState {
         ensure_admin(caller);
-        let state = borrow_global_mut<ReferralState>(@lottery);
+        let state = borrow_state_mut();
         state.admin = new_admin;
     }
 
@@ -135,7 +135,7 @@ module lottery::referrals {
         if (referrer_bps + referee_bps > operations_bps) {
             abort E_INVALID_CONFIG
         };
-        let state = borrow_global_mut<ReferralState>(@lottery);
+        let state = borrow_state_mut();
         let config = ReferralConfig { referrer_bps, referee_bps };
         if (table::contains(&state.configs, lottery_id)) {
             *table::borrow_mut(&mut state.configs, lottery_id) = config;
@@ -154,7 +154,7 @@ module lottery::referrals {
         if (player == referrer) {
             abort E_SELF_REFERRAL
         };
-        let state = borrow_global_mut<ReferralState>(@lottery);
+        let state = borrow_state_mut();
         if (table::contains(&state.referrers, player)) {
             abort E_ALREADY_REGISTERED
         };
@@ -175,7 +175,7 @@ module lottery::referrals {
         if (player == referrer) {
             abort E_SELF_REFERRAL
         };
-        let state = borrow_global_mut<ReferralState>(@lottery);
+        let state = borrow_state_mut();
         if (table::contains(&state.referrers, player)) {
             *table::borrow_mut(&mut state.referrers, player) = referrer;
         } else {
@@ -190,7 +190,7 @@ module lottery::referrals {
 
     public entry fun admin_clear_referrer(caller: &signer, player: address) acquires ReferralState {
         ensure_admin(caller);
-        let state = borrow_global_mut<ReferralState>(@lottery);
+        let state = borrow_state_mut();
         if (table::contains(&state.referrers, player)) {
             table::remove(&mut state.referrers, player);
             event::emit_event(
@@ -265,7 +265,7 @@ module lottery::referrals {
         if (amount == 0) {
             return
         };
-        let state = borrow_global_mut<ReferralState>(@lottery);
+        let state = borrow_state_mut();
         if (!table::contains(&state.configs, lottery_id)) {
             return
         };
@@ -375,7 +375,7 @@ module lottery::referrals {
         borrow_global<ReferralState>(@lottery)
     }
 
-    fun borrow_global_mut<ReferralState>(@lottery): &mut ReferralState acquires ReferralState {
+    fun borrow_state_mut(): &mut ReferralState acquires ReferralState {
         if (!exists<ReferralState>(@lottery)) {
             abort E_NOT_INITIALIZED
         };
