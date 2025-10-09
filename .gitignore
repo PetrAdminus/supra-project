@@ -1,4 +1,4 @@
-﻿# Build artifacts
+# Build artifacts
 build/
 **/build/
 supra/move_workspace/lottery/build/
@@ -66,5 +66,4 @@ migration_dvrf3.html
 migration_dvrf3.txt
 tmp_update.py
 .codex-tmp/
-
 SupraLottery.backup/
