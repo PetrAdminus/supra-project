@@ -1,6 +1,8 @@
 """FastAPI-роутер центра поддержки."""
 from __future__ import annotations
 
+from typing import Any, Dict
+
 from fastapi import APIRouter, HTTPException, status
 
 from .schemas import (
@@ -13,6 +15,14 @@ from .schemas import (
 from .service import create_or_update_article, create_ticket, get_article_by_slug, list_articles
 
 router = APIRouter(prefix="/support", tags=["support"])
+
+
+def _model_dump(payload: Any) -> Dict[str, Any]:
+    """Возвращает словарь представления pydantic-модели."""
+
+    if hasattr(payload, "model_dump"):
+        return getattr(payload, "model_dump")()
+    return getattr(payload, "dict")()
 
 
 @router.get("/articles", response_model=SupportArticleListResponse)
@@ -52,7 +62,7 @@ def get_article(slug: str) -> SupportArticleResponse:
 
 @router.put("/articles/{slug}", response_model=SupportArticleResponse)
 def put_article(slug: str, payload: SupportArticleCreate) -> SupportArticleResponse:
-    data = payload.dict()
+    data = _model_dump(payload)
     data["slug"] = slug
     article = create_or_update_article(data)
     return SupportArticleResponse(
@@ -68,5 +78,5 @@ def put_article(slug: str, payload: SupportArticleCreate) -> SupportArticleRespo
 
 @router.post("/tickets", response_model=SupportTicketResponse, status_code=status.HTTP_201_CREATED)
 def post_ticket(payload: SupportTicketCreate) -> SupportTicketResponse:
-    ticket = create_ticket(payload.dict())
+    ticket = create_ticket(_model_dump(payload))
     return SupportTicketResponse(id=ticket.id, status=ticket.status, created_at=ticket.created_at)

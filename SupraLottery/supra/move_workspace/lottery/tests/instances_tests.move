@@ -31,14 +31,10 @@ module lottery::instances_tests {
         assert!(instances::contains_instance(lottery_id), 2);
         assert!(instances::is_instance_active(lottery_id), 3);
 
-        let info = test_utils::unwrap(instances::get_lottery_info(lottery_id));
-        let owner = info.owner;
-        let lottery_addr = info.lottery;
-        let blueprint = info.blueprint;
+        let info_view = test_utils::unwrap(instances::get_lottery_info_view(lottery_id));
+        let (owner, lottery_addr, ticket_price, jackpot_share_bps) = info_view;
         assert!(owner == @lottery_owner, 4);
         assert!(lottery_addr == @lottery_contract, 5);
-        let ticket_price = blueprint.ticket_price;
-        let jackpot_share_bps = blueprint.jackpot_share_bps;
         assert!(ticket_price == 10, 6);
         assert!(jackpot_share_bps == 500, 7);
 
@@ -46,10 +42,8 @@ module lottery::instances_tests {
         registry::update_blueprint(factory_admin, lottery_id, updated_blueprint);
         instances::sync_blueprint(lottery_admin, lottery_id);
 
-        let synced_info = test_utils::unwrap(instances::get_lottery_info(lottery_id));
-        let synced_blueprint = synced_info.blueprint;
-        let synced_price = synced_blueprint.ticket_price;
-        let synced_share = synced_blueprint.jackpot_share_bps;
+        let synced_info = test_utils::unwrap(instances::get_lottery_info_view(lottery_id));
+        let (_, _, synced_price, synced_share) = synced_info;
         assert!(synced_price == 25, 8);
         assert!(synced_share == 800, 9);
 

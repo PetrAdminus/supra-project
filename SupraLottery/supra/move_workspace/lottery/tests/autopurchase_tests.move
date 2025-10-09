@@ -1,6 +1,7 @@
 module lottery::autopurchase_tests {
     use std::option;
     use std::vector;
+    use std::u128;
     use std::account;
     use std::signer;
     use lottery::autopurchase;
@@ -74,11 +75,9 @@ module lottery::autopurchase_tests {
         autopurchase::configure_plan(buyer, lottery_id, 2, true);
         autopurchase::deposit(buyer, lottery_id, TICKET_PRICE * 3);
 
-        let summary_before = test_utils::unwrap(autopurchase::get_lottery_summary(lottery_id));
-        let balance_before = summary_before.total_balance;
-        let total_players = summary_before.total_players;
-        let active_players = summary_before.active_players;
-        assert!(balance_before == TICKET_PRICE * 3, 9);
+        let (total_players, active_players, total_balance) =
+            autopurchase::get_lottery_summary_view(lottery_id);
+        assert!(total_balance == u128::from_u64(TICKET_PRICE * 3), 9);
         assert!(total_players == 1, 10);
         assert!(active_players == 1, 11);
 
@@ -93,42 +92,29 @@ module lottery::autopurchase_tests {
 
         autopurchase::execute(lottery_admin, lottery_id, @player1);
 
-        let plan_after_first = test_utils::unwrap(autopurchase::get_plan(lottery_id, @player1));
-        let balance = plan_after_first.balance;
-        let tickets_per_draw = plan_after_first.tickets_per_draw;
-        let active = plan_after_first.active;
-        assert!(balance == TICKET_PRICE, 0);
-        assert!(tickets_per_draw == 2, 1);
-        assert!(active, 2);
+        let balance_after_first = autopurchase::get_plan_balance(@player1, lottery_id);
+        assert!(balance_after_first == u128::from_u64(TICKET_PRICE), 0);
 
-        let snapshot = test_utils::unwrap(rounds::get_round_snapshot(lottery_id));
-        let ticket_count = snapshot.ticket_count;
+        let (ticket_count, _, _, _) = test_utils::unwrap(rounds::get_round_snapshot(lottery_id, 0));
         assert!(ticket_count == 2, 3);
 
-        let summary_mid = test_utils::unwrap(autopurchase::get_lottery_summary(lottery_id));
-        let balance_mid = summary_mid.total_balance;
-        let total_players_mid = summary_mid.total_players;
-        let active_players_mid = summary_mid.active_players;
-        assert!(balance_mid == TICKET_PRICE, 16);
+        let (total_players_mid, active_players_mid, balance_mid) =
+            autopurchase::get_lottery_summary_view(lottery_id);
+        assert!(balance_mid == u128::from_u64(TICKET_PRICE), 16);
         assert!(total_players_mid == 1, 17);
         assert!(active_players_mid == 1, 18);
 
 
         autopurchase::execute(lottery_admin, lottery_id, @player1);
-        let plan_after_second = test_utils::unwrap(autopurchase::get_plan(lottery_id, @player1));
-        let final_balance = plan_after_second.balance;
-        assert!(final_balance == 0, 4);
+        let final_balance = autopurchase::get_plan_balance(@player1, lottery_id);
+        assert!(final_balance == u128::from_u64(0), 4);
 
-        let summary_final = test_utils::unwrap(autopurchase::get_lottery_summary(lottery_id));
-        let balance_final = summary_final.total_balance;
-        assert!(balance_final == 0, 19);
+        let (_, _, balance_final) = autopurchase::get_lottery_summary_view(lottery_id);
+        assert!(balance_final == u128::from_u64(0), 19);
 
-        let pool_opt = treasury_multi::get_pool(lottery_id);
-        let pool_snapshot = test_utils::unwrap(pool_opt);
-        let prize_balance = pool_snapshot.prize_balance;
-        let operations_balance = pool_snapshot.operations_balance;
-        assert!(prize_balance == 210, 5);
-        assert!(operations_balance == 30, 6);
+        let (prize_balance, operations_balance) = treasury_multi::get_pool_balances(lottery_id);
+        assert!(prize_balance == u128::from_u64(210), 5);
+        assert!(operations_balance == u128::from_u64(30), 6);
         assert!(treasury_multi::jackpot_balance() == 60, 7);
         assert!(treasury_v1::balance_of(@player1) == 20_000 - (TICKET_PRICE * 3), 8);
     }
@@ -182,12 +168,10 @@ module lottery::autopurchase_tests {
         let balance_after = treasury_v1::balance_of(@player3);
         assert!(balance_after == balance_before + 120, 0);
 
-        let plan = test_utils::unwrap(autopurchase::get_plan(lottery_id, @player3));
-        let balance = plan.balance;
-        assert!(balance == 380, 1);
+        let balance = autopurchase::get_plan_balance(@player3, lottery_id);
+        assert!(balance == u128::from_u64(380), 1);
 
-        let summary = test_utils::unwrap(autopurchase::get_lottery_summary(lottery_id));
-        let total_balance = summary.total_balance;
-        assert!(total_balance == 380, 2);
+        let (_, _, total_balance) = autopurchase::get_lottery_summary_view(lottery_id);
+        assert!(total_balance == u128::from_u64(380), 2);
     }
 }

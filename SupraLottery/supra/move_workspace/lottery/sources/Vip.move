@@ -2,6 +2,7 @@ module lottery::vip {
     use std::option;
     use std::signer;
     use std::vector;
+    use std::u128;
     use vrf_hub::table;
     use std::event;
     use std::math64;
@@ -137,7 +138,7 @@ module lottery::vip {
         price: u64,
         duration_secs: u64,
         bonus_tickets: u64,
-    ) acquires VipState, instances::LotteryCollection {
+    ) acquires VipState {
         ensure_admin(caller);
         ensure_lottery_known(lottery_id);
         if (price == 0) {
@@ -172,7 +173,7 @@ module lottery::vip {
     }
 
     public entry fun subscribe(caller: &signer, lottery_id: u64)
-    acquires VipState, instances::LotteryCollection {
+    acquires VipState {
         let player = signer::address_of(caller);
         subscribe_internal(caller, lottery_id, player);
     }
@@ -181,7 +182,7 @@ module lottery::vip {
         caller: &signer,
         lottery_id: u64,
         player: address,
-    ) acquires VipState, instances::LotteryCollection {
+    ) acquires VipState {
         ensure_admin(caller);
         subscribe_internal(caller, lottery_id, player);
     }
@@ -244,6 +245,23 @@ module lottery::vip {
     }
 
     #[view]
+    /// test-view: возвращает (total_members, active_members, total_revenue, bonus_tickets_issued)
+    public fun get_lottery_summary_view(lottery_id: u64): (u64, u64, u128, u64)
+    acquires VipState {
+        let summary_opt = get_lottery_summary(lottery_id);
+        if (!option::is_some(&summary_opt)) {
+            abort E_UNKNOWN_LOTTERY;
+        };
+        let summary_ref = option::borrow(&summary_opt);
+        (
+            summary_ref.total_members,
+            summary_ref.active_members,
+            u128::from_u64(summary_ref.total_revenue),
+            summary_ref.bonus_tickets_issued,
+        )
+    }
+
+    #[view]
     public fun list_players(lottery_id: u64): option::Option<vector<address>> acquires VipState {
         if (!exists<VipState>(@lottery)) {
             return option::none<vector<address>>();
@@ -280,6 +298,21 @@ module lottery::vip {
             is_active,
             bonus_tickets: subscription.bonus_tickets,
         })
+    }
+
+    #[view]
+    /// test-view: возвращает (is_active, bonus_tickets)
+    public fun get_subscription_view(lottery_id: u64, player: address): (bool, u64)
+    acquires VipState {
+        let subscription_opt = get_subscription(lottery_id, player);
+        if (!option::is_some(&subscription_opt)) {
+            abort E_SUBSCRIPTION_NOT_FOUND;
+        };
+        let subscription_ref = option::borrow(&subscription_opt);
+        (
+            subscription_ref.is_active,
+            subscription_ref.bonus_tickets,
+        )
     }
 
     public(friend) fun bonus_tickets_for(lottery_id: u64, player: address): u64 acquires VipState {
@@ -327,7 +360,7 @@ module lottery::vip {
         payer: &signer,
         lottery_id: u64,
         player: address,
-    ) acquires VipState, instances::LotteryCollection {
+    ) acquires VipState {
         ensure_lottery_known(lottery_id);
         if (!exists<VipState>(@lottery)) {
             abort E_NOT_INITIALIZED;
@@ -411,7 +444,7 @@ module lottery::vip {
         );
     }
 
-    fun ensure_lottery_known(lottery_id: u64) acquires instances::LotteryCollection {
+    fun ensure_lottery_known(lottery_id: u64) {
         if (!instances::contains_instance(lottery_id)) {
             abort E_UNKNOWN_LOTTERY;
         };

@@ -39,20 +39,47 @@ def _pick_primary_lottery(report: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return next((entry for entry in lotteries if isinstance(entry, dict)), None)
 
 
-def _extract_round(report: Dict[str, Any]) -> tuple[Dict[str, Any], Optional[Any], Optional[Dict[str, Any]]]:
+def _extract_round(
+    report: Dict[str, Any],
+) -> tuple[Dict[str, Any], Optional[Any], Optional[Dict[str, Any]]]:
+    """Нормализовать данные раунда для различных форматов отчёта."""
+
+    lottery_section = report.get("lottery")
+    if isinstance(lottery_section, dict):
+        status = lottery_section.get("status")
+        if isinstance(status, dict):
+            pending_id = status.get("pending_request_id")
+            return dict(status), pending_id, lottery_section
+        round_section = lottery_section.get("round")
+        if isinstance(round_section, dict):
+            snapshot = round_section.get("snapshot")
+            if not isinstance(snapshot, dict):
+                snapshot = dict(round_section)
+            pending_id = round_section.get("pending_request_id")
+            return dict(snapshot), pending_id, lottery_section
+
     lottery = _pick_primary_lottery(report)
-    if not isinstance(lottery, dict):
-        return {}, None, None
-    round_section = lottery.get("round")
-    if isinstance(round_section, dict):
-        snapshot = round_section.get("snapshot")
-        pending_id = round_section.get("pending_request_id")
-    else:
-        snapshot = None
-        pending_id = None
-    if not isinstance(snapshot, dict):
-        snapshot = {}
-    return snapshot, pending_id, lottery
+    if isinstance(lottery, dict):
+        round_section = lottery.get("round")
+        if isinstance(round_section, dict):
+            snapshot = round_section.get("snapshot")
+            if not isinstance(snapshot, dict):
+                snapshot = dict(round_section)
+            pending_id = round_section.get("pending_request_id")
+        else:
+            snapshot = {}
+            pending_id = None
+        return dict(snapshot), pending_id, lottery
+
+    return {}, None, None
+
+
+def extract_round_data(
+    report: Dict[str, Any],
+) -> tuple[Dict[str, Any], Optional[Any], Optional[Dict[str, Any]]]:
+    """Публичная обёртка для повторного использования нормализованных данных."""
+
+    return _extract_round(report)
 
 
 def _as_bool(value: Any) -> bool:
@@ -151,7 +178,8 @@ def evaluate(report: Dict[str, Any], ns: argparse.Namespace) -> List[str]:
     if not ns.skip_draw_scheduled and not _as_bool(snapshot.get("draw_scheduled", False)):
         reasons.append("Розыгрыш ещё не запланирован (draw_scheduled=false)")
 
-    has_pending_flag = _as_bool(snapshot.get("has_pending_request", False))
+    pending_value = snapshot.get("has_pending_request", snapshot.get("pending_request", False))
+    has_pending_flag = _as_bool(pending_value)
     if pending_request_id is not None:
         has_pending_flag = True
     if not ns.allow_pending_request and has_pending_flag:
@@ -163,6 +191,10 @@ def evaluate(report: Dict[str, Any], ns: argparse.Namespace) -> List[str]:
             reasons.append("Минимальный баланс депозита не достигнут")
 
     aggregators = deposit.get("whitelisted_contracts", []) or []
+    if not aggregators and isinstance(lottery_entry, dict):
+        whitelist_status = lottery_entry.get("whitelist_status")
+        if isinstance(whitelist_status, dict):
+            aggregators = whitelist_status.get("aggregators", []) or []
     if ns.require_aggregator and not aggregators:
         reasons.append("Whitelist агрегаторов пуст")
 
@@ -203,7 +235,10 @@ def build_summary(
         "ticket_count": ticket_count,
         "min_tickets_required": ns.min_tickets,
         "draw_scheduled": _as_bool(snapshot.get("draw_scheduled", False)),
-        "pending_request": _as_bool(snapshot.get("has_pending_request", False)) or pending_request_id is not None,
+        "pending_request": (
+            _as_bool(snapshot.get("has_pending_request", snapshot.get("pending_request", False)))
+            or pending_request_id is not None
+        ),
         "pending_request_id": pending_request_id,
         "min_balance_reached": _as_bool(deposit.get("min_balance_reached", False)),
         "aggregators": [str(value) for value in aggregators],

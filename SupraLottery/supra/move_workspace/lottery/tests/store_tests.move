@@ -1,5 +1,6 @@
 module lottery::store_tests {
     use std::option;
+    use std::u128;
     use std::account;
     use std::signer;
     use lottery::instances;
@@ -83,18 +84,14 @@ module lottery::store_tests {
 
         store::purchase(buyer, lottery_id, 1, 2);
 
-        let item_stats = test_utils::unwrap(store::get_item_with_stats(lottery_id, 1));
-        let item = item_stats.item;
-        let sold = item_stats.sold;
-        let stock = item.stock;
+        let item_stats = test_utils::unwrap(store::get_item_with_stats_view(lottery_id, 1));
+        let (_, _, stock, sold, _) = item_stats;
         assert!(sold == 2, 0);
         let remaining = test_utils::unwrap(stock);
         assert!(remaining == ITEM_STOCK - 2, 1);
 
-        let summary = test_utils::unwrap(treasury_multi::get_lottery_summary(lottery_id));
-        let pool = summary.pool;
-        let operations_balance = pool.operations_balance;
-        assert!(operations_balance == ITEM_PRICE * 2, 2);
+        let (_, operations_balance) = treasury_multi::get_pool_balances(lottery_id);
+        assert!(operations_balance == u128::from_u64(ITEM_PRICE * 2), 2);
     }
 
     #[test(

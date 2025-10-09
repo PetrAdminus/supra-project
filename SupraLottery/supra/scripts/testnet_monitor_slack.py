@@ -17,6 +17,7 @@ import urllib.request
 from typing import Optional
 
 from . import monitor_common as common
+from . import testnet_draw_readiness as readiness
 
 DEFAULT_TITLE = "Supra dVRF статус"
 DEFAULT_WEBHOOK_TYPE = "slack"
@@ -86,38 +87,34 @@ def _pick_primary_lottery(report: dict) -> Optional[dict]:
 
 
 def format_message(ns: argparse.Namespace, report: dict, monitor_rc: int) -> str:
-    balance = int(report["deposit"]["balance"])
-    min_balance = int(report["calculation"]["min_balance"])
+    deposit = report.get("deposit", {})
+    calculation = report.get("calculation", {})
+    balance = int(deposit.get("balance", 0))
+    min_balance = int(calculation.get("min_balance", deposit.get("min_balance", 0)))
     status_emoji = "✅" if balance >= min_balance else "⚠️"
-    primary_lottery = _pick_primary_lottery(report)
-    draw_summary = ""
-    if isinstance(primary_lottery, dict):
-        lottery_id = primary_lottery.get("lottery_id")
-        round_section = primary_lottery.get("round")
-        if isinstance(round_section, dict):
-            snapshot = round_section.get("snapshot")
-            pending = round_section.get("pending_request_id")
-        else:
-            snapshot = None
-            pending = None
-        parts = []
-        if lottery_id is not None:
-            parts.append(f"lottery_id={lottery_id}")
-        if isinstance(snapshot, dict):
-            parts.append(f"tickets={snapshot.get('ticket_count')}")
-            parts.append(f"scheduled={snapshot.get('draw_scheduled')}")
-            parts.append(f"has_pending={snapshot.get('has_pending_request')}")
-        if pending is not None:
-            parts.append(f"pending_request_id={pending}")
-        draw_summary = " | ".join(filter(None, (str(item) for item in parts)))
+
+    snapshot, pending_id, lottery_entry = readiness.extract_round_data(report)
+    lottery_id = lottery_entry.get("lottery_id") if isinstance(lottery_entry, dict) else None
+
+    parts = []
+    if lottery_id is not None:
+        parts.append(f"lottery_id={lottery_id}")
+    if snapshot:
+        parts.append(f"tickets={snapshot.get('ticket_count')}")
+        parts.append(f"draw_scheduled={snapshot.get('draw_scheduled')}")
+        pending_flag = snapshot.get("has_pending_request", snapshot.get("pending_request"))
+        parts.append(f"pending_request={pending_flag}")
+    if pending_id is not None:
+        parts.append(f"pending_request_id={pending_id}")
+    draw_summary = " | ".join(str(item) for item in parts if item is not None)
     profile = ns.profile or "<не задан>"
     base = (
         f"{status_emoji} {ns.title}\n"
         f"Профиль: {profile}\n"
         f"Баланс депозита: {balance}\n"
         f"min_balance (с учётом запаса): {min_balance}\n"
-        f"Лимиты газа: price={report['deposit']['max_gas_price']} | limit={report['deposit']['max_gas_limit']}\n"
-        f"Минимальный баланс достигнут: {report['deposit']['min_balance_reached']}\n"
+        f"Лимиты газа: price={deposit.get('max_gas_price')} | limit={deposit.get('max_gas_limit')}\n"
+        f"Минимальный баланс достигнут: {deposit.get('min_balance_reached')}\n"
     )
     if draw_summary:
         base += f"Статус лотереи: {draw_summary}\n"

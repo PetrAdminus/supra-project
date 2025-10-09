@@ -395,9 +395,14 @@ module lottery::main_v2 {
         let per_request_fee_u64 = checked_u64_from_u128(per_request_fee, E_MIN_BALANCE_OVERFLOW);
         assert!(initial_deposit >= min_balance, E_INITIAL_DEPOSIT_TOO_LOW);
         if (call_native) {
-            deposit::clientSettingMinimumBalance(sender, min_balance);
-            deposit::depositFundClient(sender, initial_deposit);
-            deposit::addContractToWhitelist(sender, @lottery, callback_gas_price, callback_gas_limit);
+            deposit::client_setting_minimum_balance(sender, min_balance);
+            deposit::deposit_fund_client(sender, initial_deposit);
+            deposit::add_contract_to_whitelist(
+                sender,
+                @lottery,
+                callback_gas_price,
+                callback_gas_limit,
+            );
         };
         event::emit(SubscriptionConfiguredEvent {
             min_balance,
@@ -489,7 +494,7 @@ module lottery::main_v2 {
         };
         let per_request_fee_u64 = checked_u64_from_u128(per_request_fee, E_MIN_BALANCE_OVERFLOW);
         if (call_native) {
-            deposit::clientSettingMinimumBalance(sender, min_balance);
+            deposit::client_setting_minimum_balance(sender, min_balance);
         };
 
         let lottery = borrow_global_mut<LotteryData>(@lottery);
@@ -702,7 +707,7 @@ module lottery::main_v2 {
         assert!(can_withdraw, E_WITHDRAWAL_PENDING_REQUEST);
 
         if (call_native) {
-            deposit::withdrawFundClient(sender, amount);
+            deposit::withdraw_fund_client(sender, amount);
         };
 
         event::emit(FundsWithdrawnEvent { admin, amount });
@@ -824,6 +829,16 @@ module lottery::main_v2 {
     #[test_only]
     public fun set_pending_request_for_test(nonce: option::Option<u64>) acquires LotteryData {
         set_pending_request_and_hash_for_test(nonce, option::none(), option::none());
+    }
+
+    #[test_only]
+    public fun get_pending_request_for_test(): option::Option<u64> acquires LotteryData {
+        if (!exists<LotteryData>(@lottery)) {
+            option::none()
+        } else {
+            let lottery = borrow_global<LotteryData>(@lottery);
+            copy_option_u64(&lottery.pending_request)
+        }
     }
 
     #[test_only]
@@ -1209,6 +1224,16 @@ module lottery::main_v2 {
     public fun next_client_seed_for_test(): u64 acquires LotteryData {
         let lottery = borrow_global<LotteryData>(@lottery);
         lottery.next_client_seed
+    }
+
+    #[test_only]
+    public fun get_last_requester_for_test(): option::Option<address> acquires LotteryData {
+        if (!exists<LotteryData>(@lottery)) {
+            option::none()
+        } else {
+            let lottery = borrow_global<LotteryData>(@lottery);
+            copy_option_address(&lottery.last_requester)
+        }
     }
 
     fun handle_verified_random(

@@ -79,8 +79,8 @@ module lottery::jackpot_tests {
         let randomness = build_randomness(1);
         jackpot::fulfill_draw(aggregator, request_id, randomness);
 
-        let snapshot = test_utils::unwrap(jackpot::get_snapshot());
-        let jackpot::JackpotSnapshot { ticket_count, draw_scheduled, has_pending_request } = snapshot;
+        let snapshot = test_utils::unwrap(jackpot::get_snapshot_view());
+        let (ticket_count, draw_scheduled, has_pending_request) = snapshot;
         assert!(ticket_count == 0, 1);
         assert!(!draw_scheduled, 2);
         assert!(!has_pending_request, 3);

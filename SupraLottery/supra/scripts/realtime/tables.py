@@ -9,6 +9,7 @@ from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..accounts.tables import Base
+from .._sqla_utils import metadata_property
 
 
 def _utcnow() -> datetime:
@@ -24,7 +25,9 @@ class ChatMessage(Base):
     room: Mapped[str] = mapped_column(String(64), index=True)
     sender_address: Mapped[str] = mapped_column(String(80), index=True)
     body: Mapped[str] = mapped_column(Text)
-    metadata: Mapped[dict[str, Any]] = mapped_column(MutableDict.as_mutable(JSON), default=dict)
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", MutableDict.as_mutable(JSON), default=dict
+    )
     created_at: Mapped[datetime] = mapped_column(default=_utcnow, index=True)
 
 
@@ -37,8 +40,13 @@ class Announcement(Base):
     title: Mapped[str] = mapped_column(String(160))
     body: Mapped[str] = mapped_column(Text)
     lottery_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
-    metadata: Mapped[dict[str, Any]] = mapped_column(MutableDict.as_mutable(JSON), default=dict)
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", MutableDict.as_mutable(JSON), default=dict
+    )
     created_at: Mapped[datetime] = mapped_column(default=_utcnow, index=True)
 
+
+ChatMessage.metadata = metadata_property()
+Announcement.metadata = metadata_property()
 
 __all__ = ["ChatMessage", "Announcement"]

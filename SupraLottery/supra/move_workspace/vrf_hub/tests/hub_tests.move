@@ -26,11 +26,13 @@ module vrf_hub::hub_tests {
         assert!(vector::length(&active) == 1, 0);
         assert!(*vector::borrow(&active, 0) == id, 0);
 
-        let registration_opt = hub::get_registration(id);
+        let registration_opt = hub::get_registration_view(id);
         let registration = option::destroy_some(registration_opt);
-        assert!(registration.owner == OWNER, 0);
-        assert!(registration.lottery == LOTTERY_ADDR, 0);
-        assert!(vector::length(&registration.metadata) == 4, 0);
+        let (owner, lottery, metadata, active) = registration;
+        assert!(owner == OWNER, 0);
+        assert!(lottery == LOTTERY_ADDR, 0);
+        assert!(active, 0);
+        assert!(vector::length(&metadata) == 4, 0);
     }
 
     #[test]
@@ -46,10 +48,11 @@ module vrf_hub::hub_tests {
         assert!(vector::length(&active) == 0, 0);
 
         hub::update_metadata(&hub_signer, id, b"data");
-        let registration_opt = hub::get_registration(id);
+        let registration_opt = hub::get_registration_view(id);
         let registration = option::destroy_some(registration_opt);
-        assert!(vector::length(&registration.metadata) == 4, 0);
-        assert!(*vector::borrow(&registration.metadata, 0) == 100, 0); // 'd'
+        let (_owner, _lottery, metadata, _active) = registration;
+        assert!(vector::length(&metadata) == 4, 0);
+        assert!(*vector::borrow(&metadata, 0) == 100, 0); // 'd'
     }
 
     #[test]
@@ -66,13 +69,13 @@ module vrf_hub::hub_tests {
         assert!(vector::length(&pending) == 1, 0);
         assert!(*vector::borrow(&pending, 0) == request_id, 0);
 
-        let record_opt = hub::get_request(request_id);
+        let record_opt = hub::get_request_view(request_id);
         let preview = option::destroy_some(record_opt);
-        assert!(preview.lottery_id == lottery_id, 0);
-        assert!(vector::length(&preview.payload) == 7, 0);
+        let (preview_lottery, preview_payload) = preview;
+        assert!(preview_lottery == lottery_id, 0);
+        assert!(vector::length(&preview_payload) == 7, 0);
 
-        let record = hub::consume_request(request_id);
-        let hub::RequestRecord { lottery_id: stored_lottery, payload } = record;
+        let (stored_lottery, payload) = hub::consume_request(request_id);
         assert!(stored_lottery == lottery_id, 0);
         assert!(vector::length(&payload) == 7, 0);
 
@@ -93,7 +96,7 @@ module vrf_hub::hub_tests {
         let aggregator = account::create_signer_for_test(@0x44);
         hub::set_callback_sender(&hub_signer, @0x44);
 
-        let _record = hub::consume_request(request_id);
+        let (_lottery, _payload) = hub::consume_request(request_id);
         hub::record_fulfillment(request_id, lottery_id, b"random");
 
         hub::ensure_callback_sender(&aggregator);

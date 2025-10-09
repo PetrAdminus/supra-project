@@ -133,7 +133,7 @@ module lottery::rounds {
     }
 
     public entry fun buy_ticket(caller: &signer, lottery_id: u64)
-    acquires RoundCollection, instances::LotteryCollection {
+    acquires RoundCollection {
         let buyer = signer::address_of(caller);
         let state = borrow_state_mut();
         let (round, blueprint) = prepare_purchase(state, lottery_id);
@@ -148,7 +148,7 @@ module lottery::rounds {
         lottery_id: u64,
         buyer: address,
         ticket_count: u64,
-    ): u64 acquires RoundCollection, instances::LotteryCollection {
+    ): u64 acquires RoundCollection {
         if (ticket_count == 0) {
             abort E_INVALID_TICKET_COUNT;
         };
@@ -160,7 +160,7 @@ module lottery::rounds {
     }
 
     public entry fun schedule_draw(caller: &signer, lottery_id: u64)
-    acquires RoundCollection, instances::LotteryCollection {
+    acquires RoundCollection {
         ensure_admin(caller);
         let state = borrow_state_mut();
         let round = ensure_round(state, lottery_id);
@@ -178,7 +178,7 @@ module lottery::rounds {
     }
 
     public entry fun reset_round(caller: &signer, lottery_id: u64)
-    acquires RoundCollection, instances::LotteryCollection {
+    acquires RoundCollection {
         ensure_admin(caller);
         let state = borrow_state_mut();
         let round = ensure_round(state, lottery_id);
@@ -195,7 +195,7 @@ module lottery::rounds {
         caller: &signer,
         lottery_id: u64,
         payload: vector<u8>,
-    ) acquires RoundCollection, instances::LotteryCollection, hub::HubState {
+    ) acquires RoundCollection {
         ensure_admin(caller);
         let state = borrow_state_mut();
         let round = ensure_round(state, lottery_id);
@@ -221,12 +221,9 @@ module lottery::rounds {
         caller: &signer,
         request_id: u64,
         randomness: vector<u8>,
-    ) acquires RoundCollection, instances::LotteryCollection, hub::HubState {
+    ) acquires RoundCollection {
         hub::ensure_callback_sender(caller);
-        let record = hub::consume_request(request_id);
-        let record_data = record;
-        let lottery_id = record_data.lottery_id;
-        let payload = record_data.payload;
+        let (lottery_id, payload) = hub::consume_request(request_id);
 
         let state = borrow_state_mut();
         if (!table::contains(&state.rounds, lottery_id)) {
@@ -284,21 +281,24 @@ module lottery::rounds {
     }
 
     #[view]
-    public fun get_round_snapshot(lottery_id: u64): option::Option<RoundSnapshot> acquires RoundCollection {
+    public fun get_round_snapshot(
+        lottery_id: u64,
+        _round: u64,
+    ): option::Option<(u64, bool, bool, u64)> acquires RoundCollection {
         if (!exists<RoundCollection>(@lottery)) {
-            return option::none<RoundSnapshot>();
+            return option::none<(u64, bool, bool, u64)>();
         };
         let state = borrow_state();
         if (!table::contains(&state.rounds, lottery_id)) {
-            option::none<RoundSnapshot>()
+            option::none<(u64, bool, bool, u64)>()
         } else {
             let round = table::borrow(&state.rounds, lottery_id);
-            option::some(RoundSnapshot {
-                ticket_count: vector::length(&round.tickets),
-                draw_scheduled: round.draw_scheduled,
-                has_pending_request: option::is_some(&round.pending_request),
-                next_ticket_id: round.next_ticket_id,
-            })
+            option::some((
+                vector::length(&round.tickets),
+                round.draw_scheduled,
+                option::is_some(&round.pending_request),
+                round.next_ticket_id,
+            ))
         }
     }
 
@@ -323,7 +323,7 @@ module lottery::rounds {
     fun prepare_purchase(
         state: &mut RoundCollection,
         lottery_id: u64,
-    ): (&mut RoundState, registry::LotteryBlueprint) acquires instances::LotteryCollection {
+    ): (&mut RoundState, registry::LotteryBlueprint) {
         let info_opt = instances::get_lottery_info(lottery_id);
         if (!option::is_some(&info_opt)) {
             abort E_INSTANCE_MISSING;
@@ -355,7 +355,7 @@ module lottery::rounds {
         ticket_price: u64,
         jackpot_share_bps: u16,
         ticket_count: u64,
-    ): u64 acquires instances::LotteryCollection {
+    ): u64 {
         let jackpot_bps = math64::from_u16(jackpot_share_bps);
         let jackpot_contribution = math64::mul_div(ticket_price, jackpot_bps, BASIS_POINT_DENOMINATOR);
         let issued = 0;
@@ -407,7 +407,7 @@ module lottery::rounds {
         borrow_global_mut<RoundCollection>(@lottery)
     }
 
-    fun ensure_round(state: &mut RoundCollection, lottery_id: u64): &mut RoundState acquires instances::LotteryCollection {
+    fun ensure_round(state: &mut RoundCollection, lottery_id: u64): &mut RoundState {
         if (!instances::contains_instance(lottery_id)) {
             abort E_INSTANCE_MISSING;
         };
@@ -446,7 +446,7 @@ module lottery::rounds {
         draw_scheduled: bool,
         next_ticket_id: u64,
         pending_request: option::Option<u64>,
-    ) acquires RoundCollection, instances::LotteryCollection {
+    ) acquires RoundCollection {
         let state = borrow_state_mut();
         if (!instances::contains_instance(lottery_id)) {
             abort E_INSTANCE_MISSING;
