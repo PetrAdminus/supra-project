@@ -14,6 +14,7 @@ ADMIN_ADDR=${3:?"Admin address is required"}
 TICKETS_REQUIRED=${TICKETS_REQUIRED:-5}
 TICKET_FUND=${TICKET_FUND:-100000000}
 RNG_COUNT=${RNG_COUNT:-1}
+NUM_CONFIRMATIONS=${NUM_CONFIRMATIONS:-1}
 CLIENT_SEED=${CLIENT_SEED:-$(date +%s)}
 
 supra_cli_init "${PROFILE}"
@@ -73,7 +74,7 @@ print("pending_request:", data.get("pending_request"))
 PY
 
 supra_cli_info "Configuring VRF request"
-supra_cli_move_run "--function-id ${LOTTERY_ADDR}::main_v2::configure_vrf_request --args u8:${RNG_COUNT} u64:${CLIENT_SEED} --assume-yes"
+supra_cli_move_run "--function-id ${LOTTERY_ADDR}::main_v2::configure_vrf_request --args u8:${RNG_COUNT} u64:${NUM_CONFIRMATIONS} u64:${CLIENT_SEED} --assume-yes"
 
 supra_cli_info "Calling manual_draw"
 supra_cli_move_run "--function-id ${LOTTERY_ADDR}::main_v2::manual_draw --assume-yes"

@@ -52,6 +52,10 @@ COMMAND_MAP: Dict[str, Tuple[str, str]] = {
         "supra.scripts.configure_vrf_request",
         "Настроить параметры запроса случайности",
     ),
+    "remove-subscription": (
+        "supra.scripts.remove_subscription",
+        "Удалить контракт лотереи из подписки Supra dVRF",
+    ),
     "vrf-audit": (
         "supra.scripts.testnet_vrf_audit",
         "Выгрузить события VRF и состояние раунда для панели честности",

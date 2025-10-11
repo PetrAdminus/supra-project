@@ -62,6 +62,15 @@ def build_command_args(ns: argparse.Namespace) -> List[str]:
     callback_gas_limit = _require_int(ns, "callback_gas_limit")
     verification_gas = _require_int(ns, "verification_gas")
 
+    if callback_gas_price > max_gas_price:
+        raise MonitorError(
+            "callback-gas-price должен быть меньше или равен max-gas-price, как требует Supra VRF subscription"
+        )
+    if callback_gas_limit > max_gas_limit:
+        raise MonitorError(
+            "callback-gas-limit должен быть меньше или равен max-gas-limit, как требует Supra VRF subscription"
+        )
+
     return [
         f"u128:{max_gas_price}",
         f"u128:{max_gas_limit}",

@@ -11,6 +11,7 @@ module lottery::migration_tests {
     use lottery::test_utils;
     use lottery::treasury_v1;
     use lottery_factory::registry;
+    use supra_framework::event;
     use vrf_hub::hub;
 
     #[test(lottery = @lottery, lottery_owner = @player1, lottery_contract = @player2)]
@@ -72,6 +73,70 @@ module lottery::migration_tests {
         let config_opt = treasury_multi::get_config(lottery_id);
         assert!(option::is_some(&config_opt), 5);
         assert!(main_v2::get_jackpot_amount() == 0, main_v2::get_jackpot_amount());
+
+        let migrated_ids = migration::list_migrated_lottery_ids();
+        assert!(vector::length(&migrated_ids) == 1, 11);
+        assert!(*vector::borrow(&migrated_ids, 0) == lottery_id, 12);
+
+        let snapshot_opt = migration::get_migration_snapshot(lottery_id);
+        assert!(option::is_some(&snapshot_opt), 13);
+        let snapshot = test_utils::unwrap(snapshot_opt);
+        let (
+            snapshot_lottery_id,
+            snapshot_ticket_count,
+            legacy_next_ticket_id,
+            migrated_next_ticket_id,
+            legacy_draw_scheduled,
+            migrated_draw_scheduled,
+            legacy_pending_request,
+            jackpot_amount_migrated,
+            snapshot_prize_bps,
+            snapshot_jackpot_bps,
+            snapshot_operations_bps,
+        ) = migration::migration_snapshot_fields_for_test(&snapshot);
+        assert!(snapshot_lottery_id == lottery_id, 14);
+        assert!(snapshot_ticket_count == 2, snapshot_ticket_count);
+        assert!(legacy_next_ticket_id == 3, legacy_next_ticket_id);
+        assert!(migrated_next_ticket_id == 2, migrated_next_ticket_id);
+        assert!(legacy_draw_scheduled, 15);
+        assert!(migrated_draw_scheduled, 16);
+        assert!(!legacy_pending_request, 17);
+        assert!(jackpot_amount_migrated == 500, jackpot_amount_migrated);
+        assert!(snapshot_prize_bps == 9_000, snapshot_prize_bps);
+        assert!(snapshot_jackpot_bps == 1_000, snapshot_jackpot_bps);
+        assert!(snapshot_operations_bps == 0, snapshot_operations_bps);
+
+        let snapshot_events = event::emitted_events<migration::MigrationSnapshotUpdatedEvent>();
+        let events_len = vector::length(&snapshot_events);
+        assert!(events_len >= 1, 18);
+        let latest_event = vector::borrow(&snapshot_events, events_len - 1);
+        let (event_lottery_id, event_snapshot) =
+            migration::migration_snapshot_event_fields_for_test(latest_event);
+        assert!(event_lottery_id == lottery_id, 19);
+        let (
+            event_snapshot_lottery_id,
+            event_ticket_count,
+            event_legacy_next_ticket_id,
+            event_migrated_next_ticket_id,
+            event_legacy_draw_scheduled,
+            event_migrated_draw_scheduled,
+            event_legacy_pending_request,
+            event_jackpot_amount,
+            event_prize_bps,
+            event_jackpot_bps,
+            event_operations_bps,
+        ) = migration::migration_snapshot_fields_for_test(&event_snapshot);
+        assert!(event_snapshot_lottery_id == lottery_id, 20);
+        assert!(event_ticket_count == 2, 21);
+        assert!(event_legacy_next_ticket_id == 3, 22);
+        assert!(event_migrated_next_ticket_id == 2, 23);
+        assert!(event_legacy_draw_scheduled, 24);
+        assert!(event_migrated_draw_scheduled, 25);
+        assert!(!event_legacy_pending_request, 26);
+        assert!(event_jackpot_amount == 500, 27);
+        assert!(event_prize_bps == 9_000, 28);
+        assert!(event_jackpot_bps == 1_000, 29);
+        assert!(event_operations_bps == 0, 30);
     }
 
     #[test(lottery = @lottery)]

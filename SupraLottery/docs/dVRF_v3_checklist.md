@@ -16,12 +16,12 @@
 - [ ] Note any new error codes / abort scenarios introduced by the framework (и обновлять [dVRF error reference](./dvrf_error_reference.md)).
 
 ## 2. Contract Changes (Lottery.move)
-- [ ] Update `request_draw` to use the v3 request API (gas config, confirmations, payload).
+- [x] Update `request_draw` to use the v3 request API (gas config, confirmations, payload).
 - [x] Adjust stored state (store maxGasPrice/maxGasLimit, contract-level callbackGasPrice/Limit, request counters, sha3-256 request hash).
 - [x] Extend events (DrawRequested, FundsWithdrawn) with fields necessary for v3 tracing, if applicable.
 - [x] Align admin flows with `addClientToWhitelist`/`addContractToWhitelist`; Move-контракт фиксирует снапшоты whitelisting и события, интеграция с SDK v3 — после релиза.
 - [x] Document post-onboarding verification через view-функции `get_client_whitelist_snapshot`, `get_min_balance_limit_snapshot`, `get_consumer_whitelist_snapshot` и проверки модуля `deposit` (`check_*`, `checkClientFund`, `isMinimumBalanceReached`, `listAllWhitelistedContractByClient`, `getSubscriptionInfoByClient`) в runbook/скриптах.
-- [x] Expose `configure_vrf_request` entry for rng_count/clientSeed tracking with audit event.
+- [x] Expose `configure_vrf_request` entry for rng_count/numConfirmations/clientSeed tracking with audit event.
 - [x] Add sha3-256 payload hash validation inside `on_random_received` (maintains v2 callback signature for now).
 - [x] Описать онбординг подписки через `deposit::migrateClient` → `deposit::addClientToWhitelist` → `lottery::main_v2::create_subscription` (формула `min_balance`, проверки `ECLIENT_NOT_EXIST`, camelCase имена API, подтверждение `"status": "Success"` после `addClientToWhitelist`, вызовы `clientSettingMinimumBalance`/`depositFundClient`, советы по копированию YAML в `/supra/.aptos`, автоматическая проверка `INITIAL_DEPOSIT >= MIN_BALANCE_LIMIT`).
 - [ ] Extend `on_random_received` for multi-value RNG arrays once v3 payload format is published.

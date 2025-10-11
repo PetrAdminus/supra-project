@@ -3,6 +3,7 @@ module vrf_hub::hub_tests {
     use std::account;
     use std::option;
     use std::vector;
+    use supra_framework::event;
     use vrf_hub::hub;
 
     const HUB_ADDR: address = @vrf_hub;
@@ -73,15 +74,17 @@ module vrf_hub::hub_tests {
 
         let record_opt = hub::get_request(request_id);
         let preview = option::destroy_some(record_opt);
-        let (preview_lottery, preview_payload) =
+        let (preview_lottery, preview_payload, preview_hash) =
             hub::request_record_fields_for_test(&preview);
         assert!(preview_lottery == lottery_id, 0);
         assert!(vector::length(&preview_payload) == 7, 0);
+        assert!(vector::length(&preview_hash) == 32, 0);
 
         let record = hub::consume_request(request_id);
-        let (stored_lottery, payload) = hub::request_record_fields_for_test(&record);
+        let (stored_lottery, payload, payload_hash) = hub::request_record_fields_for_test(&record);
         assert!(stored_lottery == lottery_id, 0);
         assert!(vector::length(&payload) == 7, 0);
+        assert!(vector::length(&payload_hash) == 32, 0);
 
         let empty = hub::list_pending_request_ids();
         assert!(vector::length(&empty) == 0, 0);
@@ -99,6 +102,21 @@ module vrf_hub::hub_tests {
 
         let aggregator = account::create_signer_for_test(@0x44);
         hub::set_callback_sender(&hub_signer, @0x44);
+
+        let status = hub::get_callback_sender_status();
+        let status_sender_opt = hub::callback_sender_status_sender(&status);
+        assert!(option::is_some(&status_sender_opt), 0);
+        let status_sender = option::destroy_some(status_sender_opt);
+        assert!(status_sender == @0x44, 0);
+
+        let sender_events = event::emitted_events<hub::CallbackSenderUpdatedEvent>();
+        let events_len = vector::length(&sender_events);
+        assert!(events_len == 1, 0);
+        let latest_sender_event = vector::borrow(&sender_events, events_len - 1);
+        let (previous_opt, current_opt) = hub::callback_sender_event_fields_for_test(latest_sender_event);
+        assert!(!option::is_some(&previous_opt), 0);
+        let current_sender = option::destroy_some(current_opt);
+        assert!(current_sender == @0x44, 0);
 
         let _record = hub::consume_request(request_id);
         hub::record_fulfillment(request_id, lottery_id, b"random");

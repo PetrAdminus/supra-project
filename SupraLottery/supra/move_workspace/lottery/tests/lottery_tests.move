@@ -1,7 +1,7 @@
 #[test_only]
 module lottery::lottery_tests {
     use std::account;
-    use std::event;
+    use supra_framework::event;
     use std::timestamp;
     use std::option;
     use std::hash;
@@ -301,6 +301,21 @@ module lottery::lottery_tests {
         let second_consumer = main_v2::whitelist_status_consumer_at(&status, 1);
         assert!(first_consumer == LOTTERY_ADDR, 226);
         assert!(second_consumer == PLAYER1, 227);
+
+        let whitelist_snapshots = event::emitted_events<main_v2::WhitelistSnapshotUpdatedEvent>();
+        let snapshot_count = vector::length(&whitelist_snapshots);
+        assert!(snapshot_count >= 3, 228);
+        let latest_snapshot = vector::borrow(&whitelist_snapshots, snapshot_count - 1);
+        let snapshot_aggregator = main_v2::whitelist_snapshot_updated_aggregator(latest_snapshot);
+        assert!(option::is_some(&snapshot_aggregator), 229);
+        let aggregator_in_snapshot = *option::borrow(&snapshot_aggregator);
+        assert!(aggregator_in_snapshot == VRF_AGGREGATOR, 230);
+        let snapshot_consumer_count = main_v2::whitelist_snapshot_updated_consumer_count(latest_snapshot);
+        assert!(snapshot_consumer_count == 2, 231);
+        let snapshot_consumer0 = main_v2::whitelist_snapshot_updated_consumer_at(latest_snapshot, 0);
+        let snapshot_consumer1 = main_v2::whitelist_snapshot_updated_consumer_at(latest_snapshot, 1);
+        assert!(snapshot_consumer0 == LOTTERY_ADDR, 232);
+        assert!(snapshot_consumer1 == PLAYER1, 233);
     }
 
     #[test]
@@ -367,6 +382,16 @@ module lottery::lottery_tests {
         let revoked_event = vector::borrow(&revoked_events, 0);
         let revoked_addr = main_v2::aggregator_revoked_fields(revoked_event);
         assert!(revoked_addr == VRF_AGGREGATOR, 57);
+
+        let whitelist_snapshots = event::emitted_events<main_v2::WhitelistSnapshotUpdatedEvent>();
+        let snapshot_len = vector::length(&whitelist_snapshots);
+        let latest_snapshot = vector::borrow(&whitelist_snapshots, snapshot_len - 1);
+        let aggregator_snapshot = main_v2::whitelist_snapshot_updated_aggregator(latest_snapshot);
+        assert!(option::is_none(&aggregator_snapshot), 234);
+        let consumers_after_revoke = main_v2::whitelist_snapshot_updated_consumer_count(latest_snapshot);
+        assert!(consumers_after_revoke == 1, 235);
+        let only_consumer = main_v2::whitelist_snapshot_updated_consumer_at(latest_snapshot, 0);
+        assert!(only_consumer == LOTTERY_ADDR, 236);
     }
 
     #[test]
@@ -522,13 +547,14 @@ module lottery::lottery_tests {
         main_v2::init(&lottery_signer);
 
         let new_seed = 5u64;
-        main_v2::configure_vrf_request(&lottery_signer, 1u8, new_seed);
+        main_v2::configure_vrf_request(&lottery_signer, 1u8, 1u64, new_seed);
 
         let events = event::emitted_events<main_v2::VrfRequestConfigUpdatedEvent>();
         assert!(vector::length(&events) == 1, 216);
         let event_ref = vector::borrow(&events, 0);
-        let (event_rng, event_seed) = main_v2::vrf_request_config_fields(event_ref);
+        let (event_rng, event_confirmations, event_seed) = main_v2::vrf_request_config_fields(event_ref);
         assert!(event_rng == 1u8, 217);
+        assert!(event_confirmations == 1u64, 300);
         assert!(event_seed == new_seed, 218);
 
         let next_seed = main_v2::next_client_seed_for_test();
@@ -539,8 +565,9 @@ module lottery::lottery_tests {
         let config_view_opt = main_v2::vrf_request_config_view(&config_opt);
         assert!(option::is_some(&config_view_opt), 221);
         let config_view_ref = option::borrow(&config_view_opt);
-        let (rng_count, client_seed) = main_v2::vrf_request_config_view_fields(config_view_ref);
+        let (rng_count, confirmations, client_seed) = main_v2::vrf_request_config_view_fields(config_view_ref);
         assert!(rng_count == 1u8, 222);
+        assert!(confirmations == 1u64, 301);
         assert!(client_seed == new_seed, 223);
     }
 
@@ -552,7 +579,29 @@ module lottery::lottery_tests {
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
         main_v2::init(&lottery_signer);
 
-        main_v2::configure_vrf_request(&lottery_signer, 2u8, 0u64);
+        main_v2::configure_vrf_request(&lottery_signer, 2u8, 1u64, 0u64);
+    }
+
+    #[test]
+    #[expected_failure(location = lottery::main_v2, abort_code = INVALID_REQUEST_CONFIG_ERROR)]
+    fun configure_vrf_request_rejects_zero_confirmations() {
+        setup_accounts_base();
+
+        let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
+        main_v2::init(&lottery_signer);
+
+        main_v2::configure_vrf_request(&lottery_signer, 1u8, 0u64, 0u64);
+    }
+
+    #[test]
+    #[expected_failure(location = lottery::main_v2, abort_code = INVALID_REQUEST_CONFIG_ERROR)]
+    fun configure_vrf_request_rejects_excess_confirmations() {
+        setup_accounts_base();
+
+        let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
+        main_v2::init(&lottery_signer);
+
+        main_v2::configure_vrf_request(&lottery_signer, 1u8, 21u64, 0u64);
     }
 
     #[test]
@@ -563,8 +612,8 @@ module lottery::lottery_tests {
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
         main_v2::init(&lottery_signer);
 
-        main_v2::configure_vrf_request(&lottery_signer, 1u8, 10u64);
-        main_v2::configure_vrf_request(&lottery_signer, 1u8, 5u64);
+        main_v2::configure_vrf_request(&lottery_signer, 1u8, 1u64, 10u64);
+        main_v2::configure_vrf_request(&lottery_signer, 1u8, 1u64, 5u64);
     }
 
     #[test]
@@ -580,7 +629,81 @@ module lottery::lottery_tests {
 
         main_v2::record_request_for_test(100, LOTTERY_ADDR);
 
-        main_v2::configure_vrf_request(&lottery_signer, 1u8, 1u64);
+        main_v2::configure_vrf_request(&lottery_signer, 1u8, 1u64, 1u64);
+    }
+
+    #[test]
+    fun pending_request_view_returns_details() {
+        setup_accounts_base();
+
+        let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
+        main_v2::init(&lottery_signer);
+
+        whitelist_callback_sender();
+        configure_gas_default();
+
+        let confirmations = 3u64;
+        let client_seed = 42u64;
+        main_v2::configure_vrf_request(&lottery_signer, 1u8, confirmations, client_seed);
+
+        let nonce = 100u64;
+        main_v2::record_request_for_test(nonce, LOTTERY_ADDR);
+
+        let view_opt = main_v2::get_pending_request_view();
+        assert!(option::is_some(&view_opt), 400);
+        let view_ref = option::borrow(&view_opt);
+        let (
+            observed_nonce,
+            requester,
+            request_hash,
+            observed_seed,
+            rng_count,
+            observed_confirmations,
+            callback_sender,
+            callback_price,
+            callback_limit,
+            max_price,
+            max_limit,
+            verification_value
+        ) = main_v2::pending_request_view_fields(view_ref);
+
+        assert!(observed_nonce == nonce, 401);
+        assert!(requester == LOTTERY_ADDR, 402);
+        assert!(observed_seed == client_seed, 403);
+        assert!(rng_count == 1u8, 404);
+        assert!(observed_confirmations == confirmations, 405);
+        assert!(callback_sender == VRF_AGGREGATOR, 411);
+        assert!(callback_price == CALLBACK_GAS_PRICE, 406);
+        assert!(callback_limit == CALLBACK_GAS_LIMIT, 407);
+        assert!(max_price == MAX_GAS_PRICE, 408);
+        assert!(max_limit == MAX_GAS_LIMIT, 409);
+        assert!(verification_value == VERIFICATION_GAS_VALUE, 410);
+
+        let envelope = main_v2::request_payload_message_for_test(
+            nonce,
+            observed_seed,
+            LOTTERY_ADDR
+        );
+        let expected_hash = hash::sha3_256(copy envelope);
+        assert!(main_v2::vector_equals_for_test(&expected_hash, &request_hash), 411);
+    }
+
+    #[test]
+    fun pending_request_view_is_none_without_pending_request() {
+        setup_accounts_base();
+
+        let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
+        main_v2::init(&lottery_signer);
+
+        whitelist_callback_sender();
+        configure_gas_default();
+
+        main_v2::configure_vrf_request(&lottery_signer, 1u8, 2u64, 5u64);
+        main_v2::record_request_for_test(55u64, LOTTERY_ADDR);
+        main_v2::clear_pending_request_state_for_test();
+
+        let view_opt = main_v2::get_pending_request_view();
+        assert!(option::is_none(&view_opt), 412);
     }
 
     #[test]
@@ -612,6 +735,16 @@ module lottery::lottery_tests {
         let removed_event = vector::borrow(&events, 0);
         let removed_addr = main_v2::consumer_removed_fields(removed_event);
         assert!(removed_addr == PLAYER1, 59);
+
+        let whitelist_snapshots = event::emitted_events<main_v2::WhitelistSnapshotUpdatedEvent>();
+        let snapshot_len = vector::length(&whitelist_snapshots);
+        let latest_snapshot = vector::borrow(&whitelist_snapshots, snapshot_len - 1);
+        let snapshot_aggregator = main_v2::whitelist_snapshot_updated_aggregator(latest_snapshot);
+        assert!(option::is_none(&snapshot_aggregator), 413);
+        let consumer_total = main_v2::whitelist_snapshot_updated_consumer_count(latest_snapshot);
+        assert!(consumer_total == 1, 414);
+        let only_consumer = main_v2::whitelist_snapshot_updated_consumer_at(latest_snapshot, 0);
+        assert!(only_consumer == LOTTERY_ADDR, 415);
     }
 
     #[test]
@@ -885,6 +1018,40 @@ module lottery::lottery_tests {
     }
 
     #[test]
+    #[expected_failure(location = lottery::main_v2, abort_code = INVALID_GAS_CONFIG_ERROR)]
+    fun configure_vrf_gas_rejects_callback_price_above_max() {
+        setup_accounts_base();
+        let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
+        main_v2::init(&lottery_signer);
+
+        main_v2::configure_vrf_gas_for_test(
+            &lottery_signer,
+            9u128,
+            MAX_GAS_LIMIT,
+            CALLBACK_GAS_PRICE,
+            CALLBACK_GAS_LIMIT,
+            VERIFICATION_GAS_VALUE,
+        );
+    }
+
+    #[test]
+    #[expected_failure(location = lottery::main_v2, abort_code = INVALID_GAS_CONFIG_ERROR)]
+    fun configure_vrf_gas_rejects_callback_limit_above_max() {
+        setup_accounts_base();
+        let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
+        main_v2::init(&lottery_signer);
+
+        main_v2::configure_vrf_gas_for_test(
+            &lottery_signer,
+            MAX_GAS_PRICE,
+            30u128,
+            CALLBACK_GAS_PRICE,
+            CALLBACK_GAS_LIMIT,
+            VERIFICATION_GAS_VALUE,
+        );
+    }
+
+    #[test]
     fun init_creates_store() {
         setup_accounts();
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
@@ -998,6 +1165,258 @@ module lottery::lottery_tests {
 
         let player_signer = account::create_signer_for_test(PLAYER1);
         treasury_v1::deposit_from_user(&player_signer, 1);
+    }
+
+    #[test]
+    #[expected_failure(location = lottery::treasury_v1, abort_code = STORE_NOT_REGISTERED_ERROR)]
+    fun set_recipients_requires_registered_store() {
+        setup_accounts_base();
+        let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
+        treasury_v1::set_recipients(
+            &lottery_signer,
+            TREASURY_RECIPIENT,
+            MARKETING_RECIPIENT,
+            COMMUNITY_RECIPIENT,
+            TEAM_RECIPIENT,
+            PARTNERS_RECIPIENT,
+        );
+    }
+
+    #[test]
+    #[expected_failure(location = lottery::treasury_v1, abort_code = STORE_FROZEN_ABORT)]
+    fun set_recipients_rejects_frozen_store() {
+        setup_accounts_base();
+        register_system_stores();
+        let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
+        treasury_v1::set_store_frozen(&lottery_signer, MARKETING_RECIPIENT, true);
+        treasury_v1::set_recipients(
+            &lottery_signer,
+            TREASURY_RECIPIENT,
+            MARKETING_RECIPIENT,
+            COMMUNITY_RECIPIENT,
+            TEAM_RECIPIENT,
+            PARTNERS_RECIPIENT,
+        );
+    }
+
+    #[test]
+    fun recipient_status_view_reports_registration_and_freeze_state() {
+        setup_accounts_base();
+        register_system_stores();
+        configure_recipients();
+
+        let (
+            treasury_status,
+            marketing_status,
+            community_status,
+            team_status,
+            partners_status,
+        ) = treasury_v1::get_recipient_statuses();
+
+        let (
+            treasury_account,
+            treasury_registered,
+            treasury_frozen,
+            treasury_store,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&treasury_status);
+        assert!(treasury_account == TREASURY_RECIPIENT, 44);
+        assert!(treasury_registered, 45);
+        assert!(!treasury_frozen, 46);
+        assert!(option::is_some(&treasury_store), 47);
+
+        let (
+            _,
+            marketing_registered,
+            marketing_frozen,
+            marketing_store,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&marketing_status);
+        assert!(marketing_registered, 48);
+        assert!(!marketing_frozen, 49);
+        assert!(option::is_some(&marketing_store), 50);
+
+        let (
+            _,
+            community_registered,
+            community_frozen,
+            _,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&community_status);
+        assert!(community_registered, 51);
+        assert!(!community_frozen, 52);
+
+        let (
+            _,
+            team_registered,
+            team_frozen,
+            _,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&team_status);
+        assert!(team_registered, 53);
+        assert!(!team_frozen, 54);
+
+        let (
+            _,
+            partners_registered,
+            partners_frozen,
+            _,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&partners_status);
+        assert!(partners_registered, 55);
+        assert!(!partners_frozen, 56);
+
+        let recipient_events = event::emitted_events<treasury_v1::RecipientsUpdatedEvent>();
+        let events_count = vector::length(&recipient_events);
+        assert!(events_count == 2, 58); // init_token + set_recipients
+        let latest_event = vector::borrow(&recipient_events, events_count - 1);
+        let (
+            previous_snapshot_opt,
+            next_snapshot,
+        ) = treasury_v1::recipients_event_fields_for_test(latest_event);
+        assert!(option::is_some(&previous_snapshot_opt), 59);
+
+        let previous_snapshot = option::borrow(&previous_snapshot_opt);
+        let (
+            prev_treasury_status,
+            prev_marketing_status,
+            prev_community_status,
+            prev_team_status,
+            prev_partners_status,
+        ) = treasury_v1::recipients_snapshot_fields_for_test(previous_snapshot);
+        let (
+            prev_treasury_account,
+            prev_treasury_registered,
+            prev_treasury_frozen,
+            _,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&prev_treasury_status);
+        assert!(prev_treasury_account == LOTTERY_ADDR, 60);
+        assert!(prev_treasury_registered, 61);
+        assert!(!prev_treasury_frozen, 62);
+
+        let (
+            prev_marketing_account,
+            prev_marketing_registered,
+            prev_marketing_frozen,
+            _,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&prev_marketing_status);
+        assert!(prev_marketing_account == LOTTERY_ADDR, 63);
+        assert!(prev_marketing_registered, 64);
+        assert!(!prev_marketing_frozen, 65);
+
+        let (
+            prev_community_account,
+            prev_community_registered,
+            prev_community_frozen,
+            _,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&prev_community_status);
+        assert!(prev_community_account == LOTTERY_ADDR, 66);
+        assert!(prev_community_registered, 67);
+        assert!(!prev_community_frozen, 68);
+
+        let (
+            prev_team_account,
+            prev_team_registered,
+            prev_team_frozen,
+            _,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&prev_team_status);
+        assert!(prev_team_account == LOTTERY_ADDR, 69);
+        assert!(prev_team_registered, 70);
+        assert!(!prev_team_frozen, 71);
+
+        let (
+            prev_partners_account,
+            prev_partners_registered,
+            prev_partners_frozen,
+            _,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&prev_partners_status);
+        assert!(prev_partners_account == LOTTERY_ADDR, 72);
+        assert!(prev_partners_registered, 73);
+        assert!(!prev_partners_frozen, 74);
+
+        let (
+            next_treasury_status,
+            next_marketing_status,
+            next_community_status,
+            next_team_status,
+            next_partners_status,
+        ) = treasury_v1::recipients_snapshot_fields_for_test(&next_snapshot);
+
+        let (
+            event_treasury_account,
+            event_treasury_registered,
+            event_treasury_frozen,
+            _,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&next_treasury_status);
+        assert!(event_treasury_account == TREASURY_RECIPIENT, 75);
+        assert!(event_treasury_registered, 76);
+        assert!(!event_treasury_frozen, 77);
+
+        let (
+            event_marketing_account,
+            event_marketing_registered,
+            event_marketing_frozen,
+            _,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&next_marketing_status);
+        assert!(event_marketing_account == MARKETING_RECIPIENT, 78);
+        assert!(event_marketing_registered, 79);
+        assert!(!event_marketing_frozen, 80);
+
+        let (
+            _community_account_event,
+            event_community_registered,
+            event_community_frozen,
+            _,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&next_community_status);
+        assert!(event_community_registered, 81);
+        assert!(!event_community_frozen, 82);
+
+        let (
+            _team_account_event,
+            event_team_registered,
+            event_team_frozen,
+            _,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&next_team_status);
+        assert!(event_team_registered, 83);
+        assert!(!event_team_frozen, 84);
+
+        let (
+            _partners_account_event,
+            event_partners_registered,
+            event_partners_frozen,
+            _,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&next_partners_status);
+        assert!(event_partners_registered, 85);
+        assert!(!event_partners_frozen, 86);
+
+        let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
+        treasury_v1::set_store_frozen(&lottery_signer, MARKETING_RECIPIENT, true);
+
+        let (
+            _,
+            marketing_status_after,
+            _,
+            _,
+            _
+        ) = treasury_v1::get_recipient_statuses();
+        let (
+            _,
+            _,
+            marketing_frozen_after,
+            _,
+            _
+        ) = treasury_v1::recipient_status_fields_for_test(&marketing_status_after);
+        assert!(marketing_frozen_after, 57);
     }
 
     #[test]
@@ -1353,6 +1772,7 @@ module lottery::lottery_tests {
         main_v2::record_request_for_test(nonce, LOTTERY_ADDR);
 
         let message = main_v2::request_payload_message_for_test(nonce, client_seed, LOTTERY_ADDR);
+        let expected_hash = hash::sha3_256(copy message);
         let verified_nums = vector[999u256];
         main_v2::handle_verified_random_for_test(
             nonce,
@@ -1389,9 +1809,41 @@ module lottery::lottery_tests {
         let draw_events = event::emitted_events<main_v2::DrawHandledEvent>();
         assert!(vector::length(&draw_events) == 1, 8);
         let draw_event_ref = vector::borrow(&draw_events, 0);
-        let (event_nonce, event_success) = main_v2::draw_handled_fields(draw_event_ref);
+        let (
+            event_nonce,
+            event_success,
+            event_hash,
+            event_requester,
+            event_sender,
+            event_client_seed,
+            event_rng_count,
+            event_confirmations,
+            randomness,
+        ) = main_v2::draw_handled_fields(draw_event_ref);
         assert!(event_nonce == nonce, 10);
         assert!(event_success, 11);
+        assert!(vector_equals(&event_hash, &expected_hash), 414);
+        assert!(event_requester == LOTTERY_ADDR, 415);
+        assert!(event_sender == VRF_AGGREGATOR, 416);
+        assert!(event_client_seed == client_seed, 417);
+        assert!(event_rng_count == 1u8, 418);
+        assert!(event_confirmations == 1u64, 419);
+        assert!(vector::length(&randomness) == 1, 420);
+        let randomness_ref = vector::borrow(&randomness, 0);
+        assert!(*randomness_ref == 999u256, 421);
+
+        let (
+            event_callback_price,
+            event_callback_limit,
+            event_max_price,
+            event_max_limit,
+            event_verification_value,
+        ) = main_v2::draw_handled_gas_fields(draw_event_ref);
+        assert!(event_callback_price == CALLBACK_GAS_PRICE, 422);
+        assert!(event_callback_limit == CALLBACK_GAS_LIMIT, 423);
+        assert!(event_max_price == MAX_GAS_PRICE, 424);
+        assert!(event_max_limit == MAX_GAS_LIMIT, 425);
+        assert!(event_verification_value == VERIFICATION_GAS_VALUE, 426);
 
         let winner_events = event::emitted_events<main_v2::WinnerSelected>();
         assert!(vector::length(&winner_events) == 1, 12);
@@ -1797,15 +2249,41 @@ module lottery::lottery_tests {
         let first_event = vector::borrow(&events, 0);
         let second_event = vector::borrow(&events, 1);
 
-        let (first_nonce, first_seed, _, _, _, first_requester) = main_v2::draw_requested_fields(first_event);
+        let (
+            first_nonce,
+            first_seed,
+            _,
+            _,
+            _,
+            first_requester,
+            first_rng,
+            first_confirmations,
+            first_sender
+        ) = main_v2::draw_requested_fields(first_event);
         assert!(first_nonce == 100, 35);
         assert!(first_seed == 0, 36);
         assert!(first_requester == LOTTERY_ADDR, 350);
+        assert!(first_rng == 1u8, 352);
+        assert!(first_confirmations == 1u64, 353);
+        assert!(first_sender == VRF_AGGREGATOR, 356);
 
-        let (second_nonce, second_seed, _, _, _, second_requester) = main_v2::draw_requested_fields(second_event);
+        let (
+            second_nonce,
+            second_seed,
+            _,
+            _,
+            _,
+            second_requester,
+            second_rng,
+            second_confirmations,
+            second_sender
+        ) = main_v2::draw_requested_fields(second_event);
         assert!(second_nonce == 200, 37);
         assert!(second_seed == 1, 38);
         assert!(second_requester == LOTTERY_ADDR, 351);
+        assert!(second_rng == 1u8, 354);
+        assert!(second_confirmations == 1u64, 355);
+        assert!(second_sender == VRF_AGGREGATOR, 357);
 
         let (request_count, response_count) = main_v2::rng_counters_for_test();
         assert!(request_count == 2, 39);
@@ -2103,6 +2581,16 @@ module lottery::lottery_tests {
     }
 
     #[test]
+    #[expected_failure(location = lottery::main_v2, abort_code = NOT_OWNER_ERROR)]
+    fun remove_subscription_requires_admin() {
+        setup_accounts();
+        let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
+        main_v2::init(&lottery_signer);
+
+        main_v2::remove_subscription(&account::create_signer_for_test(PLAYER1));
+    }
+
+    #[test]
     #[expected_failure(location = lottery::main_v2, abort_code = WITHDRAWAL_PENDING_REQUEST_ERROR)]
     fun withdraw_fails_with_pending_request() {
         setup_accounts();
@@ -2111,6 +2599,17 @@ module lottery::lottery_tests {
         main_v2::set_pending_request_for_test(option::some(7));
 
         main_v2::withdraw_funds(&lottery_signer, 1);
+    }
+
+    #[test]
+    #[expected_failure(location = lottery::main_v2, abort_code = WITHDRAWAL_PENDING_REQUEST_ERROR)]
+    fun remove_subscription_rejects_pending_request() {
+        setup_accounts();
+        let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
+        main_v2::init(&lottery_signer);
+        main_v2::set_pending_request_for_test(option::some(9));
+
+        main_v2::remove_subscription(&lottery_signer);
     }
 
     #[test]
@@ -2127,6 +2626,29 @@ module lottery::lottery_tests {
         let (admin, amount) = main_v2::funds_withdrawn_fields(event_ref);
         assert!(admin == LOTTERY_ADDR, 1);
         assert!(amount == 250, 2);
+    }
+
+    #[test]
+    fun remove_subscription_emits_event() {
+        setup_accounts();
+        let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
+        main_v2::init(&lottery_signer);
+        main_v2::whitelist_callback_sender(&lottery_signer, VRF_AGGREGATOR);
+        main_v2::whitelist_consumer(&lottery_signer, PLAYER1);
+
+        main_v2::remove_subscription_for_test(&lottery_signer);
+
+        let events = event::emitted_events<main_v2::SubscriptionContractRemovedEvent>();
+        assert!(vector::length(&events) == 1, 0);
+        let event_ref = vector::borrow(&events, 0);
+        let (admin, callback_sender, consumer_count, pending) =
+            main_v2::subscription_contract_removed_fields(event_ref);
+        assert!(admin == LOTTERY_ADDR, 1);
+        assert!(option::is_some(&callback_sender), 2);
+        let sender_addr = *option::borrow(&callback_sender);
+        assert!(sender_addr == VRF_AGGREGATOR, 3);
+        assert!(consumer_count == 2, 4);
+        assert!(!pending, 5);
     }
 
     #[test]

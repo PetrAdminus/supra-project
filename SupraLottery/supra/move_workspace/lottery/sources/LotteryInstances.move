@@ -9,7 +9,7 @@ module lottery::instances {
     use std::option;
     use std::signer;
     use vrf_hub::table;
-    use std::event;
+    use supra_framework::event;
     use std::math64;
     use std::vector;
     use lottery_factory::registry;
@@ -60,6 +60,7 @@ module lottery::instances {
         admin_events: event::EventHandle<AdminUpdatedEvent>,
         hub_events: event::EventHandle<HubAddressUpdatedEvent>,
         status_events: event::EventHandle<LotteryInstanceStatusUpdatedEvent>,
+        snapshot_events: event::EventHandle<LotteryInstancesSnapshotUpdatedEvent>,
     }
 
     #[event]
@@ -96,6 +97,30 @@ module lottery::instances {
         active: bool,
     }
 
+    struct LotteryInstanceSnapshot has copy, drop, store {
+        lottery_id: u64,
+        owner: address,
+        lottery: address,
+        ticket_price: u64,
+        jackpot_share_bps: u16,
+        tickets_sold: u64,
+        jackpot_accumulated: u64,
+        active: bool,
+    }
+
+    struct LotteryInstancesSnapshot has copy, drop, store {
+        admin: address,
+        hub: address,
+        instances: vector<LotteryInstanceSnapshot>,
+    }
+
+    #[event]
+    struct LotteryInstancesSnapshotUpdatedEvent has drop, store, copy {
+        admin: address,
+        hub: address,
+        snapshot: LotteryInstanceSnapshot,
+    }
+
 
     public entry fun init(caller: &signer, hub: address) {
         let addr = signer::address_of(caller);
@@ -117,6 +142,7 @@ module lottery::instances {
                 admin_events: event::new_event_handle<AdminUpdatedEvent>(caller),
                 hub_events: event::new_event_handle<HubAddressUpdatedEvent>(caller),
                 status_events: event::new_event_handle<LotteryInstanceStatusUpdatedEvent>(caller),
+                snapshot_events: event::new_event_handle<LotteryInstancesSnapshotUpdatedEvent>(caller),
             },
         );
     }
@@ -150,6 +176,7 @@ module lottery::instances {
         let previous = state.admin;
         state.admin = new_admin;
         event::emit_event(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
+        emit_all_snapshots(state);
     }
 
 
@@ -159,6 +186,7 @@ module lottery::instances {
         let previous = state.hub;
         state.hub = new_hub;
         event::emit_event(&mut state.hub_events, HubAddressUpdatedEvent { previous, next: new_hub });
+        emit_all_snapshots(state);
     }
 
 
@@ -178,6 +206,7 @@ module lottery::instances {
             instance.active = active;
             event::emit_event(&mut state.status_events, LotteryInstanceStatusUpdatedEvent { lottery_id, active });
         };
+        emit_instance_snapshot(state, lottery_id);
     }
 
 
@@ -231,6 +260,7 @@ module lottery::instances {
             LotteryInstanceCreatedEvent { lottery_id, owner, lottery: lottery_addr, ticket_price, jackpot_share_bps },
         );
         event::emit_event(&mut state.status_events, LotteryInstanceStatusUpdatedEvent { lottery_id, active: true });
+        emit_instance_snapshot(state, lottery_id);
     }
 
 
@@ -259,6 +289,7 @@ module lottery::instances {
             &mut state.blueprint_events,
             LotteryInstanceBlueprintSyncedEvent { lottery_id, ticket_price, jackpot_share_bps },
         );
+        emit_instance_snapshot(state, lottery_id);
     }
 
 
@@ -357,6 +388,31 @@ module lottery::instances {
     }
 
 
+    #[view]
+    public fun get_instance_snapshot(lottery_id: u64): option::Option<LotteryInstanceSnapshot>
+    acquires LotteryCollection {
+        if (!exists<LotteryCollection>(@lottery)) {
+            return option::none<LotteryInstanceSnapshot>()
+        };
+        let state = borrow_global<LotteryCollection>(@lottery);
+        if (!table::contains(&state.instances, lottery_id)) {
+            return option::none<LotteryInstanceSnapshot>()
+        };
+        option::some(build_instance_snapshot(&state, lottery_id))
+    }
+
+
+    #[view]
+    public fun get_instances_snapshot(): option::Option<LotteryInstancesSnapshot>
+    acquires LotteryCollection {
+        if (!exists<LotteryCollection>(@lottery)) {
+            return option::none<LotteryInstancesSnapshot>()
+        };
+        let state = borrow_global<LotteryCollection>(@lottery);
+        option::some(build_instances_snapshot(&state))
+    }
+
+
     public(friend) fun record_ticket_sale(lottery_id: u64, jackpot_contribution: u64) acquires LotteryCollection {
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
@@ -365,6 +421,7 @@ module lottery::instances {
         let instance = table::borrow_mut(&mut state.instances, lottery_id);
         instance.tickets_sold = math64::checked_add(instance.tickets_sold, 1);
         instance.jackpot_accumulated = math64::checked_add(instance.jackpot_accumulated, jackpot_contribution);
+        emit_instance_snapshot(state, lottery_id);
     }
 
 
@@ -380,6 +437,7 @@ module lottery::instances {
         let instance = table::borrow_mut(&mut state.instances, lottery_id);
         instance.tickets_sold = tickets_sold;
         instance.jackpot_accumulated = jackpot_accumulated;
+        emit_instance_snapshot(state, lottery_id);
     }
 
     fun ensure_admin(caller: &signer) acquires LotteryCollection {
@@ -400,5 +458,113 @@ module lottery::instances {
     #[test_only]
     public fun instance_stats_for_test(stats: &InstanceStats): (u64, u64, bool) {
         (stats.tickets_sold, stats.jackpot_accumulated, stats.active)
+    }
+
+    #[test_only]
+    public fun instance_snapshot_fields_for_test(
+        snapshot: &LotteryInstanceSnapshot,
+    ): (u64, address, address, u64, u16, u64, u64, bool) {
+        (
+            snapshot.lottery_id,
+            snapshot.owner,
+            snapshot.lottery,
+            snapshot.ticket_price,
+            snapshot.jackpot_share_bps,
+            snapshot.tickets_sold,
+            snapshot.jackpot_accumulated,
+            snapshot.active,
+        )
+    }
+
+    #[test_only]
+    public fun instances_snapshot_fields_for_test(
+        snapshot: &LotteryInstancesSnapshot,
+    ): (address, address, vector<LotteryInstanceSnapshot>) {
+        (snapshot.admin, snapshot.hub, copy_instance_snapshots(&snapshot.instances))
+    }
+
+    #[test_only]
+    public fun snapshot_event_fields_for_test(
+        event: &LotteryInstancesSnapshotUpdatedEvent,
+    ): (address, address, LotteryInstanceSnapshot) {
+        (event.admin, event.hub, event.snapshot)
+    }
+
+    fun emit_instance_snapshot(state: &mut LotteryCollection, lottery_id: u64) {
+        if (!table::contains(&state.instances, lottery_id)) {
+            return
+        };
+        let snapshot = build_instance_snapshot(&*state, lottery_id);
+        event::emit_event(
+            &mut state.snapshot_events,
+            LotteryInstancesSnapshotUpdatedEvent { admin: state.admin, hub: state.hub, snapshot },
+        );
+    }
+
+    fun emit_all_snapshots(state: &mut LotteryCollection) {
+        let len = vector::length(&state.lottery_ids);
+        let mut i = 0;
+        while (i < len) {
+            let id = *vector::borrow(&state.lottery_ids, i);
+            if (table::contains(&state.instances, id)) {
+                emit_instance_snapshot(state, id);
+            };
+            i = i + 1;
+        };
+    }
+
+    fun build_instance_snapshot(state: &LotteryCollection, lottery_id: u64): LotteryInstanceSnapshot {
+        let instance = table::borrow(&state.instances, lottery_id);
+        let info_ref = &instance.info;
+        let owner = registry::lottery_info_owner(info_ref);
+        let lottery_addr = registry::lottery_info_lottery(info_ref);
+        let blueprint = registry::lottery_info_blueprint(info_ref);
+        let ticket_price = registry::blueprint_ticket_price(&blueprint);
+        let jackpot_share_bps = registry::blueprint_jackpot_share_bps(&blueprint);
+        LotteryInstanceSnapshot {
+            lottery_id,
+            owner,
+            lottery: lottery_addr,
+            ticket_price,
+            jackpot_share_bps,
+            tickets_sold: instance.tickets_sold,
+            jackpot_accumulated: instance.jackpot_accumulated,
+            active: instance.active,
+        }
+    }
+
+    fun build_instances_snapshot(state: &LotteryCollection): LotteryInstancesSnapshot {
+        LotteryInstancesSnapshot {
+            admin: state.admin,
+            hub: state.hub,
+            instances: collect_instance_snapshots(state),
+        }
+    }
+
+    fun collect_instance_snapshots(state: &LotteryCollection): vector<LotteryInstanceSnapshot> {
+        let snapshots = vector::empty<LotteryInstanceSnapshot>();
+        let len = vector::length(&state.lottery_ids);
+        let mut i = 0;
+        while (i < len) {
+            let id = *vector::borrow(&state.lottery_ids, i);
+            if (table::contains(&state.instances, id)) {
+                let snapshot = build_instance_snapshot(state, id);
+                vector::push_back(&mut snapshots, snapshot);
+            };
+            i = i + 1;
+        };
+        snapshots
+    }
+
+    fun copy_instance_snapshots(values: &vector<LotteryInstanceSnapshot>): vector<LotteryInstanceSnapshot> {
+        let out = vector::empty<LotteryInstanceSnapshot>();
+        let len = vector::length(values);
+        let mut i = 0;
+        while (i < len) {
+            let snapshot = *vector::borrow(values, i);
+            vector::push_back(&mut out, snapshot);
+            i = i + 1;
+        };
+        out
     }
 }

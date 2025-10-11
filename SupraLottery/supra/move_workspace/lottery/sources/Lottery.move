@@ -8,9 +8,9 @@ module lottery::main_v2 {
     use std::timestamp;
     use std::signer;
     use std::vector;
-    use std::event;
-    use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::supra_vrf;
-    use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::deposit;
+    use supra_framework::event;
+    use supra_addr::supra_vrf;
+    use supra_addr::deposit;
     use lottery::treasury_v1;
 
     const E_NOT_OWNER: u64 = 1;
@@ -25,7 +25,8 @@ module lottery::main_v2 {
     const MIN_REQUEST_WINDOW: u64 = 30;
     const MIN_REQUEST_WINDOW_U128: u128 = 30;
     const EXPECTED_RNG_COUNT: u8 = 1;
-    const EXPECTED_RNG_COUNT_U64: u64 = 1;
+    const EXPECTED_CONFIRMATIONS: u64 = 1;
+    const MAX_CONFIRMATIONS: u64 = 20;
     const E_TREASURY_NOT_INITIALIZED: u64 = 12;
     const E_PLAYER_STORE_NOT_REGISTERED: u64 = 13;
     const E_INVALID_CALLBACK_PAYLOAD: u64 = 14;
@@ -70,6 +71,7 @@ module lottery::main_v2 {
 
     struct VrfRequestConfig has copy, drop, store {
         rng_count: u8,
+        num_confirmations: u64,
         client_seed: u64,
     }
 
@@ -119,6 +121,13 @@ module lottery::main_v2 {
         pending_request: option::Option<u64>,
     }
     #[event]
+    struct SubscriptionContractRemovedEvent has drop, store, copy {
+        admin: address,
+        callback_sender: option::Option<address>,
+        consumer_count: u64,
+        pending_request: bool,
+    }
+    #[event]
     struct MinimumBalanceUpdatedEvent has drop, store, copy {
         min_balance: u64,
         per_request_fee: u64,
@@ -141,7 +150,11 @@ module lottery::main_v2 {
         callback_gas_limit: u128,
     }
     #[event]
-    struct VrfRequestConfigUpdatedEvent has drop, store, copy { rng_count: u8, client_seed: u64 }
+    struct VrfRequestConfigUpdatedEvent has drop, store, copy {
+        rng_count: u8,
+        num_confirmations: u64,
+        client_seed: u64,
+    }
     #[event]
     struct GasConfigUpdatedEvent has drop, store, copy {
         max_gas_price: u128,
@@ -163,6 +176,11 @@ module lottery::main_v2 {
     #[event]
     struct ConsumerRemovedEvent has drop, store, copy { consumer: address }
     #[event]
+    struct WhitelistSnapshotUpdatedEvent has drop, store {
+        aggregator: option::Option<address>,
+        consumers: vector<address>,
+    }
+    #[event]
     struct DrawRequestedEvent has drop, store, copy {
         nonce: u64,
         client_seed: u64,
@@ -170,9 +188,33 @@ module lottery::main_v2 {
         callback_gas_price: u128,
         callback_gas_limit: u128,
         requester: address,
+        callback_address: address,
+        callback_module: vector<u8>,
+        callback_function: vector<u8>,
+        rng_count: u8,
+        num_confirmations: u64,
+        callback_sender: address,
+        max_gas_price: u128,
+        max_gas_limit: u128,
+        verification_gas_value: u128,
     }
     #[event]
-    struct DrawHandledEvent has drop, store, copy { nonce: u64, success: bool }
+    struct DrawHandledEvent has drop, store, copy {
+        nonce: u64,
+        success: bool,
+        request_hash: vector<u8>,
+        requester: address,
+        callback_sender: address,
+        client_seed: u64,
+        rng_count: u8,
+        num_confirmations: u64,
+        callback_gas_price: u128,
+        callback_gas_limit: u128,
+        max_gas_price: u128,
+        max_gas_limit: u128,
+        verification_gas_value: u128,
+        randomness: vector<u256>,
+    }
     #[event]
     struct FundsWithdrawnEvent has drop, store, copy { admin: address, amount: u64 }
 
@@ -185,15 +227,35 @@ module lottery::main_v2 {
         rng_response_count: u64,
     }
 
-    struct VrfRequestEnvelope has copy, drop, store {
+    struct PendingRequestView has copy, drop {
+        nonce: u64,
+        requester: address,
+        request_hash: vector<u8>,
+        client_seed: u64,
+        rng_count: u8,
+        num_confirmations: u64,
+        callback_sender: address,
+        callback_gas_price: u128,
+        callback_gas_limit: u128,
+        max_gas_price: u128,
+        max_gas_limit: u128,
+        verification_gas_value: u128,
+    }
+
+    struct CallbackRequest has copy, drop, store {
         nonce: u64,
         client_seed: u64,
+        requester: address,
+        rng_count: u8,
+        num_confirmations: u64,
+        callback_address: address,
+        callback_module: vector<u8>,
+        callback_function: vector<u8>,
         max_gas_price: u128,
         max_gas_limit: u128,
         callback_gas_price: u128,
         callback_gas_limit: u128,
         verification_gas_value: u128,
-        requester: address,
     }
 
     public(friend) fun export_state_for_migration():
@@ -235,6 +297,18 @@ module lottery::main_v2 {
         result
     }
 
+    fun clone_u256_vector(values: &vector<u256>): vector<u256> {
+        let result = vector::empty<u256>();
+        let len = vector::length(values);
+        let i = 0;
+        while (i < len) {
+            let value = *vector::borrow(values, i);
+            vector::push_back(&mut result, value);
+            i = i + 1;
+        };
+        result
+    }
+
     fun clear_addresses(tickets: &mut vector<address>) {
         while (vector::length(tickets) > 0) {
             vector::pop_back(tickets);
@@ -249,6 +323,15 @@ module lottery::main_v2 {
         }
     }
 
+    fun emit_whitelist_snapshot(
+        consumers: &vector<address>,
+        callback_sender: &option::Option<address>,
+    ) {
+        let aggregator = copy_option_address(callback_sender);
+        let consumers_copy = clone_addresses(consumers);
+        event::emit(WhitelistSnapshotUpdatedEvent { aggregator, consumers: consumers_copy });
+    }
+
     fun copy_option_u64(opt: &option::Option<u64>): option::Option<u64> {
         if (option::is_some(opt)) {
             option::some(*option::borrow(opt))
@@ -257,26 +340,52 @@ module lottery::main_v2 {
         }
     }
 
-    fun build_request_envelope(
+    fun callback_module_bytes(): vector<u8> {
+        b"main_v2"
+    }
+
+    fun callback_function_bytes(): vector<u8> {
+        b"on_random_received"
+    }
+
+    fun build_callback_request(
         nonce: u64,
         client_seed: u64,
         requester: address,
-        lottery: &LotteryData
-    ): VrfRequestEnvelope {
-        VrfRequestEnvelope {
+        lottery: &LotteryData,
+        rng_count: u8,
+        num_confirmations: u64
+    ): CallbackRequest {
+        CallbackRequest {
             nonce,
             client_seed,
+            requester,
+            rng_count,
+            num_confirmations,
+            callback_address: @lottery,
+            callback_module: callback_module_bytes(),
+            callback_function: callback_function_bytes(),
             max_gas_price: lottery.max_gas_price,
             max_gas_limit: lottery.max_gas_limit,
             callback_gas_price: lottery.callback_gas_price,
             callback_gas_limit: lottery.callback_gas_limit,
             verification_gas_value: lottery.verification_gas_value,
-            requester,
         }
     }
 
-    fun encode_request_envelope(envelope: &VrfRequestEnvelope): vector<u8> {
-        bcs::to_bytes(envelope)
+    fun encode_callback_request(request: &CallbackRequest): vector<u8> {
+        bcs::to_bytes(request)
+    }
+
+    fun resolve_request_parameters(
+        config_opt: &option::Option<VrfRequestConfig>
+    ): (u8, u64) {
+        if (option::is_some(config_opt)) {
+            let config = option::borrow(config_opt);
+            (config.rng_count, config.num_confirmations)
+        } else {
+            (EXPECTED_RNG_COUNT, EXPECTED_CONFIRMATIONS)
+        }
     }
 
     fun compute_request_payload_hash(
@@ -285,8 +394,18 @@ module lottery::main_v2 {
         requester: address,
         lottery: &LotteryData
     ): vector<u8> {
-        let envelope = build_request_envelope(nonce, client_seed, requester, lottery);
-        let encoded = encode_request_envelope(&envelope);
+        let (rng_count, num_confirmations) = resolve_request_parameters(
+            &lottery.vrf_request_config
+        );
+        let request = build_callback_request(
+            nonce,
+            client_seed,
+            requester,
+            lottery,
+            rng_count,
+            num_confirmations,
+        );
+        let encoded = encode_callback_request(&request);
         hash::sha3_256(encoded)
     }
 
@@ -323,6 +442,12 @@ module lottery::main_v2 {
         });
 
         event::emit(ConsumerWhitelistedEvent { consumer: @lottery });
+
+        let lottery_snapshot = borrow_global<LotteryData>(@lottery);
+        emit_whitelist_snapshot(
+            &lottery_snapshot.whitelisted_consumers,
+            &lottery_snapshot.whitelisted_callback_sender,
+        );
     }
 
     public entry fun buy_ticket(user: &signer) acquires LotteryData {
@@ -429,6 +554,7 @@ module lottery::main_v2 {
         assert!(aggregator != @0x0, E_INVALID_CALLBACK_SENDER);
         lottery.whitelisted_callback_sender = option::some(aggregator);
         event::emit(AggregatorWhitelistedEvent { aggregator });
+        emit_whitelist_snapshot(&lottery.whitelisted_consumers, &lottery.whitelisted_callback_sender);
     }
 
     public entry fun revoke_callback_sender(sender: &signer) acquires LotteryData {
@@ -440,6 +566,7 @@ module lottery::main_v2 {
         assert!(option::is_some(&lottery.whitelisted_callback_sender), E_CALLBACK_SOURCE_NOT_SET);
         let aggregator = option::extract(&mut lottery.whitelisted_callback_sender);
         event::emit(AggregatorRevokedEvent { aggregator });
+        emit_whitelist_snapshot(&lottery.whitelisted_consumers, &lottery.whitelisted_callback_sender);
     }
 
     public entry fun whitelist_consumer(sender: &signer, consumer: address) acquires LotteryData {
@@ -451,6 +578,7 @@ module lottery::main_v2 {
         assert!(!is_consumer_whitelisted(&lottery.whitelisted_consumers, consumer), E_CONSUMER_ALREADY_WHITELISTED);
         vector::push_back(&mut lottery.whitelisted_consumers, consumer);
         event::emit(ConsumerWhitelistedEvent { consumer });
+        emit_whitelist_snapshot(&lottery.whitelisted_consumers, &lottery.whitelisted_callback_sender);
     }
 
     public entry fun remove_consumer(sender: &signer, consumer: address) acquires LotteryData {
@@ -462,6 +590,7 @@ module lottery::main_v2 {
         let removed = remove_consumer_from_list(&mut lottery.whitelisted_consumers, consumer);
         assert!(removed, E_CONSUMER_NOT_WHITELISTED);
         event::emit(ConsumerRemovedEvent { consumer });
+        emit_whitelist_snapshot(&lottery.whitelisted_consumers, &lottery.whitelisted_callback_sender);
     }
 
     public entry fun set_minimum_balance(sender: &signer) acquires LotteryData {
@@ -602,6 +731,7 @@ module lottery::main_v2 {
     public entry fun configure_vrf_request(
         sender: &signer,
         rng_count: u8,
+        num_confirmations: u64,
         client_seed: u64
     ) acquires LotteryData {
         let admin = signer::address_of(sender);
@@ -610,15 +740,21 @@ module lottery::main_v2 {
         let lottery = borrow_global_mut<LotteryData>(@lottery);
         assert!(option::is_none(&lottery.pending_request), E_REQUEST_STILL_PENDING);
         assert!(rng_count == EXPECTED_RNG_COUNT, E_INVALID_REQUEST_CONFIG);
+        assert!(num_confirmations > 0, E_INVALID_REQUEST_CONFIG);
+        assert!(num_confirmations <= MAX_CONFIRMATIONS, E_INVALID_REQUEST_CONFIG);
         assert!(client_seed < U64_MAX, E_CLIENT_SEED_OVERFLOW);
 
         let current_seed = lottery.next_client_seed;
         assert!(client_seed >= current_seed, E_CLIENT_SEED_REGRESSION);
 
         lottery.next_client_seed = client_seed;
-        lottery.vrf_request_config = option::some(VrfRequestConfig { rng_count, client_seed });
+        lottery.vrf_request_config = option::some(VrfRequestConfig {
+            rng_count,
+            num_confirmations,
+            client_seed,
+        });
 
-        event::emit(VrfRequestConfigUpdatedEvent { rng_count, client_seed });
+        event::emit(VrfRequestConfigUpdatedEvent { rng_count, num_confirmations, client_seed });
     }
 
     fun configure_vrf_gas_internal(
@@ -639,6 +775,8 @@ module lottery::main_v2 {
         assert!(callback_gas_price > 0, E_INVALID_GAS_CONFIG);
         assert!(callback_gas_limit > 0, E_INVALID_GAS_CONFIG);
         assert!(verification_gas_value > 0, E_INVALID_GAS_CONFIG);
+        assert!(callback_gas_price <= max_gas_price, E_INVALID_GAS_CONFIG);
+        assert!(callback_gas_limit <= max_gas_limit, E_INVALID_GAS_CONFIG);
         lottery.max_gas_price = max_gas_price;
         lottery.max_gas_limit = max_gas_limit;
         lottery.callback_gas_price = callback_gas_price;
@@ -713,6 +851,38 @@ module lottery::main_v2 {
         withdraw_funds_internal(sender, amount, false);
     }
 
+    public entry fun remove_subscription(sender: &signer) acquires LotteryData {
+        remove_subscription_internal(sender, true);
+    }
+
+    fun remove_subscription_internal(sender: &signer, call_native: bool) acquires LotteryData {
+        let admin = signer::address_of(sender);
+        assert!(admin == @lottery, E_NOT_OWNER);
+
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
+        let has_pending = option::is_some(&lottery.pending_request);
+        assert!(!has_pending, E_WITHDRAWAL_PENDING_REQUEST);
+
+        let callback_sender = copy_option_address(&lottery.whitelisted_callback_sender);
+        let consumer_count = vector::length(&lottery.whitelisted_consumers);
+
+        if (call_native) {
+            deposit::remove_contract_from_whitelist(sender, @lottery);
+        };
+
+        event::emit(SubscriptionContractRemovedEvent {
+            admin,
+            callback_sender,
+            consumer_count,
+            pending_request: has_pending,
+        });
+    }
+
+    #[test_only]
+    public fun remove_subscription_for_test(sender: &signer) acquires LotteryData {
+        remove_subscription_internal(sender, false);
+    }
+
     public entry fun manual_draw(sender: &signer) acquires LotteryData {
         // Only lottery admin can trigger manual draw
         assert!(signer::address_of(sender) == @lottery, E_NOT_OWNER);
@@ -766,20 +936,24 @@ module lottery::main_v2 {
         let client_seed = next_client_seed(lottery);
 
         let callback_address = @lottery;
-        let callback_module = string::utf8(b"main_v2");
-        let callback_function = string::utf8(b"on_random_received");
+        let callback_module = string::utf8(callback_module_bytes());
+        let callback_function = string::utf8(callback_function_bytes());
+
+        let (rng_count, num_confirmations) = resolve_request_parameters(
+            &lottery.vrf_request_config
+        );
 
         let nonce = supra_vrf::rng_request(
             sender,
             callback_address,
             callback_module,
             callback_function,
-            EXPECTED_RNG_COUNT, // number of random values
+            rng_count, // number of random values
             client_seed, // client_seed
-            1  // confirmations
+            num_confirmations  // confirmations
         );
 
-        record_vrf_request(lottery, nonce, client_seed, requester);
+        record_vrf_request(lottery, nonce, client_seed, requester, rng_count, num_confirmations);
     }
 
     fun next_client_seed(lottery: &mut LotteryData): u64 {
@@ -793,17 +967,30 @@ module lottery::main_v2 {
         lottery: &mut LotteryData,
         nonce: u64,
         client_seed: u64,
-        requester: address
+        requester: address,
+        rng_count: u8,
+        num_confirmations: u64
     ) {
-        let envelope = build_request_envelope(nonce, client_seed, requester, lottery);
-        let payload = encode_request_envelope(&envelope);
+        let request = build_callback_request(
+            nonce,
+            client_seed,
+            requester,
+            lottery,
+            rng_count,
+            num_confirmations,
+        );
+        let payload = encode_callback_request(&request);
         let stored_hash = hash::sha3_256(copy payload);
         let event_hash = copy stored_hash;
+        let callback_sender = ensure_callback_sender_configured_internal(
+            &lottery.whitelisted_callback_sender
+        );
         lottery.pending_request = option::some(nonce);
         lottery.last_request_payload_hash = option::some(stored_hash);
         lottery.last_requester = option::some(requester);
         lottery.vrf_request_config = option::some(VrfRequestConfig {
-            rng_count: EXPECTED_RNG_COUNT,
+            rng_count,
+            num_confirmations,
             client_seed,
         });
         lottery.rng_request_count = safe_add_u64(
@@ -818,6 +1005,15 @@ module lottery::main_v2 {
             callback_gas_price: lottery.callback_gas_price,
             callback_gas_limit: lottery.callback_gas_limit,
             requester,
+            callback_address: @lottery,
+            callback_module: callback_module_bytes(),
+            callback_function: callback_function_bytes(),
+            rng_count,
+            num_confirmations,
+            callback_sender,
+            max_gas_price: lottery.max_gas_price,
+            max_gas_limit: lottery.max_gas_limit,
+            verification_gas_value: lottery.verification_gas_value,
         });
     }
 
@@ -899,6 +1095,18 @@ module lottery::main_v2 {
     }
 
     #[test_only]
+    public fun subscription_contract_removed_fields(
+        event: &SubscriptionContractRemovedEvent
+    ): (address, option::Option<address>, u64, bool) {
+        (
+            event.admin,
+            copy_option_address(&event.callback_sender),
+            event.consumer_count,
+            event.pending_request,
+        )
+    }
+
+    #[test_only]
     public fun minimum_balance_updated_fields(event: &MinimumBalanceUpdatedEvent): (u64, u64, u128, u128, u128) {
         (
             event.min_balance,
@@ -931,8 +1139,8 @@ module lottery::main_v2 {
     }
 
     #[test_only]
-    public fun vrf_request_config_fields(event: &VrfRequestConfigUpdatedEvent): (u8, u64) {
-        (event.rng_count, event.client_seed)
+    public fun vrf_request_config_fields(event: &VrfRequestConfigUpdatedEvent): (u8, u64, u64) {
+        (event.rng_count, event.num_confirmations, event.client_seed)
     }
 
     #[test_only]
@@ -953,6 +1161,28 @@ module lottery::main_v2 {
     #[test_only]
     public fun aggregator_revoked_fields(event: &AggregatorRevokedEvent): address {
         event.aggregator
+    }
+
+    #[test_only]
+    public fun whitelist_snapshot_updated_aggregator(
+        event: &WhitelistSnapshotUpdatedEvent
+    ): option::Option<address> {
+        copy_option_address(&event.aggregator)
+    }
+
+    #[test_only]
+    public fun whitelist_snapshot_updated_consumer_count(
+        event: &WhitelistSnapshotUpdatedEvent
+    ): u64 {
+        vector::length(&event.consumers)
+    }
+
+    #[test_only]
+    public fun whitelist_snapshot_updated_consumer_at(
+        event: &WhitelistSnapshotUpdatedEvent,
+        index: u64,
+    ): address {
+        *vector::borrow(&event.consumers, index)
     }
 
     #[test_only]
@@ -1044,14 +1274,15 @@ module lottery::main_v2 {
     #[test_only]
     struct VrfRequestConfigView has copy, drop {
         rng_count: u8,
+        num_confirmations: u64,
         client_seed: u64,
     }
 
     #[test_only]
     public fun vrf_request_config_view_fields(
         view: &VrfRequestConfigView
-    ): (u8, u64) {
-        (view.rng_count, view.client_seed)
+    ): (u8, u64, u64) {
+        (view.rng_count, view.num_confirmations, view.client_seed)
     }
 
     #[test_only]
@@ -1093,6 +1324,7 @@ module lottery::main_v2 {
             let config = option::borrow(config_opt);
             option::some(VrfRequestConfigView {
                 rng_count: config.rng_count,
+                num_confirmations: config.num_confirmations,
                 client_seed: config.client_seed,
             })
         } else {
@@ -1101,33 +1333,71 @@ module lottery::main_v2 {
     }
 
     #[test_only]
-    public fun draw_requested_fields(event: &DrawRequestedEvent): (u64, u64, vector<u8>, u128, u128, address) {
+    public fun draw_requested_fields(
+        event: &DrawRequestedEvent
+    ): (u64, u64, vector<u8>, u128, u128, address, u8, u64, address) {
         (
             event.nonce,
             event.client_seed,
             event.request_hash,
             event.callback_gas_price,
             event.callback_gas_limit,
-            event.requester
+            event.requester,
+            event.rng_count,
+            event.num_confirmations,
+            event.callback_sender,
         )
     }
 
     #[test_only]
     public fun record_request_for_test(nonce: u64, requester: address) acquires LotteryData {
-        {
+        let (rng_count, num_confirmations) = {
             let lottery_view = borrow_global<LotteryData>(@lottery);
             ensure_gas_configured(lottery_view);
             ensure_callback_sender_configured(lottery_view);
             ensure_consumer_whitelisted(lottery_view, requester);
+            resolve_request_parameters(&lottery_view.vrf_request_config)
         };
         let lottery = borrow_global_mut<LotteryData>(@lottery);
         let client_seed = next_client_seed(lottery);
-        record_vrf_request(lottery, nonce, client_seed, requester);
+        record_vrf_request(
+            lottery,
+            nonce,
+            client_seed,
+            requester,
+            rng_count,
+            num_confirmations,
+        );
     }
 
     #[test_only]
-    public fun draw_handled_fields(event: &DrawHandledEvent): (u64, bool) {
-        (event.nonce, event.success)
+    public fun draw_handled_fields(
+        event: &DrawHandledEvent
+    ): (u64, bool, vector<u8>, address, address, u64, u8, u64, vector<u256>) {
+        (
+            event.nonce,
+            event.success,
+            copy event.request_hash,
+            event.requester,
+            event.callback_sender,
+            event.client_seed,
+            event.rng_count,
+            event.num_confirmations,
+            copy event.randomness,
+        )
+    }
+
+    #[test_only]
+    public fun draw_handled_gas_fields(
+        event: &DrawHandledEvent
+    ): (u128, u128, u128, u128, u128) {
+        (
+            event.callback_gas_price,
+            event.callback_gas_limit,
+            event.max_gas_price,
+            event.max_gas_limit,
+            event.verification_gas_value,
+        )
     }
 
     #[test_only]
@@ -1139,6 +1409,9 @@ module lottery::main_v2 {
         let lottery = borrow_global<LotteryData>(@lottery);
         assert!(option::is_some(&lottery.last_requester), E_INVALID_CALLBACK_PAYLOAD);
         let requester = *option::borrow(&lottery.last_requester);
+        let (rng_count, num_confirmations) = resolve_request_parameters(
+            &lottery.vrf_request_config
+        );
         ensure_payload_hash_matches(
             &lottery.last_request_payload_hash,
             lottery.max_gas_price,
@@ -1150,6 +1423,8 @@ module lottery::main_v2 {
             client_seed,
             requester,
             message,
+            rng_count,
+            num_confirmations,
         );
     }
 
@@ -1160,8 +1435,18 @@ module lottery::main_v2 {
         requester: address
     ): vector<u8> acquires LotteryData {
         let lottery = borrow_global<LotteryData>(@lottery);
-        let envelope = build_request_envelope(nonce, client_seed, requester, lottery);
-        encode_request_envelope(&envelope)
+        let (rng_count, num_confirmations) = resolve_request_parameters(
+            &lottery.vrf_request_config
+        );
+        let request = build_callback_request(
+            nonce,
+            client_seed,
+            requester,
+            lottery,
+            rng_count,
+            num_confirmations,
+        );
+        encode_callback_request(&request)
     }
 
     #[test_only]
@@ -1173,6 +1458,26 @@ module lottery::main_v2 {
             status.jackpot_amount,
             status.rng_request_count,
             status.rng_response_count
+        )
+    }
+
+    #[test_only]
+    public fun pending_request_view_fields(
+        view: &PendingRequestView
+    ): (u64, address, vector<u8>, u64, u8, u64, address, u128, u128, u128, u128, u128) {
+        (
+            view.nonce,
+            view.requester,
+            copy view.request_hash,
+            view.client_seed,
+            view.rng_count,
+            view.num_confirmations,
+            view.callback_sender,
+            view.callback_gas_price,
+            view.callback_gas_limit,
+            view.max_gas_price,
+            view.max_gas_limit,
+            view.verification_gas_value,
         )
     }
 
@@ -1223,11 +1528,15 @@ module lottery::main_v2 {
         assert!(vector::length(&lottery.tickets) > 0, E_NO_TICKETS_AVAILABLE);
         assert!(option::is_some(&lottery.pending_request), E_PENDING_REQUEST_STATE);
         assert!(lottery.draw_scheduled, E_DRAW_NOT_SCHEDULED);
+        let (expected_rng_count, expected_confirmations) = resolve_request_parameters(
+            &lottery.vrf_request_config
+        );
         let expected_nonce = *option::borrow(&lottery.pending_request);
         assert!(expected_nonce == nonce, E_NONCE_MISMATCH);
         ensure_callback_caller_allowed_internal(&lottery.whitelisted_callback_sender, caller_address);
         assert!(option::is_some(&lottery.last_requester), E_INVALID_CALLBACK_PAYLOAD);
         let expected_requester = *option::borrow(&lottery.last_requester);
+        let callback_sender = ensure_callback_sender_configured(lottery);
         ensure_payload_hash_matches(
             &lottery.last_request_payload_hash,
             lottery.max_gas_price,
@@ -1239,11 +1548,23 @@ module lottery::main_v2 {
             client_seed,
             expected_requester,
             message,
+            expected_rng_count,
+            expected_confirmations,
         );
 
-        assert!(rng_count == EXPECTED_RNG_COUNT, E_UNEXPECTED_RNG_COUNT);
+        assert!(rng_count == expected_rng_count, E_UNEXPECTED_RNG_COUNT);
         let actual_len = vector::length(&verified_nums);
-        assert!(actual_len == EXPECTED_RNG_COUNT_U64, E_UNEXPECTED_RNG_COUNT);
+        let expected_len = u8_to_u64(expected_rng_count);
+        assert!(actual_len == expected_len, E_UNEXPECTED_RNG_COUNT);
+
+        assert!(option::is_some(&lottery.last_request_payload_hash), E_INVALID_CALLBACK_PAYLOAD);
+        let request_hash = copy *option::borrow(&lottery.last_request_payload_hash);
+        let randomness_for_event = clone_u256_vector(&verified_nums);
+        let callback_gas_price = lottery.callback_gas_price;
+        let callback_gas_limit = lottery.callback_gas_limit;
+        let max_gas_price = lottery.max_gas_price;
+        let max_gas_limit = lottery.max_gas_limit;
+        let verification_gas_value = lottery.verification_gas_value;
 
         clear_pending_request_state(lottery);
 
@@ -1262,7 +1583,22 @@ module lottery::main_v2 {
             E_RNG_RESPONSE_OVERFLOW,
         );
         event::emit(WinnerSelected { winner, prize: prize_amount });
-        event::emit(DrawHandledEvent { nonce, success: true });
+        event::emit(DrawHandledEvent {
+            nonce,
+            success: true,
+            request_hash,
+            requester: expected_requester,
+            callback_sender,
+            client_seed,
+            rng_count: expected_rng_count,
+            num_confirmations: expected_confirmations,
+            callback_gas_price,
+            callback_gas_limit,
+            max_gas_price,
+            max_gas_limit,
+            verification_gas_value,
+            randomness: randomness_for_event,
+        });
 
         lottery.tickets = vector::empty();
         lottery.jackpot_amount = 0;
@@ -1375,6 +1711,41 @@ module lottery::main_v2 {
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             (lottery.rng_request_count, lottery.rng_response_count)
+        }
+    }
+
+    #[view]
+    public fun get_pending_request_view(): option::Option<PendingRequestView> acquires LotteryData {
+        if (!exists<LotteryData>(@lottery)) {
+            option::none()
+        } else {
+            let lottery = borrow_global<LotteryData>(@lottery);
+            if (!option::is_some(&lottery.pending_request)) {
+                option::none()
+            } else {
+                assert!(option::is_some(&lottery.last_request_payload_hash), E_INVALID_CALLBACK_PAYLOAD);
+                assert!(option::is_some(&lottery.last_requester), E_INVALID_CALLBACK_PAYLOAD);
+                assert!(option::is_some(&lottery.vrf_request_config), E_INVALID_CALLBACK_PAYLOAD);
+                let nonce_ref = option::borrow(&lottery.pending_request);
+                let requester_ref = option::borrow(&lottery.last_requester);
+                let hash_ref = option::borrow(&lottery.last_request_payload_hash);
+                let config = option::borrow(&lottery.vrf_request_config);
+                let callback_sender = ensure_callback_sender_configured(&lottery);
+                option::some(PendingRequestView {
+                    nonce: *nonce_ref,
+                    requester: *requester_ref,
+                    request_hash: *hash_ref,
+                    client_seed: config.client_seed,
+                    rng_count: config.rng_count,
+                    num_confirmations: config.num_confirmations,
+                    callback_sender,
+                    callback_gas_price: lottery.callback_gas_price,
+                    callback_gas_limit: lottery.callback_gas_limit,
+                    max_gas_price: lottery.max_gas_price,
+                    max_gas_limit: lottery.max_gas_limit,
+                    verification_gas_value: lottery.verification_gas_value,
+                })
+            }
         }
     }
 
@@ -1681,24 +2052,31 @@ module lottery::main_v2 {
         nonce: u64,
         client_seed: u64,
         expected_requester: address,
-        message: vector<u8>
+        message: vector<u8>,
+        rng_count: u8,
+        num_confirmations: u64
     ) {
         assert!(option::is_some(stored_hash_opt), E_INVALID_CALLBACK_PAYLOAD);
         let stored_hash = option::borrow(stored_hash_opt);
         let payload_hash = hash::sha3_256(copy message);
         assert!(vector_equals(stored_hash, &payload_hash), E_INVALID_CALLBACK_PAYLOAD);
 
-        let envelope = VrfRequestEnvelope {
+        let envelope = CallbackRequest {
             nonce,
             client_seed,
+            requester: expected_requester,
+            rng_count,
+            num_confirmations,
+            callback_address: @lottery,
+            callback_module: callback_module_bytes(),
+            callback_function: callback_function_bytes(),
             max_gas_price,
             max_gas_limit,
             callback_gas_price,
             callback_gas_limit,
             verification_gas_value,
-            requester: expected_requester,
         };
-        let expected_payload = encode_request_envelope(&envelope);
+        let expected_payload = encode_callback_request(&envelope);
         let expected_hash = hash::sha3_256(copy expected_payload);
         assert!(vector_equals(&payload_hash, &expected_hash), E_INVALID_CALLBACK_PAYLOAD);
         assert!(vector_equals(&message, &expected_payload), E_INVALID_CALLBACK_PAYLOAD);
@@ -1720,6 +2098,11 @@ module lottery::main_v2 {
             };
             equal
         }
+    }
+
+    #[test_only]
+    public fun vector_equals_for_test(lhs: &vector<u8>, rhs: &vector<u8>): bool {
+        vector_equals(lhs, rhs)
     }
 
     fun first_u64_from_bytes(bytes: &vector<u8>): u64 {

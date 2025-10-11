@@ -7,8 +7,9 @@ module vrf_hub::hub {
     use std::option;
     use std::signer;
     use std::vector;
+    use std::hash;
     use vrf_hub::table;
-    use std::event;
+    use supra_framework::event;
 
 
     const E_NOT_AUTHORIZED: u64 = 1;
@@ -38,6 +39,7 @@ module vrf_hub::hub {
     struct RequestRecord has copy, drop, store {
         lottery_id: u64,
         payload: vector<u8>,
+        payload_hash: vector<u8>,
     }
 
 
@@ -55,6 +57,7 @@ module vrf_hub::hub {
         metadata_events: event::EventHandle<LotteryMetadataUpdatedEvent>,
         request_events: event::EventHandle<RandomnessRequestedEvent>,
         fulfill_events: event::EventHandle<RandomnessFulfilledEvent>,
+        callback_sender_events: event::EventHandle<CallbackSenderUpdatedEvent>,
     }
 
     #[event]
@@ -81,6 +84,7 @@ module vrf_hub::hub {
         request_id: u64,
         lottery_id: u64,
         payload: vector<u8>,
+        payload_hash: vector<u8>,
     }
 
     #[event]
@@ -88,6 +92,16 @@ module vrf_hub::hub {
         request_id: u64,
         lottery_id: u64,
         randomness: vector<u8>,
+    }
+
+    #[event]
+    struct CallbackSenderUpdatedEvent has drop, store, copy {
+        previous: option::Option<address>,
+        current: option::Option<address>,
+    }
+
+    struct CallbackSenderStatus has copy, drop {
+        sender: option::Option<address>,
     }
 
 
@@ -113,6 +127,7 @@ module vrf_hub::hub {
             metadata_events: event::new_event_handle<LotteryMetadataUpdatedEvent>(caller),
             request_events: event::new_event_handle<RandomnessRequestedEvent>(caller),
             fulfill_events: event::new_event_handle<RandomnessFulfilledEvent>(caller),
+            callback_sender_events: event::new_event_handle<CallbackSenderUpdatedEvent>(caller),
         });
     }
 
@@ -276,7 +291,12 @@ module vrf_hub::hub {
     public entry fun set_callback_sender(caller: &signer, sender: address) acquires HubState {
         ensure_admin(caller);
         let state = borrow_global_mut<HubState>(@vrf_hub);
+        let previous = copy_option_address(&state.callback_sender);
         state.callback_sender = option::some(sender);
+        event::emit_event(
+            &mut state.callback_sender_events,
+            CallbackSenderUpdatedEvent { previous, current: option::some(sender) },
+        );
     }
 
 
@@ -285,6 +305,13 @@ module vrf_hub::hub {
         ensure_initialized();
         let state = borrow_global<HubState>(@vrf_hub);
         state.callback_sender
+    }
+
+    #[view]
+    public fun get_callback_sender_status(): CallbackSenderStatus acquires HubState {
+        ensure_initialized();
+        let state = borrow_global<HubState>(@vrf_hub);
+        CallbackSenderStatus { sender: copy_option_address(&state.callback_sender) }
     }
 
 
@@ -301,11 +328,22 @@ module vrf_hub::hub {
         let request_id = state.next_request_id;
         state.next_request_id = request_id + 1;
         let payload_for_event = clone_bytes(&payload);
-        table::add(&mut state.requests, request_id, RequestRecord { lottery_id, payload });
+        let payload_hash = compute_payload_hash(&payload);
+        let hash_for_event = clone_bytes(&payload_hash);
+        table::add(
+            &mut state.requests,
+            request_id,
+            RequestRecord { lottery_id, payload, payload_hash },
+        );
         vector::push_back(&mut state.pending_request_ids, request_id);
         event::emit_event(
             &mut state.request_events,
-            RandomnessRequestedEvent { request_id, lottery_id, payload: payload_for_event },
+            RandomnessRequestedEvent {
+                request_id,
+                lottery_id,
+                payload: payload_for_event,
+                payload_hash: hash_for_event,
+            },
         );
         request_id
     }
@@ -363,6 +401,10 @@ module vrf_hub::hub {
         clone_bytes(&record.payload)
     }
 
+    public fun request_record_payload_hash(record: &RequestRecord): vector<u8> {
+        clone_bytes(&record.payload_hash)
+    }
+
     public fun registration_owner(registration: &LotteryRegistration): address {
         registration.owner
     }
@@ -390,8 +432,12 @@ module vrf_hub::hub {
     #[test_only]
     public fun request_record_fields_for_test(
         record: &RequestRecord
-    ): (u64, vector<u8>) {
-        (record.lottery_id, clone_bytes(&record.payload))
+    ): (u64, vector<u8>, vector<u8>) {
+        (
+            record.lottery_id,
+            clone_bytes(&record.payload),
+            clone_bytes(&record.payload_hash),
+        )
     }
 
 
@@ -406,6 +452,26 @@ module vrf_hub::hub {
         if (addr != allowed) {
             abort E_CALLBACK_NOT_ALLOWED
         };
+    }
+
+    fun copy_option_address(value: &option::Option<address>): option::Option<address> {
+        if (option::is_some(value)) {
+            option::some(*option::borrow(value))
+        } else {
+            option::none()
+        }
+    }
+
+    #[test_only]
+    public fun callback_sender_status_sender(status: &CallbackSenderStatus): option::Option<address> {
+        status.sender
+    }
+
+    #[test_only]
+    public fun callback_sender_event_fields_for_test(
+        event: &CallbackSenderUpdatedEvent
+    ): (option::Option<address>, option::Option<address>) {
+        (event.previous, event.current)
     }
 
     fun ensure_admin(caller: &signer) acquires HubState {
@@ -445,6 +511,10 @@ module vrf_hub::hub {
             i = i + 1;
         };
         result
+    }
+
+    fun compute_payload_hash(payload: &vector<u8>): vector<u8> {
+        hash::sha3_256(clone_bytes(payload))
     }
 
     fun remove_pending_request_id(ids: &mut vector<u64>, request_id: u64) {

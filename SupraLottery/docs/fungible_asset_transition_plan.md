@@ -2,6 +2,10 @@
 
 > Опираться на официальные материалы Supra: [token-standards](https://docs.supra.com/network/move/token-standards), [описание модуля fungible_asset](https://docs.supra.com/network/move/supra-fungible-asset-fa-module) и исходники `supra-framework` на GitHub ([Supra-Labs](https://github.com/Supra-Labs), [Entropy-Foundation/aptos-core](https://github.com/Entropy-Foundation/aptos-core/tree/dev/aptos-move/framework/supra-framework)).
 
+## Статус
+- ✅ Реализация Supra FA завершена: `treasury_v1` хранит `fungible_asset::Metadata` и capability, операции используют `primary_fungible_store`, а view-функции возвращают адреса primary store и supply. Оставшиеся задачи смещаются на доработку мультикадров (`TreasuryMulti`) и документации по миграции.
+- ✅ `treasury_multi` валидирует, что `treasury_v1` инициализирован и адреса пулов зарегистрировали primary store, предоставляя view `get_recipients` для аудита перед выплатами.
+
 ## 1. Анализ текущей системы
 - Провести поиск всех зависимостей `coin::Coin<SupraCoin>`:
   - `supra/move_workspace/lottery/sources/Lottery.move`.
@@ -38,7 +42,12 @@
 - Добавить view-функции: текущий баланс, общий supply, статус capability, а также админские хелперы для массовой регистрации `Store`.
 - Предоставить агрегирующие view-функции `account_status` и `account_extended_status`, чтобы фронтенд получал регистрацию, freeze-статус и баланс за один RPC.
 - Предусмотреть инструменты заморозки store: entry-функции администратора и view `store_frozen`, чтобы оперативно блокировать подозрительные аккаунты и отслеживать статус.
-- При назначении получателей распределения проверять, что для каждого адреса предварительно зарегистрирован primary store; иначе `set_recipients` должна завершаться с ошибкой, чтобы соблюсти требования Supra FA к зарегистрированным хранилищам.
+- При назначении получателей распределения проверять, что для каждого адреса предварительно зарегистрирован primary store и store не заморожен; иначе `set_recipients` должна завершаться с ошибкой, чтобы соблюсти требования Supra FA к зарегистрированным и активным хранилищам. ✅ Реализовано в `treasury_v1::set_recipients` и дополнено в `treasury_multi::init/set_recipients`.
+- Добавить view для аудита получателей мультикадров: `treasury_multi::get_recipient_statuses` отдаёт адрес, признак регистрации, freeze и баланс Supra FA; Move-тесты проверяют сценарии после распределения и вывода средств. ✅
+- Добавить view для аудита базовых получателей: `treasury_v1::get_recipient_statuses` публикует регистрацию, freeze и адрес primary store для направлений казначейства; тестовый декодер `recipient_status_fields_for_test` позволяет валидировать структуру в Move-тестах. ✅
+- Усилить проверки выплат: `treasury_multi::init/set_recipients`, `withdraw_operations`, `pay_operations_bonus_internal` и `distribute_jackpot` проверяют регистрацию и freeze-статус получателей, предотвращая зависание средств в замороженных primary store. ✅
+- Логировать обновления получателей базового казначейства: событие `treasury_v1::RecipientsUpdatedEvent` публикует парные снимки (предыдущий и текущий `VaultRecipientsSnapshot`) при инициализации и каждом вызове `set_recipients`, что позволяет Supra отслеживать историю изменений и сравнивать конфигурации. ✅
+- Синхронизировать журналирование мультипулов: `treasury_multi::RecipientsUpdatedEvent` эмитится при `init` и `set_recipients`, публикуя `RecipientStatus` для предыдущих и новых адресов, что позволяет Supra наблюдать за сменой пулов и freeze-статусами. ✅
 - Экспортировать `get_config`, `config_event_fields` и документацию по конфигурации распределения, чтобы фронтенд и операторские скрипты отображали доли и реагировали на события.
 - Реализовать функции миграции Store для безопасного обновления конфигураций.
 

@@ -1,8 +1,10 @@
 #[test_only]
 module lottery::store_tests {
     use std::option;
+    use std::vector;
     use std::account;
     use std::signer;
+    use supra_framework::event;
     use lottery::instances;
     use lottery::rounds;
     use lottery::store;
@@ -67,10 +69,10 @@ module lottery::store_tests {
         lottery_admin: &signer,
         buyer: &signer,
     ) {
+        setup_token(lottery_admin, buyer);
         let lottery_id = setup_lottery(vrf_admin, factory_admin, lottery_admin);
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
-        setup_token(lottery_admin, buyer);
 
         store::upsert_item(
             lottery_admin,
@@ -95,6 +97,68 @@ module lottery::store_tests {
         let (_config, pool) = treasury_multi::summary_components_for_test(&summary);
         let (_prize_balance, operations_balance) = treasury_multi::pool_balances_for_test(&pool);
         assert!(operations_balance == ITEM_PRICE * 2, 2);
+
+        let lottery_snapshot = test_utils::unwrap(store::get_lottery_snapshot(lottery_id));
+        let (snapshot_lottery_id, item_snapshots) =
+            store::store_lottery_snapshot_fields_for_test(&lottery_snapshot);
+        assert!(snapshot_lottery_id == lottery_id, 20);
+        assert!(vector::length(&item_snapshots) == 1, 21);
+        let item_snapshot = vector::borrow(&item_snapshots, 0);
+        let (
+            snapshot_item_id,
+            snapshot_price,
+            snapshot_available,
+            snapshot_stock,
+            snapshot_sold,
+            snapshot_metadata,
+        ) = store::store_item_snapshot_fields_for_test(item_snapshot);
+        assert!(snapshot_item_id == 1, 22);
+        assert!(snapshot_price == ITEM_PRICE, 23);
+        assert!(snapshot_available, 24);
+        let remaining_snapshot = test_utils::unwrap(snapshot_stock);
+        assert!(remaining_snapshot == ITEM_STOCK - 2, 25);
+        assert!(snapshot_sold == 2, 26);
+        let expected_metadata = b"avatar-premium";
+        let metadata_len = vector::length(&snapshot_metadata);
+        assert!(metadata_len == vector::length(&expected_metadata), 27);
+        let metadata_idx = 0;
+        while (metadata_idx < metadata_len) {
+            assert!(
+                *vector::borrow(&snapshot_metadata, metadata_idx)
+                    == *vector::borrow(&expected_metadata, metadata_idx),
+                28,
+            );
+            metadata_idx = metadata_idx + 1;
+        };
+
+        let store_snapshot_before = test_utils::unwrap(store::get_store_snapshot());
+        let (store_admin_before, store_lotteries_before) =
+            store::store_snapshot_fields_for_test(&store_snapshot_before);
+        assert!(store_admin_before == signer::address_of(lottery_admin), 29);
+        assert!(vector::length(&store_lotteries_before) == 1, 30);
+
+        store::set_admin(lottery_admin, @lottery_owner);
+
+        let store_snapshot_after = test_utils::unwrap(store::get_store_snapshot());
+        let (store_admin_after, _) = store::store_snapshot_fields_for_test(&store_snapshot_after);
+        assert!(store_admin_after == @lottery_owner, 31);
+
+        let snapshot_events = event::emitted_events<store::StoreSnapshotUpdatedEvent>();
+        assert!(vector::length(&snapshot_events) == 3, 32);
+        let last_event = vector::borrow(&snapshot_events, 2);
+        let (event_admin, event_snapshot) = store::store_snapshot_event_fields_for_test(last_event);
+        assert!(event_admin == @lottery_owner, 33);
+        let (event_lottery_id, event_items) =
+            store::store_lottery_snapshot_fields_for_test(&event_snapshot);
+        assert!(event_lottery_id == lottery_id, 34);
+        assert!(vector::length(&event_items) == 1, 35);
+        let event_item = vector::borrow(&event_items, 0);
+        let (_, _, event_available, event_stock, event_sold, _) =
+            store::store_item_snapshot_fields_for_test(event_item);
+        assert!(event_available, 36);
+        let event_remaining = test_utils::unwrap(event_stock);
+        assert!(event_remaining == ITEM_STOCK - 2, 37);
+        assert!(event_sold == 2, 38);
     }
 
     #[test(
@@ -110,10 +174,10 @@ module lottery::store_tests {
         lottery_admin: &signer,
         buyer: &signer,
     ) {
+        setup_token(lottery_admin, buyer);
         let lottery_id = setup_lottery(vrf_admin, factory_admin, lottery_admin);
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
-        setup_token(lottery_admin, buyer);
 
         store::upsert_item(
             lottery_admin,

@@ -3,6 +3,7 @@ module lottery::autopurchase_tests {
     use std::vector;
     use std::account;
     use std::signer;
+    use supra_framework::event;
     use lottery::autopurchase;
     use lottery::instances;
     use lottery::rounds;
@@ -66,10 +67,10 @@ module lottery::autopurchase_tests {
         lottery_admin: &signer,
         buyer: &signer,
     ) {
+        setup_token(lottery_admin, buyer);
         let lottery_id = setup_lottery(vrf_admin, factory_admin, lottery_admin);
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
-        setup_token(lottery_admin, buyer);
 
         autopurchase::configure_plan(buyer, lottery_id, 2, true);
         autopurchase::deposit(buyer, lottery_id, TICKET_PRICE * 3);
@@ -88,6 +89,28 @@ module lottery::autopurchase_tests {
         let lotteries = autopurchase::list_lottery_ids();
         assert!(vector::length(&lotteries) == 1, 14);
         assert!(*vector::borrow(&lotteries, 0) == lottery_id, 15);
+
+        let lottery_snapshot = test_utils::unwrap(autopurchase::get_lottery_snapshot(lottery_id));
+        let (balance_snapshot, players_count_snapshot, active_players_snapshot, player_snapshots) =
+            autopurchase::lottery_snapshot_fields_for_test(&lottery_snapshot);
+        assert!(balance_snapshot == TICKET_PRICE * 3, 35);
+        assert!(players_count_snapshot == 1, 36);
+        assert!(active_players_snapshot == 1, 37);
+        assert!(vector::length(&player_snapshots) == 1, 38);
+        let first_player = vector::borrow(&player_snapshots, 0);
+        let (player_addr, plan_balance, plan_tickets, plan_active) =
+            autopurchase::player_snapshot_fields_for_test(first_player);
+        assert!(player_addr == @player1, 39);
+        assert!(plan_balance == TICKET_PRICE * 3, 40);
+        assert!(plan_tickets == 2, 41);
+        assert!(plan_active, 42);
+
+        let (admin_addr, lotteries_snapshot) =
+            autopurchase::autopurchase_snapshot_fields_for_test(
+                &test_utils::unwrap(autopurchase::get_autopurchase_snapshot()),
+            );
+        assert!(admin_addr == signer::address_of(lottery_admin), 43);
+        assert!(vector::length(&lotteries_snapshot) == 1, 44);
 
 
         autopurchase::execute(lottery_admin, lottery_id, @player1);
@@ -128,6 +151,25 @@ module lottery::autopurchase_tests {
         assert!(operations_balance == 30, 6);
         assert!(treasury_multi::jackpot_balance() == 60, 7);
         assert!(treasury_v1::balance_of(@player1) == 20_000 - (TICKET_PRICE * 3), 8);
+
+        let snapshot_events = event::emitted_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
+        assert!(vector::length(&snapshot_events) == 4, 45);
+        let last_event = vector::borrow(&snapshot_events, 3);
+        let (event_admin, event_snapshot) =
+            autopurchase::autopurchase_snapshot_event_fields_for_test(last_event);
+        assert!(event_admin == signer::address_of(lottery_admin), 46);
+        let (event_balance, event_players, event_active_players, event_player_snapshots) =
+            autopurchase::lottery_snapshot_fields_for_test(&event_snapshot);
+        assert!(event_balance == 0, 47);
+        assert!(event_players == 1, 48);
+        assert!(event_active_players == 1, 49);
+        assert!(vector::length(&event_player_snapshots) == 1, 50);
+        let player_snapshot = vector::borrow(&event_player_snapshots, 0);
+        let (_, final_plan_balance, final_plan_tickets, final_plan_active) =
+            autopurchase::player_snapshot_fields_for_test(player_snapshot);
+        assert!(final_plan_balance == 0, 51);
+        assert!(final_plan_tickets == 2, 52);
+        assert!(final_plan_active, 53);
     }
 
     #[test(
@@ -143,10 +185,10 @@ module lottery::autopurchase_tests {
         lottery_admin: &signer,
         buyer: &signer,
     ) {
+        setup_token(lottery_admin, buyer);
         let lottery_id = setup_lottery(vrf_admin, factory_admin, lottery_admin);
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
-        setup_token(lottery_admin, buyer);
 
         autopurchase::configure_plan(buyer, lottery_id, 1, false);
         autopurchase::deposit(buyer, lottery_id, TICKET_PRICE);
@@ -166,10 +208,10 @@ module lottery::autopurchase_tests {
         lottery_admin: &signer,
         buyer: &signer,
     ) {
+        setup_token(lottery_admin, buyer);
         let lottery_id = setup_lottery(vrf_admin, factory_admin, lottery_admin);
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
-        setup_token(lottery_admin, buyer);
 
         autopurchase::configure_plan(buyer, lottery_id, 1, true);
         autopurchase::deposit(buyer, lottery_id, 500);
@@ -186,5 +228,23 @@ module lottery::autopurchase_tests {
         let summary = test_utils::unwrap(autopurchase::get_lottery_summary(lottery_id));
         let (total_balance, _, _) = autopurchase::summary_fields_for_test(&summary);
         assert!(total_balance == 380, 2);
+
+        let snapshot_events = event::emitted_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
+        assert!(vector::length(&snapshot_events) == 3, 54);
+        let last_event = vector::borrow(&snapshot_events, 2);
+        let (event_admin, event_snapshot) =
+            autopurchase::autopurchase_snapshot_event_fields_for_test(last_event);
+        assert!(event_admin == signer::address_of(lottery_admin), 55);
+        let (event_balance, _, _, players) =
+            autopurchase::lottery_snapshot_fields_for_test(&event_snapshot);
+        assert!(event_balance == 380, 56);
+        assert!(vector::length(&players) == 1, 57);
+        let player_snapshot = vector::borrow(&players, 0);
+        let (player_addr, player_balance, player_tickets, player_active) =
+            autopurchase::player_snapshot_fields_for_test(player_snapshot);
+        assert!(player_addr == @player3, 58);
+        assert!(player_balance == 380, 59);
+        assert!(player_tickets == 1, 60);
+        assert!(player_active, 61);
     }
 }

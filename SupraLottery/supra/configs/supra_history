@@ -1802,3 +1802,11 @@ Output:
 General: {
   "Error": "Move unit tests failed"
 }
+Local: (2025-10-09 20:44:00.317898767 +00:00)	 Utc: (2025-10-09 20:44:00.318033220 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}

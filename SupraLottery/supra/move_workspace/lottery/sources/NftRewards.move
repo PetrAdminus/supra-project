@@ -5,7 +5,7 @@ module lottery::nft_rewards {
     use std::signer;
     use std::vector;
     use vrf_hub::table;
-    use std::event;
+    use supra_framework::event;
 
     const E_NOT_AUTHORIZED: u64 = 1;
     const E_ALREADY_INITIALIZED: u64 = 2;
@@ -32,8 +32,10 @@ module lottery::nft_rewards {
         admin: address,
         next_badge_id: u64,
         users: table::Table<address, UserBadges>,
+        owners: vector<address>,
         mint_events: event::EventHandle<BadgeMintedEvent>,
         burn_events: event::EventHandle<BadgeBurnedEvent>,
+        snapshot_events: event::EventHandle<NftRewardsSnapshotUpdatedEvent>,
     }
 
     #[event]
@@ -52,6 +54,35 @@ module lottery::nft_rewards {
     }
 
 
+    struct BadgeSnapshot has copy, drop, store {
+        badge_id: u64,
+        lottery_id: u64,
+        draw_id: u64,
+        metadata_uri: vector<u8>,
+        minted_by: address,
+    }
+
+
+    struct BadgeOwnerSnapshot has copy, drop, store {
+        owner: address,
+        badges: vector<BadgeSnapshot>,
+    }
+
+
+    struct NftRewardsSnapshot has copy, drop, store {
+        admin: address,
+        next_badge_id: u64,
+        owners: vector<BadgeOwnerSnapshot>,
+    }
+
+    #[event]
+    struct NftRewardsSnapshotUpdatedEvent has drop, store, copy {
+        admin: address,
+        next_badge_id: u64,
+        snapshot: BadgeOwnerSnapshot,
+    }
+
+
     public entry fun init(caller: &signer) {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
@@ -66,10 +97,14 @@ module lottery::nft_rewards {
                 admin: addr,
                 next_badge_id: 1,
                 users: table::new(),
+                owners: vector::empty<address>(),
                 mint_events: event::new_event_handle<BadgeMintedEvent>(caller),
                 burn_events: event::new_event_handle<BadgeBurnedEvent>(caller),
+                snapshot_events: event::new_event_handle<NftRewardsSnapshotUpdatedEvent>(caller),
             },
         );
+        let state = borrow_global_mut<BadgeAuthority>(@lottery);
+        emit_all_snapshots(state);
     }
 
 
@@ -90,6 +125,7 @@ module lottery::nft_rewards {
         ensure_admin(caller);
         let state = borrow_global_mut<BadgeAuthority>(@lottery);
         state.admin = new_admin;
+        emit_all_snapshots(state);
     }
 
 
@@ -106,7 +142,7 @@ module lottery::nft_rewards {
         state.next_badge_id = badge_id + 1;
         let metadata_for_event = clone_bytes(&metadata_uri);
 
-        let collection = borrow_or_create_user(&mut state.users, owner);
+        let collection = borrow_or_create_user(&mut state.users, &mut state.owners, owner);
         let data = WinnerBadgeData {
             badge_id,
             lottery_id,
@@ -126,6 +162,7 @@ module lottery::nft_rewards {
                 metadata_uri: metadata_for_event,
             },
         );
+        emit_owner_snapshot(state, owner);
     }
 
 
@@ -142,6 +179,7 @@ module lottery::nft_rewards {
             abort E_BADGE_NOT_FOUND
         };
         event::emit_event(&mut state.burn_events, BadgeBurnedEvent { badge_id, owner });
+        emit_owner_snapshot(state, owner);
     }
 
 
@@ -191,11 +229,91 @@ module lottery::nft_rewards {
     }
 
 
+    #[view]
+    public fun list_owner_addresses(): vector<address> acquires BadgeAuthority {
+        if (!exists<BadgeAuthority>(@lottery)) {
+            return vector::empty<address>()
+        };
+        let state = borrow_global<BadgeAuthority>(@lottery);
+        clone_address_vector(&state.owners)
+    }
+
+
+    #[view]
+    public fun get_owner_snapshot(owner: address): option::Option<BadgeOwnerSnapshot>
+    acquires BadgeAuthority {
+        if (!exists<BadgeAuthority>(@lottery)) {
+            return option::none<BadgeOwnerSnapshot>()
+        };
+        let state = borrow_global<BadgeAuthority>(@lottery);
+        if (!table::contains(&state.users, owner)) {
+            return option::none<BadgeOwnerSnapshot>()
+        };
+        option::some(build_owner_snapshot(&state, owner))
+    }
+
+
+    #[view]
+    public fun get_snapshot(): option::Option<NftRewardsSnapshot> acquires BadgeAuthority {
+        if (!exists<BadgeAuthority>(@lottery)) {
+            return option::none<NftRewardsSnapshot>()
+        };
+        let state = borrow_global<BadgeAuthority>(@lottery);
+        option::some(build_snapshot(&state))
+    }
+
+
     #[test_only]
     public fun badge_fields_for_test(
         badge: &WinnerBadgeData
     ): (u64, u64, vector<u8>, address) {
         (badge.lottery_id, badge.draw_id, badge.metadata_uri, badge.minted_by)
+    }
+
+
+    #[test_only]
+    public fun badge_snapshot_fields_for_test(
+        snapshot: &BadgeSnapshot
+    ): (u64, u64, u64, vector<u8>, address) {
+        (
+            snapshot.badge_id,
+            snapshot.lottery_id,
+            snapshot.draw_id,
+            snapshot.metadata_uri,
+            snapshot.minted_by,
+        )
+    }
+
+
+    #[test_only]
+    public fun owner_snapshot_fields_for_test(
+        snapshot: &BadgeOwnerSnapshot
+    ): (address, vector<BadgeSnapshot>) {
+        (snapshot.owner, clone_badge_snapshot_vector(&snapshot.badges))
+    }
+
+
+    #[test_only]
+    public fun rewards_snapshot_fields_for_test(
+        snapshot: &NftRewardsSnapshot
+    ): (address, u64, vector<BadgeOwnerSnapshot>) {
+        (
+            snapshot.admin,
+            snapshot.next_badge_id,
+            clone_owner_snapshot_vector(&snapshot.owners),
+        )
+    }
+
+
+    #[test_only]
+    public fun snapshot_event_fields_for_test(
+        event: &NftRewardsSnapshotUpdatedEvent
+    ): (address, u64, BadgeOwnerSnapshot) {
+        (
+            event.admin,
+            event.next_badge_id,
+            copy_owner_snapshot(&event.snapshot),
+        )
     }
 
 
@@ -219,10 +337,12 @@ module lottery::nft_rewards {
 
     fun borrow_or_create_user(
         users: &mut table::Table<address, UserBadges>,
+        owners: &mut vector<address>,
         owner: address,
     ): &mut UserBadges {
         if (!table::contains(users, owner)) {
             table::add(users, owner, UserBadges { badges: table::new(), badge_ids: vector::empty<u64>() });
+            vector::push_back(owners, owner);
         };
         table::borrow_mut(users, owner)
     }
@@ -252,6 +372,78 @@ module lottery::nft_rewards {
         };
     }
 
+
+    fun build_snapshot(state: &BadgeAuthority): NftRewardsSnapshot {
+        let owners = vector::empty<BadgeOwnerSnapshot>();
+        let len = vector::length(&state.owners);
+        let idx = 0;
+        while (idx < len) {
+            let owner = *vector::borrow(&state.owners, idx);
+            if (table::contains(&state.users, owner)) {
+                vector::push_back(&mut owners, build_owner_snapshot(state, owner));
+            };
+            idx = idx + 1;
+        };
+        NftRewardsSnapshot { admin: state.admin, next_badge_id: state.next_badge_id, owners }
+    }
+
+
+    fun build_owner_snapshot(state: &BadgeAuthority, owner: address): BadgeOwnerSnapshot {
+        if (!table::contains(&state.users, owner)) {
+            return BadgeOwnerSnapshot { owner, badges: vector::empty<BadgeSnapshot>() }
+        };
+        let collection = table::borrow(&state.users, owner);
+        let len = vector::length(&collection.badge_ids);
+        let idx = 0;
+        let badges = vector::empty<BadgeSnapshot>();
+        while (idx < len) {
+            let badge_id = *vector::borrow(&collection.badge_ids, idx);
+            if (table::contains(&collection.badges, badge_id)) {
+                let data = table::borrow(&collection.badges, badge_id);
+                vector::push_back(&mut badges, build_badge_snapshot(badge_id, data));
+            };
+            idx = idx + 1;
+        };
+        BadgeOwnerSnapshot { owner, badges }
+    }
+
+
+    fun build_badge_snapshot(badge_id: u64, data: &WinnerBadgeData): BadgeSnapshot {
+        BadgeSnapshot {
+            badge_id,
+            lottery_id: data.lottery_id,
+            draw_id: data.draw_id,
+            metadata_uri: clone_bytes(&data.metadata_uri),
+            minted_by: data.minted_by,
+        }
+    }
+
+
+    fun emit_owner_snapshot(state: &mut BadgeAuthority, owner: address) {
+        let snapshot = build_owner_snapshot(&*state, owner);
+        event::emit_event(
+            &mut state.snapshot_events,
+            NftRewardsSnapshotUpdatedEvent {
+                admin: state.admin,
+                next_badge_id: state.next_badge_id,
+                snapshot,
+            },
+        );
+    }
+
+
+    fun emit_all_snapshots(state: &mut BadgeAuthority) {
+        let len = vector::length(&state.owners);
+        let idx = 0;
+        while (idx < len) {
+            let owner = *vector::borrow(&state.owners, idx);
+            if (table::contains(&state.users, owner)) {
+                emit_owner_snapshot(state, owner);
+            };
+            idx = idx + 1;
+        };
+    }
+
     fun clone_bytes(data: &vector<u8>): vector<u8> {
         let out = vector::empty<u8>();
         let len = vector::length(data);
@@ -270,6 +462,47 @@ module lottery::nft_rewards {
         while (i < len) {
             vector::push_back(&mut out, *vector::borrow(data, i));
             i = i + 1;
+        };
+        out
+    }
+
+
+    fun clone_badge_snapshot_vector(values: &vector<BadgeSnapshot>): vector<BadgeSnapshot> {
+        let out = vector::empty<BadgeSnapshot>();
+        let len = vector::length(values);
+        let idx = 0;
+        while (idx < len) {
+            vector::push_back(&mut out, *vector::borrow(values, idx));
+            idx = idx + 1;
+        };
+        out
+    }
+
+
+    fun clone_owner_snapshot_vector(values: &vector<BadgeOwnerSnapshot>): vector<BadgeOwnerSnapshot> {
+        let out = vector::empty<BadgeOwnerSnapshot>();
+        let len = vector::length(values);
+        let idx = 0;
+        while (idx < len) {
+            vector::push_back(&mut out, copy_owner_snapshot(vector::borrow(values, idx)));
+            idx = idx + 1;
+        };
+        out
+    }
+
+
+    fun copy_owner_snapshot(snapshot: &BadgeOwnerSnapshot): BadgeOwnerSnapshot {
+        BadgeOwnerSnapshot { owner: snapshot.owner, badges: clone_badge_snapshot_vector(&snapshot.badges) }
+    }
+
+
+    fun clone_address_vector(values: &vector<address>): vector<address> {
+        let out = vector::empty<address>();
+        let len = vector::length(values);
+        let idx = 0;
+        while (idx < len) {
+            vector::push_back(&mut out, *vector::borrow(values, idx));
+            idx = idx + 1;
         };
         out
     }

@@ -12,6 +12,7 @@ module lottery::referrals_tests {
     use lottery::treasury_v1;
     use lottery_factory::registry;
     use vrf_hub::hub;
+    use supra_framework::event;
 
     fun setup_environment(
         vrf_admin: &signer,
@@ -25,7 +26,6 @@ module lottery::referrals_tests {
         instances::init(lottery_admin, @vrf_hub);
         rounds::init(lottery_admin);
         referrals::init(lottery_admin);
-        treasury_multi::init(lottery_admin, @jackpot_pool, @operations_pool);
 
         account::create_account_for_test(@jackpot_pool);
         account::create_account_for_test(@operations_pool);
@@ -43,6 +43,7 @@ module lottery::referrals_tests {
         treasury_v1::register_store(buyer);
         treasury_v1::register_store(referrer);
         treasury_v1::mint_to(lottery_admin, signer::address_of(buyer), 5_000);
+        treasury_multi::init(lottery_admin, @jackpot_pool, @operations_pool);
     }
 
     #[test(
@@ -98,6 +99,41 @@ module lottery::referrals_tests {
         assert!(stored_referrer == signer::address_of(referrer), 6);
 
         assert!(referrals::total_registered() == 1, 7);
+
+        let snapshot = referrals::get_referral_snapshot();
+        let admin_addr = referrals::referral_snapshot_admin(&snapshot);
+        assert!(admin_addr == @lottery, 8);
+        let total_registered = referrals::referral_snapshot_total_registered(&snapshot);
+        assert!(total_registered == 1, 9);
+        let lottery_count = referrals::referral_snapshot_lottery_count(&snapshot);
+        assert!(lottery_count == 1, 10);
+        let entry_snapshot = referrals::referral_snapshot_lottery_at(&snapshot, 0);
+        let (
+            entry_lottery_id,
+            entry_referrer_bps,
+            entry_referee_bps,
+            entry_rewarded_purchases,
+            entry_total_referrer_rewards,
+            entry_total_referee_rewards,
+        ) = referrals::lottery_referral_snapshot_fields_for_test(&entry_snapshot);
+        assert!(entry_lottery_id == lottery_id, 11);
+        assert!(entry_referrer_bps == 800, 12);
+        assert!(entry_referee_bps == 600, 13);
+        assert!(entry_rewarded_purchases == 1, 14);
+        assert!(entry_total_referrer_rewards == 8, 15);
+        assert!(entry_total_referee_rewards == 6, 16);
+
+        let snapshot_events = event::emitted_events<referrals::ReferralSnapshotUpdatedEvent>();
+        let snapshot_events_len = vector::length(&snapshot_events);
+        assert!(snapshot_events_len >= 4, 17);
+        let latest_snapshot = vector::borrow(&snapshot_events, snapshot_events_len - 1);
+        let latest_previous_opt = referrals::referral_snapshot_event_previous_for_test(latest_snapshot);
+        assert!(option::is_some(&latest_previous_opt), 18);
+        let latest_snapshot_state = referrals::referral_snapshot_event_current_for_test(latest_snapshot);
+        let latest_total_registered = referrals::referral_snapshot_total_registered(&latest_snapshot_state);
+        assert!(latest_total_registered == 1, 19);
+        let latest_count = referrals::referral_snapshot_lottery_count(&latest_snapshot_state);
+        assert!(latest_count == 1, 20);
     }
 
     #[test(

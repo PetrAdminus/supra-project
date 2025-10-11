@@ -70,7 +70,8 @@
         "data": {
           "lottery_id": 0,
           "request_id": "0xabc123",
-          "seed": "0x9988"
+          "seed": "0x9988",
+          "payload_hash": "0xf1f2f3"
         }
       }
     ],

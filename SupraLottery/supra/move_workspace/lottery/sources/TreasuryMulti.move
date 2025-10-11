@@ -9,7 +9,7 @@ module lottery::treasury_multi {
     use std::signer;
     use std::vector;
     use vrf_hub::table;
-    use std::event;
+    use supra_framework::event;
     use std::math64;
     use lottery::treasury_v1;
 
@@ -22,6 +22,15 @@ module lottery::treasury_multi {
     const E_INSUFFICIENT_JACKPOT: u64 = 7;
     const E_POOL_ALREADY_EXISTS: u64 = 8;
     const E_INSUFFICIENT_OPERATIONS: u64 = 9;
+    const E_TREASURY_NOT_READY: u64 = 10;
+    const E_JACKPOT_RECIPIENT_UNREGISTERED: u64 = 11;
+    const E_OPERATIONS_RECIPIENT_UNREGISTERED: u64 = 12;
+    const E_JACKPOT_RECIPIENT_FROZEN: u64 = 13;
+    const E_OPERATIONS_RECIPIENT_FROZEN: u64 = 14;
+    const E_BONUS_RECIPIENT_UNREGISTERED: u64 = 15;
+    const E_BONUS_RECIPIENT_FROZEN: u64 = 16;
+    const E_JACKPOT_WINNER_UNREGISTERED: u64 = 17;
+    const E_JACKPOT_WINNER_FROZEN: u64 = 18;
 
     const BASIS_POINT_DENOMINATOR: u64 = 10_000;
 
@@ -58,6 +67,14 @@ module lottery::treasury_multi {
         jackpot_events: event::EventHandle<JackpotPaidEvent>,
     }
 
+    struct RecipientStatus has copy, drop, store {
+        recipient: address,
+        registered: bool,
+        frozen: bool,
+        store: option::Option<address>,
+        balance: u64,
+    }
+
     #[event]
     struct LotteryConfigUpdatedEvent has drop, store, copy {
         lottery_id: u64,
@@ -83,10 +100,10 @@ module lottery::treasury_multi {
 
     #[event]
     struct RecipientsUpdatedEvent has drop, store, copy {
-        previous_jackpot: address,
-        previous_operations: address,
-        next_jackpot: address,
-        next_operations: address,
+        previous_jackpot: option::Option<RecipientStatus>,
+        previous_operations: option::Option<RecipientStatus>,
+        next_jackpot: RecipientStatus,
+        next_operations: RecipientStatus,
     }
 
     #[event]
@@ -134,6 +151,17 @@ module lottery::treasury_multi {
         jackpot_recipient: address,
         operations_recipient: address,
     ) {
+        ensure_treasury_ready();
+        ensure_recipient_ready_for_payout(
+            jackpot_recipient,
+            E_JACKPOT_RECIPIENT_UNREGISTERED,
+            E_JACKPOT_RECIPIENT_FROZEN,
+        );
+        ensure_recipient_ready_for_payout(
+            operations_recipient,
+            E_OPERATIONS_RECIPIENT_UNREGISTERED,
+            E_OPERATIONS_RECIPIENT_FROZEN,
+        );
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED
@@ -141,27 +169,32 @@ module lottery::treasury_multi {
         if (exists<TreasuryState>(@lottery)) {
             abort E_ALREADY_INITIALIZED
         };
-        move_to(
-            caller,
-            TreasuryState {
-                admin: addr,
-                jackpot_recipient,
-                operations_recipient,
-                jackpot_balance: 0,
-                configs: table::new(),
-                pools: table::new(),
-                lottery_ids: vector::empty<u64>(),
-                config_events: event::new_event_handle<LotteryConfigUpdatedEvent>(caller),
-                allocation_events: event::new_event_handle<AllocationRecordedEvent>(caller),
-                admin_events: event::new_event_handle<AdminUpdatedEvent>(caller),
-                recipient_events: event::new_event_handle<RecipientsUpdatedEvent>(caller),
-                prize_events: event::new_event_handle<PrizePaidEvent>(caller),
-                operations_events: event::new_event_handle<OperationsWithdrawnEvent>(caller),
-                operations_income_events: event::new_event_handle<OperationsIncomeRecordedEvent>(caller),
-                operations_bonus_events: event::new_event_handle<OperationsBonusPaidEvent>(caller),
-                jackpot_events: event::new_event_handle<JackpotPaidEvent>(caller),
-            },
+        let mut state = TreasuryState {
+            admin: addr,
+            jackpot_recipient,
+            operations_recipient,
+            jackpot_balance: 0,
+            configs: table::new(),
+            pools: table::new(),
+            lottery_ids: vector::empty<u64>(),
+            config_events: event::new_event_handle<LotteryConfigUpdatedEvent>(caller),
+            allocation_events: event::new_event_handle<AllocationRecordedEvent>(caller),
+            admin_events: event::new_event_handle<AdminUpdatedEvent>(caller),
+            recipient_events: event::new_event_handle<RecipientsUpdatedEvent>(caller),
+            prize_events: event::new_event_handle<PrizePaidEvent>(caller),
+            operations_events: event::new_event_handle<OperationsWithdrawnEvent>(caller),
+            operations_income_events: event::new_event_handle<OperationsIncomeRecordedEvent>(caller),
+            operations_bonus_events: event::new_event_handle<OperationsBonusPaidEvent>(caller),
+            jackpot_events: event::new_event_handle<JackpotPaidEvent>(caller),
+        };
+
+        emit_recipients_event(
+            &mut state,
+            option::none(),
+            option::none(),
         );
+
+        move_to(caller, state);
     }
 
 
@@ -192,19 +225,28 @@ module lottery::treasury_multi {
         operations_recipient: address,
     ) acquires TreasuryState {
         ensure_admin(caller);
+        ensure_treasury_ready();
+        ensure_recipient_ready_for_payout(
+            jackpot_recipient,
+            E_JACKPOT_RECIPIENT_UNREGISTERED,
+            E_JACKPOT_RECIPIENT_FROZEN,
+        );
+        ensure_recipient_ready_for_payout(
+            operations_recipient,
+            E_OPERATIONS_RECIPIENT_UNREGISTERED,
+            E_OPERATIONS_RECIPIENT_FROZEN,
+        );
         let state = borrow_global_mut<TreasuryState>(@lottery);
         let previous_jackpot = state.jackpot_recipient;
         let previous_operations = state.operations_recipient;
+        let previous_jackpot_status = option::some(build_recipient_status(previous_jackpot));
+        let previous_operations_status = option::some(build_recipient_status(previous_operations));
         state.jackpot_recipient = jackpot_recipient;
         state.operations_recipient = operations_recipient;
-        event::emit_event(
-            &mut state.recipient_events,
-            RecipientsUpdatedEvent {
-                previous_jackpot,
-                previous_operations,
-                next_jackpot: jackpot_recipient,
-                next_operations: operations_recipient,
-            },
+        emit_recipients_event(
+            state,
+            previous_jackpot_status,
+            previous_operations_status,
         );
     }
 
@@ -388,6 +430,24 @@ module lottery::treasury_multi {
         }
     }
 
+    #[view]
+    public fun get_recipients(): (address, address) acquires TreasuryState {
+        ensure_initialized();
+        let state = borrow_global<TreasuryState>(@lottery);
+        (state.jackpot_recipient, state.operations_recipient)
+    }
+
+
+    #[view]
+    public fun get_recipient_statuses(): (RecipientStatus, RecipientStatus) acquires TreasuryState {
+        ensure_initialized();
+        let state = borrow_global<TreasuryState>(@lottery);
+        (
+            build_recipient_status(state.jackpot_recipient),
+            build_recipient_status(state.operations_recipient),
+        )
+    }
+
 
     #[view]
     public fun jackpot_balance(): u64 acquires TreasuryState {
@@ -464,11 +524,34 @@ module lottery::treasury_multi {
         (summary.config, summary.pool)
     }
 
+    #[test_only]
+    public fun recipient_status_fields_for_test(
+        status: &RecipientStatus
+    ): (address, bool, bool, option::Option<address>, u64) {
+        (
+            status.recipient,
+            status.registered,
+            status.frozen,
+            status.store,
+            status.balance,
+        )
+    }
+
     fun validate_basis_points(config: &LotteryShareConfig) {
         let sum = config.prize_bps + config.jackpot_bps + config.operations_bps;
         if (sum != BASIS_POINT_DENOMINATOR) {
             abort E_INVALID_BASIS_POINTS
         };
+    }
+
+    fun ensure_recipient_ready_for_payout(
+        recipient: address,
+        not_registered_error: u64,
+        frozen_error: u64,
+    ) {
+        let (registered, frozen, _store, _balance) = treasury_v1::account_extended_status(recipient);
+        assert!(registered, not_registered_error);
+        assert!(!frozen, frozen_error);
     }
 
     fun apply_allocation(state: &mut TreasuryState, lottery_id: u64, amount: u64) {
@@ -532,8 +615,13 @@ module lottery::treasury_multi {
         if (amount == 0) {
             return 0
         };
-        pool.operations_balance = 0;
         let recipient = state.operations_recipient;
+        ensure_recipient_ready_for_payout(
+            recipient,
+            E_OPERATIONS_RECIPIENT_UNREGISTERED,
+            E_OPERATIONS_RECIPIENT_FROZEN,
+        );
+        pool.operations_balance = 0;
         treasury_v1::payout_from_treasury(recipient, amount);
         event::emit_event(
             &mut state.operations_events,
@@ -558,6 +646,11 @@ module lottery::treasury_multi {
         if (pool.operations_balance < amount) {
             abort E_INSUFFICIENT_OPERATIONS
         };
+        ensure_recipient_ready_for_payout(
+            recipient,
+            E_BONUS_RECIPIENT_UNREGISTERED,
+            E_BONUS_RECIPIENT_FROZEN,
+        );
         pool.operations_balance = pool.operations_balance - amount;
         treasury_v1::payout_from_treasury(recipient, amount);
         event::emit_event(
@@ -573,6 +666,11 @@ module lottery::treasury_multi {
         if (amount > state.jackpot_balance) {
             abort E_INSUFFICIENT_JACKPOT
         };
+        ensure_recipient_ready_for_payout(
+            recipient,
+            E_JACKPOT_WINNER_UNREGISTERED,
+            E_JACKPOT_WINNER_FROZEN,
+        );
         state.jackpot_balance = state.jackpot_balance - amount;
         treasury_v1::payout_from_treasury(recipient, amount);
         event::emit_event(
@@ -604,6 +702,49 @@ module lottery::treasury_multi {
         out
     }
 
+    fun emit_recipients_event(
+        state: &mut TreasuryState,
+        previous_jackpot: option::Option<RecipientStatus>,
+        previous_operations: option::Option<RecipientStatus>,
+    ) {
+        event::emit_event(
+            &mut state.recipient_events,
+            RecipientsUpdatedEvent {
+                previous_jackpot,
+                previous_operations,
+                next_jackpot: build_recipient_status(state.jackpot_recipient),
+                next_operations: build_recipient_status(state.operations_recipient),
+            },
+        );
+    }
+
+    fun build_recipient_status(recipient: address): RecipientStatus {
+        let (registered, frozen, store_opt, balance) =
+            treasury_v1::account_extended_status(recipient);
+        RecipientStatus { recipient, registered, frozen, store: store_opt, balance }
+    }
+
+    #[test_only]
+    public fun recipient_event_fields_for_test(
+        event: &RecipientsUpdatedEvent
+    ): (
+        option::Option<RecipientStatus>,
+        option::Option<RecipientStatus>,
+        RecipientStatus,
+        RecipientStatus,
+    ) {
+        let previous_jackpot = event.previous_jackpot;
+        let previous_operations = event.previous_operations;
+        let next_jackpot = event.next_jackpot;
+        let next_operations = event.next_operations;
+        (
+            previous_jackpot,
+            previous_operations,
+            next_jackpot,
+            next_operations,
+        )
+    }
+
     fun ensure_admin(caller: &signer) acquires TreasuryState {
         ensure_initialized();
         let addr = signer::address_of(caller);
@@ -618,4 +759,11 @@ module lottery::treasury_multi {
             abort E_NOT_INITIALIZED
         };
     }
+
+    fun ensure_treasury_ready() {
+        if (!treasury_v1::is_initialized()) {
+            abort E_TREASURY_NOT_READY
+        };
+    }
+
 }

@@ -3,7 +3,7 @@ module lottery::metadata {
     use std::signer;
     use vrf_hub::table;
     use std::vector;
-    use std::event;
+    use supra_framework::event;
 
     const E_ALREADY_INIT: u64 = 1;
     const E_NOT_INITIALIZED: u64 = 2;
@@ -22,9 +22,6 @@ module lottery::metadata {
         admin: address,
         entries: table::Table<u64, LotteryMetadata>,
         lottery_ids: vector<u64>,
-        upsert_events: event::EventHandle<LotteryMetadataUpsertedEvent>,
-        remove_events: event::EventHandle<LotteryMetadataRemovedEvent>,
-        admin_events: event::EventHandle<MetadataAdminUpdatedEvent>,
     }
 
     #[event]
@@ -45,6 +42,22 @@ module lottery::metadata {
         next: address,
     }
 
+    struct MetadataEntry has copy, drop, store {
+        lottery_id: u64,
+        metadata: LotteryMetadata,
+    }
+
+    struct MetadataSnapshot has copy, drop, store {
+        admin: address,
+        entries: vector<MetadataEntry>,
+    }
+
+    #[event]
+    struct MetadataSnapshotUpdatedEvent has drop, store, copy {
+        previous: option::Option<MetadataSnapshot>,
+        current: MetadataSnapshot,
+    }
+
     public entry fun init(caller: &signer) {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
@@ -59,11 +72,14 @@ module lottery::metadata {
                 admin: addr,
                 entries: table::new(),
                 lottery_ids: vector::empty<u64>(),
-                upsert_events: event::new_event_handle<LotteryMetadataUpsertedEvent>(caller),
-                remove_events: event::new_event_handle<LotteryMetadataRemovedEvent>(caller),
-                admin_events: event::new_event_handle<MetadataAdminUpdatedEvent>(caller),
             },
         );
+        let state = borrow_global<MetadataRegistry>(@lottery);
+        let current = build_snapshot(state);
+        event::emit(MetadataSnapshotUpdatedEvent {
+            previous: option::none<MetadataSnapshot>(),
+            current,
+        });
     }
 
     public fun is_initialized(): bool {
@@ -114,9 +130,15 @@ module lottery::metadata {
     public entry fun set_admin(caller: &signer, new_admin: address) acquires MetadataRegistry {
         ensure_admin(caller);
         let state = borrow_global_mut<MetadataRegistry>(@lottery);
+        let previous_snapshot = option::some<MetadataSnapshot>(build_snapshot(&*state));
         let previous = state.admin;
         state.admin = new_admin;
-        event::emit_event(&mut state.admin_events, MetadataAdminUpdatedEvent { previous, next: new_admin });
+        event::emit(MetadataAdminUpdatedEvent { previous, next: new_admin });
+        let next_snapshot = build_snapshot(&*state);
+        event::emit(MetadataSnapshotUpdatedEvent {
+            previous: previous_snapshot,
+            current: next_snapshot,
+        });
     }
 
     public entry fun upsert_metadata(
@@ -148,6 +170,7 @@ module lottery::metadata {
         ensure_admin(caller);
         let metadata_for_event = clone_metadata(&metadata);
         let state = borrow_global_mut<MetadataRegistry>(@lottery);
+        let previous_snapshot = option::some<MetadataSnapshot>(build_snapshot(&*state));
         let created = if (table::contains(&state.entries, lottery_id)) {
             let entry = table::borrow_mut(&mut state.entries, lottery_id);
             *entry = metadata;
@@ -157,10 +180,12 @@ module lottery::metadata {
             vector::push_back(&mut state.lottery_ids, lottery_id);
             true
         };
-        event::emit_event(
-            &mut state.upsert_events,
-            LotteryMetadataUpsertedEvent { lottery_id, created, metadata: metadata_for_event },
-        );
+        event::emit(LotteryMetadataUpsertedEvent { lottery_id, created, metadata: metadata_for_event });
+        let next_snapshot = build_snapshot(&*state);
+        event::emit(MetadataSnapshotUpdatedEvent {
+            previous: previous_snapshot,
+            current: next_snapshot,
+        });
     }
 
     public entry fun remove_metadata(caller: &signer, lottery_id: u64) acquires MetadataRegistry {
@@ -169,9 +194,15 @@ module lottery::metadata {
         if (!table::contains(&state.entries, lottery_id)) {
             abort E_METADATA_MISSING
         };
+        let previous_snapshot = option::some<MetadataSnapshot>(build_snapshot(&*state));
         table::remove(&mut state.entries, lottery_id);
         remove_lottery_id(&mut state.lottery_ids, lottery_id);
-        event::emit_event(&mut state.remove_events, LotteryMetadataRemovedEvent { lottery_id });
+        event::emit(LotteryMetadataRemovedEvent { lottery_id });
+        let next_snapshot = build_snapshot(&*state);
+        event::emit(MetadataSnapshotUpdatedEvent {
+            previous: previous_snapshot,
+            current: next_snapshot,
+        });
     }
 
     fun ensure_admin(caller: &signer) acquires MetadataRegistry {
@@ -183,6 +214,41 @@ module lottery::metadata {
         if (addr != state.admin) {
             abort E_NOT_AUTHORIZED
         }
+    }
+
+    #[view]
+    public fun get_metadata_snapshot(): MetadataSnapshot acquires MetadataRegistry {
+        let state = borrow_global<MetadataRegistry>(@lottery);
+        build_snapshot(state)
+    }
+
+    #[test_only]
+    public fun metadata_snapshot_event_fields_for_test(
+        event: &MetadataSnapshotUpdatedEvent
+    ): (option::Option<MetadataSnapshot>, MetadataSnapshot) {
+        (event.previous, event.current)
+    }
+
+    #[test_only]
+    public fun metadata_snapshot_admin(snapshot: &MetadataSnapshot): address {
+        snapshot.admin
+    }
+
+    #[test_only]
+    public fun metadata_snapshot_entry_count(snapshot: &MetadataSnapshot): u64 {
+        vector::length(&snapshot.entries)
+    }
+
+    #[test_only]
+    public fun metadata_snapshot_entry_at(snapshot: &MetadataSnapshot, index: u64): MetadataEntry {
+        *vector::borrow(&snapshot.entries, index)
+    }
+
+    #[test_only]
+    public fun metadata_entry_fields_for_test(
+        entry: &MetadataEntry
+    ): (u64, LotteryMetadata) {
+        (entry.lottery_id, clone_metadata(&entry.metadata))
     }
 
     #[test_only]
@@ -206,6 +272,24 @@ module lottery::metadata {
             website_uri: clone_bytes(&metadata.website_uri),
             rules_uri: clone_bytes(&metadata.rules_uri),
         }
+    }
+
+    fun build_snapshot(state: &MetadataRegistry): MetadataSnapshot {
+        let entries = vector::empty<MetadataEntry>();
+        let len = vector::length(&state.lottery_ids);
+        let i = 0;
+        while (i < len) {
+            let lottery_id = *vector::borrow(&state.lottery_ids, i);
+            if (table::contains(&state.entries, lottery_id)) {
+                let metadata = clone_metadata(table::borrow(&state.entries, lottery_id));
+                vector::push_back(
+                    &mut entries,
+                    MetadataEntry { lottery_id, metadata },
+                );
+            };
+            i = i + 1;
+        };
+        MetadataSnapshot { admin: state.admin, entries }
     }
 
     fun clone_bytes(source: &vector<u8>): vector<u8> {

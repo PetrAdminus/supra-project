@@ -2,7 +2,7 @@ module lottery::jackpot {
     use std::option;
     use std::signer;
     use std::vector;
-    use std::event;
+    use supra_framework::event;
     use std::math64;
     use lottery::treasury_multi;
     use lottery::treasury_v1;
@@ -32,6 +32,7 @@ module lottery::jackpot {
         schedule_events: event::EventHandle<JackpotScheduleUpdatedEvent>,
         request_events: event::EventHandle<JackpotRequestIssuedEvent>,
         fulfill_events: event::EventHandle<JackpotFulfilledEvent>,
+        snapshot_events: event::EventHandle<JackpotSnapshotUpdatedEvent>,
     }
 
     #[event]
@@ -65,9 +66,18 @@ module lottery::jackpot {
     }
 
     struct JackpotSnapshot has copy, drop, store {
+        admin: address,
+        lottery_id: u64,
         ticket_count: u64,
         draw_scheduled: bool,
         has_pending_request: bool,
+        pending_request_id: option::Option<u64>,
+    }
+
+    #[event]
+    struct JackpotSnapshotUpdatedEvent has drop, store, copy {
+        previous: option::Option<JackpotSnapshot>,
+        current: JackpotSnapshot,
     }
 
     public entry fun init(caller: &signer, lottery_id: u64) {
@@ -90,8 +100,11 @@ module lottery::jackpot {
                 schedule_events: event::new_event_handle<JackpotScheduleUpdatedEvent>(caller),
                 request_events: event::new_event_handle<JackpotRequestIssuedEvent>(caller),
                 fulfill_events: event::new_event_handle<JackpotFulfilledEvent>(caller),
+                snapshot_events: event::new_event_handle<JackpotSnapshotUpdatedEvent>(caller),
             },
         );
+        let state = borrow_global_mut<JackpotState>(@lottery);
+        emit_snapshot_event(state, option::none<JackpotSnapshot>());
     }
 
     #[view]
@@ -114,7 +127,9 @@ module lottery::jackpot {
     public entry fun set_admin(caller: &signer, new_admin: address) acquires JackpotState {
         ensure_admin(caller);
         let state = borrow_global_mut<JackpotState>(@lottery);
+        let previous = option::some(build_snapshot(&*state));
         state.admin = new_admin;
+        emit_snapshot_event(state, previous);
     }
 
     public entry fun grant_ticket(caller: &signer, player: address) acquires JackpotState {
@@ -137,6 +152,7 @@ module lottery::jackpot {
     public entry fun schedule_draw(caller: &signer) acquires JackpotState {
         ensure_admin(caller);
         let state = borrow_global_mut<JackpotState>(@lottery);
+        let previous = option::some(build_snapshot(&*state));
         if (vector::length(&state.tickets) == 0) {
             abort E_NO_TICKETS
         };
@@ -149,11 +165,13 @@ module lottery::jackpot {
             &mut state.schedule_events,
             JackpotScheduleUpdatedEvent { lottery_id, draw_scheduled: true },
         );
+        emit_snapshot_event(state, previous);
     }
 
     public entry fun reset(caller: &signer) acquires JackpotState {
         ensure_admin(caller);
         let state = borrow_global_mut<JackpotState>(@lottery);
+        let previous = option::some(build_snapshot(&*state));
         clear_tickets(&mut state.tickets);
         state.draw_scheduled = false;
         state.pending_request = option::none<u64>();
@@ -162,12 +180,14 @@ module lottery::jackpot {
             &mut state.schedule_events,
             JackpotScheduleUpdatedEvent { lottery_id, draw_scheduled: false },
         );
+        emit_snapshot_event(state, previous);
     }
 
     public entry fun request_randomness(caller: &signer, payload: vector<u8>)
     acquires JackpotState {
         ensure_admin(caller);
         let state = borrow_global_mut<JackpotState>(@lottery);
+        let previous = option::some(build_snapshot(&*state));
         if (!state.draw_scheduled) {
             abort E_DRAW_NOT_SCHEDULED
         };
@@ -184,6 +204,7 @@ module lottery::jackpot {
             &mut state.request_events,
             JackpotRequestIssuedEvent { lottery_id, request_id },
         );
+        emit_snapshot_event(state, previous);
     }
 
     public entry fun fulfill_draw(
@@ -197,6 +218,7 @@ module lottery::jackpot {
         let payload = hub::request_record_payload(&record);
 
         let state = borrow_global_mut<JackpotState>(@lottery);
+        let previous = option::some(build_snapshot(&*state));
         if (recorded_lottery != state.lottery_id) {
             abort E_LOTTERY_MISMATCH
         };
@@ -246,6 +268,7 @@ module lottery::jackpot {
                 payload,
             },
         );
+        emit_snapshot_event(state, previous);
     }
 
     #[view]
@@ -254,11 +277,7 @@ module lottery::jackpot {
             return option::none<JackpotSnapshot>()
         };
         let state = borrow_global<JackpotState>(@lottery);
-        option::some(JackpotSnapshot {
-            ticket_count: vector::length(&state.tickets),
-            draw_scheduled: state.draw_scheduled,
-            has_pending_request: option::is_some(&state.pending_request),
-        })
+        option::some(build_snapshot(&state))
     }
 
     #[view]
@@ -267,11 +286,7 @@ module lottery::jackpot {
             return option::none<u64>()
         };
         let state = borrow_global<JackpotState>(@lottery);
-        if (option::is_some(&state.pending_request)) {
-            option::some(*option::borrow(&state.pending_request))
-        } else {
-            option::none<u64>()
-        }
+        copy_option_u64(&state.pending_request)
     }
 
     fun ensure_admin(caller: &signer) acquires JackpotState {
@@ -285,6 +300,7 @@ module lottery::jackpot {
     }
 
     fun grant_ticket_internal(state: &mut JackpotState, player: address) {
+        let previous = option::some(build_snapshot(&*state));
         if (state.draw_scheduled) {
             abort E_DRAW_ALREADY_SCHEDULED
         };
@@ -298,6 +314,7 @@ module lottery::jackpot {
             &mut state.ticket_events,
             JackpotTicketGrantedEvent { lottery_id, player, ticket_index },
         );
+        emit_snapshot_event(state, previous);
     }
 
     fun clear_tickets(tickets: &mut vector<address>) {
@@ -347,11 +364,59 @@ module lottery::jackpot {
     #[test_only]
     public fun jackpot_snapshot_fields_for_test(
         snapshot: &JackpotSnapshot
-    ): (u64, bool, bool) {
+    ): (
+        address,
+        u64,
+        u64,
+        bool,
+        bool,
+        option::Option<u64>,
+    ) {
         (
+            snapshot.admin,
+            snapshot.lottery_id,
             snapshot.ticket_count,
             snapshot.draw_scheduled,
             snapshot.has_pending_request,
+            snapshot.pending_request_id,
         )
+    }
+
+    #[test_only]
+    public fun jackpot_snapshot_event_fields_for_test(
+        event: &JackpotSnapshotUpdatedEvent
+    ): (option::Option<JackpotSnapshot>, JackpotSnapshot) {
+        (event.previous, event.current)
+    }
+
+    fun emit_snapshot_event(
+        state: &mut JackpotState,
+        previous: option::Option<JackpotSnapshot>,
+    ) {
+        let snapshot = build_snapshot(&*state);
+        event::emit_event(
+            &mut state.snapshot_events,
+            JackpotSnapshotUpdatedEvent { previous, current: snapshot },
+        );
+    }
+
+    fun build_snapshot(state: &JackpotState): JackpotSnapshot {
+        let pending_request_id = copy_option_u64(&state.pending_request);
+        JackpotSnapshot {
+            admin: state.admin,
+            lottery_id: state.lottery_id,
+            ticket_count: vector::length(&state.tickets),
+            draw_scheduled: state.draw_scheduled,
+            has_pending_request: option::is_some(&state.pending_request),
+            pending_request_id,
+        }
+    }
+
+    fun copy_option_u64(value: &option::Option<u64>): option::Option<u64> {
+        if (option::is_some(value)) {
+            option::some(*option::borrow(value))
+        } else {
+            option::none<u64>()
+        }
     }
 }

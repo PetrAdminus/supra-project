@@ -27,6 +27,7 @@ export CALLBACK_GAS_LIMIT=150000
 export VERIFICATION_GAS_VALUE=25000
 export INITIAL_DEPOSIT=20000000000
 export RNG_COUNT=1
+export NUM_CONFIRMATIONS=1 # Supra dVRF допускает диапазон 1..20
 export CLIENT_SEED=1234567890
 ```
 
@@ -36,6 +37,8 @@ export CLIENT_SEED=1234567890
 1. Настройте лимиты газа внутри контракта:
    ```powershell
    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile $PROFILE --function-id $LOTTERY_ADDR::main_v2::configure_vrf_gas --args u128:$MAX_GAS_PRICE u128:$MAX_GAS_LIMIT u128:$CALLBACK_GAS_PRICE u128:$CALLBACK_GAS_LIMIT u128:$VERIFICATION_GAS_VALUE --assume-yes"
+
+   > Следите за неравенствами `callback_gas_price ≤ max_gas_price` и `callback_gas_limit ≤ max_gas_limit`, как требует Supra VRF subscription. Скрипт и контракт отклонят значения, нарушающие ограничения.【F:SupraLottery/supra/scripts/configure_vrf_gas.py†L52-L65】【F:SupraLottery/supra/move_workspace/lottery/sources/Lottery.move†L700-L711】【F:SupraLottery/docs/dvrf_reference_snapshot.md†L53-L60】
    ```
 2. Зарегистрируйте клиента в модуле депозита Supra и добавьте его в whitelist:
    ```powershell
@@ -60,6 +63,11 @@ export CLIENT_SEED=1234567890
    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile $PROFILE --function-id $LOTTERY_ADDR::main_v2::whitelist_callback_sender --args address:<АДРЕС_АГРЕГАТОРА>"
    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile $PROFILE --function-id $LOTTERY_ADDR::main_v2::whitelist_consumer --args address:$LOTTERY_ADDR"
    ```
+6. (Опционально) отключите контракт от подписки, если тестовое окружение нужно освободить:
+   ```powershell
+   python -m supra.scripts remove-subscription --profile $PROFILE --lottery-addr $LOTTERY_ADDR --deposit-addr $DEPOSIT_ADDR --supra-config $SUPRA_CONFIG
+   ```
+   Скрипт проверит отсутствие `pending_request` и вызовет `lottery::remove_subscription`, который публикует событие `SubscriptionContractRemovedEvent` и удаляет контракт из whitelist депозита.
 
 ## 4. Продажа билетов и запрос VRF
 1. Зарегистрируйте store и заминтите токены игрокам (пример для одного аккаунта):
@@ -78,7 +86,7 @@ export CLIENT_SEED=1234567890
    Поле `draw_scheduled` должно быть `true`, а `pending_request` — `false`.
 4. Настройте параметры VRF-запроса и инициируйте розыгрыш:
    ```powershell
-   docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile $PROFILE --function-id $LOTTERY_ADDR::main_v2::configure_vrf_request --args u8:$RNG_COUNT u64:$CLIENT_SEED"
+   docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile $PROFILE --function-id $LOTTERY_ADDR::main_v2::configure_vrf_request --args u8:$RNG_COUNT u64:$NUM_CONFIRMATIONS u64:$CLIENT_SEED"
    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile $PROFILE --function-id $LOTTERY_ADDR::main_v2::manual_draw"
    ```
    > Чтобы объединить проверку готовности и сам вызов, используйте [`supra/scripts/testnet_manual_draw.py`](../supra/scripts/testnet_manual_draw.py). Скрипт повторно запустит `testnet_monitor_json.py`, выведет итоговую команду Supra CLI и выполнит `manual_draw` (или завершится с кодом 1, если контракт не готов).

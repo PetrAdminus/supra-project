@@ -7,15 +7,15 @@ MoveStdlib = { local = "../move-stdlib" }
 vrf_hub = { local = "../vrf_hub" }
 lottery_factory = { local = "../lottery_factory" }
 SupraVrf = { local = "../SupraVrf" }
+SupraFramework = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/supra-framework", rev = "dev" }
 
 [addresses]
 MoveStdlib = "0x1"
 std = "0x1"
-SupraVrf = "0x1"
+supra_addr = "{{supra_addr}}"
 lottery = "0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490"
 vrf_hub = "0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490"
 lottery_factory = "0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490"
-vrf_validator = "0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e"
 lottery_owner = "0x103"
 lottery_contract = "0x104"
 player1 = "0x105"

@@ -9,10 +9,13 @@ from typing import Dict, List, Optional
 from .monitor_common import MonitorError, add_monitor_arguments, env_default
 from .lib.transactions import execute_move_tool_run
 
+MIN_CONFIRMATIONS = 1
+MAX_CONFIRMATIONS = 20
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Настроить rng_count и client_seed для Supra VRF",
+        description="Настроить rng_count, num_confirmations и client_seed для Supra VRF",
     )
     add_monitor_arguments(parser, include_fail_on_low=False)
     parser.add_argument(
@@ -20,6 +23,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=env_default("RNG_COUNT", int),
         help="количество случайных чисел (u8) для configure_vrf_request",
+    )
+    parser.add_argument(
+        "--num-confirmations",
+        type=int,
+        default=env_default("NUM_CONFIRMATIONS", int),
+        help="число подтверждений (u64) для configure_vrf_request",
     )
     parser.add_argument(
         "--client-seed",
@@ -57,10 +66,21 @@ def _require_int(ns: argparse.Namespace, name: str) -> int:
 
 def build_command_args(ns: argparse.Namespace) -> List[str]:
     rng_count = _require_int(ns, "rng_count")
+    num_confirmations = _require_int(ns, "num_confirmations")
     client_seed = _require_int(ns, "client_seed")
+
+    if num_confirmations < MIN_CONFIRMATIONS:
+        raise MonitorError(
+            "num-confirmations должен быть не меньше 1 согласно требованиям Supra dVRF"
+        )
+    if num_confirmations > MAX_CONFIRMATIONS:
+        raise MonitorError(
+            "num-confirmations не может превышать 20 (лимит Supra dVRF на подтверждения)"
+        )
 
     return [
         f"u8:{rng_count}",
+        f"u64:{num_confirmations}",
         f"u64:{client_seed}",
     ]
 

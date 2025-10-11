@@ -27,6 +27,7 @@ CALLBACK_GAS_LIMIT=${CALLBACK_GAS_LIMIT:-150000}
 VERIFICATION_GAS_VALUE=${VERIFICATION_GAS_VALUE:-25000}
 INITIAL_DEPOSIT=${INITIAL_DEPOSIT:-2000000000}
 RNG_COUNT=${RNG_COUNT:-1}
+NUM_CONFIRMATIONS=${NUM_CONFIRMATIONS:-1}
 CLIENT_SEED=${CLIENT_SEED:-0}
 
 supra_cli_init "${PROFILE}"
@@ -167,7 +168,7 @@ if [[ -n "${CONSUMER_ADDRS:-}" ]]; then
 fi
 
 supra_cli_info "Configuring VRF request"
-supra_cli_move_run "--function-id ${LOTTERY_ADDR}::main_v2::configure_vrf_request --args u8:${RNG_COUNT} u64:${CLIENT_SEED} --assume-yes"
+supra_cli_move_run "--function-id ${LOTTERY_ADDR}::main_v2::configure_vrf_request --args u8:${RNG_COUNT} u64:${NUM_CONFIRMATIONS} u64:${CLIENT_SEED} --assume-yes"
 
 if [[ -n "${PUBLISH_PACKAGE:-}" ]]; then
   supra_cli_info "Publishing Move package"
