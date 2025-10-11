@@ -1624,3 +1624,29 @@ Output:
 }
 
 
+Local: (2025-10-11 13:41:57.408232793 +00:00)	 Utc: (2025-10-11 13:41:57.408296166 UTC)
+
+CMD:
+Test
+Output:
+{
+  "Result": "Success"
+}
+
+
+Local: (2025-10-11 13:42:06.962978824 +00:00)	 Utc: (2025-10-11 13:42:06.963037378 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to find package manifest in '/supra/move_workspace/lottery_factory' or in its parents"
+}
+Local: (2025-10-11 14:00:23.176146177 +00:00)	 Utc: (2025-10-11 14:00:23.176188659 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': Unable to resolve named address 'lottery' in package 'lottery' when resolving dependencies: Attempted to assign a different value '0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0' to an a already-assigned named address '0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490'"
+}

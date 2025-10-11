@@ -1810,3 +1810,40 @@ Output:
 General: {
   "Error": "Move unit tests failed"
 }
+Local: (2025-10-11 13:09:23.022885333 +00:00)	 Utc: (2025-10-11 13:09:23.025778980 UTC)
+
+CMD:
+List(ListProfileArgs { reveal_secrets: false })
+Output:
+-------------------------- Profile List ---------------------------------
+	(*) lottery_v2
+CliProfile { account_address: "0x50989d6bf578d211a2f3b54833e3a1e3c5864ec64f9b24bad6d24a7bd69e9cde", ed25519_public_key: fefdfccdab5c6638ba401a8ff92daab62bcb59d03c960b1eb2a3a13b76f2ed71, rpc_url: "https://rpc-testnet.supra.com/", faucet_url: "https://rpc-testnet.supra.com/", chain_id: 6 }
+	 lottery_admin
+CliProfile { account_address: "0x3bd5cb43528ea967459e0741d8120fa4472f0c580a8b7c04f598cc3dd3341fbc", ed25519_public_key: 9b6695ba81fab12fab1a6b280dd1ba2abfbac36fe5f90a0e9852d7b1bbab2813, rpc_url: "https://rpc-testnet.supra.com/", faucet_url: "https://rpc-testnet.supra.com/", chain_id: 6 }
+-------------------------------------------------------------------------
+
+
+Local: (2025-10-11 13:42:38.159555291 +00:00)	 Utc: (2025-10-11 13:42:38.160944823 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Error parsing '[addresses]' section of manifest: Invalid address '{{supra_addr}}' encountered.: Hex characters are invalid: Invalid string length"
+}
+Local: (2025-10-11 13:43:11.168274496 +00:00)	 Utc: (2025-10-11 13:43:11.168361946 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Error parsing '[addresses]' section of manifest: Invalid address '{{supra_addr}}' encountered.: Hex characters are invalid: Invalid string length"
+}
+Local: (2025-10-11 13:43:36.946773173 +00:00)	 Utc: (2025-10-11 13:43:36.946832158 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Error parsing '[addresses]' section of manifest: Invalid address '{{supra_addr}}' encountered.: Hex characters are invalid: Invalid string length"
+}

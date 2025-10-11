@@ -96,20 +96,27 @@ class MonitorSlackTests(unittest.TestCase):
                 "max_gas_limit": "500000",
             },
             "calculation": {"min_balance": "200"},
-            "lottery": {
-                "status": {
-                    "draw_scheduled": True,
-                    "pending_request": False,
-                    "ticket_count": 5,
+            "lotteries": [
+                {
+                    "lottery_id": 1,
+                    "registration": {"active": True},
+                    "round": {
+                        "snapshot": {
+                            "draw_scheduled": True,
+                            "has_pending_request": False,
+                            "ticket_count": 5,
+                        },
+                        "pending_request_id": None,
+                    },
                 }
-            },
+            ],
         }
 
         message = slack.format_message(ns, report, monitor_rc=1)
 
         self.assertIn("⚠️", message)
         self.assertIn("Баланс депозита: 100", message)
-        self.assertIn("draw_scheduled=True", message)
+        self.assertIn("scheduled=True", message)
         self.assertIn("Баланс ниже минимального лимита", message)
 
     def test_main_dry_run_outputs_message_and_exit_code(self) -> None:

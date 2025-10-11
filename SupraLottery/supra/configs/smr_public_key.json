@@ -1,6 +1,27 @@
 {
-  "active": "lottery_v2",
+  "active": "my_new_profile",
   "list": {
+    "player1": {
+      "ed25519_public_key": "4b57b7f672a7c7e4cacb6a7f2b39877f1ce2eb5ecb3e83acd27cbf4b6ee1768c",
+      "account_address": "553fd40012531ebe3bf92c5eff9b8a11cd64add9f339e75b728652041cf21762",
+      "rpc_url": "https://rpc-testnet.supra.com/",
+      "faucet_url": "https://rpc-testnet.supra.com/",
+      "chain_id": 6
+    },
+    "player5": {
+      "ed25519_public_key": "b7b3e651245c2cda2719af97f94936fd9e22f720b0b12f8bc1227b0cd2e3131f",
+      "account_address": "86a58977804013bb93dea0cd56a0066ee6572d698cf8232add978d6cb3ed0aac",
+      "rpc_url": "https://rpc-testnet.supra.com/",
+      "faucet_url": "https://rpc-testnet.supra.com/",
+      "chain_id": 6
+    },
+    "player2": {
+      "ed25519_public_key": "0effe8244ca076e98bed5516203dad33b3328152b7cffd3ecb6f63e8acc2af84",
+      "account_address": "0a8658ac7bd47fc754f7f4be8dce53a5fca5febb11e1d1ec634d19768756184a",
+      "rpc_url": "https://rpc-testnet.supra.com/",
+      "faucet_url": "https://rpc-testnet.supra.com/",
+      "chain_id": 6
+    },
     "lottery_v2": {
       "ed25519_public_key": "fefdfccdab5c6638ba401a8ff92daab62bcb59d03c960b1eb2a3a13b76f2ed71",
       "account_address": "50989d6bf578d211a2f3b54833e3a1e3c5864ec64f9b24bad6d24a7bd69e9cde",
@@ -11,6 +32,27 @@
     "lottery_admin": {
       "ed25519_public_key": "9b6695ba81fab12fab1a6b280dd1ba2abfbac36fe5f90a0e9852d7b1bbab2813",
       "account_address": "3bd5cb43528ea967459e0741d8120fa4472f0c580a8b7c04f598cc3dd3341fbc",
+      "rpc_url": "https://rpc-testnet.supra.com/",
+      "faucet_url": "https://rpc-testnet.supra.com/",
+      "chain_id": 6
+    },
+    "my_new_profile": {
+      "ed25519_public_key": "cc8c05c83dd2ce871bd2e72ca9119577f8bf0a77435b3aaf11449d19994755a4",
+      "account_address": "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0",
+      "rpc_url": "https://rpc-testnet.supra.com/",
+      "faucet_url": "https://rpc-testnet.supra.com/",
+      "chain_id": 6
+    },
+    "player3": {
+      "ed25519_public_key": "d73e3621f3799784001924e6375e852e4322f5acdada9d987438dd04b2868865",
+      "account_address": "8a7be3bf99dd30503fa55e71508230cd23c782c8435fe69d3a48941fbe864729",
+      "rpc_url": "https://rpc-testnet.supra.com/",
+      "faucet_url": "https://rpc-testnet.supra.com/",
+      "chain_id": 6
+    },
+    "player4": {
+      "ed25519_public_key": "e8efa5966017bb6513cf19c67fe7337dd1b84d8bf12352a7c2269615e3f3143d",
+      "account_address": "82ec5deb788ca7e02948800ed2f4baf81b0317164e9c8bfeaa1020e0dc8954d6",
       "rpc_url": "https://rpc-testnet.supra.com/",
       "faucet_url": "https://rpc-testnet.supra.com/",
       "chain_id": 6

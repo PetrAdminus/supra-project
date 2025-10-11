@@ -39,18 +39,33 @@ def build_namespace(**kwargs) -> Namespace:
     return Namespace(**defaults)
 
 
-def ready_report(ticket_count: int = 6) -> dict:
-    return {
-        "lottery": {
-            "status": {
-                "ticket_count": ticket_count,
-                "draw_scheduled": True,
-                "pending_request": False,
-            },
-            "whitelist_status": {"aggregators": ["0xagg"]},
+def ready_report(
+    *,
+    ticket_count: int = 6,
+    draw_scheduled: bool = True,
+    pending: bool = False,
+    pending_request_id: int | None = None,
+    min_balance_reached: bool = True,
+    aggregators: list[str] | None = None,
+) -> dict:
+    snapshot = {
+        "ticket_count": ticket_count,
+        "draw_scheduled": draw_scheduled,
+        "has_pending_request": pending,
+    }
+    lottery_entry = {
+        "lottery_id": 1,
+        "registration": {"active": True},
+        "round": {
+            "snapshot": snapshot,
+            "pending_request_id": pending_request_id,
         },
+    }
+    return {
+        "lotteries": [lottery_entry],
         "deposit": {
-            "min_balance_reached": True,
+            "min_balance_reached": min_balance_reached,
+            "whitelisted_contracts": aggregators if aggregators is not None else ["0xagg"],
         },
     }
 
@@ -64,15 +79,13 @@ class DrawReadinessEvaluateTests(unittest.TestCase):
         self.assertFalse(reasons)
 
     def test_evaluate_detects_pending_request(self) -> None:
-        report = ready_report()
-        report["lottery"]["status"]["pending_request"] = True
+        report = ready_report(pending=True, pending_request_id=1)
         ns = build_namespace()
         reasons = readiness.evaluate(report, ns)
         self.assertIn("pending_request=true", " ".join(reasons))
 
     def test_evaluate_checks_aggregator_presence(self) -> None:
-        report = ready_report()
-        report["lottery"]["whitelist_status"]["aggregators"] = []
+        report = ready_report(aggregators=[])
         ns = build_namespace(require_aggregator=True)
         reasons = readiness.evaluate(report, ns)
         self.assertIn("Whitelist агрегаторов пуст", reasons)
@@ -113,8 +126,7 @@ class DrawReadinessMainTests(unittest.TestCase):
 
     def test_main_prints_reasons_on_failure(self) -> None:
         ns = build_namespace()
-        report = ready_report(ticket_count=1)
-        report["deposit"]["min_balance_reached"] = False
+        report = ready_report(ticket_count=1, min_balance_reached=False, draw_scheduled=False)
         process = CompletedProcess(args=["python"], returncode=0, stdout=json.dumps(report))
 
         parser_mock = Mock()
@@ -149,7 +161,10 @@ class DrawReadinessMainTests(unittest.TestCase):
         self.assertEqual(exc.exception.code, 0)
         summary = json.loads(stdout.getvalue())
         self.assertTrue(summary["ready"])
-        self.assertEqual(summary["ticket_count"], report["lottery"]["status"]["ticket_count"])
+        self.assertEqual(
+            summary["ticket_count"],
+            report["lotteries"][0]["round"]["snapshot"]["ticket_count"],
+        )
 
     def test_main_includes_report_when_requested(self) -> None:
         ns = build_namespace(json_summary=True, include_report=True)
