@@ -7,7 +7,11 @@ members = [
   "SupraVrf",
 ]
 
-[dev-addresses]
+[package]
+name = "supra_workspace"
+version = "0.0.1"
+
+[addresses]
 lottery = "0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490"
 vrf_hub = "0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490"
 lottery_factory = "0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490"

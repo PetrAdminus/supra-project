@@ -8,4 +8,4 @@ subdir = 'aptos-move/framework/supra-framework'
 rev = 'dev'
 
 [addresses]
-supra_addr = "{{supra_addr}}"
+supra_addr = "0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e"

@@ -2,6 +2,7 @@ module lottery_factory::registry {
     use std::option;
     use std::signer;
     use std::vector;
+    use supra_framework::account;
     use supra_framework::event;
     use vrf_hub::hub;
     use vrf_hub::table;
@@ -70,16 +71,17 @@ module lottery_factory::registry {
         if (exists<FactoryState>(@lottery_factory)) {
             abort E_ALREADY_INIT
         };
-        let mut state = FactoryState {
+        let state = FactoryState {
             admin: addr,
             lotteries: table::new(),
             lottery_ids: vector::empty<u64>(),
-            planned_events: event::new_event_handle<LotteryPlannedEvent>(caller),
-            activated_events: event::new_event_handle<LotteryActivatedEvent>(caller),
-            snapshot_events: event::new_event_handle<LotteryRegistrySnapshotUpdatedEvent>(caller),
+            planned_events: account::new_event_handle<LotteryPlannedEvent>(caller),
+            activated_events: account::new_event_handle<LotteryActivatedEvent>(caller),
+            snapshot_events: account::new_event_handle<LotteryRegistrySnapshotUpdatedEvent>(caller),
         };
-        emit_registry_snapshot(&mut state);
         move_to(caller, state);
+        let state_ref = borrow_global_mut<FactoryState>(@lottery_factory);
+        emit_registry_snapshot(state_ref);
     }
 
     #[view]
@@ -219,7 +221,7 @@ module lottery_factory::registry {
             }
         };
         let state = borrow_global<FactoryState>(@lottery_factory);
-        build_registry_snapshot(&state)
+        build_registry_snapshot(state)
     }
 
     #[test_only]
@@ -286,7 +288,7 @@ module lottery_factory::registry {
     ): vector<LotteryRegistryEntry> {
         let entries = vector::empty<LotteryRegistryEntry>();
         let len = vector::length(ids);
-        let mut idx = 0;
+        let idx = 0;
         while (idx < len) {
             let lottery_id = *vector::borrow(ids, idx);
             if (table::contains(lotteries, lottery_id)) {
@@ -314,7 +316,7 @@ module lottery_factory::registry {
     ): vector<LotteryRegistryEntry> {
         let out = vector::empty<LotteryRegistryEntry>();
         let len = vector::length(entries);
-        let mut idx = 0;
+        let idx = 0;
         while (idx < len) {
             vector::push_back(&mut out, *vector::borrow(entries, idx));
             idx = idx + 1;
@@ -324,7 +326,7 @@ module lottery_factory::registry {
 
     fun record_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
         let len = vector::length(ids);
-        let mut idx = 0;
+        let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
                 return
@@ -337,7 +339,7 @@ module lottery_factory::registry {
     fun copy_u64_vector(values: &vector<u64>): vector<u64> {
         let out = vector::empty<u64>();
         let len = vector::length(values);
-        let mut idx = 0;
+        let idx = 0;
         while (idx < len) {
             vector::push_back(&mut out, *vector::borrow(values, idx));
             idx = idx + 1;

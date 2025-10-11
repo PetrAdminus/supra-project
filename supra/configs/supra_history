@@ -1650,3 +1650,121 @@ Output:
 General: {
   "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': Unable to resolve named address 'lottery' in package 'lottery' when resolving dependencies: Attempted to assign a different value '0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0' to an a already-assigned named address '0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490'"
 }
+Local: (2025-10-11 15:09:41.604682275 +00:00)	 Utc: (2025-10-11 15:09:41.606100635 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to find package manifest in 'C:UsersspellDesktopprojectssupra--package-dirrojectSupraLotterysupramove_workspacelottery' or in its parents"
+}
+Local: (2025-10-11 15:09:42.078998227 +00:00)	 Utc: (2025-10-11 15:09:42.079147307 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to find package manifest in 'C:UsersspellDesktopprojectssupra--package-dirrojectSupraLotterysupramove_workspacelottery_factory' or in its parents"
+}
+Local: (2025-10-11 15:09:42.556670258 +00:00)	 Utc: (2025-10-11 15:09:42.556759762 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to find package manifest in 'C:UsersspellDesktopprojectssupra--package-dirrojectSupraLotterysupramove_workspaceSupraVrf' or in its parents"
+}
+Local: (2025-10-11 15:09:43.038407447 +00:00)	 Utc: (2025-10-11 15:09:43.038529574 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to find package manifest in 'C:UsersspellDesktopprojectssupra--package-dirrojectSupraLotterysupramove_workspacevrf_hub' or in its parents"
+}
+Local: (2025-10-11 15:10:41.428611662 +00:00)	 Utc: (2025-10-11 15:10:41.428667601 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to find package manifest in 'C:path' or in its parents"
+}
+Local: (2025-10-11 15:18:27.813625972 +00:00)	 Utc: (2025-10-11 15:18:27.813695367 UTC)
+
+CMD:
+Test
+Output:
+{
+  "Result": "Success"
+}
+
+
+Local: (2025-10-11 15:24:04.666811619 +00:00)	 Utc: (2025-10-11 15:24:04.666877055 UTC)
+
+CMD:
+Test
+Output:
+{
+  "Result": "Success"
+}
+
+
+Local: (2025-10-11 15:34:05.681819696 +00:00)	 Utc: (2025-10-11 15:34:05.681885725 UTC)
+
+CMD:
+Test
+Output:
+{
+  "Result": "Success"
+}
+
+
+Local: (2025-10-11 15:34:19.233242036 +00:00)	 Utc: (2025-10-11 15:34:19.233323945 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to find package manifest in '/supra/move_workspace/lottery_factory' or in its parents"
+}
+Local: (2025-10-11 15:53:59.471778210 +00:00)	 Utc: (2025-10-11 15:53:59.472223674 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Error parsing package manifest: Required field name 'package' not found"
+}
+Local: (2025-10-11 15:54:35.945597451 +00:00)	 Utc: (2025-10-11 15:54:35.945670533 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'supra_workspace': Found unbound dev address assignment 'lottery = 0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490' in root package 'supra_workspace'. Dev addresses cannot introduce new named addresses"
+}
+Local: (2025-10-11 17:00:30.844884043 +00:00)	 Utc: (2025-10-11 17:00:30.844922769 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': While resolving dependency 'SupraVrf' in package 'lottery': Unable to resolve package dependency 'SupraVrf': While resolving dependency 'SupraFramework' in package 'SupraVrf': While processing dependency 'SupraFramework': Unable to find package manifest for 'SupraFramework' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_dev/aptos-move/framework/supra-framework\""
+}
+Local: (2025-10-11 17:00:49.007097934 +00:00)	 Utc: (2025-10-11 17:00:49.007155245 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Error parsing '[addresses]' section of manifest: Invalid address '{{supra_addr}}' encountered.: Hex characters are invalid: Invalid string length"
+}
+Local: (2025-10-11 17:38:27.693701375 +00:00)	 Utc: (2025-10-11 17:38:27.694762422 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Error parsing '[addresses]' section of manifest: Invalid address '{{supra_addr}}' encountered.: Hex characters are invalid: Invalid string length"
+}

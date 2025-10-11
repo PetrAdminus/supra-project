@@ -144,3 +144,20 @@ git config --global alias.st "status -sb"
 ```
 
 > Теперь `git lg` и `git st` ускорят проверку перед/после merge.
+
+---
+
+## 10) Check-list before `git push origin main`
+Before pushing merged changes make sure release tooling and documentation are up to date:
+
+- Close pending items in `SupraLottery/docs/audit/internal_audit_checklist.md` (Supra CLI env, full `move-test` run with JSON/JUnit artefacts, `python -m unittest`, smoke test, monitoring).
+- Work through every unchecked task in `SupraLottery/docs/dVRF_v3_checklist.md` (VRF v3 migration, tests, docs).
+- Resolve TODOs in `SupraLottery/docs/dVRF_v2_snapshot.md` and `SupraLottery/docs/audit/external_handover_summary.md`, including tx hashes and handover notes.
+- Verify `SupraLottery/supra/move_workspace/Move.toml` and child package manifests reference the correct addresses/dependencies.
+- Run `python -m supra.scripts.cli move-test --workspace SupraLottery/supra/move_workspace --all-packages --keep-going --report-json tmp/move-test-report.json --report-junit tmp/move-test-report.xml -- --skip-fetch-latest-git-deps` and archive the reports (`tmp/`, `docs/audit/move_test_reports/`).
+- Execute `PYTHONPATH=SupraLottery python -m unittest` and retain the latest log (for example `tmp/unittest.log`).
+- Check Supra CLI configs in `SupraLottery/supra/configs/*.yaml`; profiles/keys must follow `SupraLottery/docs/testnet_runbook.md`.
+- Run monitoring helpers (`supra/scripts/testnet_monitor_json.py`, Slack/Prometheus variants) ensuring `min_balance_reached=True` and no active `pending_request`.
+- Update audit/alignment docs after completing the checks so they reflect the current state.
+
+

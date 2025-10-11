@@ -9,6 +9,7 @@ module vrf_hub::hub {
     use std::vector;
     use std::hash;
     use vrf_hub::table;
+    use supra_framework::account;
     use supra_framework::event;
 
 
@@ -122,12 +123,12 @@ module vrf_hub::hub {
             lottery_ids: vector::empty<u64>(),
             pending_request_ids: vector::empty<u64>(),
             callback_sender: option::none(),
-            register_events: event::new_event_handle<LotteryRegisteredEvent>(caller),
-            status_events: event::new_event_handle<LotteryStatusChangedEvent>(caller),
-            metadata_events: event::new_event_handle<LotteryMetadataUpdatedEvent>(caller),
-            request_events: event::new_event_handle<RandomnessRequestedEvent>(caller),
-            fulfill_events: event::new_event_handle<RandomnessFulfilledEvent>(caller),
-            callback_sender_events: event::new_event_handle<CallbackSenderUpdatedEvent>(caller),
+            register_events: account::new_event_handle<LotteryRegisteredEvent>(caller),
+            status_events: account::new_event_handle<LotteryStatusChangedEvent>(caller),
+            metadata_events: account::new_event_handle<LotteryMetadataUpdatedEvent>(caller),
+            request_events: account::new_event_handle<RandomnessRequestedEvent>(caller),
+            fulfill_events: account::new_event_handle<RandomnessFulfilledEvent>(caller),
+            callback_sender_events: account::new_event_handle<CallbackSenderUpdatedEvent>(caller),
         });
     }
 

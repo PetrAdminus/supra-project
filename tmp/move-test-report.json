@@ -1,0 +1,71 @@
+{
+  "workspace": "C:\\Users\\spell\\Desktop\\projects\\supra-project\\SupraLottery\\supra\\move_workspace",
+  "cli_path": "tmp\\aptos.cmd",
+  "cli_flavour": "aptos",
+  "results": [
+    {
+      "package": "lottery",
+      "command": [
+        "tmp\\aptos.cmd",
+        "move",
+        "test",
+        "--package-dir",
+        "C:\\Users\\spell\\Desktop\\projects\\supra-project\\SupraLottery\\supra\\move_workspace\\lottery",
+        "--skip-fetch-latest-git-deps"
+      ],
+      "flavour": "aptos",
+      "cli": "tmp\\aptos.cmd",
+      "status": "passed",
+      "return_code": 0,
+      "duration_seconds": 305.08687138557434
+    },
+    {
+      "package": "lottery_factory",
+      "command": [
+        "tmp\\aptos.cmd",
+        "move",
+        "test",
+        "--package-dir",
+        "C:\\Users\\spell\\Desktop\\projects\\supra-project\\SupraLottery\\supra\\move_workspace\\lottery_factory",
+        "--skip-fetch-latest-git-deps"
+      ],
+      "flavour": "aptos",
+      "cli": "tmp\\aptos.cmd",
+      "status": "failed",
+      "return_code": 1,
+      "duration_seconds": 0.013344287872314453
+    },
+    {
+      "package": "SupraVrf",
+      "command": [
+        "tmp\\aptos.cmd",
+        "move",
+        "test",
+        "--package-dir",
+        "C:\\Users\\spell\\Desktop\\projects\\supra-project\\SupraLottery\\supra\\move_workspace\\SupraVrf",
+        "--skip-fetch-latest-git-deps"
+      ],
+      "flavour": "aptos",
+      "cli": "tmp\\aptos.cmd",
+      "status": "failed",
+      "return_code": 1,
+      "duration_seconds": 0.013553142547607422
+    },
+    {
+      "package": "vrf_hub",
+      "command": [
+        "tmp\\aptos.cmd",
+        "move",
+        "test",
+        "--package-dir",
+        "C:\\Users\\spell\\Desktop\\projects\\supra-project\\SupraLottery\\supra\\move_workspace\\vrf_hub",
+        "--skip-fetch-latest-git-deps"
+      ],
+      "flavour": "aptos",
+      "cli": "tmp\\aptos.cmd",
+      "status": "failed",
+      "return_code": 1,
+      "duration_seconds": 0.015059232711791992
+    }
+  ]
+}
