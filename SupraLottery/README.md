@@ -21,12 +21,33 @@ Supra Lottery — пакет смарт-контрактов на Move для б
 > Ключи и параметры из supra/configs предназначены только для локальной разработки. Перед публикацией замените их собственными значениями.
 
 ### Запуск Move-тестов
+Для локального прогона используйте унифицированную команду CLI — она автоматически подбирает доступную утилиту (`supra`, `aptos` или `move`) и прокидывает нужные аргументы. Запускайте команду из каталога `SupraLottery` (или добавьте `PYTHONPATH=SupraLottery`), чтобы Python увидел пакет `supra`:
+
+```
+cd SupraLottery
+python -m supra.scripts.cli move-test --workspace supra/move_workspace --package lottery
+```
+
+Поддерживаются дополнительные сценарии:
+
+- `--package` — прогнать тесты конкретного пакета (`vrf_hub`, `lottery_factory`). Если флаг опустить, будет собран весь workspace.
+- `--list-packages` — вывести доступные пакеты внутри workspace (определяются по наличию `Move.toml`).
+- `--all-packages` — последовательно запустить тесты для каждого пакета; удобно для CI, чтобы увидеть, какой пакет дал сбой.
+- `--report-json <путь>` — сохранить результаты прогона (пакет, команда, код возврата, длительность) в JSON-файл для загрузки в CI-артефакты.
+- `--report-junit <путь>` — сгенерировать JUnit XML с итогами тестов для публикации в CI.
+- `--keep-going` — продолжать прогон даже после провала и вернуть код первого ошибочного пакета; полезно для отчётов с полным списком неуспешных пакетов.
+- `--cli-flavour {supra,aptos,move}` — подсказать flavour при `--dry-run`, если бинарь CLI недоступен (скрипт сформирует команды и отчёты без реального запуска).
+- Дополнительные ключи CLI передаются после `--`, например `-- --filter snapshots`.
+
+Если Supra CLI не установлена, скрипт автоматически переключится на `aptos move test` или `move test`. В режиме `--dry-run` можно подготовить отчёты JSON/JUnit заранее, указав flavour через `--cli-flavour` (например, `--dry-run --cli-flavour supra`) — это полезно для внутренних чек-листов, когда бинарь ещё не установлен. Для запуска внутри контейнера Docker сохраните предыдущую команду:
+
 ```
 docker compose run --rm \
   --entrypoint bash supra_cli \
-  -lc "/supra/supra move tool test --package-dir /supra/move_workspace/lottery --skip-fetch-latest-git-deps"
+  -lc "python -m supra.scripts.cli move-test --workspace /supra/move_workspace --package lottery"
 ```
-Команда собирает пакет и прогоняет полный набор Move-юнит-тестов (позитивные и негативные сценарии VRF, whitelisting, переполнения счётчиков) внутри контейнера. На данный момент тесты запускаются вручную перед каждым релизом; автоматический CI отключён по требованию аудитора.
+
+Команда собирает пакет и прогоняет полный набор Move-юнит-тестов (позитивные и негативные сценарии VRF, whitelisting, переполнения счётчиков). Поскольку пакеты используют git-зависимости Supra Framework/Move Stdlib, первый запуск скачает требуемые ревизии; при оффлайн-прогоне добавьте флаг `--skip-fetch-latest-git-deps` через `-- --skip-fetch-latest-git-deps`. Для регрессионных прогонов в CI используйте `PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test --workspace SupraLottery/supra/move_workspace --all-packages --keep-going --report-json ci/move-test-report.json --report-junit ci/move-test-report.xml -- --skip-fetch-latest-git-deps`, чтобы каждый пакет проходил проверку, даже если один из них падает, а артефакты включали JSON и JUnit-отчёты. На данный момент тесты запускаются вручную перед каждым релизом; автоматический CI отключён по требованию аудитора.
 
 ### Юнит-тесты Python-скриптов
 В репозитории появились вспомогательные утилиты на Python, поэтому для регрессионной проверки формул и форматирования достаточно запустить встроенный `unittest`:
@@ -330,6 +351,9 @@ Move-тесты `history_tests` подтверждают сохранение з
 - [Пример переменных окружения для миграции](supra/scripts/testnet_env.example) — шаблон `.env` для скрипта миграции и ручных команд.
 - [Мониторинг событий dVRF](docs/dvrf_event_monitoring.md) — команды `events list/tail` и подсказки по парсингу результатов.
 - [Справочник ошибок dVRF](docs/dvrf_error_reference.md) — расшифровка кодов `E*` и рекомендации по устранению.
+- [Чек-лист деплоя Supra testnet](docs/testnet_deployment_checklist.md) — быстрый контрольный список адресов, лимитов газа и обязательных команд перед релизом.
+- [Внутренний чек-лист аудита SupraLottery](docs/audit/internal_audit_checklist.md) — пошаговая проверка кода, тестов и документации перед передачей результатов Supra.
+- [Сценарий динамического аудита G1](docs/audit/internal_audit_dynamic_runbook.md) — инструкции по запуску Supra CLI, сбору JSON/JUnit, `python -m unittest` и смоук-тесту testnet.
 - [Чек-лист миграции dVRF v3](docs/dVRF_v3_checklist.md) — статус перехода и TODO для команды разработки.
 - [Скрипт смоук-теста testnet](supra/scripts/testnet_smoke_test.sh) — автоматизирует покупку билетов и запуск `manual_draw` для проверки подписки.
 - [Скрипт отчёта о статусе подписки](supra/scripts/testnet_status_report.sh) — собирает ключевые view-команды для контракта и депозита Supra dVRF.

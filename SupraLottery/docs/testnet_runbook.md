@@ -10,6 +10,11 @@
 - Значения газа: `maxGasPrice`, `maxGasLimit`, `callbackGasPrice`, `callbackGasLimit`, коэффициент безопасности для депозита.
 - Установленный Docker и подготовленный `supra_cli` (см. `docker-compose.yml`).
 
+> Быстрый контроль перед релизом: воспользуйтесь [чек-листом деплоя](./testnet_deployment_checklist.md), где собраны адреса, значения газа и обязательные команды.
+>
+> После выполнения всех шагов runbook пройдите [внутренний чек-лист аудита](./audit/internal_audit_checklist.md), чтобы сверить конфигурацию, тесты и документацию перед передачей статуса Supra.
+> Для динамических проверок (Supra CLI, Move-тесты, Python-тесты, смоук-прогон) используйте [сценарий G1](./audit/internal_audit_dynamic_runbook.md).
+
 ## 2. Настройка Supra CLI профиля
 Supra CLI начиная с релиза 2025.05 хранит ключи и параметры сети в профилях. Перед запуском остальных команд создайте и активируйте профиль администратора (в примерах используется имя `lottery_admin`). Приватный ключ передаётся **без префикса `0x`**.
 
@@ -605,7 +610,8 @@ docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/con
    - Экспортировать список билетов и текущий `jackpot_amount` через view-функции `lottery::main_v2`.
 
 ## 10. Автоматизация Supra Move тестов
-- Перед публикацией релиза вручную запустите `docker compose run --rm --entrypoint bash supra_cli -lc "/supra/supra move tool test --package-dir /supra/move_workspace/lottery --skip-fetch-latest-git-deps"` и зафиксируйте результат в отчёте. Автоматический GitHub Actions workflow отключён по договорённости — регрессионные проверки выполняются оператором вручную.
+- Перед публикацией релиза вручную запустите `PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test --workspace SupraLottery/supra/move_workspace --all-packages --keep-going --report-json ci/move-test-report.json --report-junit ci/move-test-report.xml -- --skip-fetch-latest-git-deps` и зафиксируйте результат в отчёте. Команда последовательно проверит `lottery`, `lottery_factory`, `vrf_hub` и другие пакеты workspace, не прерываясь на первом провале; JSON (`ci/move-test-report.json`) и JUnit (`ci/move-test-report.xml`) можно приложить к релизному отчёту или загрузить в CI-артефакты. Автоматический GitHub Actions workflow отключён по договорённости — регрессионные проверки выполняются оператором вручную.
+- Для запуска внутри Docker сохраните ту же команду: `docker compose run --rm --entrypoint bash supra_cli -lc "python -m supra.scripts.cli move-test --workspace /supra/move_workspace --all-packages -- --skip-fetch-latest-git-deps"`. При необходимости можно предварительно вывести список пакетов через `python -m supra.scripts.cli move-test --workspace /supra/move_workspace --list-packages` либо локально выполнить `PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test --workspace SupraLottery/supra/move_workspace --list-packages`.
 - Для локальной отладки без docker compose используйте команду ниже (идентична основной, но запуск через `docker run`):
   ```bash
   docker run --rm \
@@ -614,7 +620,7 @@ docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/con
     -v $(pwd)/supra/configs:/supra/configs \
     --entrypoint bash \
     asia-docker.pkg.dev/supra-devnet-misc/supra-testnet/validator-node:v9.0.12 \
-    -lc "/supra/supra move tool test --package-dir /supra/move_workspace/lottery --skip-fetch-latest-git-deps"
+    -lc "python -m supra.scripts.cli move-test --workspace /supra/move_workspace --all-packages -- --skip-fetch-latest-git-deps"
   ```
 - Ведите журнал запусков (дата, commit, конфигурация), чтобы демонстрировать регулярную валидацию клиента Supra VRF согласно рекомендациям Supra VRF Subscription FAQ.
 2. **Заморозить операции**

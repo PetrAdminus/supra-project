@@ -20,7 +20,7 @@
 - **Используемые зависимости**: `supra_framework::event`, `aptos_std::table`, `std::string` и `std::vector`.
 
 ## Наблюдения для сравнения
-- Официальный шаблон опирается на git-зависимости Supra, тогда как в SupraLottery используются локальные копии `move-stdlib` и собственный пакет `SupraVrf`.
+- Официальный шаблон опирается на git-зависимости Supra; SupraLottery теперь зеркалирует этот подход: пакеты подтягивают `move-stdlib` и `SupraFramework` из `Entropy-Foundation/aptos-core`, а `SupraVrf` остаётся локальной копией официального пакета.
 - Шаблон демонстрирует именованные адреса (`supra_addr`, `dice_addr`) и отсутствие жёстко зашитых hex-адресов внутри модулей.
 - `rng_request` и `verify_callback` в шаблоне идентичны по сигнатурам текущему модулю `SupraVrf` в SupraLottery, что подтверждает правильность базового API.
 - Шаблон хранит BCS-конверт запроса с полями `callbackAddress`, `callbackModule`, `callbackFunction`, счётчиками RNG и подтверждений; SupraLottery теперь строит `CallbackRequest` с тем же набором полей, добавляет whitelisted `callback_sender` (агрегатор Supra) и транслирует всё в события `DrawRequestedEvent`/`DrawHandledEvent`.

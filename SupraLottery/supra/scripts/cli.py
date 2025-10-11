@@ -56,6 +56,10 @@ COMMAND_MAP: Dict[str, Tuple[str, str]] = {
         "supra.scripts.remove_subscription",
         "Удалить контракт лотереи из подписки Supra dVRF",
     ),
+    "move-test": (
+        "supra.scripts.move_tests",
+        "Запустить Move-тесты supra/move_workspace через Supra/Aptos/Move CLI",
+    ),
     "vrf-audit": (
         "supra.scripts.testnet_vrf_audit",
         "Выгрузить события VRF и состояние раунда для панели честности",

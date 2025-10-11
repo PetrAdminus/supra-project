@@ -1,5 +1,5 @@
 [workspace]
-resolver = "legacy"
+resolver = "v2"
 members = [
   "lottery",
   "vrf_hub",

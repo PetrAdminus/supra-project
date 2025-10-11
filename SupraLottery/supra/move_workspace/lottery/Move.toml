@@ -3,7 +3,7 @@ name = "lottery"
 version = "0.0.1"
 
 [dependencies]
-MoveStdlib = { local = "../move-stdlib" }
+MoveStdlib = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/move-stdlib", rev = "dev" }
 vrf_hub = { local = "../vrf_hub" }
 lottery_factory = { local = "../lottery_factory" }
 SupraVrf = { local = "../SupraVrf" }
