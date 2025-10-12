@@ -182,7 +182,7 @@ module lottery::instances_tests {
         assert!(instances::is_instance_active(lottery_id), 2);
 
         let events = event::emitted_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
-        // create_instance + deactivate + activate = 3 события снапшотов
+        // create_instance + deactivate + activate = 3 snapshot events
         assert!(vector::length(&events) == 3, 4);
     }
 

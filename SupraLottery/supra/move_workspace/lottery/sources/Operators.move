@@ -4,6 +4,7 @@ module lottery::operators {
     use std::vector;
     use vrf_hub::table;
     use supra_framework::event;
+    use lottery::events;
 
     const E_ALREADY_INIT: u64 = 1;
     const E_NOT_INITIALIZED: u64 = 2;
@@ -82,11 +83,11 @@ module lottery::operators {
                 admin: addr,
                 entries: table::new(),
                 lottery_ids: vector::empty<u64>(),
-                admin_events: event::new_event_handle<AdminUpdatedEvent>(caller),
-                owner_events: event::new_event_handle<OwnerUpdatedEvent>(caller),
-                grant_events: event::new_event_handle<OperatorGrantedEvent>(caller),
-                revoke_events: event::new_event_handle<OperatorRevokedEvent>(caller),
-                snapshot_events: event::new_event_handle<OperatorSnapshotUpdatedEvent>(caller),
+                admin_events: events::new_handle<AdminUpdatedEvent>(caller),
+                owner_events: events::new_handle<OwnerUpdatedEvent>(caller),
+                grant_events: events::new_handle<OperatorGrantedEvent>(caller),
+                revoke_events: events::new_handle<OperatorRevokedEvent>(caller),
+                snapshot_events: events::new_handle<OperatorSnapshotUpdatedEvent>(caller),
             },
         );
     }
@@ -101,7 +102,7 @@ module lottery::operators {
         let state = borrow_global_mut<LotteryOperators>(@lottery);
         let previous = state.admin;
         state.admin = new_admin;
-        event::emit_event(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
+        events::emit(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
     }
 
     public entry fun set_owner(caller: &signer, lottery_id: u64, owner: address) acquires LotteryOperators {
@@ -118,7 +119,7 @@ module lottery::operators {
                 },
             );
             record_lottery_id(&mut state.lottery_ids, lottery_id);
-            event::emit_event(
+            events::emit(
                 &mut state.owner_events,
                 OwnerUpdatedEvent {
                     lottery_id,
@@ -127,8 +128,8 @@ module lottery::operators {
                 },
             );
         } else {
-            let mut owner_changed = false;
-            let mut previous_owner = owner;
+            let owner_changed = false;
+            let previous_owner = owner;
             {
                 let entry = table::borrow_mut(&mut state.entries, lottery_id);
                 if (entry.owner != owner) {
@@ -138,7 +139,7 @@ module lottery::operators {
                 };
             };
             if (owner_changed) {
-                event::emit_event(
+                events::emit(
                     &mut state.owner_events,
                     OwnerUpdatedEvent {
                         lottery_id,
@@ -164,7 +165,7 @@ module lottery::operators {
             table::add(&mut entry.operators, operator, true);
             record_operator(&mut entry.operator_list, operator);
         };
-        event::emit_event(
+        events::emit(
             &mut state.grant_events,
             OperatorGrantedEvent {
                 lottery_id,
@@ -187,7 +188,7 @@ module lottery::operators {
             table::remove(&mut entry.operators, operator);
             remove_operator(&mut entry.operator_list, operator);
         };
-        event::emit_event(
+        events::emit(
             &mut state.revoke_events,
             OperatorRevokedEvent {
                 lottery_id,
@@ -398,7 +399,7 @@ module lottery::operators {
     fun emit_operator_snapshot(state: &mut LotteryOperators, lottery_id: u64) {
         let snapshot = build_operator_snapshot(state, lottery_id);
         let OperatorSnapshot { owner, operators } = snapshot;
-        event::emit_event(
+        events::emit(
             &mut state.snapshot_events,
             OperatorSnapshotUpdatedEvent { lottery_id, owner, operators },
         );

@@ -1,8 +1,8 @@
 #[test_only]
 module lottery::lottery_tests {
-    use 0x1::account;
-    use 0x1::event;
-    use 0x1::timestamp;
+    use std::account;
+    use supra_framework::event;
+    use std::timestamp;
     use std::option;
     use std::hash;
     use std::string;
@@ -977,7 +977,7 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    #[expected_failure(location = 0x1::fungible_asset, abort_code = STORE_FROZEN_ABORT)]
+    #[expected_failure(location = supra_framework::fungible_asset, abort_code = STORE_FROZEN_ABORT)]
     fun deposit_rejected_when_user_store_frozen() {
         setup_accounts();
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
@@ -989,7 +989,7 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    #[expected_failure(location = 0x1::fungible_asset, abort_code = STORE_FROZEN_ABORT)]
+    #[expected_failure(location = supra_framework::fungible_asset, abort_code = STORE_FROZEN_ABORT)]
     fun deposit_rejected_when_treasury_store_frozen() {
         setup_accounts();
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);

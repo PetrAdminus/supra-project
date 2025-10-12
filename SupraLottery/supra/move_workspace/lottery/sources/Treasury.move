@@ -1,7 +1,4 @@
 module lottery::treasury_v1 {
-    friend lottery::autopurchase;
-    friend lottery::main_v2;
-    friend lottery::treasury_multi;
     use std::math64;
     use std::option;
     use std::signer;
@@ -370,7 +367,7 @@ module lottery::treasury_v1 {
         fungible_asset::transfer_with_ref(&state.transfer_ref, user_store, treasury_store, amount);
     }
 
-    public(friend) fun payout_from_treasury(recipient: address, amount: u64) acquires TokenState {
+    public(package) fun payout_from_treasury(recipient: address, amount: u64) acquires TokenState {
         ensure_token_initialized();
         let state = state_ref();
         let treasury_store = ensure_store_exists(state, @lottery, E_TREASURY_STORE_NOT_REGISTERED);
@@ -598,7 +595,7 @@ module lottery::treasury_v1 {
         )
     }
 
-    public(friend) fun distribute_payout(winner: address, total_amount: u64): u64 acquires TokenState, Vaults {
+    public(package) fun distribute_payout(winner: address, total_amount: u64): u64 acquires TokenState, Vaults {
         ensure_token_initialized();
         if (total_amount == 0) {
             return 0

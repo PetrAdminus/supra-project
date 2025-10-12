@@ -39,13 +39,20 @@ python -m supra.scripts.cli move-test --workspace supra/move_workspace --package
 - `--cli-flavour {supra,aptos,move}` — подсказать flavour при `--dry-run`, если бинарь CLI недоступен (скрипт сформирует команды и отчёты без реального запуска).
 - Дополнительные ключи CLI передаются после `--`, например `-- --filter snapshots`.
 
-Если Supra CLI не установлена, скрипт автоматически переключится на `aptos move test` или `move test`. В режиме `--dry-run` можно подготовить отчёты JSON/JUnit заранее, указав flavour через `--cli-flavour` (например, `--dry-run --cli-flavour supra`) — это полезно для внутренних чек-листов, когда бинарь ещё не установлен. Для запуска внутри контейнера Docker сохраните предыдущую команду:
+Если Supra CLI не установлена, скрипт автоматически переключится на `aptos move test` или `move test`. При этом параметр пакета будет проброшен в корректной форме (`--package-dir` для Supra/Aptos или `--package` для vanilla Move). В режиме `--dry-run` можно подготовить отчёты JSON/JUnit заранее, указав flavour через `--cli-flavour` (например, `--dry-run --cli-flavour supra`) — это полезно для внутренних чек-листов, когда бинарь ещё не установлен. Для запуска внутри контейнера Docker сохраните предыдущую команду:
 
 ```
 docker compose run --rm \
   --entrypoint bash supra_cli \
   -lc "python -m supra.scripts.cli move-test --workspace /supra/move_workspace --package lottery"
 ```
+
+> Соглашения Move 1: не используем `let mut`, комментарии оставляем в ASCII, а обработчики событий создаём через модуль `events`
+> соответствующего пакета. Для лотереи доступны `lottery::events::{new_handle, emit, emit_copy}`, для фабрики —
+> `lottery_factory::events`, для VRF-хаба — `vrf_hub::events`. Это избавляет модули от прямых обращений к
+> `account::new_event_handle` и упрощает сопровождение при апгрейдах Supra Framework.
+
+> **Настройка адресов:** для одиночного запуска можно добавить `-- --override-addresses lottery=0x1ee ...`. Для регулярных прогонов создайте `.move/config` с секцией `[addresses]` — CLI прочитает файл автоматически и не придётся править `Move.toml`. Конфиг работает одинаково в Docker и на локальной машине.
 
 Команда собирает пакет и прогоняет полный набор Move-юнит-тестов (позитивные и негативные сценарии VRF, whitelisting, переполнения счётчиков). Поскольку пакеты используют git-зависимости Supra Framework/Move Stdlib, первый запуск скачает требуемые ревизии; при оффлайн-прогоне добавьте флаг `--skip-fetch-latest-git-deps` через `-- --skip-fetch-latest-git-deps`. Для регрессионных прогонов в CI используйте `PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test --workspace SupraLottery/supra/move_workspace --all-packages --keep-going --report-json ci/move-test-report.json --report-junit ci/move-test-report.xml -- --skip-fetch-latest-git-deps`, чтобы каждый пакет проходил проверку, даже если один из них падает, а артефакты включали JSON и JUnit-отчёты. На данный момент тесты запускаются вручную перед каждым релизом; автоматический CI отключён по требованию аудитора.
 
@@ -277,7 +284,7 @@ Move-тесты `history_tests` подтверждают сохранение з
 2. `nft_rewards::mint_badge` может вызываться только администратором (адрес @lottery); она резервирует новый `badge_id`, сохраняет метаданные (`lottery_id`, `draw_id`, `metadata_uri`, адрес минтера) и эмитит событие, пригодное для панели честности и фронтенда.
 3. `nft_rewards::burn_badge` доступна администратору или владельцу бейджа и полностью удаляет запись, публикуя `BadgeBurnedEvent`.
 4. Для мониторинга доступны `has_badge`, `list_badges`, `list_owner_addresses`, `get_owner_snapshot` и `get_snapshot`: они возвращают как индивидуальные бейджи, так и агрегированные снимки (администратор, счётчик `next_badge_id`, владельцы и их награды). Событие `NftRewardsSnapshotUpdatedEvent` публикуется после `init`, минта и бёрна, поэтому Supra и аудиторы получают актуальный снимок без реконструкции истории событий. Обновлённые Move-тесты `nft_rewards_tests.move` покрывают выпуск, запрет минта неадминистратором, бёрн владельцем и корректность snapshot/view/событий.
-7. **Интеграция с лотереей** — `treasury_v1::deposit_from_user` списывает токены при покупке билета, а `payout_from_treasury` (доступна модулям `lottery::main_v2` и `lottery::treasury_multi`) распределяет призы, глобальный джекпот и операционные доли; обе операции проверяют наличие store у плательщика и получателя.
+7. **Интеграция с лотереей** — `treasury_v1::deposit_from_user` списывает токены при покупке билета, а `payout_from_treasury` (пакетная функция, доступная всем модулям `lottery`) распределяет призы, глобальный джекпот и операционные доли; обе операции проверяют наличие store у плательщика и получателя.
 
 #### Коллекция экземпляров `lottery::instances`
 - Публикуется под `@lottery` и связывается с VRF-хабом (адрес хранится в поле `hub`).

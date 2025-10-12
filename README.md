@@ -57,7 +57,7 @@ docker compose run --rm \
 4. **Заморозка store** — `treasury_v1::set_store_frozen` позволяет администратору временно заблокировать вывод и депозиты конкретного primary store (например, при разборе инцидентов). Повторный вызов с `false` снимает блокировку.
 5. **Назначение получателей** — перед вызовом `set_recipients` администратор обязан зарегистрировать primary store на каждом целевом адресе (`register_store_for`/`register_stores_for`), иначе функция завершится `E_RECIPIENT_STORE_NOT_REGISTERED`; это соответствует требованиям Supra FA о переводах только между зарегистрированными store.
 6. **Управление конфигурацией распределения** — `treasury_v1::set_config` обновляет доли (basis points) между джекпотом, призовым пулом и операционными направлениями, а `ConfigUpdatedEvent` фиксирует изменения; `get_config` предоставляет актуальные значения для фронтенда и скриптов.
-7. **Интеграция с лотереей** — `treasury_v1::deposit_from_user` списывает токены при покупке билета, а `payout_from_treasury` (доступна модулю `lottery::main_v2`) распределяет джекпот из казначейства; обе операции проверяют наличие store у плательщика и получателя.
+7. **Интеграция с лотереей** — `treasury_v1::deposit_from_user` списывает токены при покупке билета, а `payout_from_treasury` (пакетная функция, доступная всем модулям `lottery`) распределяет джекпот из казначейства; обе операции проверяют наличие store у плательщика и получателя.
 
 Просмотр балансов и состояния:
 
@@ -129,6 +129,17 @@ docker compose run --rm \
 - Аккаунт тестовой сети `0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490` **ещё не добавлен в whitelist**; функции `deposit::*` возвращают `EUNAUTHORIZED_ACCESS`.
 - Команды мониторинга (`get_lottery_status`, `get_whitelist_status`, `get_vrf_request_config`, `get_registered_tickets`, `treasury_v1::get_config`, `treasury_v1::get_balances`) доступны через `supra move tool view`.
 - Фронтенд (`frontend/`) запускается с мок-данными, содержит заглушку кошелька StarKey и переключатель между mock/Supra API; после получения whitelisting обновляем `src/api/supraClient.ts`.
+
+### Move 1: правила и тесты
+- Соблюдайте соглашения Move 1: не используйте `let mut`, оставляйте только ASCII-комментарии, инициализируйте события через модуль `events` соответствующего пакета (`lottery::events::new_handle`, `lottery_factory::events::new_handle`, `vrf_hub::events::new_handle`), подключайте стандартную библиотеку через алиас `std`.
+- Для точечного прогона пакета выполните `python -m supra.scripts.cli move-test --package lottery` — скрипт по умолчанию работает в `SupraLottery/supra/move_workspace`, показывает список пакетов через `--list-packages` и поддерживает прогон всех пакетов через `--all-packages`.
+- Если Supra CLI недоступна, утилита автоматически переключится на `aptos move test` или «ванильный» `move test`, сохранив выбор пакета (`--package-dir` или `--package` в зависимости от CLI) для запуска внутри общего воркспейса.
+- Для статической проверки без запуска тестов используйте `--mode check`, например: `python -m supra.scripts.cli move-test --package lottery --mode check`.
+
+#### Настройка адресов для локальных прогонов
+- Для единичного запуска можно переопределить адреса прямо в команде: `python -m supra.scripts.cli move-test --package lottery -- --override-addresses lottery=0x1ee ...`.
+- Если тесты выполняются регулярно, создайте файл `.move/config` в корне workspace с секцией `[addresses]` и пропишите значения (`lottery = "0x1ee"`, `supra_addr = "0x42"`). Скрипт `move-test` передаст файл всем flavour CLI автоматически.
+- При работе в Docker-контейнере адреса из `.move/config` доступны как для `supra move tool`, так и для запасных `aptos move`/`move`, что избавляет от ручного редактирования `Move.toml` перед каждым прогоном.
 
 ### Профили Supra CLI, тестнет и мейннет
 - `supra/configs/testnet.yaml` и `supra/.aptos/config.yaml` описывают профиль лотереи (`lottery_v3`) в тестовой сети — используем его для разработки и интеграционных проверок.

@@ -1,15 +1,15 @@
 // sources/Lottery.move
 module lottery::main_v2 {
     use std::string;
-    use 0x1::bcs;
+    use std::bcs;
     use std::option;
     use std::hash;
-    use 0x1::timestamp;
-    use 0x1::signer;
-    use 0x1::vector;
-    use 0x1::event;
-    use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::supra_vrf;
-    use 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::deposit;
+    use std::timestamp;
+    use std::signer;
+    use std::vector;
+    use supra_framework::event;
+    use supra_addr::supra_vrf;
+    use supra_addr::deposit;
     use lottery::treasury_v1;
 
     const E_NOT_OWNER: u64 = 1;

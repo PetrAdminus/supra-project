@@ -1,14 +1,13 @@
 module lottery::treasury_v1 {
-    friend lottery::main_v2;
     use std::option;
     use std::string;
-    use 0x1::event;
-    use 0x1::vector;
-    use 0x1::object;
-    use 0x1::fungible_asset;
-    use 0x1::primary_fungible_store;
-    use 0x1::signer;
-    use 0x1::math64;
+    use supra_framework::event;
+    use std::vector;
+    use supra_framework::object;
+    use supra_framework::fungible_asset;
+    use supra_framework::primary_fungible_store;
+    use std::signer;
+    use std::math64;
 
     const E_NOT_OWNER: u64 = 1;
     const E_ALREADY_INITIALIZED: u64 = 2;
@@ -265,7 +264,7 @@ module lottery::treasury_v1 {
         primary_fungible_store::deposit(@lottery, asset);
     }
 
-    public(friend) fun payout_from_treasury(recipient: address, amount: u64) acquires TokenState {
+    public(package) fun payout_from_treasury(recipient: address, amount: u64) acquires TokenState {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
         let state = borrow_global<TokenState>(@lottery);
         assert!(primary_fungible_store::primary_store_exists(@lottery, state.metadata), E_TREASURY_STORE_NOT_REGISTERED);
@@ -504,7 +503,7 @@ module lottery::treasury_v1 {
         );
     }
 
-    public(friend) fun distribute_payout(winner: address, total_amount: u64): u64 acquires TokenState, Vaults {
+    public(package) fun distribute_payout(winner: address, total_amount: u64): u64 acquires TokenState, Vaults {
         assert!(exists<TokenState>(@lottery), E_NOT_INITIALIZED);
         if (total_amount == 0) {
             return 0

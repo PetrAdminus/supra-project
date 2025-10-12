@@ -1,15 +1,12 @@
 module vrf_hub::hub {
-    friend lottery::rounds;
-    friend lottery::jackpot;
-    friend lottery::instances;
     #[test_only]
     friend vrf_hub::hub_tests;
     use std::option;
     use std::signer;
     use std::vector;
     use std::hash;
+    use vrf_hub::events;
     use vrf_hub::table;
-    use supra_framework::account;
     use supra_framework::event;
 
 
@@ -123,12 +120,12 @@ module vrf_hub::hub {
             lottery_ids: vector::empty<u64>(),
             pending_request_ids: vector::empty<u64>(),
             callback_sender: option::none(),
-            register_events: account::new_event_handle<LotteryRegisteredEvent>(caller),
-            status_events: account::new_event_handle<LotteryStatusChangedEvent>(caller),
-            metadata_events: account::new_event_handle<LotteryMetadataUpdatedEvent>(caller),
-            request_events: account::new_event_handle<RandomnessRequestedEvent>(caller),
-            fulfill_events: account::new_event_handle<RandomnessFulfilledEvent>(caller),
-            callback_sender_events: account::new_event_handle<CallbackSenderUpdatedEvent>(caller),
+            register_events: events::new_handle<LotteryRegisteredEvent>(caller),
+            status_events: events::new_handle<LotteryStatusChangedEvent>(caller),
+            metadata_events: events::new_handle<LotteryMetadataUpdatedEvent>(caller),
+            request_events: events::new_handle<RandomnessRequestedEvent>(caller),
+            fulfill_events: events::new_handle<RandomnessFulfilledEvent>(caller),
+            callback_sender_events: events::new_handle<CallbackSenderUpdatedEvent>(caller),
         });
     }
 
@@ -172,8 +169,8 @@ module vrf_hub::hub {
             LotteryRegistration { owner, lottery, metadata, active: true },
         );
         vector::push_back(&mut state.lottery_ids, id);
-        event::emit_event(&mut state.register_events, LotteryRegisteredEvent { lottery_id: id, owner, lottery });
-        event::emit_event(
+        events::emit(&mut state.register_events, LotteryRegisteredEvent { lottery_id: id, owner, lottery });
+        events::emit(
             &mut state.metadata_events,
             LotteryMetadataUpdatedEvent { lottery_id: id, metadata: metadata_event },
         );
@@ -194,7 +191,7 @@ module vrf_hub::hub {
         };
         let registration = table::borrow_mut(&mut state.lotteries, lottery_id);
         registration.metadata = metadata;
-        event::emit_event(
+        events::emit(
             &mut state.metadata_events,
             LotteryMetadataUpdatedEvent { lottery_id, metadata: metadata_event },
         );
@@ -214,7 +211,7 @@ module vrf_hub::hub {
         let registration = table::borrow_mut(&mut state.lotteries, lottery_id);
         if (registration.active != active) {
             registration.active = active;
-            event::emit_event(
+            events::emit(
                 &mut state.status_events,
                 LotteryStatusChangedEvent { lottery_id, active },
             );
@@ -294,7 +291,7 @@ module vrf_hub::hub {
         let state = borrow_global_mut<HubState>(@vrf_hub);
         let previous = copy_option_address(&state.callback_sender);
         state.callback_sender = option::some(sender);
-        event::emit_event(
+        events::emit(
             &mut state.callback_sender_events,
             CallbackSenderUpdatedEvent { previous, current: option::some(sender) },
         );
@@ -316,7 +313,7 @@ module vrf_hub::hub {
     }
 
 
-    public(friend) fun request_randomness(lottery_id: u64, payload: vector<u8>): u64 acquires HubState {
+    public fun request_randomness(lottery_id: u64, payload: vector<u8>): u64 acquires HubState {
         let state = borrow_global_mut<HubState>(@vrf_hub);
         if (!table::contains(&state.lotteries, lottery_id)) {
             abort E_UNKNOWN_LOTTERY
@@ -337,7 +334,7 @@ module vrf_hub::hub {
             RequestRecord { lottery_id, payload, payload_hash },
         );
         vector::push_back(&mut state.pending_request_ids, request_id);
-        event::emit_event(
+        events::emit(
             &mut state.request_events,
             RandomnessRequestedEvent {
                 request_id,
@@ -350,7 +347,7 @@ module vrf_hub::hub {
     }
 
 
-    public(friend) fun consume_request(request_id: u64): RequestRecord acquires HubState {
+    public fun consume_request(request_id: u64): RequestRecord acquires HubState {
         let state = borrow_global_mut<HubState>(@vrf_hub);
         if (!table::contains(&state.requests, request_id)) {
             abort E_UNKNOWN_REQUEST
@@ -381,14 +378,14 @@ module vrf_hub::hub {
     }
 
 
-    public(friend) fun record_fulfillment(
+    public fun record_fulfillment(
         request_id: u64,
         lottery_id: u64,
         randomness: vector<u8>,
     ) acquires HubState {
         let state = borrow_global_mut<HubState>(@vrf_hub);
         let randomness_for_event = clone_bytes(&randomness);
-        event::emit_event(
+        events::emit(
             &mut state.fulfill_events,
             RandomnessFulfilledEvent { request_id, lottery_id, randomness: randomness_for_event },
         );
@@ -442,7 +439,7 @@ module vrf_hub::hub {
     }
 
 
-    public(friend) fun ensure_callback_sender(caller: &signer) acquires HubState {
+    public fun ensure_callback_sender(caller: &signer) acquires HubState {
         ensure_initialized();
         let state = borrow_global<HubState>(@vrf_hub);
         if (!option::is_some(&state.callback_sender)) {

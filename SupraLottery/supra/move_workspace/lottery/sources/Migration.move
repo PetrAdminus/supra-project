@@ -6,6 +6,7 @@ module lottery::migration {
     use lottery::main_v2;
     use lottery::rounds;
     use lottery::treasury_multi;
+    use lottery::events;
     use lottery_factory::registry;
     use supra_framework::event;
     use vrf_hub::table;
@@ -168,7 +169,7 @@ module lottery::migration {
         let lottery_id = snapshot.lottery_id;
         table::add(&mut state.snapshots, lottery_id, snapshot);
         record_lottery_id(&mut state.lottery_ids, lottery_id);
-        event::emit_event(
+        events::emit(
             &mut state.snapshot_events,
             MigrationSnapshotUpdatedEvent {
                 lottery_id,
@@ -185,7 +186,7 @@ module lottery::migration {
                 MigrationLedger {
                     snapshots: table::new(),
                     lottery_ids: vector::empty<u64>(),
-                    snapshot_events: event::new_event_handle<MigrationSnapshotUpdatedEvent>(caller),
+                    snapshot_events: events::new_handle<MigrationSnapshotUpdatedEvent>(caller),
                 },
             );
         };

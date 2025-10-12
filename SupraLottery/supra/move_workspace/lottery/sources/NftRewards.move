@@ -1,11 +1,10 @@
 module lottery::nft_rewards {
-    #[test_only]
-    friend lottery::nft_rewards_tests;
     use std::option;
     use std::signer;
     use std::vector;
     use vrf_hub::table;
     use supra_framework::event;
+    use lottery::events;
 
     const E_NOT_AUTHORIZED: u64 = 1;
     const E_ALREADY_INITIALIZED: u64 = 2;
@@ -98,9 +97,9 @@ module lottery::nft_rewards {
                 next_badge_id: 1,
                 users: table::new(),
                 owners: vector::empty<address>(),
-                mint_events: event::new_event_handle<BadgeMintedEvent>(caller),
-                burn_events: event::new_event_handle<BadgeBurnedEvent>(caller),
-                snapshot_events: event::new_event_handle<NftRewardsSnapshotUpdatedEvent>(caller),
+                mint_events: events::new_handle<BadgeMintedEvent>(caller),
+                burn_events: events::new_handle<BadgeBurnedEvent>(caller),
+                snapshot_events: events::new_handle<NftRewardsSnapshotUpdatedEvent>(caller),
             },
         );
         let state = borrow_global_mut<BadgeAuthority>(@lottery);
@@ -152,7 +151,7 @@ module lottery::nft_rewards {
         };
         table::add(&mut collection.badges, badge_id, data);
         vector::push_back(&mut collection.badge_ids, badge_id);
-        event::emit_event(
+        events::emit(
             &mut state.mint_events,
             BadgeMintedEvent {
                 badge_id,
@@ -178,7 +177,7 @@ module lottery::nft_rewards {
         if (!option::is_some(&removed)) {
             abort E_BADGE_NOT_FOUND
         };
-        event::emit_event(&mut state.burn_events, BadgeBurnedEvent { badge_id, owner });
+        events::emit(&mut state.burn_events, BadgeBurnedEvent { badge_id, owner });
         emit_owner_snapshot(state, owner);
     }
 
@@ -421,7 +420,7 @@ module lottery::nft_rewards {
 
     fun emit_owner_snapshot(state: &mut BadgeAuthority, owner: address) {
         let snapshot = build_owner_snapshot(&*state, owner);
-        event::emit_event(
+        events::emit(
             &mut state.snapshot_events,
             NftRewardsSnapshotUpdatedEvent {
                 admin: state.admin,

@@ -41,7 +41,41 @@ class MoveTestsScriptTest(TestCase):
         self.assertEqual(0, exit_code)
         expected_package = str((self.workspace / "lottery").resolve())
         run_mock.assert_called_once_with(
-            [str(fake_supra), "move", "test", "-p", expected_package, "--filter", "snapshots"],
+            [
+                str(fake_supra),
+                "move",
+                "tool",
+                "test",
+                "--package-dir",
+                expected_package,
+                "--filter",
+                "snapshots",
+            ],
+            check=False,
+        )
+
+    def test_runs_check_mode_with_supra_cli(self) -> None:
+        fake_supra = self.workspace / "supra-cli"
+        fake_supra.write_text("#!/bin/sh\n")
+
+        with patch("supra.scripts.move_tests._resolve_cli", return_value=(str(fake_supra), "supra")), patch(
+            "supra.scripts.move_tests.subprocess.run",
+            return_value=subprocess.CompletedProcess(args=[], returncode=0),
+        ) as run_mock:
+            exit_code = move_tests.run(
+                ["--workspace", str(self.workspace), "--package", "lottery", "--mode", "check"]
+            )
+
+        self.assertEqual(0, exit_code)
+        run_mock.assert_called_once_with(
+            [
+                str(fake_supra),
+                "move",
+                "tool",
+                "check",
+                "--package-dir",
+                str((self.workspace / "lottery").resolve()),
+            ],
             check=False,
         )
 
@@ -63,6 +97,53 @@ class MoveTestsScriptTest(TestCase):
         expected_package = str(self.workspace.resolve())
         run_mock.assert_called_once_with(
             [str(fake_aptos), "move", "test", "--package-dir", expected_package],
+            check=False,
+        )
+
+    def test_runs_check_mode_with_aptos_cli(self) -> None:
+        fake_aptos = self.workspace / "aptos-cli"
+        fake_aptos.write_text("#!/bin/sh\n")
+
+        with patch("supra.scripts.move_tests._resolve_cli", return_value=(str(fake_aptos), "aptos")), patch(
+            "supra.scripts.move_tests.subprocess.run",
+            return_value=subprocess.CompletedProcess(args=[], returncode=0),
+        ) as run_mock:
+            exit_code = move_tests.run(
+                ["--workspace", str(self.workspace), "--package", "lottery", "--mode", "check"]
+            )
+
+        self.assertEqual(0, exit_code)
+        run_mock.assert_called_once_with(
+            [
+                str(fake_aptos),
+                "move",
+                "check",
+                "--package-dir",
+                str((self.workspace / "lottery").resolve()),
+            ],
+            check=False,
+        )
+
+    def test_runs_check_mode_with_vanilla_cli(self) -> None:
+        fake_move = self.workspace / "move-cli"
+        fake_move.write_text("#!/bin/sh\n")
+
+        with patch("supra.scripts.move_tests._resolve_cli", return_value=(str(fake_move), "move")), patch(
+            "supra.scripts.move_tests.subprocess.run",
+            return_value=subprocess.CompletedProcess(args=[], returncode=0),
+        ) as run_mock:
+            exit_code = move_tests.run(
+                ["--workspace", str(self.workspace), "--package", "lottery", "--mode", "check"]
+            )
+
+        self.assertEqual(0, exit_code)
+        run_mock.assert_called_once_with(
+            [
+                str(fake_move),
+                "check",
+                "--package-path",
+                str((self.workspace / "lottery").resolve()),
+            ],
             check=False,
         )
 
@@ -95,8 +176,28 @@ class MoveTestsScriptTest(TestCase):
         expected_vrf_hub = str((self.workspace / "vrf_hub").resolve())
         run_mock.assert_has_calls(
             [
-                call([str(fake_cli), "move", "test", "-p", expected_lottery], check=False),
-                call([str(fake_cli), "move", "test", "-p", expected_vrf_hub], check=False),
+                call(
+                    [
+                        str(fake_cli),
+                        "move",
+                        "tool",
+                        "test",
+                        "--package-dir",
+                        expected_lottery,
+                    ],
+                    check=False,
+                ),
+                call(
+                    [
+                        str(fake_cli),
+                        "move",
+                        "tool",
+                        "test",
+                        "--package-dir",
+                        expected_vrf_hub,
+                    ],
+                    check=False,
+                ),
             ]
         )
 
@@ -139,7 +240,7 @@ class MoveTestsScriptTest(TestCase):
         self.assertEqual("skipped", result["status"])
         self.assertIsNone(result["return_code"])
         self.assertEqual(0.0, result["duration_seconds"])
-        self.assertEqual([], result["command"][5:])  # убедимся, что командный список корректный
+        self.assertEqual([], result["command"][6:])  # убедимся, что командный список корректный
 
         tree = ET.parse(junit_path)
         suite = tree.getroot()

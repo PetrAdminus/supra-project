@@ -1,13 +1,13 @@
-"""Helper to run Move tests via Supra CLI with graceful fallbacks.
+"""Helper to run Move tests or checks via Supra CLI with graceful fallbacks.
 
 The Supra alignment plan (этап F2) требует автоматизировать запуск
-`supra move test` для рабочей области `supra/move_workspace`.  В
+`supra move tool test` для рабочей области `supra/move_workspace`.  В
 разработческой среде Supra CLI может отсутствовать, поэтому модуль
 предоставляет последовательность запасных вариантов:
 
-1. Попытаться запустить `supra move test -p <package>`.
-2. Если Supra CLI недоступен, использовать `aptos move test`.
-3. В крайнем случае попробовать «vanilla» Move CLI (`move test`).
+1. Попытаться запустить `supra move tool <mode> --package-dir <package>`.
+2. Если Supra CLI недоступен, использовать `aptos move <mode>`.
+3. В крайнем случае попробовать «ванильный» Move CLI (`move <mode>`).
 
 Модуль интегрируется в общий Supra CLI (`python -m supra.scripts.cli
 move-test`) и принимает аргументы для выбора рабочего каталога,
@@ -81,17 +81,52 @@ def _resolve_cli(preferred: str | None) -> Tuple[str, str]:
 def _build_command(
     cli_path: str,
     flavour: str,
-    package_dir: Path,
+    workspace: Path,
+    package_name: str | None,
+    action: str,
     extra_args: Sequence[str],
 ) -> List[str]:
-    """Формирует итоговую команду для запуска тестов."""
+    """Формирует итоговую команду для запуска тестов или проверок."""
+
+    workspace_path = workspace.resolve()
+    package_dir = workspace_path if package_name is None else workspace_path / package_name
 
     if flavour == "supra":
-        base_cmd = [cli_path, "move", "test", "-p", str(package_dir)]
+        base_cmd = [
+            cli_path,
+            "move",
+            "tool",
+            action,
+            "--package-dir",
+            str(package_dir),
+        ]
     elif flavour == "aptos":
-        base_cmd = [cli_path, "move", "test", "--package-dir", str(package_dir)]
+        base_cmd = [
+            cli_path,
+            "move",
+            action,
+            "--package-dir",
+            str(package_dir),
+        ]
     else:
-        base_cmd = [cli_path, "test", "--package-path", str(package_dir)]
+        if action == "test":
+            base_cmd = [
+                cli_path,
+                action,
+                "--package-path",
+                str(workspace_path),
+            ]
+            if package_name:
+                base_cmd.extend(["--package", package_name])
+        else:
+            # Vanilla Move CLI использует `move check --package-path <dir>` без `--package`.
+            target = package_dir if package_name else workspace_path
+            base_cmd = [
+                cli_path,
+                action,
+                "--package-path",
+                str(target),
+            ]
 
     return [*base_cmd, *extra_args]
 
@@ -121,6 +156,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--package",
         help="подкаталог пакета внутри workspace (например, lottery)",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=("test", "check"),
+        default="test",
+        help="тип операции Move CLI: test (по умолчанию) или check",
     )
     parser.add_argument(
         "--all-packages",
@@ -228,13 +269,24 @@ def run(argv: Sequence[str] | None = None) -> int:
     first_failure_code = 0
     results: List[dict[str, object]] = []
 
+    action = args.mode
+
     for package_name in packages_to_run:
         package_dir = workspace if package_name is None else workspace / package_name
 
         if not package_dir.exists():
             raise SystemExit(f"Пакет {package_dir} не существует")
+        if package_name and not (package_dir / "Move.toml").exists():
+            raise SystemExit(f"Пакет {package_name} не содержит Move.toml")
 
-        command = _build_command(cli_path, flavour, package_dir.resolve(), extra_args)
+        command = _build_command(
+            cli_path,
+            flavour,
+            workspace.resolve(),
+            package_name,
+            action,
+            extra_args,
+        )
         quoted = " ".join(shlex.quote(part) for part in command)
         package_label = package_name or "workspace"
         print(
