@@ -1,4 +1,4 @@
-Local: (2025-09-13 14:11:18.257629334 +00:00)	 Utc: (2025-09-13 14:11:18.258713022 UTC)
+﻿Local: (2025-09-13 14:11:18.257629334 +00:00)	 Utc: (2025-09-13 14:11:18.258713022 UTC)
 
 CMD:
 New(NewProfileArgs { name: Some("lottery_admin"), private_key: Some(SoCryptoSecretKey(...)), profile_option: ProfileAttributeOptionsMaker { network: Some(Testnet), profile_option: None }, interactive: false })
@@ -1648,7 +1648,7 @@ CMD:
 Test
 Output:
 General: {
-  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': Unable to resolve named address 'lottery' in package 'lottery' when resolving dependencies: Attempted to assign a different value '0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0' to an a already-assigned named address '0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490'"
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': Unable to resolve named address 'lottery' in package 'lottery' when resolving dependencies: Attempted to assign a different value '0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0' to an a already-assigned named address '0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0'"
 }
 Local: (2025-10-11 15:09:41.604682275 +00:00)	 Utc: (2025-10-11 15:09:41.606100635 UTC)
 
@@ -1742,7 +1742,7 @@ CMD:
 Test
 Output:
 General: {
-  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'supra_workspace': Found unbound dev address assignment 'lottery = 0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490' in root package 'supra_workspace'. Dev addresses cannot introduce new named addresses"
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'supra_workspace': Found unbound dev address assignment 'lottery = 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0' in root package 'supra_workspace'. Dev addresses cannot introduce new named addresses"
 }
 Local: (2025-10-11 17:00:30.844884043 +00:00)	 Utc: (2025-10-11 17:00:30.844922769 UTC)
 

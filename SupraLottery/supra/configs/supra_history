@@ -1,4 +1,4 @@
-Local: (2025-09-13 14:11:18.257629334 +00:00)	 Utc: (2025-09-13 14:11:18.258713022 UTC)
+﻿Local: (2025-09-13 14:11:18.257629334 +00:00)	 Utc: (2025-09-13 14:11:18.258713022 UTC)
 
 CMD:
 New(NewProfileArgs { name: Some("lottery_admin"), private_key: Some(SoCryptoSecretKey(...)), profile_option: ProfileAttributeOptionsMaker { network: Some(Testnet), profile_option: None }, interactive: false })
@@ -1584,7 +1584,7 @@ CMD:
 Test
 Output:
 General: {
-  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': Found non-unique dev address assignment 'lottery = 0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490' in root package 'lottery'. Dev address assignments must not conflict with any other assignments in order to ensure that the package will compile with any possible address assignment. Assignment conflicts with previous assignments: lottery, lottery_factory, vrf_hub = 0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490"
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': Found non-unique dev address assignment 'lottery = 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0' in root package 'lottery'. Dev address assignments must not conflict with any other assignments in order to ensure that the package will compile with any possible address assignment. Assignment conflicts with previous assignments: lottery, lottery_factory, vrf_hub = 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
 }
 Local: (2025-10-08 10:16:40.931571796 +00:00)	 Utc: (2025-10-08 10:16:40.931601394 UTC)
 
@@ -1600,7 +1600,7 @@ CMD:
 Test
 Output:
 General: {
-  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': Unable to resolve named address 'lottery' inpackage 'lottery' when resolving dependencies in dev mode: Attempted to assign a different value '0x100' to an a already-assigned named address '0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490'"
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': Unable to resolve named address 'lottery' inpackage 'lottery' when resolving dependencies in dev mode: Attempted to assign a different value '0x100' to an a already-assigned named address '0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0'"
 }
 Local: (2025-10-08 11:52:50.487254830 +00:00)	 Utc: (2025-10-08 11:52:50.487334834 UTC)
 
@@ -1846,4 +1846,12 @@ Test
 Output:
 General: {
   "Error": "Unexpected error: Failed to run tests: Error parsing '[addresses]' section of manifest: Invalid address '{{supra_addr}}' encountered.: Hex characters are invalid: Invalid string length"
+}
+Local: (2025-10-12 10:12:10.982107625 +00:00)	 Utc: (2025-10-12 10:12:10.982141551 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': Found unbound dev address assignment 'jackpot_pool = 0x109' in root package 'lottery'. Dev addresses cannot introduce new named addresses"
 }

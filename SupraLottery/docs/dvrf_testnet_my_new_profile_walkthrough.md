@@ -1,4 +1,5 @@
-# Настройка Supra dVRF для профиля `my_new_profile`
+﻿# Настройка Supra dVRF для профиля `my_new_profile`
+> **������.** ����� `0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0` ���������� Supra (whitelist), �� ������� �������� ��������� `deposit::checkClientFund`/`monitor-json` ��� ��������� �������.
 
 Этот сценарий повторяет команды, которые мы отладили в testnet для аккаунта администратора `my_new_profile` (адрес `0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0`).
 Все команды выполняются из корня репозитория `SupraLottery`.

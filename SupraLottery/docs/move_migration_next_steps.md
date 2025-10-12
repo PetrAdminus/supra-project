@@ -1,22 +1,127 @@
-# Следующие шаги по миграции Move 1
+﻿# План перехода SupraLottery на Move 1
 
-Ниже перечислены предложения, которые помогут завершить перевод Supra Lottery на Move 1 и сделать пакеты независимыми друг от друга.
+Документ фиксирует все необходимые шаги для полного соответствия текущего кода требованиям Move 1 и Supra Framework. Выполняйте пункты последовательно; отмечайте прогресс ссылками на коммиты либо отчёты тестов.
 
-## 1. Унифицировать события и инициализацию ресурсов
-- ✅ Вынесена вспомогательная функция `events::new_handle` в отдельный модуль, инициализирующий обработчики событий для всех подсистем лотереи. Благодаря этому код `init` теперь использует единый вызов без прямого обращения к `account::new_event_handle`, что упростит адаптацию к будущим изменениям Supra Framework и снизит дублирование в `Autopurchase`, `Rounds`, `TreasuryMulti`, `Vip` и других модулях.【F:SupraLottery/supra/move_workspace/lottery/sources/Events.move†L1-L14】【F:SupraLottery/supra/move_workspace/lottery/sources/Autopurchase.move†L122-L130】【F:SupraLottery/supra/move_workspace/lottery/sources/TreasuryMulti.move†L171-L183】
-- ✅ Функции ядра переведены на `public(package)`, и лишние `friend`-директивы удалены: теперь пакет не требует доверенных модулей даже для тестов. Следующий шаг — добавить автоматические прогонки `move check`/`move test` для автономных пакетов, чтобы гарантировать сохранение ограничений доступа после изменений видимости.【F:SupraLottery/supra/move_workspace/lottery/sources/Treasury.move†L1-L9】【F:SupraLottery/supra/move_workspace/lottery/sources/Lottery.move†L1-L6】
-- ✅ Добавлены обёртки `events::emit`/`events::emit_copy`, которые инкапсулируют `event::emit_event` и позволяют сокращать повторяющийся код при публикации снимков и административных действий. Теперь модули лотереи используют единый интерфейс как для создания обработчиков событий, так и для их отправки.【F:SupraLottery/supra/move_workspace/lottery/sources/Events.move†L15-L27】【F:SupraLottery/supra/move_workspace/lottery/sources/Autopurchase.move†L176-L185】【F:SupraLottery/supra/move_workspace/lottery/sources/LotteryInstances.move†L169-L207】
-- ✅ Фабрика лотерей и VRF-хаб получили аналогичные модули `events`, так что все пакеты воркспейса инициализируют и публикуют события через единый слой абстракции, не обращаясь напрямую к `account::new_event_handle` или `event::emit_event`. Это облегчает сопровождение и предотвращает расхождения между пакетами при будущих изменениях Supra Framework.【F:SupraLottery/supra/move_workspace/lottery_factory/sources/Events.move†L1-L27】【F:SupraLottery/supra/move_workspace/lottery_factory/sources/LotteryFactory.move†L40-L47】【F:SupraLottery/supra/move_workspace/vrf_hub/sources/Events.move†L1-L22】【F:SupraLottery/supra/move_workspace/vrf_hub/sources/VRFHub.move†L11-L20】
+---
 
-## 2. Упростить структуру воркспейса
-- ✅ Удалены устаревшие копии пакетов из `tmp/move_workspace_copy`, теперь поддерживаются только каноничные исходники в `SupraLottery/supra/move_workspace` и `supra/move_workspace`.
-- ✅ `Move.toml` пакета лотереи синхронизированы между `SupraLottery/supra/move_workspace` и `supra/move_workspace`: обе версии подключают `SupraFramework`, `vrf_hub`, `lottery_factory`, `SupraVrf` и используют единый набор адресов с выносом тестовых значений в `[dev-addresses]`. Теперь локальный воркспейс `supra/` ссылается на эталонные пакеты из `SupraLottery/`, устраняя дублирование конфигурации и зависимостей.【F:SupraLottery/supra/move_workspace/lottery/Move.toml†L1-L28】【F:supra/move_workspace/lottery/Move.toml†L1-L31】
+## 1. Обновление инициализации событий
 
-## 3. Автоматизировать тесты
-- ✅ Скрипт `SupraLottery/supra/scripts/move_tests.py` автоматически подбирает формат аргумента пакета (`--package-dir` для Supra/Aptos, `--package` для vanilla Move) и поддерживает режим `--mode check`, позволяя запускать как тесты, так и статические проверки для отдельных пакетов (`lottery`, `vrf_hub` и т.д.) без обходных путей.【F:SupraLottery/supra/scripts/move_tests.py†L90-L162】
-- Настроить GitHub Actions или локальный `make`-скрипт, проверяющий все пакеты (`lottery`, `lottery_factory`, `vrf_hub`, `SupraVrf`) отдельно, чтобы быстрее ловить регрессии.【F:SupraLottery/supra/scripts/move_tests.py†L94-L162】
+**Цель:** избавиться от устаревшего `event::new_event_handle` и перейти на `supra_framework::account::new_event_handle`, что гарантирует корректные GUID и совместимость с Move 1.
 
-## 4. Документировать обновлённый пайплайн
-- ✅ README содержит раздел о переходе на Move 1, едином модуле событий и пример вызова `move-test` с переключением CLI.【F:README.md†L122-L170】
-- ✅ В руководства добавлены подсказки по переопределению адресов (`--override-addresses`) и использованию `.move/config` для повторяемых прогонов без правки `Move.toml`. Блок присутствует и в корневом README, и в `SupraLottery/README.md` для разработчиков воркспейса.【F:README.md†L147-L156】【F:SupraLottery/README.md†L54-L60】
-- Добавить в репозиторий шаблон `.move/config.example` с комментариями по адресам тестовой/боевой сети, чтобы новые участники могли скопировать файл без обращения к документации.
+1. В каждом модуле замените создание хэндлов на `account::new_event_handle`. Актуальные файлы:
+   - `SupraLottery/supra/move_workspace/lottery/sources/Autopurchase.move`
+   - `…/History.move`, `…/Jackpot.move`, `…/Lottery.move`, `…/LotteryInstances.move`, `…/LotteryRounds.move`
+   - `…/Metadata.move`, `…/NftRewards.move`, `…/Operators.move`, `…/Referrals.move`, `…/Store.move`
+   - `…/Treasury.move`, `…/TreasuryMulti.move`, `…/Vip.move`
+   - `SupraLottery/supra/move_workspace/lottery_factory/sources/LotteryFactory.move`
+   - `SupraLottery/supra/move_workspace/vrf_hub/sources/VRFHub.move`
+   - `SupraLottery/supra/move_workspace/SupraVrf/sources/*.move`
+2. После `move_to` сразу выполняйте `borrow_global_mut` и генерируйте первый снапшот (см. пример в `LotteryFactory.move`).
+3. Удалите вспомогательные функции `lottery::events::new_handle`, либо сведите их к thin-wrapper над `account::new_event_handle` и скорректируйте импорты.
+
+**Проверка:** `move tool test --package-dir …/lottery` без ошибок и без предупреждений о недоступности `event::new_event_handle`.
+
+---
+
+## 2. Коррекция видимости и friend-доступа
+
+**Цель:** Move 1 жёстче относится к `public(package)` и friend-модулям.
+
+1. Проанализируйте каждую функцию с `public(package)` и переведите:
+   - на `public(friend)` с явным перечислением дружественных модулей, либо
+   - на `public entry`/`public` (если требуется внешний вызов), либо
+   - на `public(package)` в пределах одного пакета Move 1 (без использования в других пакетах).
+2. Убедитесь, что `friend`-списки покрывают реальные импорты (`friend lottery::rounds`, `friend lottery::jackpot` и т. д.). Move 1 требует, чтобы friend-импортируемые модули находились в том же пакете.
+3. Пересоберите workspace; если компилятор сообщает «unbound module», либо перенесите модуль в тот же пакет, либо замените friend на публичный API.
+
+---
+
+## 3. Замена вспомогательных `events::emit*`
+
+**Цель:** использовать базовые функции Supra Framework и избежать промежуточных обёрток.
+
+1. В `SupraLottery/supra/move_workspace/lottery/sources/Events.move` замените содержимое:
+   - уберите `emit`/`emit_copy`, используйте напрямую `event::emit_event`.
+   - при необходимости оставьте thin-wrapper, но без собственных проверок.
+2. В модулях (`Autopurchase`, `LotteryInstances`, `TreasuryMulti`, `Vip` и т. д.) замените вызовы `events::emit*` на `event::emit_event` или `event::emit_event(handle, copy message)` в зависимости от необходимости.
+3. Убедитесь, что после изменения компилятор не сообщает предупреждений о неиспользуемых функциях в `Events.move`.
+
+---
+
+## 4. Очистка синтаксиса Move 1
+
+**Цель:** убрать конструкции, несовместимые с Move 1.
+
+1. Циклы вида:
+   ```move
+   let mut idx = 0;
+   while (idx < len) {
+       …
+   }
+   ```
+   Замените на:
+   ```move
+   let idx = 0;
+   while (idx < len) {
+       …
+       idx = idx + 1;
+   }
+   ```
+   Тесты и код (`lottery`, `lottery_factory`, `vrf_hub`, `SupraVrf`) должны полностью уйти от `let mut`.
+2. Уберите не-ASCII в исходниках и тестах (в частности, комментарии в `lottery/tests/*.move`).
+3. Исправьте операторы `copy event.request_hash` на `copy event.request_hash` внутри корректных scopes (Move 1 требует закрывающих скобок).
+
+---
+
+## 5. Обновление Move.toml и адресов
+
+1. `SupraLottery/supra/move_workspace/Move.toml` уже содержит `[package]` и `[addresses]`. Убедитесь, что локальные проекты (`supra/move_workspace`) синхронизированы с такой же структурой.
+2. В пакетах `lottery`, `SupraVrf` и др. замените шаблоны `{{supra_addr}}` на реальные значения (например, тестнет-адрес `0x186…1219e`) либо подключите механизм override (через CLI).
+3. Обновите `.move/config` (см. README) с новым workspace и адресами.
+
+---
+
+## 6. Автоматизация тестов
+
+1. В `SupraLottery/supra/scripts/move_tests.py` добавьте режим, поддерживающий:
+   - `--mode check` (только `move check`),
+   - запуск через Docker Supra CLI и Aptos CLI,
+   - fallback на `move test` с `--package-dir`.
+2. Интегрируйте скрипт в GitHub Actions (`.github/workflows/*`), чтобы прогонять пакеты `lottery`, `lottery_factory`, `vrf_hub`, `SupraVrf` в CI.
+3. Сохраняйте отчёты: `tmp/move-test-report.json`, `tmp/move-test-report.xml`, лог `tmp/unittest.log`.
+
+---
+
+## 7. Документация и конфигурация CLI
+
+1. Обновите `README.md` и `SupraLottery/README.md`: добавьте инструкции Move 1 (`supra move tool test`, `--named-addresses`, обновлённый `move-tests` скрипт).
+2. В `docs/testnet_runbook.md`, `docs/dvrf_reference_snapshot.md`, `docs/audit/internal_audit_*` свяжите новые команды CLI, структуру событий и GUID.
+3. Добавьте `.move/config.example` и раздел в README о настройке (адреса, профили CLI, переменные окружения).
+4. ���������, �� ����������� ������ `my_new_profile` ������������ Supra (whitelist). ����������� �������� ������� (`deposit::checkClientFund`, `monitor-json`) �������������� ����� �������; ��������� ���������� � QA/hand-over ��������.
+
+---
+
+## 8. План внедрения (рекомендуемый порядок)
+
+1. **Этап A — инфраструктура**
+   - Обновить `Move.toml` и заменить `supra_addr` во всех пакетах.
+   - Почистить `.move/config`, README.
+2. **Этап B — события**
+   - Перевести все модули на `account::new_event_handle`.
+   - Убрать `events::emit*`.
+3. **Этап C — синтаксис**
+   - Удалить `let mut`, кириллицу в комментариях, привести циклы.
+   - Исправить `public(package)`/`friend`.
+4. **Этап D — тесты**
+   - `move tool test` для каждого пакета (`lottery`, `lottery_factory`, `vrf_hub`, `SupraVrf`).
+   - `python -m supra.scripts.cli move-test --workspace … --all-packages`.
+   - `PYTHONPATH=SupraLottery python -m unittest`.
+5. **Этап E — CI и документация**
+   - Обновить `move_tests.py`, добавить workflow.
+   - Обновить `docs/*`.
+6. **�⠯ F - ������������ �����������**
+   - �������� ����������� `/supra/move_workspace` ����� �������� ���������� (�������� ������������ CI/скриптов).
+   - �������� CI/скрипты, ������� ������������ �� зеркальные пути.
+   - �������� README � ���㬥����, ���������� ������ ���������.
+
+Фиксируйте результат каждого шага отдельным коммитом и ссылкой на отчёт (JSON/JUnit, unittest logs). После выполнения всех этапов `move tool test` на workspace должен проходить без ошибок, а чек-листы (internal audit + dVRF v3) — закрываться автоматом.

@@ -48,6 +48,8 @@ docker compose run --rm \
 - `docs/` — runbook’и, миграционные заметки по dVRF и эксплуатационная документация.
 - `frontend/` — SPA, мок-данные, Storybook-истории и юнит-тесты.
 
+> TODO: после подготовки миграции выровнять структуру и удалить зеркальные каталоги (`SupraLottery/supra/...` и `supra/...`), чтобы остался единый Move-workspace.
+
 ### Казначейство на Fungible Asset
 Модуль `lottery::treasury_v1` оборачивает стандарт `0x1::fungible_asset` и предоставляет следующие сценарии:
 
@@ -126,7 +128,7 @@ docker compose run --rm \
 
 ### Текущее состояние (сентябрь 2025)
 - Move-пакет успешно компилируется, юнит-тесты проходят внутри контейнера Supra CLI.
-- Аккаунт тестовой сети `0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490` **ещё не добавлен в whitelist**; функции `deposit::*` возвращают `EUNAUTHORIZED_ACCESS`.
+- Аккаунт тестовой сети `0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490` **добавлен в whitelist, но требует проверки**; контролируем первые вызовы, пока функции `deposit::*` могут возвращать `EUNAUTHORIZED_ACCESS`.
 - Команды мониторинга (`get_lottery_status`, `get_whitelist_status`, `get_vrf_request_config`, `get_registered_tickets`, `treasury_v1::get_config`, `treasury_v1::get_balances`) доступны через `supra move tool view`.
 - Фронтенд (`frontend/`) запускается с мок-данными, содержит заглушку кошелька StarKey и переключатель между mock/Supra API; после получения whitelisting обновляем `src/api/supraClient.ts`.
 

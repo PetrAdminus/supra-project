@@ -4,8 +4,8 @@ version = "0.0.1"
 
 [addresses]
 std = "0x1"
-vrf_hub = "0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490"
-lottery = "0x9a969d3b77941cec267f03b9bbb323c0333fa63d0e9e15204edabc415f134490"
+vrf_hub = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
+lottery = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
 
 [dependencies]
 MoveStdlib = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/move-stdlib", rev = "dev" }
