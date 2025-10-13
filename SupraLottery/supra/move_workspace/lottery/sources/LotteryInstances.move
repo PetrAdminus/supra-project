@@ -527,7 +527,7 @@ module lottery::instances {
     }
 
     fun build_instance_snapshot_from_table(
-        instances: &table::Table<u64, LotteryInstance>,
+        instances: &table::Table<u64, InstanceState>,
         lottery_id: u64,
     ): LotteryInstanceSnapshot {
         let instance = table::borrow(instances, lottery_id);

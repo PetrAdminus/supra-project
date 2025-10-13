@@ -327,6 +327,20 @@ module lottery::history {
         }
     }
 
+    fun build_lottery_snapshot(
+        state: &HistoryCollection,
+        lottery_id: u64
+    ): LotteryHistorySnapshot {
+        build_lottery_snapshot_from_table(&state.histories, lottery_id)
+    }
+
+    fun build_lottery_snapshot_from_mut(
+        state: &mut HistoryCollection,
+        lottery_id: u64
+    ): LotteryHistorySnapshot {
+        build_lottery_snapshot_from_table(&state.histories, lottery_id)
+    }
+
     fun build_lottery_snapshot_from_table(
         histories: &table::Table<u64, LotteryHistory>,
         lottery_id: u64
