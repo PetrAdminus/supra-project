@@ -425,12 +425,13 @@ module lottery::treasury_v1 {
         ensure_recipient_store_ready(state, team);
         ensure_recipient_store_ready(state, partners);
 
-        {
+        let previous_snapshot = {
             let vaults = borrow_global_mut<Vaults>(@lottery);
-            let previous_snapshot = build_recipients_snapshot(&vaults.recipients);
+            let snapshot = build_recipients_snapshot(state, &vaults.recipients);
             vaults.recipients = VaultRecipients { treasury, marketing, community, team, partners };
-            emit_recipients_event(option::some(previous_snapshot));
+            snapshot
         };
+        emit_recipients_event(option::some(previous_snapshot));
     }
 
     #[view]
@@ -525,13 +526,13 @@ module lottery::treasury_v1 {
         };
 
         let state = borrow_global<TokenState>(@lottery);
-        if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
+        let (registered, _frozen, store_opt, balance) =
+            account_extended_status_from_state(state, account);
+        if (!registered) {
             return (false, option::none(), 0)
         };
 
-        let store_address = primary_fungible_store::primary_store_address(account, state.metadata);
-        let balance = primary_fungible_store::balance(account, state.metadata);
-        (true, option::some(store_address), balance)
+        (true, store_opt, balance)
     }
 
     #[view]
@@ -541,6 +542,13 @@ module lottery::treasury_v1 {
         };
 
         let state = borrow_global<TokenState>(@lottery);
+        account_extended_status_from_state(state, account)
+    }
+
+    fun account_extended_status_from_state(
+        state: &TokenState,
+        account: address
+    ): (bool, bool, option::Option<address>, u64) {
         if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
             return (false, false, option::none(), 0)
         };
@@ -607,7 +615,7 @@ module lottery::treasury_v1 {
         VaultRecipientStatus,
         VaultRecipientStatus,
         VaultRecipientStatus,
-    ) acquires Vaults {
+    ) acquires TokenState, Vaults {
         let recipients = if (exists<Vaults>(@lottery)) {
             let vaults = borrow_global<Vaults>(@lottery);
             vaults.recipients
@@ -615,12 +623,23 @@ module lottery::treasury_v1 {
             default_recipients()
         };
 
+        if (!exists<TokenState>(@lottery)) {
+            return (
+                empty_recipient_status(recipients.treasury),
+                empty_recipient_status(recipients.marketing),
+                empty_recipient_status(recipients.community),
+                empty_recipient_status(recipients.team),
+                empty_recipient_status(recipients.partners),
+            )
+        };
+
+        let state = borrow_global<TokenState>(@lottery);
         (
-            build_recipient_status(recipients.treasury),
-            build_recipient_status(recipients.marketing),
-            build_recipient_status(recipients.community),
-            build_recipient_status(recipients.team),
-            build_recipient_status(recipients.partners),
+            build_recipient_status(state, recipients.treasury),
+            build_recipient_status(state, recipients.marketing),
+            build_recipient_status(state, recipients.community),
+            build_recipient_status(state, recipients.team),
+            build_recipient_status(state, recipients.partners),
         )
     }
 
@@ -793,26 +812,42 @@ module lottery::treasury_v1 {
 
     fun emit_recipients_event(
         previous: option::Option<VaultRecipientsSnapshot>
-    ) acquires Vaults {
+    ) acquires TokenState, Vaults {
         let vaults = borrow_global<Vaults>(@lottery);
-        let next_snapshot = build_recipients_snapshot(&vaults.recipients);
+        let state = borrow_global<TokenState>(@lottery);
+        let next_snapshot = build_recipients_snapshot(state, &vaults.recipients);
         event::emit(RecipientsUpdatedEvent { previous, next: next_snapshot });
     }
 
-    fun build_recipient_status(account: address): VaultRecipientStatus {
-        let (registered, frozen, store_opt, balance) = account_extended_status(account);
+    fun build_recipient_status(
+        state: &TokenState,
+        account: address
+    ): VaultRecipientStatus {
+        let (registered, frozen, store_opt, balance) =
+            account_extended_status_from_state(state, account);
         VaultRecipientStatus { account, registered, frozen, store: store_opt, balance }
     }
 
+    fun empty_recipient_status(account: address): VaultRecipientStatus {
+        VaultRecipientStatus {
+            account,
+            registered: false,
+            frozen: false,
+            store: option::none(),
+            balance: 0,
+        }
+    }
+
     fun build_recipients_snapshot(
+        state: &TokenState,
         recipients: &VaultRecipients
     ): VaultRecipientsSnapshot {
         VaultRecipientsSnapshot {
-            treasury: build_recipient_status(recipients.treasury),
-            marketing: build_recipient_status(recipients.marketing),
-            community: build_recipient_status(recipients.community),
-            team: build_recipient_status(recipients.team),
-            partners: build_recipient_status(recipients.partners),
+            treasury: build_recipient_status(state, recipients.treasury),
+            marketing: build_recipient_status(state, recipients.marketing),
+            community: build_recipient_status(state, recipients.community),
+            team: build_recipient_status(state, recipients.team),
+            partners: build_recipient_status(state, recipients.partners),
         }
     }
 }
