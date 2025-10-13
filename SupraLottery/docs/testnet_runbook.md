@@ -87,6 +87,14 @@ Supra CLI начиная с релиза 2025.05 хранит ключи и па
    ```bash
    docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::treasury_v1::store_frozen --args address:<ACCOUNT>"
    ```
+
+   С миграцией на Move 1 все события казначейства создаются через `supra_framework::account::new_event_handle`, поэтому GUID определяется адресом лотереи и `creation_num`. Сверить значения можно командой:
+
+   ```bash
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool resource --profile <PROFILE> --account <LOTTERY_ADDR> --resource-id lottery::treasury_v1::TreasuryState"
+   ```
+
+   Поля `*_events.guid.id.creation_num` в выводе подскажут, какие GUID передавать в `supra move tool event --start <seq>` при выгрузке логов. Адрес лотереи возьмите из `.move/config` или чек-листа деплоя. Благодаря начальному `event::emit_event` сразу после `move_to` (см. модули `LotteryRounds`, `TreasuryMulti`, `Autopurchase`) счётчик начинается с `0`, так что мониторинг не пропускает первые события.
 6. При необходимости можно временно заморозить primary store (например, на время расследования инцидента) и затем снять блокировку:
    ```bash
    docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::treasury_v1::set_store_frozen --args address:<ACCOUNT> bool:true"

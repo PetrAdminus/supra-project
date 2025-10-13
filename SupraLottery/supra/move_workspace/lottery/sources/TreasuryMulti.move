@@ -1,11 +1,19 @@
 module lottery::treasury_multi {
+    friend lottery::jackpot;
+    friend lottery::migration;
+    friend lottery::referrals;
+    friend lottery::rounds;
+    friend lottery::store;
+    friend lottery::treasury_multi_tests;
+    friend lottery::vip;
+
     use std::option;
     use std::signer;
     use std::vector;
     use vrf_hub::table;
+    use supra_framework::account;
     use supra_framework::event;
     use std::math64;
-    use lottery::events;
     use lottery::treasury_v1;
 
     const E_NOT_AUTHORIZED: u64 = 1;
@@ -172,15 +180,15 @@ module lottery::treasury_multi {
             configs: table::new(),
             pools: table::new(),
             lottery_ids: vector::empty<u64>(),
-            config_events: events::new_handle<LotteryConfigUpdatedEvent>(caller),
-            allocation_events: events::new_handle<AllocationRecordedEvent>(caller),
-            admin_events: events::new_handle<AdminUpdatedEvent>(caller),
-            recipient_events: events::new_handle<RecipientsUpdatedEvent>(caller),
-            prize_events: events::new_handle<PrizePaidEvent>(caller),
-            operations_events: events::new_handle<OperationsWithdrawnEvent>(caller),
-            operations_income_events: events::new_handle<OperationsIncomeRecordedEvent>(caller),
-            operations_bonus_events: events::new_handle<OperationsBonusPaidEvent>(caller),
-            jackpot_events: events::new_handle<JackpotPaidEvent>(caller),
+            config_events: account::new_event_handle<LotteryConfigUpdatedEvent>(caller),
+            allocation_events: account::new_event_handle<AllocationRecordedEvent>(caller),
+            admin_events: account::new_event_handle<AdminUpdatedEvent>(caller),
+            recipient_events: account::new_event_handle<RecipientsUpdatedEvent>(caller),
+            prize_events: account::new_event_handle<PrizePaidEvent>(caller),
+            operations_events: account::new_event_handle<OperationsWithdrawnEvent>(caller),
+            operations_income_events: account::new_event_handle<OperationsIncomeRecordedEvent>(caller),
+            operations_bonus_events: account::new_event_handle<OperationsBonusPaidEvent>(caller),
+            jackpot_events: account::new_event_handle<JackpotPaidEvent>(caller),
         };
 
         emit_recipients_event(
@@ -210,7 +218,7 @@ module lottery::treasury_multi {
         let state = borrow_global_mut<TreasuryState>(@lottery);
         let previous = state.admin;
         state.admin = new_admin;
-        events::emit(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
+        event::emit_event(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
     }
 
 
@@ -264,7 +272,7 @@ module lottery::treasury_multi {
             record_lottery_id(state, lottery_id);
             table::add(&mut state.configs, lottery_id, config);
         };
-        events::emit(
+        event::emit_event(
             &mut state.config_events,
             LotteryConfigUpdatedEvent {
                 lottery_id,
@@ -288,14 +296,14 @@ module lottery::treasury_multi {
     }
 
 
-    public(package) fun record_allocation_internal(lottery_id: u64, amount: u64) acquires TreasuryState {
+    public(friend) fun record_allocation_internal(lottery_id: u64, amount: u64) acquires TreasuryState {
         ensure_initialized();
         let state = borrow_global_mut<TreasuryState>(@lottery);
         apply_allocation(state, lottery_id, amount);
     }
 
 
-    public(package) fun migrate_seed_pool(
+    public(friend) fun migrate_seed_pool(
         lottery_id: u64,
         prize_balance: u64,
         operations_balance: u64,
@@ -321,7 +329,7 @@ module lottery::treasury_multi {
     }
 
 
-    public(package) fun distribute_prize_internal(lottery_id: u64, winner: address): u64
+    public(friend) fun distribute_prize_internal(lottery_id: u64, winner: address): u64
     acquires TreasuryState {
         ensure_initialized();
         let state = borrow_global_mut<TreasuryState>(@lottery);
@@ -336,7 +344,7 @@ module lottery::treasury_multi {
     }
 
 
-    public(package) fun withdraw_operations_internal(lottery_id: u64): u64
+    fun withdraw_operations_internal(lottery_id: u64): u64
     acquires TreasuryState {
         ensure_initialized();
         let state = borrow_global_mut<TreasuryState>(@lottery);
@@ -344,7 +352,7 @@ module lottery::treasury_multi {
     }
 
 
-    public(package) fun pay_operations_bonus_internal(
+    public(friend) fun pay_operations_bonus_internal(
         lottery_id: u64,
         recipient: address,
         amount: u64,
@@ -355,7 +363,7 @@ module lottery::treasury_multi {
     }
 
 
-    public(package) fun record_operations_income_internal(
+    public(friend) fun record_operations_income_internal(
         lottery_id: u64,
         amount: u64,
         source: vector<u8>,
@@ -377,7 +385,7 @@ module lottery::treasury_multi {
                 LotteryPool { prize_balance: 0, operations_balance: amount },
             );
         };
-        events::emit(
+        event::emit_event(
             &mut state.operations_income_events,
             OperationsIncomeRecordedEvent { lottery_id, amount, source },
         );
@@ -396,7 +404,7 @@ module lottery::treasury_multi {
     }
 
 
-    public(package) fun distribute_jackpot_internal(recipient: address, amount: u64)
+    public(friend) fun distribute_jackpot_internal(recipient: address, amount: u64)
     acquires TreasuryState {
         ensure_initialized();
         let state = borrow_global_mut<TreasuryState>(@lottery);
@@ -476,47 +484,51 @@ module lottery::treasury_multi {
         option::some(LotterySummary { config, pool })
     }
 
-    public(package) fun pool_prize_balance(pool: &LotteryPool): u64 {
+    fun pool_prize_balance(pool: &LotteryPool): u64 {
         pool.prize_balance
     }
 
-    public(package) fun pool_operations_balance(pool: &LotteryPool): u64 {
+    public(friend) fun pool_operations_balance(pool: &LotteryPool): u64 {
         pool.operations_balance
     }
 
-    public(package) fun share_config_prize_bps(config: &LotteryShareConfig): u64 {
+    fun share_config_prize_bps(config: &LotteryShareConfig): u64 {
         config.prize_bps
     }
 
-    public(package) fun share_config_jackpot_bps(config: &LotteryShareConfig): u64 {
+    fun share_config_jackpot_bps(config: &LotteryShareConfig): u64 {
         config.jackpot_bps
     }
 
-    public(package) fun share_config_operations_bps(config: &LotteryShareConfig): u64 {
+    fun share_config_operations_bps(config: &LotteryShareConfig): u64 {
         config.operations_bps
     }
 
-    public(package) fun summary_config(summary: &LotterySummary): LotteryShareConfig {
+    fun summary_config(summary: &LotterySummary): LotteryShareConfig {
         summary.config
     }
 
-    public(package) fun summary_pool(summary: &LotterySummary): LotteryPool {
+    public(friend) fun summary_pool(summary: &LotterySummary): LotteryPool {
         summary.pool
     }
 
     #[test_only]
     public fun pool_balances_for_test(pool: &LotteryPool): (u64, u64) {
-        (pool.prize_balance, pool.operations_balance)
+        (pool_prize_balance(pool), pool_operations_balance(pool))
     }
 
     #[test_only]
     public fun share_config_bps_for_test(config: &LotteryShareConfig): (u64, u64, u64) {
-        (config.prize_bps, config.jackpot_bps, config.operations_bps)
+        (
+            share_config_prize_bps(config),
+            share_config_jackpot_bps(config),
+            share_config_operations_bps(config),
+        )
     }
 
     #[test_only]
     public fun summary_components_for_test(summary: &LotterySummary): (LotteryShareConfig, LotteryPool) {
-        (summary.config, summary.pool)
+        (summary_config(summary), summary_pool(summary))
     }
 
     #[test_only]
@@ -571,7 +583,7 @@ module lottery::treasury_multi {
             );
         };
 
-        events::emit(
+        event::emit_event(
             &mut state.allocation_events,
             AllocationRecordedEvent {
                 lottery_id,
@@ -594,7 +606,7 @@ module lottery::treasury_multi {
         };
         pool.prize_balance = 0;
         treasury_v1::payout_from_treasury(winner, amount);
-        events::emit(
+        event::emit_event(
             &mut state.prize_events,
             PrizePaidEvent { lottery_id, winner, amount },
         );
@@ -618,7 +630,7 @@ module lottery::treasury_multi {
         );
         pool.operations_balance = 0;
         treasury_v1::payout_from_treasury(recipient, amount);
-        events::emit(
+        event::emit_event(
             &mut state.operations_events,
             OperationsWithdrawnEvent { lottery_id, recipient, amount },
         );
@@ -648,7 +660,7 @@ module lottery::treasury_multi {
         );
         pool.operations_balance = pool.operations_balance - amount;
         treasury_v1::payout_from_treasury(recipient, amount);
-        events::emit(
+        event::emit_event(
             &mut state.operations_bonus_events,
             OperationsBonusPaidEvent { lottery_id, recipient, amount },
         );
@@ -668,7 +680,7 @@ module lottery::treasury_multi {
         );
         state.jackpot_balance = state.jackpot_balance - amount;
         treasury_v1::payout_from_treasury(recipient, amount);
-        events::emit(
+        event::emit_event(
             &mut state.jackpot_events,
             JackpotPaidEvent { recipient, amount },
         );
@@ -702,7 +714,7 @@ module lottery::treasury_multi {
         previous_jackpot: option::Option<RecipientStatus>,
         previous_operations: option::Option<RecipientStatus>,
     ) {
-        events::emit(
+        event::emit_event(
             &mut state.recipient_events,
             RecipientsUpdatedEvent {
                 previous_jackpot,

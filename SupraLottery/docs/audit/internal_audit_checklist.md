@@ -11,7 +11,7 @@
 
 ## 1. Подготовка окружения
 - [x] Обновить git-репозиторий и убедиться, что рабочее дерево чистое (`git status`).
-- [x] Синхронизировать git-зависимости Move (`PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test --workspace SupraLottery/supra/move_workspace --list-packages -- --skip-fetch-latest-git-deps`). 14.02 выполнен `--all-packages --dry-run --cli-flavour supra`, сформирован шаблон отчёта (см. `docs/audit/move_test_reports/2025-02-14-move-test-dry-run.json`).
+- [x] Синхронизировать git-зависимости Move (`PYTHONPATH=SupraLottery python -m supra.scripts.move_tests --workspace SupraLottery/supra/move_workspace --mode check --dry-run --cli-flavour supra`). 14.02 выполнен `--all-packages --dry-run --cli-flavour supra`, сформирован шаблон отчёта (см. `docs/audit/move_test_reports/2025-02-14-move-test-dry-run.json`).
 - [ ] Проверить наличие Supra CLI или Aptos CLI в PATH либо подготовить Docker-контейнер `supra_cli` (dry-run задействовал fallback `--cli-flavour supra`, требуется фактический бинарь для запуска тестов). См. инструкции в `internal_audit_dynamic_runbook.md`, раздел 1.
 - [ ] Обновить `.env`/YAML-профиль Supra CLI актуальными адресами и ключами перед ручными проверками (подробнее — `internal_audit_dynamic_runbook.md`, шаг 1.4).
 
@@ -23,8 +23,8 @@
 - [x] Проверить наличие view-функций и событий в вспомогательных модулях (`Metadata`, `Referrals`, `Vip`, `Autopurchase`, `Store`, `History`, `Jackpot`, `LotteryRounds`, `LotteryInstances`) — см. `internal_audit_static_review.md`, раздел 3.
 
 ## 3. Тестирование
-- [ ] Прогнать юнит-тесты Move для всех пакетов: `PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test --workspace SupraLottery/supra/move_workspace --all-packages --keep-going --report-json tmp/move-test-report.json --report-junit tmp/move-test-report.xml -- --skip-fetch-latest-git-deps`. 14.02 выполнен промежуточный `--dry-run --cli-flavour supra`, отчёт сохранён в `docs/audit/move_test_reports/2025-02-14-move-test-dry-run.json`/`...xml`; запуск с реальной CLI остаётся в плане (см. `internal_audit_dynamic_runbook.md`, раздел 2).
-- [ ] Зафиксировать артефакты `tmp/move-test-report.json` и `tmp/move-test-report.xml` в CI или загрузить для ревью (для dry-run приложена версионированная копия в `docs/audit/move_test_reports/`; порядок публикации описан в `internal_audit_dynamic_runbook.md`, шаг 2.3).
+- [ ] Прогнать юнит-тесты Move для всех пакетов: `PYTHONPATH=SupraLottery python -m supra.scripts.move_tests --workspace SupraLottery/supra/move_workspace --all-packages --mode test --keep-going --report-json tmp/move-test-report.json --report-junit tmp/move-test-report.xml --log-path tmp/unittest.log -- --skip-fetch-latest-git-deps`. 14.02 выполнен промежуточный `--dry-run --cli-flavour supra`, отчёт сохранён в `docs/audit/move_test_reports/2025-02-14-move-test-dry-run.json`/`...xml`; запуск с реальной CLI остаётся в плане (см. `internal_audit_dynamic_runbook.md`, раздел 2).
+- [ ] Зафиксировать артефакты `tmp/move-test-report.json`, `tmp/move-test-report.xml` и `tmp/unittest.log` в CI или загрузить для ревью (для dry-run приложена версионированная копия в `docs/audit/move_test_reports/`; порядок публикации описан в `internal_audit_dynamic_runbook.md`, шаг 2.3).
 - [ ] Выполнить Python-юнит-тесты: `python -m unittest` (при наличии известных падений задокументировать исключения в отчёте; см. `internal_audit_dynamic_runbook.md`, раздел 3).
 - [ ] При необходимости выполнить смоук-тест testnet: `supra/scripts/testnet_smoke_test.sh` или ручной сценарий из runbook (фиксировать tx hash и результаты; подробности — `internal_audit_dynamic_runbook.md`, раздел 4).
 

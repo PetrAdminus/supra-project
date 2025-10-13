@@ -1,12 +1,13 @@
 module lottery::history {
+    friend lottery::rounds;
 
     use std::option;
     use std::signer;
     use std::vector;
     use vrf_hub::table;
+    use supra_framework::account;
     use supra_framework::event;
     use std::timestamp;
-    use lottery::events;
 
     const MAX_HISTORY_LENGTH: u64 = 128;
 
@@ -77,8 +78,8 @@ module lottery::history {
                 admin: addr,
                 histories: table::new(),
                 lottery_ids: vector::empty<u64>(),
-                record_events: events::new_handle<DrawRecordedEvent>(caller),
-                snapshot_events: events::new_handle<HistorySnapshotUpdatedEvent>(caller),
+                record_events: account::new_event_handle<DrawRecordedEvent>(caller),
+                snapshot_events: account::new_event_handle<HistorySnapshotUpdatedEvent>(caller),
             },
         );
         let previous = option::none<HistorySnapshot>();
@@ -114,7 +115,7 @@ module lottery::history {
         };
     }
 
-    public(package) fun record_draw(
+    public(friend) fun record_draw(
         lottery_id: u64,
         request_id: u64,
         winner: address,
@@ -141,7 +142,7 @@ module lottery::history {
         };
         vector::push_back(&mut history.records, record);
         trim_history(&mut history.records);
-        events::emit(
+        event::emit_event(
             &mut state.record_events,
             DrawRecordedEvent {
                 lottery_id,
@@ -330,7 +331,7 @@ module lottery::history {
         previous: option::Option<HistorySnapshot>
     ) {
         let current = build_snapshot(&*state);
-        events::emit(
+        event::emit_event(
             &mut state.snapshot_events,
             HistorySnapshotUpdatedEvent { previous, current },
         );

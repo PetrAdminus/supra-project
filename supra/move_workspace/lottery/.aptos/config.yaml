@@ -1,9 +1,0 @@
----
-profiles:
-  default:
-    network: Testnet
-    private_key: "0x6748d24620b759f85443edee8fdc60daa12b42f783f9507fb5b5ade6b9f10eaa"
-    public_key: "0x9b6695ba81fab12fab1a6b280dd1ba2abfbac36fe5f90a0e9852d7b1bbab2813"
-    account: 0x3bd5cb43528ea967459e0741d8120fa4472f0c580a8b7c04f598cc3dd3341fbc
-    rest_url: "https://rpc-testnet.supra.com"
-    faucet_url: "https://faucet.testnet.supra.com"

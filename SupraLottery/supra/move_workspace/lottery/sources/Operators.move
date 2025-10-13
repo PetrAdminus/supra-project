@@ -3,9 +3,9 @@ module lottery::operators {
     use std::signer;
     use std::vector;
     use vrf_hub::table;
+    use supra_framework::account;
     use supra_framework::event;
-    use lottery::events;
-
+    
     const E_ALREADY_INIT: u64 = 1;
     const E_NOT_INITIALIZED: u64 = 2;
     const E_NOT_AUTHORIZED: u64 = 3;
@@ -83,13 +83,15 @@ module lottery::operators {
                 admin: addr,
                 entries: table::new(),
                 lottery_ids: vector::empty<u64>(),
-                admin_events: events::new_handle<AdminUpdatedEvent>(caller),
-                owner_events: events::new_handle<OwnerUpdatedEvent>(caller),
-                grant_events: events::new_handle<OperatorGrantedEvent>(caller),
-                revoke_events: events::new_handle<OperatorRevokedEvent>(caller),
-                snapshot_events: events::new_handle<OperatorSnapshotUpdatedEvent>(caller),
+                admin_events: account::new_event_handle<AdminUpdatedEvent>(caller),
+                owner_events: account::new_event_handle<OwnerUpdatedEvent>(caller),
+                grant_events: account::new_event_handle<OperatorGrantedEvent>(caller),
+                revoke_events: account::new_event_handle<OperatorRevokedEvent>(caller),
+                snapshot_events: account::new_event_handle<OperatorSnapshotUpdatedEvent>(caller),
             },
         );
+        let state = borrow_global_mut<LotteryOperators>(@lottery);
+        emit_all_snapshots(state);
     }
 
     #[view]
@@ -102,7 +104,7 @@ module lottery::operators {
         let state = borrow_global_mut<LotteryOperators>(@lottery);
         let previous = state.admin;
         state.admin = new_admin;
-        events::emit(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
+        event::emit_event(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
     }
 
     public entry fun set_owner(caller: &signer, lottery_id: u64, owner: address) acquires LotteryOperators {
@@ -119,7 +121,7 @@ module lottery::operators {
                 },
             );
             record_lottery_id(&mut state.lottery_ids, lottery_id);
-            events::emit(
+            event::emit_event(
                 &mut state.owner_events,
                 OwnerUpdatedEvent {
                     lottery_id,
@@ -139,7 +141,7 @@ module lottery::operators {
                 };
             };
             if (owner_changed) {
-                events::emit(
+                event::emit_event(
                     &mut state.owner_events,
                     OwnerUpdatedEvent {
                         lottery_id,
@@ -165,7 +167,7 @@ module lottery::operators {
             table::add(&mut entry.operators, operator, true);
             record_operator(&mut entry.operator_list, operator);
         };
-        events::emit(
+        event::emit_event(
             &mut state.grant_events,
             OperatorGrantedEvent {
                 lottery_id,
@@ -188,7 +190,7 @@ module lottery::operators {
             table::remove(&mut entry.operators, operator);
             remove_operator(&mut entry.operator_list, operator);
         };
-        events::emit(
+        event::emit_event(
             &mut state.revoke_events,
             OperatorRevokedEvent {
                 lottery_id,
@@ -396,10 +398,20 @@ module lottery::operators {
         out
     }
 
+    fun emit_all_snapshots(state: &mut LotteryOperators) {
+        let len = vector::length(&state.lottery_ids);
+        let idx = 0;
+        while (idx < len) {
+            let lottery_id = *vector::borrow(&state.lottery_ids, idx);
+            emit_operator_snapshot(state, lottery_id);
+            idx = idx + 1;
+        };
+    }
+
     fun emit_operator_snapshot(state: &mut LotteryOperators, lottery_id: u64) {
         let snapshot = build_operator_snapshot(state, lottery_id);
         let OperatorSnapshot { owner, operators } = snapshot;
-        events::emit(
+        event::emit_event(
             &mut state.snapshot_events,
             OperatorSnapshotUpdatedEvent { lottery_id, owner, operators },
         );

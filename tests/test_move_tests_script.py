@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import json
-import subprocess
 import tempfile
 import io
 import xml.etree.ElementTree as ET
 from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import TestCase
-from unittest.mock import call, patch
+from unittest.mock import ANY, call, patch
 
 from supra.scripts import move_tests
 
@@ -31,16 +30,32 @@ class MoveTestsScriptTest(TestCase):
             return str(fake_supra) if name == "supra" else None
 
         with patch("supra.scripts.move_tests.shutil.which", side_effect=fake_which), patch(
-            "supra.scripts.move_tests.subprocess.run",
-            return_value=subprocess.CompletedProcess(args=[], returncode=0),
+            "supra.scripts.move_tests._run_with_streaming",
+            return_value=0,
         ) as run_mock:
             exit_code = move_tests.run(
-                ["--workspace", str(self.workspace), "--package", "lottery", "--", "--filter", "snapshots"]
+                [
+                    "--workspace",
+                    str(self.workspace),
+                    "--package",
+                    "lottery",
+                    "--report-log",
+                    "-",
+                    "--report-json",
+                    "-",
+                    "--report-junit",
+                    "-",
+                    "--",
+                    "--filter",
+                    "snapshots",
+                ]
             )
 
         self.assertEqual(0, exit_code)
         expected_package = str((self.workspace / "lottery").resolve())
-        run_mock.assert_called_once_with(
+        run_mock.assert_called_once()
+        command, log_stream = run_mock.call_args[0]
+        self.assertEqual(
             [
                 str(fake_supra),
                 "move",
@@ -51,23 +66,39 @@ class MoveTestsScriptTest(TestCase):
                 "--filter",
                 "snapshots",
             ],
-            check=False,
+            command,
         )
+        self.assertIsNone(log_stream)
 
     def test_runs_check_mode_with_supra_cli(self) -> None:
         fake_supra = self.workspace / "supra-cli"
         fake_supra.write_text("#!/bin/sh\n")
 
         with patch("supra.scripts.move_tests._resolve_cli", return_value=(str(fake_supra), "supra")), patch(
-            "supra.scripts.move_tests.subprocess.run",
-            return_value=subprocess.CompletedProcess(args=[], returncode=0),
+            "supra.scripts.move_tests._run_with_streaming",
+            return_value=0,
         ) as run_mock:
             exit_code = move_tests.run(
-                ["--workspace", str(self.workspace), "--package", "lottery", "--mode", "check"]
+                [
+                    "--workspace",
+                    str(self.workspace),
+                    "--package",
+                    "lottery",
+                    "--mode",
+                    "check",
+                    "--report-log",
+                    "-",
+                    "--report-json",
+                    "-",
+                    "--report-junit",
+                    "-",
+                ]
             )
 
         self.assertEqual(0, exit_code)
-        run_mock.assert_called_once_with(
+        run_mock.assert_called_once()
+        command, log_stream = run_mock.call_args[0]
+        self.assertEqual(
             [
                 str(fake_supra),
                 "move",
@@ -76,8 +107,9 @@ class MoveTestsScriptTest(TestCase):
                 "--package-dir",
                 str((self.workspace / "lottery").resolve()),
             ],
-            check=False,
+            command,
         )
+        self.assertIsNone(log_stream)
 
     def test_falls_back_to_aptos(self) -> None:
         fake_aptos = self.workspace / "aptos-cli"
@@ -88,71 +120,125 @@ class MoveTestsScriptTest(TestCase):
             return mapping.get(name)
 
         with patch("supra.scripts.move_tests.shutil.which", side_effect=fake_which), patch(
-            "supra.scripts.move_tests.subprocess.run",
-            return_value=subprocess.CompletedProcess(args=[], returncode=0),
+            "supra.scripts.move_tests._run_with_streaming",
+            return_value=0,
         ) as run_mock:
-            exit_code = move_tests.run(["--workspace", str(self.workspace)])
+            exit_code = move_tests.run(
+                [
+                    "--workspace",
+                    str(self.workspace),
+                    "--report-log",
+                    "-",
+                    "--report-json",
+                    "-",
+                    "--report-junit",
+                    "-",
+                ]
+            )
 
         self.assertEqual(0, exit_code)
         expected_package = str(self.workspace.resolve())
-        run_mock.assert_called_once_with(
-            [str(fake_aptos), "move", "test", "--package-dir", expected_package],
-            check=False,
+        run_mock.assert_called_once()
+        command, log_stream = run_mock.call_args[0]
+        self.assertEqual(
+            [
+                str(fake_aptos),
+                "move",
+                "test",
+                "--package-dir",
+                expected_package,
+                "--skip-fetch-latest-git-deps",
+            ],
+            command,
         )
+        self.assertIsNone(log_stream)
 
     def test_runs_check_mode_with_aptos_cli(self) -> None:
         fake_aptos = self.workspace / "aptos-cli"
         fake_aptos.write_text("#!/bin/sh\n")
 
         with patch("supra.scripts.move_tests._resolve_cli", return_value=(str(fake_aptos), "aptos")), patch(
-            "supra.scripts.move_tests.subprocess.run",
-            return_value=subprocess.CompletedProcess(args=[], returncode=0),
+            "supra.scripts.move_tests._run_with_streaming",
+            return_value=0,
         ) as run_mock:
             exit_code = move_tests.run(
-                ["--workspace", str(self.workspace), "--package", "lottery", "--mode", "check"]
+                [
+                    "--workspace",
+                    str(self.workspace),
+                    "--package",
+                    "lottery",
+                    "--mode",
+                    "check",
+                    "--report-log",
+                    "-",
+                    "--report-json",
+                    "-",
+                    "--report-junit",
+                    "-",
+                ]
             )
 
         self.assertEqual(0, exit_code)
-        run_mock.assert_called_once_with(
+        run_mock.assert_called_once()
+        command, log_stream = run_mock.call_args[0]
+        self.assertEqual(
             [
                 str(fake_aptos),
                 "move",
-                "check",
+                "compile",
                 "--package-dir",
                 str((self.workspace / "lottery").resolve()),
+                "--skip-fetch-latest-git-deps",
             ],
-            check=False,
+            command,
         )
+        self.assertIsNone(log_stream)
 
     def test_runs_check_mode_with_vanilla_cli(self) -> None:
         fake_move = self.workspace / "move-cli"
         fake_move.write_text("#!/bin/sh\n")
 
         with patch("supra.scripts.move_tests._resolve_cli", return_value=(str(fake_move), "move")), patch(
-            "supra.scripts.move_tests.subprocess.run",
-            return_value=subprocess.CompletedProcess(args=[], returncode=0),
+            "supra.scripts.move_tests._run_with_streaming",
+            return_value=0,
         ) as run_mock:
             exit_code = move_tests.run(
-                ["--workspace", str(self.workspace), "--package", "lottery", "--mode", "check"]
+                [
+                    "--workspace",
+                    str(self.workspace),
+                    "--package",
+                    "lottery",
+                    "--mode",
+                    "check",
+                    "--report-log",
+                    "-",
+                    "--report-json",
+                    "-",
+                    "--report-junit",
+                    "-",
+                ]
             )
 
         self.assertEqual(0, exit_code)
-        run_mock.assert_called_once_with(
+        run_mock.assert_called_once()
+        command, log_stream = run_mock.call_args[0]
+        self.assertEqual(
             [
                 str(fake_move),
                 "check",
-                "--package-path",
+                "--package-dir",
                 str((self.workspace / "lottery").resolve()),
             ],
-            check=False,
+            command,
         )
+        self.assertIsNone(log_stream)
 
     def test_lists_packages(self) -> None:
         (self.workspace / "vrf_hub").mkdir(parents=True, exist_ok=True)
         (self.workspace / "vrf_hub" / "Move.toml").write_text("[package]\nname = \"vrf_hub\"\n")
 
         buf = io.StringIO()
-        with patch("supra.scripts.move_tests.subprocess.run") as run_mock, redirect_stdout(buf):
+        with patch("supra.scripts.move_tests._run_with_streaming") as run_mock, redirect_stdout(buf):
             exit_code = move_tests.run(["--workspace", str(self.workspace), "--list-packages"])
 
         self.assertEqual(0, exit_code)
@@ -168,8 +254,23 @@ class MoveTestsScriptTest(TestCase):
 
         with patch(
             "supra.scripts.move_tests._resolve_cli", return_value=(str(fake_cli), "supra")
-        ), patch("supra.scripts.move_tests.subprocess.run", return_value=subprocess.CompletedProcess(args=[], returncode=0)) as run_mock:
-            exit_code = move_tests.run(["--workspace", str(self.workspace), "--all-packages"])
+        ), patch(
+            "supra.scripts.move_tests._run_with_streaming",
+            return_value=0,
+        ) as run_mock:
+            exit_code = move_tests.run(
+                [
+                    "--workspace",
+                    str(self.workspace),
+                    "--all-packages",
+                    "--report-log",
+                    "-",
+                    "--report-json",
+                    "-",
+                    "--report-junit",
+                    "-",
+                ]
+            )
 
         self.assertEqual(0, exit_code)
         expected_lottery = str((self.workspace / "lottery").resolve())
@@ -185,7 +286,7 @@ class MoveTestsScriptTest(TestCase):
                         "--package-dir",
                         expected_lottery,
                     ],
-                    check=False,
+                    ANY,
                 ),
                 call(
                     [
@@ -196,7 +297,7 @@ class MoveTestsScriptTest(TestCase):
                         "--package-dir",
                         expected_vrf_hub,
                     ],
-                    check=False,
+                    ANY,
                 ),
             ]
         )
@@ -214,7 +315,7 @@ class MoveTestsScriptTest(TestCase):
 
         with patch(
             "supra.scripts.move_tests._resolve_cli", return_value=(str(fake_cli), "supra")
-        ), patch("supra.scripts.move_tests.subprocess.run") as run_mock:
+        ), patch("supra.scripts.move_tests._run_with_streaming") as run_mock:
             exit_code = move_tests.run(
                 [
                     "--workspace",
@@ -240,7 +341,17 @@ class MoveTestsScriptTest(TestCase):
         self.assertEqual("skipped", result["status"])
         self.assertIsNone(result["return_code"])
         self.assertEqual(0.0, result["duration_seconds"])
-        self.assertEqual([], result["command"][6:])  # убедимся, что командный список корректный
+        self.assertEqual(
+            [
+                str(fake_cli),
+                "move",
+                "tool",
+                "test",
+                "--package-dir",
+                str(self.workspace.resolve()),
+            ],
+            result["command"],
+        )
 
         tree = ET.parse(junit_path)
         suite = tree.getroot()
@@ -290,15 +401,12 @@ class MoveTestsScriptTest(TestCase):
         fake_cli = self.workspace / "supra-cli"
         fake_cli.write_text("#!/bin/sh\n")
 
-        run_side_effect = [
-            subprocess.CompletedProcess(args=[], returncode=0),
-            subprocess.CompletedProcess(args=[], returncode=77),
-        ]
+        run_side_effect = [0, 77]
 
         with patch(
             "supra.scripts.move_tests._resolve_cli", return_value=(str(fake_cli), "supra")
         ), patch(
-            "supra.scripts.move_tests.subprocess.run",
+            "supra.scripts.move_tests._run_with_streaming",
             side_effect=run_side_effect,
         ) as run_mock, patch(
             "supra.scripts.move_tests.time.time",
@@ -338,16 +446,12 @@ class MoveTestsScriptTest(TestCase):
         fake_cli = self.workspace / "supra-cli"
         fake_cli.write_text("#!/bin/sh\n")
 
-        run_side_effect = [
-            subprocess.CompletedProcess(args=[], returncode=0),
-            subprocess.CompletedProcess(args=[], returncode=12),
-            subprocess.CompletedProcess(args=[], returncode=34),
-        ]
+        run_side_effect = [0, 12, 34]
 
         with patch(
             "supra.scripts.move_tests._resolve_cli", return_value=(str(fake_cli), "supra")
         ), patch(
-            "supra.scripts.move_tests.subprocess.run",
+            "supra.scripts.move_tests._run_with_streaming",
             side_effect=run_side_effect,
         ) as run_mock:
             exit_code = move_tests.run(
@@ -380,16 +484,12 @@ class MoveTestsScriptTest(TestCase):
         fake_cli = self.workspace / "supra-cli"
         fake_cli.write_text("#!/bin/sh\n")
 
-        run_side_effect = [
-            subprocess.CompletedProcess(args=[], returncode=0),
-            subprocess.CompletedProcess(args=[], returncode=12),
-            subprocess.CompletedProcess(args=[], returncode=34),
-        ]
+        run_side_effect = [0, 12, 34]
 
         with patch(
             "supra.scripts.move_tests._resolve_cli", return_value=(str(fake_cli), "supra")
         ), patch(
-            "supra.scripts.move_tests.subprocess.run",
+            "supra.scripts.move_tests._run_with_streaming",
             side_effect=run_side_effect,
         ), patch(
             "supra.scripts.move_tests.time.time",

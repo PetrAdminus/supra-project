@@ -18,7 +18,9 @@ frontend/coverage/
 node_modules/
 
 # Move / Aptos tooling caches
-.move
+.move/
+!.move/config
+!.move/config.example
 .aptos
 .supra
 

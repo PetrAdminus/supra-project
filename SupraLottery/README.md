@@ -44,15 +44,31 @@ python -m supra.scripts.cli move-test --workspace supra/move_workspace --package
 ```
 docker compose run --rm \
   --entrypoint bash supra_cli \
-  -lc "python -m supra.scripts.cli move-test --workspace /supra/move_workspace --package lottery"
+  -lc "python -m supra.scripts.cli move-test --workspace /supra/move_workspace --package lottery -- --named-addresses lottery=$(grep '^lottery' /supra/.move/config | cut -d'=' -f2) lottery_factory=$(grep '^lottery_factory' /supra/.move/config | cut -d'=' -f2) vrf_hub=$(grep '^vrf_hub' /supra/.move/config | cut -d'=' -f2) supra_addr=$(grep '^supra_addr' /supra/.move/config | cut -d'=' -f2)"
 ```
 
-> Соглашения Move 1: не используем `let mut`, комментарии оставляем в ASCII, а обработчики событий создаём через модуль `events`
-> соответствующего пакета. Для лотереи доступны `lottery::events::{new_handle, emit, emit_copy}`, для фабрики —
-> `lottery_factory::events`, для VRF-хаба — `vrf_hub::events`. Это избавляет модули от прямых обращений к
-> `account::new_event_handle` и упрощает сопровождение при апгрейдах Supra Framework.
+> Соглашения Move 1: не используем `let mut`, комментарии оставляем в ASCII, обработчики событий создаём напрямую через `supra_framework::account::new_event_handle`,
+> а публикацию выполняем через `supra_framework::event::emit_event` без обёрток. Это облегчает перенос на новые версии Supra Framework и упрощает сопровождение кода.
 
-> **Настройка адресов:** для одиночного запуска можно добавить `-- --override-addresses lottery=0x1ee ...`. Для регулярных прогонов создайте `.move/config` с секцией `[addresses]` — CLI прочитает файл автоматически и не придётся править `Move.toml`. Конфиг работает одинаково в Docker и на локальной машине.
+> **Настройка адресов:** для одиночного запуска можно добавить `-- --override-addresses lottery=0x1ee ...`. Supra CLI Move 1 также принимает адреса через `--named-addresses`; если запускаете `supra move tool test` напрямую, обязательно передайте все именованные адреса (`lottery`, `lottery_factory`, `vrf_hub`, `supra_addr`) или экспортируйте `MOVE_HOME=.move`, чтобы CLI автоматически прочитал `.move/config`. В репозитории уже есть `.move/config` с тестнет-адресами и путём workspace; скрипт `move-test` и Supra CLI используют его автоматически. Для собственных окружений скопируйте `.move/config.example` и замените адреса на нужные — файл одинаково работает локально и внутри Docker.
+
+### Прямой запуск `supra/scripts/move_tests.py`
+
+Если нужно получить отчёты без обёртки CLI, используйте раннер `supra/scripts/move_tests.py`: он ищет Supra/Aptos/vanilla Move CLI, подставляет workspace и адреса из `.move/config`, сохраняет JSON/JUnit (`tmp/move-test-report.json`, `tmp/move-test-report.xml`) и лог `tmp/unittest.log`.
+
+```bash
+PYTHONPATH=SupraLottery python -m supra.scripts.move_tests \
+  --workspace SupraLottery/supra/move_workspace \
+  --all-packages \
+  --mode test \
+  --keep-going \
+  --report-json tmp/move-test-report.json \
+  --report-junit tmp/move-test-report.xml \
+  --log-path tmp/unittest.log \
+  -- --skip-fetch-latest-git-deps
+```
+
+Флаги `--mode check` и `--dry-run --cli-flavour supra` помогают подготовить артефакты в окружении без установленной Supra CLI. По умолчанию раннер читает `.move/config`, начиная с указанного воркспейса и поднимаясь вверх по каталогам, собирает именованные адреса и добавляет их в `--named-addresses`. Для нестандартной конфигурации передайте путь к файлу через `--move-config` либо отключите автоподстановку флагом `--no-auto-named-addresses`. Тот же скрипт использует workflow `.github/workflows/move-tests.yml`, выгружая отчёты в CI.
 
 Команда собирает пакет и прогоняет полный набор Move-юнит-тестов (позитивные и негативные сценарии VRF, whitelisting, переполнения счётчиков). Поскольку пакеты используют git-зависимости Supra Framework/Move Stdlib, первый запуск скачает требуемые ревизии; при оффлайн-прогоне добавьте флаг `--skip-fetch-latest-git-deps` через `-- --skip-fetch-latest-git-deps`. Для регрессионных прогонов в CI используйте `PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test --workspace SupraLottery/supra/move_workspace --all-packages --keep-going --report-json ci/move-test-report.json --report-junit ci/move-test-report.xml -- --skip-fetch-latest-git-deps`, чтобы каждый пакет проходил проверку, даже если один из них падает, а артефакты включали JSON и JUnit-отчёты. На данный момент тесты запускаются вручную перед каждым релизом; автоматический CI отключён по требованию аудитора.
 

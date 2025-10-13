@@ -1,5 +1,7 @@
 // sources/Lottery.move
 module lottery::main_v2 {
+    friend lottery::migration;
+
     use std::string;
     use std::bcs;
     use std::option;
@@ -257,7 +259,7 @@ module lottery::main_v2 {
         verification_gas_value: u128,
     }
 
-    public(package) fun export_state_for_migration():
+    public(friend) fun export_state_for_migration():
         (vector<address>, bool, u64, option::Option<u64>, u64) acquires LotteryData {
         let lottery = borrow_global<LotteryData>(@lottery);
         let tickets = clone_addresses(&lottery.tickets);
@@ -271,7 +273,7 @@ module lottery::main_v2 {
         )
     }
 
-    public(package) fun clear_state_after_migration() acquires LotteryData {
+    public(friend) fun clear_state_after_migration() acquires LotteryData {
         let lottery = borrow_global_mut<LotteryData>(@lottery);
         clear_addresses(&mut lottery.tickets);
         lottery.jackpot_amount = 0;

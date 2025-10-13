@@ -19,34 +19,41 @@
    ```bash
    which supra || supra --version
    ```
-3. Перед запуском тестов обновите git-зависимости Move:
+3. Перед запуском тестов обновите git-зависимости Move (скрипт автоматически считывает `.move/config`):
    ```bash
-   PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test \
+   PYTHONPATH=SupraLottery python -m supra.scripts.move_tests \
      --workspace SupraLottery/supra/move_workspace \
-     --list-packages -- --fetch-latest-git-deps
+     --mode check \
+     --dry-run \
+     --cli-flavour supra \
+     -- --fetch-latest-git-deps
    ```
 4. Подготовьте `.env` или YAML-профиль Supra CLI с адресами и ключами, которые используются в runbook и смоук-тестах.
    Проверьте, что значения `supra_addr`, `lottery_admin`, `vrf_hub_admin` и подписка dVRF соответствуют актуальной сети.
 
 ## 2. Прогон Move-тестов
-1. Запустите последовательный прогон всех пакетов с генерацией JSON и JUnit:
+1. Запустите последовательный прогон всех пакетов с генерацией JSON, JUnit и лога CLI:
    ```bash
-   PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test \
+   PYTHONPATH=SupraLottery python -m supra.scripts.move_tests \
      --workspace SupraLottery/supra/move_workspace \
-     --all-packages --keep-going \
+     --all-packages \
+     --mode test \
+     --keep-going \
      --report-json tmp/move-test-report.json \
      --report-junit tmp/move-test-report.xml \
+     --log-path tmp/unittest.log \
      -- --skip-fetch-latest-git-deps
    ```
-2. Убедитесь, что Supra CLI действительно выполняет тесты (в логах команды отображаются команды `supra move test`).
+2. Убедитесь, что Supra CLI действительно выполняет тесты (в `tmp/unittest.log` остаются команды `supra move test`).
    Скрипт завершится кодом 0, если все пакеты прошли, либо вернёт код первого упавшего пакета при `--keep-going`.
 3. Скопируйте полученные артефакты в `docs/audit/move_test_reports/` с датой запуска, например:
    ```bash
    cp tmp/move-test-report.json docs/audit/move_test_reports/2025-02-28-move-test.json
    cp tmp/move-test-report.xml  docs/audit/move_test_reports/2025-02-28-move-test.xml
+   cp tmp/unittest.log          docs/audit/move_test_reports/2025-02-28-move-test.log
    ```
 4. Обновите разделы «Тестирование» в `docs/audit/internal_audit_checklist.md` и `docs/audit/external_handover_summary.md`,
-   указав дату, CLI и ссылку на артефакты.
+   указав дату, CLI и ссылки на все три артефакта.
 
 ## 3. Python-юнит-тесты
 1. Выполните полный набор Python-тестов из корня репозитория:

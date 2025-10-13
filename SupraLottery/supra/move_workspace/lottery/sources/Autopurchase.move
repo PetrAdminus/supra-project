@@ -3,10 +3,10 @@ module lottery::autopurchase {
     use std::signer;
     use std::vector;
     use vrf_hub::table;
+    use supra_framework::account;
     use supra_framework::event;
     use std::math64;
     use lottery::instances;
-    use lottery::events;
     use lottery::rounds;
     use lottery::treasury_v1;
     use lottery_factory::registry;
@@ -123,13 +123,15 @@ module lottery::autopurchase {
                 admin: addr,
                 lotteries: table::new(),
                 lottery_ids: vector::empty(),
-                deposit_events: events::new_handle<AutopurchaseDepositEvent>(caller),
-                config_events: events::new_handle<AutopurchaseConfigUpdatedEvent>(caller),
-                executed_events: events::new_handle<AutopurchaseExecutedEvent>(caller),
-                refund_events: events::new_handle<AutopurchaseRefundedEvent>(caller),
-                snapshot_events: events::new_handle<AutopurchaseSnapshotUpdatedEvent>(caller),
+                deposit_events: account::new_event_handle<AutopurchaseDepositEvent>(caller),
+                config_events: account::new_event_handle<AutopurchaseConfigUpdatedEvent>(caller),
+                executed_events: account::new_event_handle<AutopurchaseExecutedEvent>(caller),
+                refund_events: account::new_event_handle<AutopurchaseRefundedEvent>(caller),
+                snapshot_events: account::new_event_handle<AutopurchaseSnapshotUpdatedEvent>(caller),
             },
         );
+        let state = borrow_global_mut<AutopurchaseState>(@lottery);
+        emit_all_snapshots(state);
     }
 
     #[view]
@@ -178,7 +180,7 @@ module lottery::autopurchase {
                 plan.tickets_per_draw = tickets_per_draw;
                 plan.active = active;
             };
-            events::emit(
+            event::emit_event(
                 &mut state.config_events,
                 AutopurchaseConfigUpdatedEvent { lottery_id, player, tickets_per_draw, active },
             );
@@ -213,7 +215,7 @@ module lottery::autopurchase {
             let plan_ref = table::borrow(&plans.plans, player);
             plan_ref.balance
         };
-        events::emit(
+        event::emit_event(
             &mut state.deposit_events,
             AutopurchaseDepositEvent {
                 lottery_id,
@@ -266,7 +268,7 @@ module lottery::autopurchase {
             plans.total_balance = plans.total_balance - spent_local;
             (tickets_to_buy_local, spent_local, plan_ref.balance)
         };
-        events::emit(
+        event::emit_event(
             &mut state.executed_events,
             AutopurchaseExecutedEvent {
                 lottery_id,
@@ -305,7 +307,7 @@ module lottery::autopurchase {
             plan_ref.balance
         };
         treasury_v1::payout_from_treasury(player, amount);
-        events::emit(
+        event::emit_event(
             &mut state.refund_events,
             AutopurchaseRefundedEvent { lottery_id, player, amount, remaining_balance },
         );
@@ -641,7 +643,7 @@ module lottery::autopurchase {
             return
         };
         let snapshot = build_lottery_snapshot(state, lottery_id);
-        events::emit(
+        event::emit_event(
             &mut state.snapshot_events,
             AutopurchaseSnapshotUpdatedEvent { admin: state.admin, snapshot },
         );

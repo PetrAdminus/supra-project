@@ -1,12 +1,14 @@
 module lottery::vip {
+    friend lottery::rounds;
+
     use std::option;
     use std::signer;
     use std::vector;
     use vrf_hub::table;
+    use supra_framework::account;
     use supra_framework::event;
     use std::math64;
     use std::timestamp;
-    use lottery::events;
     use lottery::instances;
     use lottery::treasury_multi;
     use lottery::treasury_v1;
@@ -129,11 +131,11 @@ module lottery::vip {
                 admin: addr,
                 lotteries: table::new(),
                 lottery_ids: vector::empty(),
-                config_events: events::new_handle<VipConfigUpdatedEvent>(caller),
-                subscribed_events: events::new_handle<VipSubscribedEvent>(caller),
-                cancelled_events: events::new_handle<VipCancelledEvent>(caller),
-                bonus_events: events::new_handle<VipBonusIssuedEvent>(caller),
-                snapshot_events: events::new_handle<VipSnapshotUpdatedEvent>(caller),
+                config_events: account::new_event_handle<VipConfigUpdatedEvent>(caller),
+                subscribed_events: account::new_event_handle<VipSubscribedEvent>(caller),
+                cancelled_events: account::new_event_handle<VipCancelledEvent>(caller),
+                bonus_events: account::new_event_handle<VipBonusIssuedEvent>(caller),
+                snapshot_events: account::new_event_handle<VipSnapshotUpdatedEvent>(caller),
             },
         );
         let state = borrow_global_mut<VipState>(@lottery);
@@ -192,7 +194,7 @@ module lottery::vip {
             );
             record_lottery_id(&mut state.lottery_ids, lottery_id);
         };
-        events::emit(
+        event::emit_event(
             &mut state.config_events,
             VipConfigUpdatedEvent { lottery_id, price, duration_secs, bonus_tickets },
         );
@@ -327,7 +329,7 @@ module lottery::vip {
         option::some(build_vip_snapshot(&state))
     }
 
-    public(package) fun bonus_tickets_for(lottery_id: u64, player: address): u64 acquires VipState {
+    public(friend) fun bonus_tickets_for(lottery_id: u64, player: address): u64 acquires VipState {
         if (!exists<VipState>(@lottery)) {
             return 0
         };
@@ -348,7 +350,7 @@ module lottery::vip {
         }
     }
 
-    public(package) fun record_bonus_usage(
+    public(friend) fun record_bonus_usage(
         lottery_id: u64,
         player: address,
         bonus_tickets: u64,
@@ -362,7 +364,7 @@ module lottery::vip {
         };
         let lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
         lottery.bonus_tickets_issued = math64::checked_add(lottery.bonus_tickets_issued, bonus_tickets);
-        events::emit(
+        event::emit_event(
             &mut state.bonus_events,
             VipBonusIssuedEvent { lottery_id, player, bonus_tickets },
         );
@@ -457,7 +459,7 @@ module lottery::vip {
             );
             record_member(&mut lottery.members, player);
         };
-        events::emit(
+        event::emit_event(
             &mut state.subscribed_events,
             VipSubscribedEvent {
                 lottery_id,
@@ -494,7 +496,7 @@ module lottery::vip {
         let subscription = table::borrow_mut(&mut lottery.subscriptions, player);
         subscription.expiry_ts = timestamp::now_seconds();
         subscription.bonus_tickets = 0;
-        events::emit(
+        event::emit_event(
             &mut state.cancelled_events,
             VipCancelledEvent { lottery_id, player },
         );
@@ -503,7 +505,7 @@ module lottery::vip {
 
     fun emit_vip_snapshot(state: &mut VipState) {
         let snapshot = build_vip_snapshot(&*state);
-        events::emit(
+        event::emit_event(
             &mut state.snapshot_events,
             VipSnapshotUpdatedEvent { snapshot },
         );
