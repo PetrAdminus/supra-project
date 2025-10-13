@@ -13,7 +13,6 @@ module lottery::treasury_multi {
     use vrf_hub::table;
     use supra_framework::account;
     use supra_framework::event;
-    use std::math64;
     use lottery::treasury_v1;
 
     const E_NOT_AUTHORIZED: u64 = 1;
@@ -34,6 +33,7 @@ module lottery::treasury_multi {
     const E_BONUS_RECIPIENT_FROZEN: u64 = 16;
     const E_JACKPOT_WINNER_UNREGISTERED: u64 = 17;
     const E_JACKPOT_WINNER_FROZEN: u64 = 18;
+    const E_ARITHMETIC_OVERFLOW: u64 = 19;
 
     const BASIS_POINT_DENOMINATOR: u64 = 10_000;
 
@@ -377,7 +377,7 @@ module lottery::treasury_multi {
         };
         if (table::contains(&state.pools, lottery_id)) {
             let pool = table::borrow_mut(&mut state.pools, lottery_id);
-            pool.operations_balance = math64::checked_add(pool.operations_balance, amount);
+            pool.operations_balance = safe_add(pool.operations_balance, amount);
         } else {
             table::add(
                 &mut state.pools,
@@ -500,7 +500,7 @@ module lottery::treasury_multi {
         config.jackpot_bps
     }
 
-    fun share_config_operations_bps(config: &LotteryShareConfig): u64 {
+    public(friend) fun share_config_operations_bps(config: &LotteryShareConfig): u64 {
         config.operations_bps
     }
 
@@ -561,20 +561,49 @@ module lottery::treasury_multi {
         assert!(!frozen, frozen_error);
     }
 
+    fun mul_div(amount: u64, basis_points: u64, denominator: u64): u64 {
+        assert!(denominator > 0, E_INVALID_BASIS_POINTS);
+        if (amount == 0 || basis_points == 0) {
+            return 0
+        };
+
+        let quotient = amount / denominator;
+        let remainder = amount % denominator;
+        let scaled_quotient = safe_mul(quotient, basis_points);
+        let scaled_remainder = safe_mul(remainder, basis_points) / denominator;
+        safe_add(scaled_quotient, scaled_remainder)
+    }
+
+    fun safe_add(lhs: u64, rhs: u64): u64 {
+        let sum = lhs + rhs;
+        assert!(sum >= lhs, E_ARITHMETIC_OVERFLOW);
+        sum
+    }
+
+    fun safe_mul(lhs: u64, rhs: u64): u64 {
+        if (lhs == 0 || rhs == 0) {
+            return 0
+        };
+
+        let product = lhs * rhs;
+        assert!(product / lhs == rhs, E_ARITHMETIC_OVERFLOW);
+        product
+    }
+
     fun apply_allocation(state: &mut TreasuryState, lottery_id: u64, amount: u64) {
         if (!table::contains(&state.configs, lottery_id)) {
             abort E_CONFIG_MISSING
         };
         let config = *table::borrow(&state.configs, lottery_id);
-        let prize_amount = math64::mul_div(amount, config.prize_bps, BASIS_POINT_DENOMINATOR);
-        let jackpot_amount = math64::mul_div(amount, config.jackpot_bps, BASIS_POINT_DENOMINATOR);
+        let prize_amount = mul_div(amount, config.prize_bps, BASIS_POINT_DENOMINATOR);
+        let jackpot_amount = mul_div(amount, config.jackpot_bps, BASIS_POINT_DENOMINATOR);
         let operations_amount = amount - prize_amount - jackpot_amount;
 
-        state.jackpot_balance = state.jackpot_balance + jackpot_amount;
+        state.jackpot_balance = safe_add(state.jackpot_balance, jackpot_amount);
         if (table::contains(&state.pools, lottery_id)) {
             let pool = table::borrow_mut(&mut state.pools, lottery_id);
-            pool.prize_balance = pool.prize_balance + prize_amount;
-            pool.operations_balance = pool.operations_balance + operations_amount;
+            pool.prize_balance = safe_add(pool.prize_balance, prize_amount);
+            pool.operations_balance = safe_add(pool.operations_balance, operations_amount);
         } else {
             table::add(
                 &mut state.pools,

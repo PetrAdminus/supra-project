@@ -1,4 +1,5 @@
 module lottery::nft_rewards {
+    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
@@ -248,7 +249,7 @@ module lottery::nft_rewards {
         if (!table::contains(&state.users, owner)) {
             return option::none<BadgeOwnerSnapshot>()
         };
-        option::some(build_owner_snapshot(&state, owner))
+        option::some(build_owner_snapshot(state, owner))
     }
 
 
@@ -258,7 +259,7 @@ module lottery::nft_rewards {
             return option::none<NftRewardsSnapshot>()
         };
         let state = borrow_global<BadgeAuthority>(@lottery);
-        option::some(build_snapshot(&state))
+        option::some(build_snapshot(state))
     }
 
 
@@ -419,7 +420,7 @@ module lottery::nft_rewards {
 
 
     fun emit_owner_snapshot(state: &mut BadgeAuthority, owner: address) {
-        let snapshot = build_owner_snapshot(&*state, owner);
+        let snapshot = build_owner_snapshot(borrow::freeze(state), owner);
         event::emit_event(
             &mut state.snapshot_events,
             NftRewardsSnapshotUpdatedEvent {

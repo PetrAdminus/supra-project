@@ -55,7 +55,7 @@ module lottery::migration_tests {
         let snapshot_opt = rounds::get_round_snapshot(lottery_id);
         assert!(option::is_some(&snapshot_opt), 1);
         let snapshot = test_utils::unwrap(snapshot_opt);
-        let (ticket_count, draw_scheduled, has_pending_request, next_ticket_id) =
+        let (ticket_count, draw_scheduled, has_pending_request, next_ticket_id, _) =
             rounds::round_snapshot_fields_for_test(&snapshot);
         assert!(ticket_count == 2, ticket_count);
         assert!(draw_scheduled, 2);

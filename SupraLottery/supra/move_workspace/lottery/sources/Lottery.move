@@ -1386,8 +1386,8 @@ module lottery::main_v2 {
     public fun draw_handled_fields(
         event: &DrawHandledEvent
     ): (u64, bool, vector<u8>, address, address, u64, u8, u64, vector<u256>) {
-        let request_hash = *event.request_hash;
-        let randomness = *event.randomness;
+        let request_hash = clone_bytes(&event.request_hash);
+        let randomness = clone_u256_vector(&event.randomness);
         (
             event.nonce,
             event.success,

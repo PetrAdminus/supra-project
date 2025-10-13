@@ -1,9 +1,9 @@
 module lottery::store {
+    use std::borrow;
     use std::option;
     use std::vector;
     use supra_framework::account;
     use supra_framework::event;
-    use std::math64;
     use std::signer;
     use vrf_hub::table;
     use lottery::instances;
@@ -18,6 +18,7 @@ module lottery::store {
     const E_INVALID_STOCK: u64 = 6;
     const E_INSUFFICIENT_STOCK: u64 = 7;
     const E_INVALID_QUANTITY: u64 = 8;
+    const E_ARITHMETIC_OVERFLOW: u64 = 9;
 
     const SOURCE_STORE: vector<u8> = b"store";
 
@@ -259,10 +260,10 @@ module lottery::store {
             } else {
                 option::none()
             };
-            total_price = math64::checked_mul(record.item.price, quantity);
+            total_price = safe_mul(record.item.price, quantity);
             treasury_v1::deposit_from_user(buyer, total_price);
             record.item.stock = stock_left;
-            record.sold = math64::checked_add(record.sold, quantity);
+            record.sold = safe_add(record.sold, quantity);
         };
         treasury_multi::record_operations_income_internal(lottery_id, total_price, source_tag());
         event::emit_event(
@@ -371,7 +372,7 @@ module lottery::store {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return option::none<StoreLotterySnapshot>()
         };
-        option::some(build_lottery_snapshot(&state, lottery_id))
+        option::some(build_lottery_snapshot(state, lottery_id))
     }
 
 
@@ -381,7 +382,7 @@ module lottery::store {
             return option::none<StoreSnapshot>()
         };
         let state = borrow_global<StoreState>(@lottery);
-        option::some(build_store_snapshot(&state))
+        option::some(build_store_snapshot(state))
     }
 
     fun ensure_admin(caller: &signer) acquires StoreState {
@@ -443,6 +444,22 @@ module lottery::store {
         snapshot: &StoreSnapshot
     ): (address, vector<StoreLotterySnapshot>) {
         (snapshot.admin, snapshot.lotteries)
+    }
+
+    fun safe_add(lhs: u64, rhs: u64): u64 {
+        let sum = lhs + rhs;
+        assert!(sum >= lhs, E_ARITHMETIC_OVERFLOW);
+        sum
+    }
+
+    fun safe_mul(lhs: u64, rhs: u64): u64 {
+        if (lhs == 0 || rhs == 0) {
+            return 0
+        };
+
+        let product = lhs * rhs;
+        assert!(product / lhs == rhs, E_ARITHMETIC_OVERFLOW);
+        product
     }
 
     fun borrow_or_add_store(state: &mut StoreState, lottery_id: u64): &mut LotteryStore {
@@ -519,7 +536,7 @@ module lottery::store {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return
         };
-        let snapshot = build_lottery_snapshot(&*state, lottery_id);
+        let snapshot = build_lottery_snapshot(borrow::freeze(state), lottery_id);
         event::emit_event(
             &mut state.snapshot_events,
             StoreSnapshotUpdatedEvent { admin: state.admin, snapshot },

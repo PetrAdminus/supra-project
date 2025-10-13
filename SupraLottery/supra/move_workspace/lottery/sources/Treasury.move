@@ -1,9 +1,8 @@
 module lottery::treasury_v1 {
     friend lottery::autopurchase;
-    friend lottery::lottery;
+    friend lottery::main_v2;
     friend lottery::treasury_multi;
 
-    use std::math64;
     use std::option;
     use std::signer;
     use std::string;
@@ -21,6 +20,7 @@ module lottery::treasury_v1 {
     const E_INVALID_BASIS_POINTS: u64 = 6;
     const E_RECIPIENT_STORE_NOT_REGISTERED: u64 = 7;
     const E_STORE_FROZEN: u64 = 0x50003;
+    const E_ARITHMETIC_OVERFLOW: u64 = 0x50004;
 
     const BASIS_POINT_DENOMINATOR: u64 = 10_000;
     const DEFAULT_BP_JACKPOT: u64 = 5_000;
@@ -230,7 +230,7 @@ module lottery::treasury_v1 {
             return 0
         };
 
-        math64::mul_div(total, basis_points, BASIS_POINT_DENOMINATOR)
+        mul_div(total, basis_points, BASIS_POINT_DENOMINATOR)
     }
 
     fun share_for_recipient(total: u64, basis_points: u64, recipient: address): u64 {
@@ -239,6 +239,35 @@ module lottery::treasury_v1 {
         };
 
         calculate_share(total, basis_points)
+    }
+
+    fun mul_div(amount: u64, basis_points: u64, denominator: u64): u64 {
+        assert!(denominator > 0, E_INVALID_BASIS_POINTS);
+        if (amount == 0 || basis_points == 0) {
+            return 0
+        };
+
+        let quotient = amount / denominator;
+        let remainder = amount % denominator;
+        let scaled_quotient = safe_mul(quotient, basis_points);
+        let scaled_remainder = safe_mul(remainder, basis_points) / denominator;
+        safe_add(scaled_quotient, scaled_remainder)
+    }
+
+    fun safe_add(lhs: u64, rhs: u64): u64 {
+        let sum = lhs + rhs;
+        assert!(sum >= lhs, E_ARITHMETIC_OVERFLOW);
+        sum
+    }
+
+    fun safe_mul(lhs: u64, rhs: u64): u64 {
+        if (lhs == 0 || rhs == 0) {
+            return 0
+        };
+
+        let product = lhs * rhs;
+        assert!(product / lhs == rhs, E_ARITHMETIC_OVERFLOW);
+        product
     }
 
     public entry fun init_token(

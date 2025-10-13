@@ -1,4 +1,5 @@
 module lottery::operators {
+    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
@@ -278,7 +279,7 @@ module lottery::operators {
             }
         };
         let state = borrow_global<LotteryOperators>(@lottery);
-        build_operator_snapshot(&state, lottery_id)
+        build_operator_snapshot(state, lottery_id)
     }
 
     #[test_only]
@@ -409,7 +410,7 @@ module lottery::operators {
     }
 
     fun emit_operator_snapshot(state: &mut LotteryOperators, lottery_id: u64) {
-        let snapshot = build_operator_snapshot(state, lottery_id);
+        let snapshot = build_operator_snapshot(borrow::freeze(state), lottery_id);
         let OperatorSnapshot { owner, operators } = snapshot;
         event::emit_event(
             &mut state.snapshot_events,

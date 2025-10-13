@@ -1,11 +1,11 @@
 module lottery::autopurchase {
+    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
     use vrf_hub::table;
     use supra_framework::account;
     use supra_framework::event;
-    use std::math64;
     use lottery::instances;
     use lottery::rounds;
     use lottery::treasury_v1;
@@ -20,6 +20,7 @@ module lottery::autopurchase {
     const E_TICKETS_PER_DRAW_ZERO: u64 = 7;
     const E_INSUFFICIENT_BALANCE: u64 = 8;
     const E_UNKNOWN_LOTTERY: u64 = 9;
+    const E_ARITHMETIC_OVERFLOW: u64 = 10;
 
     struct AutopurchasePlan has copy, drop, store {
         balance: u64,
@@ -209,9 +210,9 @@ module lottery::autopurchase {
                 );
             } else {
                 let plan = table::borrow_mut(&mut plans.plans, player);
-                plan.balance = math64::checked_add(plan.balance, amount);
+                plan.balance = safe_add(plan.balance, amount);
             };
-            plans.total_balance = math64::checked_add(plans.total_balance, amount);
+            plans.total_balance = safe_add(plans.total_balance, amount);
             let plan_ref = table::borrow(&plans.plans, player);
             plan_ref.balance
         };
@@ -403,7 +404,7 @@ module lottery::autopurchase {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return option::none<AutopurchaseLotterySnapshot>()
         };
-        option::some(build_lottery_snapshot(&state, lottery_id))
+        option::some(build_lottery_snapshot(state, lottery_id))
     }
 
     #[view]
@@ -414,7 +415,7 @@ module lottery::autopurchase {
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
-        option::some(build_autopurchase_snapshot(&state))
+        option::some(build_autopurchase_snapshot(state))
     }
 
     fun ensure_lottery_known(lottery_id: u64) {
@@ -526,6 +527,12 @@ module lottery::autopurchase {
             idx = idx + 1;
         };
         out
+    }
+
+    fun safe_add(lhs: u64, rhs: u64): u64 {
+        let sum = lhs + rhs;
+        assert!(sum >= lhs, E_ARITHMETIC_OVERFLOW);
+        sum
     }
 
     fun copy_address_vector(values: &vector<address>): vector<address> {
@@ -642,7 +649,7 @@ module lottery::autopurchase {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return
         };
-        let snapshot = build_lottery_snapshot(state, lottery_id);
+        let snapshot = build_lottery_snapshot(borrow::freeze(state), lottery_id);
         event::emit_event(
             &mut state.snapshot_events,
             AutopurchaseSnapshotUpdatedEvent { admin: state.admin, snapshot },
