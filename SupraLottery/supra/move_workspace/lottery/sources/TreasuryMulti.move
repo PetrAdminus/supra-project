@@ -4,6 +4,7 @@ module lottery::treasury_multi {
     friend lottery::referrals;
     friend lottery::rounds;
     friend lottery::store;
+    #[test_only]
     friend lottery::treasury_multi_tests;
     friend lottery::vip;
 
