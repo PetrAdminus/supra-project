@@ -107,9 +107,9 @@ module lottery::history {
     public entry fun clear_history(caller: &signer, lottery_id: u64) acquires HistoryCollection {
         ensure_admin(caller);
         let state = borrow_global_mut<HistoryCollection>(@lottery);
-        if (table::contains(&state.histories, lottery_id)) {
+        if (table::contains<u64, LotteryHistory>(&state.histories, lottery_id)) {
             let previous = option::some(build_snapshot_from_mut(state));
-            let history = table::borrow_mut(&mut state.histories, lottery_id);
+            let history = table::borrow_mut<u64, LotteryHistory>(&mut state.histories, lottery_id);
             clear_records(&mut history.records);
             emit_history_snapshot(state, previous);
         };
@@ -162,7 +162,7 @@ module lottery::history {
             return false
         };
         let state = borrow_global<HistoryCollection>(@lottery);
-        table::contains(&state.histories, lottery_id)
+        table::contains<u64, LotteryHistory>(&state.histories, lottery_id)
     }
 
     #[view]
@@ -180,10 +180,10 @@ module lottery::history {
             return option::none<vector<DrawRecord>>()
         };
         let state = borrow_global<HistoryCollection>(@lottery);
-        if (!table::contains(&state.histories, lottery_id)) {
+        if (!table::contains<u64, LotteryHistory>(&state.histories, lottery_id)) {
             option::none<vector<DrawRecord>>()
         } else {
-            let history = table::borrow(&state.histories, lottery_id);
+            let history = table::borrow<u64, LotteryHistory>(&state.histories, lottery_id);
             option::some(clone_records(&history.records))
         }
     }
@@ -194,10 +194,10 @@ module lottery::history {
             return option::none<DrawRecord>()
         };
         let state = borrow_global<HistoryCollection>(@lottery);
-        if (!table::contains(&state.histories, lottery_id)) {
+        if (!table::contains<u64, LotteryHistory>(&state.histories, lottery_id)) {
             option::none<DrawRecord>()
         } else {
-            let history = table::borrow(&state.histories, lottery_id);
+            let history = table::borrow<u64, LotteryHistory>(&state.histories, lottery_id);
             if (vector::is_empty(&history.records)) {
                 option::none<DrawRecord>()
             } else {
@@ -215,7 +215,7 @@ module lottery::history {
             return option::none<LotteryHistorySnapshot>()
         };
         let state = borrow_global<HistoryCollection>(@lottery);
-        if (!table::contains(&state.histories, lottery_id)) {
+        if (!table::contains<u64, LotteryHistory>(&state.histories, lottery_id)) {
             option::none<LotteryHistorySnapshot>()
         } else {
             option::some(build_lottery_snapshot(state, lottery_id))
@@ -243,11 +243,15 @@ module lottery::history {
     }
 
     fun borrow_or_create_history(state: &mut HistoryCollection, lottery_id: u64): &mut LotteryHistory {
-        if (!table::contains(&state.histories, lottery_id)) {
-            table::add(&mut state.histories, lottery_id, LotteryHistory { records: vector::empty<DrawRecord>() });
+        if (!table::contains<u64, LotteryHistory>(&state.histories, lottery_id)) {
+            table::add<u64, LotteryHistory>(
+                &mut state.histories,
+                lottery_id,
+                LotteryHistory { records: vector::empty<DrawRecord>() },
+            );
             push_unique(&mut state.lottery_ids, lottery_id);
         };
-        table::borrow_mut(&mut state.histories, lottery_id)
+        table::borrow_mut<u64, LotteryHistory>(&mut state.histories, lottery_id)
     }
 
     fun trim_history(records: &mut vector<DrawRecord>) {
@@ -311,11 +315,11 @@ module lottery::history {
         histories: &table::Table<u64, LotteryHistory>,
     ): HistorySnapshot {
         let snapshots = vector::empty<LotteryHistorySnapshot>();
-        let len = vector::length(lottery_ids);
+        let len = vector::length<u64>(lottery_ids);
         let index = 0;
         while (index < len) {
-            let lottery_id = *vector::borrow(lottery_ids, index);
-            if (table::contains(histories, lottery_id)) {
+            let lottery_id = *vector::borrow<u64>(lottery_ids, index);
+            if (table::contains<u64, LotteryHistory>(histories, lottery_id)) {
                 vector::push_back(&mut snapshots, build_lottery_snapshot_from_table(histories, lottery_id));
             };
             index = index + 1;
@@ -345,7 +349,7 @@ module lottery::history {
         histories: &table::Table<u64, LotteryHistory>,
         lottery_id: u64
     ): LotteryHistorySnapshot {
-        let history = table::borrow(histories, lottery_id);
+        let history = table::borrow<u64, LotteryHistory>(histories, lottery_id);
         LotteryHistorySnapshot {
             lottery_id,
             records: clone_records(&history.records),
