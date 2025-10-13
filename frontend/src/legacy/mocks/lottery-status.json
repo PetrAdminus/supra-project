@@ -1,0 +1,103 @@
+{
+  "timestamp": "2025-01-01T12:00:00Z",
+  "profile": "mock",
+  "calculation": {
+    "per_request_fee": "12",
+    "min_balance": "345"
+  },
+  "addresses": {
+    "lottery": "0xlottery",
+    "hub": "0xhub",
+    "factory": "0xfactory",
+    "deposit": "0xdeposit",
+    "client": "0xclient"
+  },
+  "hub": {
+    "lotteryCount": 2,
+    "nextLotteryId": 3,
+    "callbackSender": "0xcallback",
+    "configuredLotteryIds": [0, 1]
+  },
+  "lotteries": [
+    {
+      "id": 0,
+      "registration": {
+        "owner": "0xowner",
+        "lotteryAddress": "0xlottery",
+        "metadataHex": "0x",
+        "active": true
+      },
+      "factory": {
+        "owner": "0xowner",
+        "lotteryAddress": "0xlottery",
+        "blueprint": {
+          "ticketPriceSupra": "5",
+          "jackpotShareBps": 2500
+        }
+      },
+      "instance": {
+        "owner": "0xowner",
+        "lotteryAddress": "0xlottery",
+        "blueprint": {
+          "ticketPriceSupra": "5",
+          "jackpotShareBps": 2500
+        }
+      },
+      "stats": {
+        "ticketsSold": 25,
+        "jackpotAccumulatedSupra": "125"
+      },
+      "round": {
+        "snapshot": {
+          "ticketCount": 25,
+          "drawScheduled": true,
+          "hasPendingRequest": false,
+          "nextTicketId": 26
+        },
+        "pendingRequestId": null
+      },
+      "treasury": {
+        "config": {
+          "jackpotBp": 3000,
+          "prizeBp": 5000,
+          "operationsBp": 2000
+        },
+        "pool": {
+          "prizeSupra": "100",
+          "operationsSupra": "50"
+        }
+      }
+    }
+  ],
+  "deposit": {
+    "balance": "1000",
+    "minBalance": "900",
+    "minBalanceReached": true,
+    "subscriptionInfo": {
+      "subscription_id": "123",
+      "last_request_time": "2024-12-31T11:00:00Z",
+      "last_fulfillment_time": "2024-12-30T11:00:00Z"
+    },
+    "contractDetails": {
+      "callback_gas_price": "10",
+      "callback_gas_limit": "5000"
+    },
+    "whitelistedContracts": ["0xlottery"],
+    "maxGasPrice": "20",
+    "maxGasLimit": "6000"
+  },
+  "treasury": {
+    "jackpotBalance": "999",
+    "tokenBalance": "5000",
+    "totalSupply": "10000",
+    "metadata": {
+      "symbol": "SLT"
+    }
+  },
+  "vrf": {
+    "subscriptionId": "123",
+    "pendingRequestId": null,
+    "lastRequestTime": "2024-12-31T11:00:00Z",
+    "lastFulfillmentTime": "2024-12-30T11:00:00Z"
+  }
+}

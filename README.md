@@ -68,7 +68,7 @@ PYTHONPATH=SupraLottery python -m supra.scripts.move_tests \
 - `docs/` — runbook’и, миграционные заметки по dVRF и эксплуатационная документация.
 - `frontend/` — SPA, мок-данные, Storybook-истории и юнит-тесты.
 
-> TODO: после подготовки миграции выровнять структуру и удалить зеркальные каталоги (`SupraLottery/supra/...` и `supra/...`), чтобы остался единый Move-workspace.
+> Зеркальные каталоги (`SupraLottery/supra/...` и `supra/...`) заменены симлинками на единый Move-workspace; дальнейшие правки выполняем только в `SupraLottery/supra/...`.
 
 ### Казначейство на Fungible Asset
 Модуль `lottery::treasury_v1` оборачивает стандарт `0x1::fungible_asset` и предоставляет следующие сценарии:

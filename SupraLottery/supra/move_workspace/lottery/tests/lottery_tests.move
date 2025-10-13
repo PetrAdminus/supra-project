@@ -679,12 +679,9 @@ module lottery::lottery_tests {
         assert!(max_limit == MAX_GAS_LIMIT, 409);
         assert!(verification_value == VERIFICATION_GAS_VALUE, 410);
 
-        let envelope = main_v2::request_payload_message_for_test(
-            nonce,
-            observed_seed,
-            LOTTERY_ADDR
+        let expected_hash = hash::sha3_256(
+            main_v2::request_payload_message_for_test(nonce, observed_seed, LOTTERY_ADDR)
         );
-        let expected_hash = hash::sha3_256(copy envelope);
         assert!(main_v2::vector_equals_for_test(&expected_hash, &request_hash), 411);
     }
 
@@ -1718,7 +1715,9 @@ module lottery::lottery_tests {
         );
 
         let tampered_message = main_v2::request_payload_message_for_test(nonce, client_seed, LOTTERY_ADDR);
-        let tampered_hash = hash::sha3_256(copy tampered_message);
+        let tampered_hash = hash::sha3_256(
+            main_v2::request_payload_message_for_test(nonce, client_seed, LOTTERY_ADDR)
+        );
 
         main_v2::configure_vrf_gas_for_test(
             &lottery_signer,
@@ -1772,7 +1771,9 @@ module lottery::lottery_tests {
         main_v2::record_request_for_test(nonce, LOTTERY_ADDR);
 
         let message = main_v2::request_payload_message_for_test(nonce, client_seed, LOTTERY_ADDR);
-        let expected_hash = hash::sha3_256(copy message);
+        let expected_hash = hash::sha3_256(
+            main_v2::request_payload_message_for_test(nonce, client_seed, LOTTERY_ADDR)
+        );
         let verified_nums = vector[999u256];
         main_v2::handle_verified_random_for_test(
             nonce,

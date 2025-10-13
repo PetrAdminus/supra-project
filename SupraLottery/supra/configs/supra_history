@@ -1855,3 +1855,19 @@ Output:
 General: {
   "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': Found unbound dev address assignment 'jackpot_pool = 0x109' in root package 'lottery'. Dev addresses cannot introduce new named addresses"
 }
+Local: (2025-10-13 10:38:45.410083960 +00:00)	 Utc: (2025-10-13 10:38:45.410139107 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': While resolving dependency 'MoveStdlib' in package 'lottery': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_dev/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-13 10:39:27.250782405 +00:00)	 Utc: (2025-10-13 10:39:27.250811582 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': Found unbound dev address assignment 'jackpot_pool = 0x109' in root package 'lottery'. Dev addresses cannot introduce new named addresses"
+}

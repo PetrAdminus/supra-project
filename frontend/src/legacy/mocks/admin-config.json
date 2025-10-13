@@ -1,0 +1,48 @@
+﻿{
+    "gas":  {
+                "maxGasFee":  200000,
+                "minBalance":  6000000,
+                "updatedAt":  "2025-09-21T12:00:00Z"
+            },
+    "vrf":  {
+                "maxGasPrice":  "100",
+                "maxGasLimit":  "200000",
+                "callbackGasPrice":  "10",
+                "callbackGasLimit":  "50000",
+                "requestedRngCount":  1,
+                "clientSeed":  42,
+                "lastConfiguredAt":  "2025-09-22T10:30:00Z"
+            },
+    "whitelist":  {
+                      "clientConfigured":  true,
+                      "consumerConfigured":  false,
+                      "client":  {
+                                     "maxGasPrice":  "100",
+                                     "maxGasLimit":  "200000",
+                                     "minBalanceLimit":  "5000000000",
+                                     "updatedAt":  "2025-09-20T09:00:00Z"
+                                 },
+                      "consumer":  null
+                  },
+    "treasury":  {
+                     "config":  {
+                                    "ticketPriceSupra":  "5",
+                                    "salesEnabled":  true,
+                                    "treasuryAddress":  "0x1234567890abcdef1234567890abcdef",
+                                    "distributionBp":  {
+                                                           "jackpot":  6000,
+                                                           "prize":  2500,
+                                                           "treasury":  1000,
+                                                           "marketing":  500
+                                                       },
+                                    "updatedAt":  "2025-09-23T08:45:00Z"
+                                },
+                     "balances":  {
+                                      "jackpotSupra":  "120.50",
+                                      "prizeSupra":  "50.25",
+                                      "treasurySupra":  "20.10",
+                                      "marketingSupra":  "10.15",
+                                      "updatedAt":  "2025-09-23T08:45:00Z"
+                                  }
+                 }
+}

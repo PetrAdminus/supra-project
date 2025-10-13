@@ -1,0 +1,11 @@
+[
+  {
+    "eventId": "EVT-010",
+    "type": "TicketBought",
+    "round": 21,
+    "timestamp": "2025-10-01T12:00:00Z",
+    "details": "Ошибка транзакции: превышен лимит газа",
+    "txHash": "0xaaa999",
+    "status": "failed"
+  }
+]

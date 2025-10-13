@@ -310,6 +310,17 @@ module lottery::main_v2 {
         result
     }
 
+    fun clone_bytes(values: &vector<u8>): vector<u8> {
+        let result = vector::empty<u8>();
+        let len = vector::length(values);
+        let i = 0;
+        while (i < len) {
+            vector::push_back(&mut result, *vector::borrow(values, i));
+            i = i + 1;
+        };
+        result
+    }
+
     fun clear_addresses(tickets: &mut vector<address>) {
         while (vector::length(tickets) > 0) {
             vector::pop_back(tickets);
@@ -981,8 +992,8 @@ module lottery::main_v2 {
             num_confirmations,
         );
         let payload = encode_callback_request(&request);
-        let stored_hash = hash::sha3_256(copy payload);
-        let event_hash = copy stored_hash;
+        let stored_hash = hash::sha3_256(payload);
+        let event_hash = clone_bytes(&stored_hash);
         let callback_sender = ensure_callback_sender_configured_internal(
             &lottery.whitelisted_callback_sender
         );
@@ -1375,16 +1386,18 @@ module lottery::main_v2 {
     public fun draw_handled_fields(
         event: &DrawHandledEvent
     ): (u64, bool, vector<u8>, address, address, u64, u8, u64, vector<u256>) {
+        let request_hash = *event.request_hash;
+        let randomness = *event.randomness;
         (
             event.nonce,
             event.success,
-            copy event.request_hash,
+            request_hash,
             event.requester,
             event.callback_sender,
             event.client_seed,
             event.rng_count,
             event.num_confirmations,
-            copy event.randomness,
+            randomness,
         )
     }
 
@@ -1466,10 +1479,11 @@ module lottery::main_v2 {
     public fun pending_request_view_fields(
         view: &PendingRequestView
     ): (u64, address, vector<u8>, u64, u8, u64, address, u128, u128, u128, u128, u128) {
+        let request_hash = clone_bytes(&view.request_hash);
         (
             view.nonce,
             view.requester,
-            copy view.request_hash,
+            request_hash,
             view.client_seed,
             view.rng_count,
             view.num_confirmations,
@@ -1559,7 +1573,7 @@ module lottery::main_v2 {
         assert!(actual_len == expected_len, E_UNEXPECTED_RNG_COUNT);
 
         assert!(option::is_some(&lottery.last_request_payload_hash), E_INVALID_CALLBACK_PAYLOAD);
-        let request_hash = copy *option::borrow(&lottery.last_request_payload_hash);
+        let request_hash = clone_bytes(option::borrow(&lottery.last_request_payload_hash));
         let randomness_for_event = clone_u256_vector(&verified_nums);
         let callback_gas_price = lottery.callback_gas_price;
         let callback_gas_limit = lottery.callback_gas_limit;
@@ -1615,7 +1629,7 @@ module lottery::main_v2 {
         rng_count: u8,
         client_seed: u64,
     ) acquires LotteryData {
-        let message_for_verification = copy message;
+        let message_for_verification = clone_bytes(&message);
         let verified_nums: vector<u256> = supra_vrf::verify_callback(
             nonce,
             message_for_verification,
@@ -2059,7 +2073,7 @@ module lottery::main_v2 {
     ) {
         assert!(option::is_some(stored_hash_opt), E_INVALID_CALLBACK_PAYLOAD);
         let stored_hash = option::borrow(stored_hash_opt);
-        let payload_hash = hash::sha3_256(copy message);
+        let payload_hash = hash::sha3_256(clone_bytes(&message));
         assert!(vector_equals(stored_hash, &payload_hash), E_INVALID_CALLBACK_PAYLOAD);
 
         let envelope = CallbackRequest {
@@ -2078,7 +2092,7 @@ module lottery::main_v2 {
             verification_gas_value,
         };
         let expected_payload = encode_callback_request(&envelope);
-        let expected_hash = hash::sha3_256(copy expected_payload);
+        let expected_hash = hash::sha3_256(clone_bytes(&expected_payload));
         assert!(vector_equals(&payload_hash, &expected_hash), E_INVALID_CALLBACK_PAYLOAD);
         assert!(vector_equals(&message, &expected_payload), E_INVALID_CALLBACK_PAYLOAD);
     }
