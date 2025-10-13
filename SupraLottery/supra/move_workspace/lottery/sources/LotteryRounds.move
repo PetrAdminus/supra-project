@@ -3,6 +3,7 @@ module lottery::rounds {
     friend lottery::migration;
 
     use std::borrow;
+    use std::u64;
     use std::option;
     use std::signer;
     use std::vector;
@@ -385,7 +386,7 @@ module lottery::rounds {
         jackpot_share_bps: u16,
         ticket_count: u64,
     ): u64 {
-        let jackpot_bps = jackpot_share_bps as u64;
+        let jackpot_bps = u64::from_u16(jackpot_share_bps);
         let jackpot_contribution = mul_div(ticket_price, jackpot_bps, BASIS_POINT_DENOMINATOR);
         let issued = 0;
         let total_amount = 0;

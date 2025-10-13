@@ -49,6 +49,8 @@
 | `lottery/sources/Autopurchase.move` | `math64::checked_add` |
 
 Базовые замены:
+> Примечание. В Move 2024 оператор приведения `as` удалён (см. раздел *No more `as` operator* в официальной документации: <https://move-language.github.io/move/move-2024-upgrade.html#no-more-as-operator>). Вместо него используем числовые функции-преобразователи `u64::from_u16`, `u128::from_u64` и т.п.
+
 ```move
 // было
 let value = math64::checked_add(a, b);
@@ -61,8 +63,9 @@ let share = math64::mul_div(amount, basis_points, BASIS_POINT_DENOMINATOR);
 let value = a + b;
 let rest  = a % b;
 let mul   = x * y;
-let bps64 = bps as u64;
-let share = amount * basis_points as u64 / BASIS_POINT_DENOMINATOR; // при необходимости добавить проверки вручную
+let bps64 = u64::from_u16(bps);
+let basis_points_u64 = u64::from_u16(basis_points);
+let share = mul_div(amount, basis_points_u64, BASIS_POINT_DENOMINATOR); // при необходимости добавить проверки вручную
 ```
 Если требуется защита от переполнения, добавляем явные `assert!` перед операцией.
 
