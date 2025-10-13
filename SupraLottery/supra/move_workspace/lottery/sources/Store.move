@@ -1,5 +1,4 @@
 module lottery::store {
-    use std::borrow;
     use std::option;
     use std::vector;
     use supra_framework::account;
@@ -486,7 +485,7 @@ module lottery::store {
         while (idx < len) {
             let lottery_id = *vector::borrow(&state.lottery_ids, idx);
             if (table::contains(&state.lotteries, lottery_id)) {
-                vector::push_back(&mut snapshots, build_lottery_snapshot(state, lottery_id));
+                vector::push_back(&mut snapshots, build_lottery_snapshot_from_table(&state.lotteries, lottery_id));
             };
             idx = idx + 1;
         };
@@ -494,7 +493,18 @@ module lottery::store {
     }
 
     fun build_lottery_snapshot(state: &StoreState, lottery_id: u64): StoreLotterySnapshot {
-        let store = table::borrow(&state.lotteries, lottery_id);
+        build_lottery_snapshot_from_table(&state.lotteries, lottery_id)
+    }
+
+    fun build_lottery_snapshot_from_mut(state: &mut StoreState, lottery_id: u64): StoreLotterySnapshot {
+        build_lottery_snapshot_from_table(&state.lotteries, lottery_id)
+    }
+
+    fun build_lottery_snapshot_from_table(
+        lotteries: &table::Table<u64, LotteryStore>,
+        lottery_id: u64,
+    ): StoreLotterySnapshot {
+        let store = table::borrow(lotteries, lottery_id);
         let items = vector::empty<StoreItemSnapshot>();
         let len = vector::length(&store.item_ids);
         let idx = 0;
@@ -536,7 +546,7 @@ module lottery::store {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return
         };
-        let snapshot = build_lottery_snapshot(borrow::freeze(state), lottery_id);
+        let snapshot = build_lottery_snapshot_from_mut(state, lottery_id);
         event::emit_event(
             &mut state.snapshot_events,
             StoreSnapshotUpdatedEvent { admin: state.admin, snapshot },

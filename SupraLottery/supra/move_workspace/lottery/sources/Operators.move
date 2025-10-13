@@ -1,5 +1,4 @@
 module lottery::operators {
-    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
@@ -410,7 +409,7 @@ module lottery::operators {
     }
 
     fun emit_operator_snapshot(state: &mut LotteryOperators, lottery_id: u64) {
-        let snapshot = build_operator_snapshot(borrow::freeze(state), lottery_id);
+        let snapshot = build_operator_snapshot_from_mut(state, lottery_id);
         let OperatorSnapshot { owner, operators } = snapshot;
         event::emit_event(
             &mut state.snapshot_events,
@@ -419,13 +418,24 @@ module lottery::operators {
     }
 
     fun build_operator_snapshot(state: &LotteryOperators, lottery_id: u64): OperatorSnapshot {
-        if (!table::contains(&state.entries, lottery_id)) {
+        build_operator_snapshot_from_entries(&state.entries, lottery_id)
+    }
+
+    fun build_operator_snapshot_from_mut(state: &mut LotteryOperators, lottery_id: u64): OperatorSnapshot {
+        build_operator_snapshot_from_entries(&state.entries, lottery_id)
+    }
+
+    fun build_operator_snapshot_from_entries(
+        entries: &table::Table<u64, LotteryOperatorEntry>,
+        lottery_id: u64,
+    ): OperatorSnapshot {
+        if (!table::contains(entries, lottery_id)) {
             return OperatorSnapshot {
                 owner: option::none(),
                 operators: vector::empty<address>(),
             }
         };
-        let entry = table::borrow(&state.entries, lottery_id);
+        let entry = table::borrow(entries, lottery_id);
         OperatorSnapshot {
             owner: option::some(entry.owner),
             operators: copy_address_vector(&entry.operator_list),
