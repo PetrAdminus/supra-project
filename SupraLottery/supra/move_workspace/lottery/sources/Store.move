@@ -1,5 +1,4 @@
 module lottery::store {
-    use std::borrow;
     use std::option;
     use std::vector;
     use supra_framework::account;
@@ -536,7 +535,7 @@ module lottery::store {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return
         };
-        let snapshot = build_lottery_snapshot(borrow::freeze(state), lottery_id);
+        let snapshot = build_lottery_snapshot(&*state, lottery_id);
         event::emit_event(
             &mut state.snapshot_events,
             StoreSnapshotUpdatedEvent { admin: state.admin, snapshot },

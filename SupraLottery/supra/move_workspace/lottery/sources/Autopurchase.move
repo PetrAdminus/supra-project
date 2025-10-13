@@ -1,5 +1,4 @@
 module lottery::autopurchase {
-    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
@@ -649,7 +648,7 @@ module lottery::autopurchase {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return
         };
-        let snapshot = build_lottery_snapshot(borrow::freeze(state), lottery_id);
+        let snapshot = build_lottery_snapshot(&*state, lottery_id);
         event::emit_event(
             &mut state.snapshot_events,
             AutopurchaseSnapshotUpdatedEvent { admin: state.admin, snapshot },

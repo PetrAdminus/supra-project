@@ -1,5 +1,4 @@
 module lottery::jackpot {
-    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
@@ -129,7 +128,7 @@ module lottery::jackpot {
     public entry fun set_admin(caller: &signer, new_admin: address) acquires JackpotState {
         ensure_admin(caller);
         let state = borrow_global_mut<JackpotState>(@lottery);
-        let previous = option::some(build_snapshot(borrow::freeze(state)));
+        let previous = option::some(build_snapshot(&*state));
         state.admin = new_admin;
         emit_snapshot_event(state, previous);
     }
@@ -154,7 +153,7 @@ module lottery::jackpot {
     public entry fun schedule_draw(caller: &signer) acquires JackpotState {
         ensure_admin(caller);
         let state = borrow_global_mut<JackpotState>(@lottery);
-        let previous = option::some(build_snapshot(borrow::freeze(state)));
+        let previous = option::some(build_snapshot(&*state));
         if (vector::length(&state.tickets) == 0) {
             abort E_NO_TICKETS
         };
@@ -173,7 +172,7 @@ module lottery::jackpot {
     public entry fun reset(caller: &signer) acquires JackpotState {
         ensure_admin(caller);
         let state = borrow_global_mut<JackpotState>(@lottery);
-        let previous = option::some(build_snapshot(borrow::freeze(state)));
+        let previous = option::some(build_snapshot(&*state));
         clear_tickets(&mut state.tickets);
         state.draw_scheduled = false;
         state.pending_request = option::none<u64>();
@@ -189,7 +188,7 @@ module lottery::jackpot {
     acquires JackpotState {
         ensure_admin(caller);
         let state = borrow_global_mut<JackpotState>(@lottery);
-        let previous = option::some(build_snapshot(borrow::freeze(state)));
+        let previous = option::some(build_snapshot(&*state));
         if (!state.draw_scheduled) {
             abort E_DRAW_NOT_SCHEDULED
         };
@@ -220,7 +219,7 @@ module lottery::jackpot {
         let payload = hub::request_record_payload(&record);
 
         let state = borrow_global_mut<JackpotState>(@lottery);
-        let previous = option::some(build_snapshot(borrow::freeze(state)));
+        let previous = option::some(build_snapshot(&*state));
         if (recorded_lottery != state.lottery_id) {
             abort E_LOTTERY_MISMATCH
         };
@@ -302,7 +301,7 @@ module lottery::jackpot {
     }
 
     fun grant_ticket_internal(state: &mut JackpotState, player: address) {
-        let previous = option::some(build_snapshot(borrow::freeze(state)));
+        let previous = option::some(build_snapshot(&*state));
         if (state.draw_scheduled) {
             abort E_DRAW_ALREADY_SCHEDULED
         };
@@ -411,7 +410,7 @@ module lottery::jackpot {
         state: &mut JackpotState,
         previous: option::Option<JackpotSnapshot>,
     ) {
-        let snapshot = build_snapshot(borrow::freeze(state));
+        let snapshot = build_snapshot(&*state);
         event::emit_event(
             &mut state.snapshot_events,
             JackpotSnapshotUpdatedEvent { previous, current: snapshot },

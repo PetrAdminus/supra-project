@@ -1745,7 +1745,7 @@ module lottery::main_v2 {
                 let requester_ref = option::borrow(&lottery.last_requester);
                 let hash_ref = option::borrow(&lottery.last_request_payload_hash);
                 let config = option::borrow(&lottery.vrf_request_config);
-                let callback_sender = ensure_callback_sender_configured(&lottery);
+                let callback_sender = ensure_callback_sender_configured(lottery);
                 option::some(PendingRequestView {
                     nonce: *nonce_ref,
                     requester: *requester_ref,

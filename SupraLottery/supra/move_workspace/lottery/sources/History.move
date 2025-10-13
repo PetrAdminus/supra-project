@@ -1,7 +1,6 @@
 module lottery::history {
     friend lottery::rounds;
 
-    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
@@ -100,7 +99,7 @@ module lottery::history {
     public entry fun set_admin(caller: &signer, new_admin: address) acquires HistoryCollection {
         ensure_admin(caller);
         let state = borrow_global_mut<HistoryCollection>(@lottery);
-        let previous = option::some(build_snapshot(borrow::freeze(state)));
+        let previous = option::some(build_snapshot(&*state));
         state.admin = new_admin;
         emit_history_snapshot(state, previous);
     }
@@ -109,7 +108,7 @@ module lottery::history {
         ensure_admin(caller);
         let state = borrow_global_mut<HistoryCollection>(@lottery);
         if (table::contains(&state.histories, lottery_id)) {
-            let previous = option::some(build_snapshot(borrow::freeze(state)));
+            let previous = option::some(build_snapshot(&*state));
             let history = table::borrow_mut(&mut state.histories, lottery_id);
             clear_records(&mut history.records);
             emit_history_snapshot(state, previous);
@@ -129,7 +128,7 @@ module lottery::history {
             return
         };
         let state = borrow_global_mut<HistoryCollection>(@lottery);
-        let previous = option::some(build_snapshot(borrow::freeze(state)));
+        let previous = option::some(build_snapshot(&*state));
         let history = borrow_or_create_history(state, lottery_id);
         let timestamp_seconds = timestamp::now_seconds();
         let record = DrawRecord {
@@ -331,7 +330,7 @@ module lottery::history {
         state: &mut HistoryCollection,
         previous: option::Option<HistorySnapshot>
     ) {
-        let current = build_snapshot(borrow::freeze(state));
+        let current = build_snapshot(&*state);
         event::emit_event(
             &mut state.snapshot_events,
             HistorySnapshotUpdatedEvent { previous, current },

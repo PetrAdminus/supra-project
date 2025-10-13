@@ -1,7 +1,6 @@
 module lottery::vip {
     friend lottery::rounds;
 
-    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
@@ -517,7 +516,7 @@ module lottery::vip {
     }
 
     fun emit_vip_snapshot(state: &mut VipState) {
-        let snapshot = build_vip_snapshot(borrow::freeze(state));
+        let snapshot = build_vip_snapshot(&*state);
         event::emit_event(
             &mut state.snapshot_events,
             VipSnapshotUpdatedEvent { snapshot },
