@@ -170,10 +170,6 @@ module lottery::treasury_v1 {
         assert!(signer::address_of(caller) == @lottery, E_NOT_OWNER);
     }
 
-    fun state_ref(): &TokenState acquires TokenState {
-        borrow_global<TokenState>(@lottery)
-    }
-
     fun metadata_address_internal(state: &TokenState): address {
         object::object_address(&state.metadata)
     }
@@ -318,7 +314,7 @@ module lottery::treasury_v1 {
 
     public entry fun register_store(account: &signer) acquires TokenState {
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         let account_addr = signer::address_of(account);
         primary_fungible_store::ensure_primary_store_exists(account_addr, state.metadata);
     }
@@ -326,14 +322,14 @@ module lottery::treasury_v1 {
     public entry fun register_store_for(admin: &signer, account: address) acquires TokenState {
         ensure_owner(admin);
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         primary_fungible_store::ensure_primary_store_exists(account, state.metadata);
     }
 
     public entry fun register_stores_for(admin: &signer, accounts: vector<address>) acquires TokenState {
         ensure_owner(admin);
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         let i = 0;
         let len = vector::length(&accounts);
         while (i < len) {
@@ -346,7 +342,7 @@ module lottery::treasury_v1 {
     public entry fun mint_to(admin: &signer, recipient: address, amount: u64) acquires TokenState {
         ensure_owner(admin);
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         let store = ensure_store_exists(state, recipient, E_STORE_NOT_REGISTERED);
         ensure_not_frozen(store);
         fungible_asset::mint_to(&state.mint_ref, store, amount);
@@ -355,7 +351,7 @@ module lottery::treasury_v1 {
     public entry fun burn_from(admin: &signer, owner: address, amount: u64) acquires TokenState {
         ensure_owner(admin);
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         let store = ensure_store_exists(state, owner, E_STORE_NOT_REGISTERED);
         ensure_not_frozen(store);
         fungible_asset::burn_from(&state.burn_ref, store, amount);
@@ -369,7 +365,7 @@ module lottery::treasury_v1 {
     ) acquires TokenState {
         ensure_owner(admin);
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         let from_store = ensure_store_exists(state, from, E_STORE_NOT_REGISTERED);
         let to_store = ensure_store_exists(state, to, E_STORE_NOT_REGISTERED);
         ensure_not_frozen(from_store);
@@ -384,14 +380,14 @@ module lottery::treasury_v1 {
     ) acquires TokenState {
         ensure_owner(admin);
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         let store = ensure_store_exists(state, account, E_STORE_NOT_REGISTERED);
         fungible_asset::set_frozen_flag(&state.transfer_ref, store, frozen);
     }
 
     public fun deposit_from_user(user: &signer, amount: u64) acquires TokenState {
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         let user_addr = signer::address_of(user);
         let user_store = ensure_store_exists(state, user_addr, E_STORE_NOT_REGISTERED);
         let treasury_store = ensure_store_exists(state, @lottery, E_TREASURY_STORE_NOT_REGISTERED);
@@ -402,7 +398,7 @@ module lottery::treasury_v1 {
 
     public(friend) fun payout_from_treasury(recipient: address, amount: u64) acquires TokenState {
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         let treasury_store = ensure_store_exists(state, @lottery, E_TREASURY_STORE_NOT_REGISTERED);
         let recipient_store = ensure_store_exists(state, recipient, E_STORE_NOT_REGISTERED);
         ensure_not_frozen(treasury_store);
@@ -422,7 +418,7 @@ module lottery::treasury_v1 {
         ensure_vaults_initialized();
         ensure_token_initialized();
 
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         ensure_recipient_store_ready(state, treasury);
         ensure_recipient_store_ready(state, marketing);
         ensure_recipient_store_ready(state, community);
@@ -440,7 +436,7 @@ module lottery::treasury_v1 {
     #[view]
     public fun treasury_balance(): u64 acquires TokenState {
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         if (!primary_fungible_store::primary_store_exists(@lottery, state.metadata)) {
             0
         } else {
@@ -451,7 +447,7 @@ module lottery::treasury_v1 {
     #[view]
     public fun balance_of(account: address): u64 acquires TokenState {
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
             0
         } else {
@@ -464,7 +460,7 @@ module lottery::treasury_v1 {
         if (!exists<TokenState>(@lottery)) {
             return false
         };
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         primary_fungible_store::primary_store_exists(account, state.metadata)
     }
 
@@ -473,7 +469,7 @@ module lottery::treasury_v1 {
         if (!exists<TokenState>(@lottery)) {
             return false
         };
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
             false
         } else {
@@ -485,7 +481,7 @@ module lottery::treasury_v1 {
     #[view]
     public fun primary_store_address(account: address): address acquires TokenState {
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         let store = ensure_store_exists(state, account, E_STORE_NOT_REGISTERED);
         object::object_address(&store)
     }
@@ -493,7 +489,7 @@ module lottery::treasury_v1 {
     #[view]
     public fun total_supply(): u128 acquires TokenState {
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         let supply_opt = fungible_asset::supply(state.metadata);
         if (option::is_some(&supply_opt)) {
             *option::borrow(&supply_opt)
@@ -505,14 +501,14 @@ module lottery::treasury_v1 {
     #[view]
     public fun metadata_address(): address acquires TokenState {
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         metadata_address_internal(state)
     }
 
     #[view]
     public fun metadata_summary(): (string::String, string::String, u8, string::String, string::String) acquires TokenState {
         ensure_token_initialized();
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         (
             fungible_asset::name(state.metadata),
             fungible_asset::symbol(state.metadata),
@@ -528,7 +524,7 @@ module lottery::treasury_v1 {
             return (false, option::none(), 0)
         };
 
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
             return (false, option::none(), 0)
         };
@@ -544,7 +540,7 @@ module lottery::treasury_v1 {
             return (false, false, option::none(), 0)
         };
 
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
             return (false, false, option::none(), 0)
         };
@@ -634,7 +630,7 @@ module lottery::treasury_v1 {
             return 0
         };
 
-        let state = state_ref();
+        let state = borrow_global<TokenState>(@lottery);
         let winner_store = ensure_store_exists(state, winner, E_STORE_NOT_REGISTERED);
         ensure_not_frozen(winner_store);
 
@@ -797,7 +793,7 @@ module lottery::treasury_v1 {
 
     fun emit_recipients_event(
         previous: option::Option<VaultRecipientsSnapshot>
-    ) acquires TokenState, Vaults {
+    ) acquires Vaults {
         let vaults = borrow_global<Vaults>(@lottery);
         let next_snapshot = build_recipients_snapshot(&vaults.recipients);
         event::emit(RecipientsUpdatedEvent { previous, next: next_snapshot });

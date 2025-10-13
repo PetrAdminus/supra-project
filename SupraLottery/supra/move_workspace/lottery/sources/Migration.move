@@ -50,7 +50,7 @@ module lottery::migration {
         prize_bps: u64,
         jackpot_bps: u64,
         operations_bps: u64,
-    ) {
+    ) acquires MigrationLedger {
         if (signer::address_of(caller) != @lottery) {
             abort E_NOT_AUTHORIZED
         };
@@ -165,21 +165,6 @@ module lottery::migration {
 
 
     fun record_snapshot(caller: &signer, snapshot: MigrationSnapshot) acquires MigrationLedger {
-        let state = ensure_ledger(caller);
-        let lottery_id = snapshot.lottery_id;
-        table::add(&mut state.snapshots, lottery_id, snapshot);
-        record_lottery_id(&mut state.lottery_ids, lottery_id);
-        event::emit_event(
-            &mut state.snapshot_events,
-            MigrationSnapshotUpdatedEvent {
-                lottery_id,
-                snapshot: *table::borrow(&state.snapshots, lottery_id),
-            },
-        );
-    }
-
-
-    fun ensure_ledger(caller: &signer): &mut MigrationLedger acquires MigrationLedger {
         if (!exists<MigrationLedger>(@lottery)) {
             move_to(
                 caller,
@@ -190,7 +175,15 @@ module lottery::migration {
                 },
             );
         };
-        borrow_global_mut<MigrationLedger>(@lottery)
+        let state = borrow_global_mut<MigrationLedger>(@lottery);
+        let lottery_id = snapshot.lottery_id;
+        let snapshot_for_event = snapshot;
+        table::add(&mut state.snapshots, lottery_id, snapshot);
+        record_lottery_id(&mut state.lottery_ids, lottery_id);
+        event::emit_event(
+            &mut state.snapshot_events,
+            MigrationSnapshotUpdatedEvent { lottery_id, snapshot: snapshot_for_event },
+        );
     }
 
 

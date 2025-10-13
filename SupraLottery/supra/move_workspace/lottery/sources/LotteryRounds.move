@@ -178,7 +178,7 @@ module lottery::rounds {
     acquires RoundCollection {
         ensure_admin(caller);
         let state = borrow_global_mut<RoundCollection>(@lottery);
-        let snapshot = {
+        let (snapshot, schedule_event) = {
             let round = ensure_round(state, lottery_id);
             if (vector::length(&round.tickets) == 0) {
                 abort E_NO_TICKETS
@@ -190,12 +190,12 @@ module lottery::rounds {
                 abort E_REQUEST_PENDING
             };
             round.draw_scheduled = true;
-            event::emit_event(
-                &mut state.schedule_events,
+            (
+                snapshot_from_round_mut(round),
                 DrawScheduleUpdatedEvent { lottery_id, draw_scheduled: true },
-            );
-            snapshot_from_round_mut(round)
+            )
         };
+        event::emit_event(&mut state.schedule_events, schedule_event);
         emit_snapshot_event(state, lottery_id, snapshot);
     }
 
@@ -203,20 +203,21 @@ module lottery::rounds {
     acquires RoundCollection {
         ensure_admin(caller);
         let state = borrow_global_mut<RoundCollection>(@lottery);
-        let snapshot = {
+        let (snapshot, schedule_event, reset_event) = {
             let round = ensure_round(state, lottery_id);
             let cleared = vector::length(&round.tickets);
             clear_tickets(&mut round.tickets);
             round.draw_scheduled = false;
             round.next_ticket_id = 0;
             round.pending_request = option::none<u64>();
-            event::emit_event(
-                &mut state.schedule_events,
+            (
+                snapshot_from_round_mut(round),
                 DrawScheduleUpdatedEvent { lottery_id, draw_scheduled: false },
-            );
-            event::emit_event(&mut state.reset_events, RoundResetEvent { lottery_id, tickets_cleared: cleared });
-            snapshot_from_round_mut(round)
+                RoundResetEvent { lottery_id, tickets_cleared: cleared },
+            )
         };
+        event::emit_event(&mut state.schedule_events, schedule_event);
+        event::emit_event(&mut state.reset_events, reset_event);
         emit_snapshot_event(state, lottery_id, snapshot);
     }
 
@@ -227,7 +228,7 @@ module lottery::rounds {
     ) acquires RoundCollection {
         ensure_admin(caller);
         let state = borrow_global_mut<RoundCollection>(@lottery);
-        let (request_id, snapshot) = {
+        let (request_id, snapshot, request_event) = {
             let round = ensure_round(state, lottery_id);
             if (!round.draw_scheduled) {
                 abort E_DRAW_NOT_SCHEDULED
@@ -244,12 +245,13 @@ module lottery::rounds {
 
             let request_id_inner = hub::request_randomness(lottery_id, payload);
             round.pending_request = option::some(request_id_inner);
-            event::emit_event(
-                &mut state.request_events,
+            (
+                request_id_inner,
+                snapshot_from_round_mut(round),
                 DrawRequestIssuedEvent { lottery_id, request_id: request_id_inner },
-            );
-            (request_id_inner, snapshot_from_round_mut(round))
+            )
         };
+        event::emit_event(&mut state.request_events, request_event);
         emit_snapshot_event(state, lottery_id, snapshot);
     }
 
