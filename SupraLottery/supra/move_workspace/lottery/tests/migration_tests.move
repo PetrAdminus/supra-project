@@ -163,6 +163,7 @@ module lottery::migration_tests {
     }
 
     fun setup_environment(lottery: &signer) {
+        test_utils::ensure_framework_accounts_for_test();
         if (!treasury_v1::is_initialized()) {
             treasury_v1::init_token(
                 lottery,

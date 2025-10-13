@@ -787,8 +787,6 @@ module lottery::main_v2 {
         assert!(callback_gas_price > 0, E_INVALID_GAS_CONFIG);
         assert!(callback_gas_limit > 0, E_INVALID_GAS_CONFIG);
         assert!(verification_gas_value > 0, E_INVALID_GAS_CONFIG);
-        assert!(callback_gas_price <= max_gas_price, E_INVALID_GAS_CONFIG);
-        assert!(callback_gas_limit <= max_gas_limit, E_INVALID_GAS_CONFIG);
         lottery.max_gas_price = max_gas_price;
         lottery.max_gas_limit = max_gas_limit;
         lottery.callback_gas_price = callback_gas_price;

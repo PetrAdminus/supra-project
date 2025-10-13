@@ -16,6 +16,7 @@ module lottery::history_tests {
     use vrf_hub::hub;
 
     fun setup_token(lottery_admin: &signer, buyer: &signer) {
+        test_utils::ensure_framework_accounts_for_test();
         account::create_account_for_test(@jackpot_pool);
         account::create_account_for_test(@operations_pool);
         treasury_v1::init_token(
@@ -52,6 +53,7 @@ module lottery::history_tests {
         buyer: &signer,
         aggregator: &signer,
     ) {
+        test_utils::ensure_framework_accounts_for_test();
         ensure_time_started();
         hub::init(vrf_admin);
         registry::init(factory_admin);
@@ -183,6 +185,7 @@ module lottery::history_tests {
         buyer: &signer,
         aggregator: &signer,
     ) {
+        test_utils::ensure_framework_accounts_for_test();
         ensure_time_started();
         hub::init(vrf_admin);
         registry::init(factory_admin);

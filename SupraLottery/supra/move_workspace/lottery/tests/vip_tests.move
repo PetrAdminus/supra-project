@@ -18,6 +18,7 @@ module lottery::vip_tests {
     const VIP_BONUS_TICKETS: u64 = 2;
 
     fun setup_token(lottery_admin: &signer, player: &signer) {
+        test_utils::ensure_framework_accounts_for_test();
         account::create_account_for_test(@jackpot_pool);
         account::create_account_for_test(@operations_pool);
         treasury_v1::init_token(
@@ -40,6 +41,7 @@ module lottery::vip_tests {
         factory_admin: &signer,
         lottery_admin: &signer,
     ): u64 {
+        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);

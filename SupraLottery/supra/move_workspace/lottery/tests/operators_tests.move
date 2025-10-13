@@ -12,6 +12,7 @@ module lottery::operators_tests {
         owner: &signer,
         operator: &signer,
     ) {
+        test_utils::ensure_framework_accounts_for_test();
         operators::init(lottery_admin);
         operators::set_owner(lottery_admin, 0, signer::address_of(owner));
 
@@ -74,6 +75,7 @@ module lottery::operators_tests {
         owner: &signer,
         operator: &signer,
     ) {
+        test_utils::ensure_framework_accounts_for_test();
         operators::init(lottery_admin);
         operators::set_owner(lottery_admin, 7, signer::address_of(owner));
 
@@ -119,6 +121,7 @@ module lottery::operators_tests {
         intruder: &signer,
         operator: &signer,
     ) {
+        test_utils::ensure_framework_accounts_for_test();
         operators::init(lottery_admin);
         operators::set_owner(lottery_admin, 42, signer::address_of(owner));
 

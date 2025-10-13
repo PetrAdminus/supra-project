@@ -195,7 +195,7 @@ module lottery::treasury_v1 {
         let error_code = if (account == @lottery) {
             E_TREASURY_STORE_NOT_REGISTERED
         } else {
-            E_RECIPIENT_STORE_NOT_REGISTERED
+            E_STORE_NOT_REGISTERED
         };
         let store = ensure_store_exists(state, account, error_code);
         ensure_not_frozen(store);
