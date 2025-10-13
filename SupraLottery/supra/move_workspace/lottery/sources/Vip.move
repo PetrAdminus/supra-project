@@ -1,6 +1,7 @@
 module lottery::vip {
     friend lottery::rounds;
 
+    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
@@ -129,7 +130,7 @@ module lottery::vip {
         config.bonus_tickets
     }
 
-    public entry fun init(caller: &signer) {
+    public entry fun init(caller: &signer) acquires VipState {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED
@@ -516,7 +517,7 @@ module lottery::vip {
     }
 
     fun emit_vip_snapshot(state: &mut VipState) {
-        let snapshot = build_vip_snapshot(&*state);
+        let snapshot = build_vip_snapshot(borrow::freeze(state));
         event::emit_event(
             &mut state.snapshot_events,
             VipSnapshotUpdatedEvent { snapshot },

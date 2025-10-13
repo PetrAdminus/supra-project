@@ -2,6 +2,7 @@ module lottery::rounds {
     friend lottery::autopurchase;
     friend lottery::migration;
 
+    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
@@ -104,7 +105,7 @@ module lottery::rounds {
         snapshot: RoundSnapshot,
     }
 
-    public entry fun init(caller: &signer) {
+    public entry fun init(caller: &signer) acquires RoundCollection {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED
@@ -194,7 +195,7 @@ module lottery::rounds {
                 &mut state.schedule_events,
                 DrawScheduleUpdatedEvent { lottery_id, draw_scheduled: true },
             );
-            snapshot_from_round(&*round)
+            snapshot_from_round(borrow::freeze(round))
         };
         emit_snapshot_event(state, lottery_id, snapshot);
     }
@@ -215,7 +216,7 @@ module lottery::rounds {
                 DrawScheduleUpdatedEvent { lottery_id, draw_scheduled: false },
             );
             event::emit_event(&mut state.reset_events, RoundResetEvent { lottery_id, tickets_cleared: cleared });
-            snapshot_from_round(&*round)
+            snapshot_from_round(borrow::freeze(round))
         };
         emit_snapshot_event(state, lottery_id, snapshot);
     }
@@ -248,7 +249,7 @@ module lottery::rounds {
                 &mut state.request_events,
                 DrawRequestIssuedEvent { lottery_id, request_id: request_id_inner },
             );
-            (request_id_inner, snapshot_from_round(&*round))
+            (request_id_inner, snapshot_from_round(borrow::freeze(round)))
         };
         emit_snapshot_event(state, lottery_id, snapshot);
     }
@@ -287,7 +288,7 @@ module lottery::rounds {
             round.next_ticket_id = 0;
             round.pending_request = option::none<u64>();
             clear_tickets(&mut round.tickets);
-            (winner_addr, winner_index_inner, snapshot_from_round(&*round))
+            (winner_addr, winner_index_inner, snapshot_from_round(borrow::freeze(round)))
         };
         emit_snapshot_event(state, lottery_id, snapshot);
 
@@ -428,7 +429,7 @@ module lottery::rounds {
         referrals::record_purchase(lottery_id, buyer, total_amount);
         let snapshot = {
             let round = ensure_round(state, lottery_id);
-            snapshot_from_round(&*round)
+            snapshot_from_round(borrow::freeze(round))
         };
         emit_snapshot_event(state, lottery_id, snapshot);
         total_amount
@@ -490,7 +491,7 @@ module lottery::rounds {
                 round.draw_scheduled = draw_scheduled;
                 round.next_ticket_id = next_ticket_id;
                 round.pending_request = pending_request;
-                snapshot_from_round(&*round)
+                snapshot_from_round(borrow::freeze(round))
             };
             emit_snapshot_event(state, lottery_id, snapshot);
             return

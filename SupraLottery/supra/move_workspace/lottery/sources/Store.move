@@ -1,4 +1,5 @@
 module lottery::store {
+    use std::borrow;
     use std::option;
     use std::vector;
     use supra_framework::account;
@@ -106,7 +107,7 @@ module lottery::store {
     }
 
 
-    public entry fun init(caller: &signer) {
+    public entry fun init(caller: &signer) acquires StoreState {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED
@@ -535,7 +536,7 @@ module lottery::store {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return
         };
-        let snapshot = build_lottery_snapshot(&*state, lottery_id);
+        let snapshot = build_lottery_snapshot(borrow::freeze(state), lottery_id);
         event::emit_event(
             &mut state.snapshot_events,
             StoreSnapshotUpdatedEvent { admin: state.admin, snapshot },

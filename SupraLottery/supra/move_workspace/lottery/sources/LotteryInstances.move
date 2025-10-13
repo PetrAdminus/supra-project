@@ -2,6 +2,7 @@ module lottery::instances {
     friend lottery::migration;
     friend lottery::rounds;
 
+    use std::borrow;
     use std::option;
     use std::signer;
     use vrf_hub::table;
@@ -119,7 +120,7 @@ module lottery::instances {
     }
 
 
-    public entry fun init(caller: &signer, hub: address) {
+    public entry fun init(caller: &signer, hub: address) acquires LotteryCollection {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED
@@ -499,7 +500,7 @@ module lottery::instances {
         if (!table::contains(&state.instances, lottery_id)) {
             return
         };
-        let snapshot = build_instance_snapshot(&*state, lottery_id);
+        let snapshot = build_instance_snapshot(borrow::freeze(state), lottery_id);
         event::emit_event(
             &mut state.snapshot_events,
             LotteryInstancesSnapshotUpdatedEvent { admin: state.admin, hub: state.hub, snapshot },

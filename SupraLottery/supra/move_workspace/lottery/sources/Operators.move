@@ -1,4 +1,5 @@
 module lottery::operators {
+    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
@@ -69,7 +70,7 @@ module lottery::operators {
         operators: vector<address>,
     }
 
-    public entry fun init(caller: &signer) {
+    public entry fun init(caller: &signer) acquires LotteryOperators {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED
@@ -409,7 +410,7 @@ module lottery::operators {
     }
 
     fun emit_operator_snapshot(state: &mut LotteryOperators, lottery_id: u64) {
-        let snapshot = build_operator_snapshot(&*state, lottery_id);
+        let snapshot = build_operator_snapshot(borrow::freeze(state), lottery_id);
         let OperatorSnapshot { owner, operators } = snapshot;
         event::emit_event(
             &mut state.snapshot_events,
