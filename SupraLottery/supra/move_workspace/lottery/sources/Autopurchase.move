@@ -443,6 +443,7 @@ module lottery::autopurchase {
                 LotteryPlans { plans: table::new(), players: vector::empty(), total_balance: 0 },
             );
             vector::push_back(&mut state.lottery_ids, lottery_id);
+            emit_autopurchase_snapshot(state, lottery_id);
         };
         table::borrow_mut<u64, LotteryPlans>(&mut state.lotteries, lottery_id)
     }
