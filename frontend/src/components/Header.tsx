@@ -1,8 +1,8 @@
 import { Wallet, Globe, ChevronDown } from "lucide-react";
 import { Button } from "./ui/button";
-import { useState } from "react";
 import logoImage from "../assets/ba8a84f656f04b98f69152f497e1e1a3743c7fc3.png";
 import { useLanguage } from "./LanguageContext";
+import { useWallet } from "../features/wallet/useWallet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,12 +16,12 @@ interface HeaderProps {
 }
 
 export function Header({ currentPage, onNavigate }: HeaderProps) {
-  const [isConnected, setIsConnected] = useState(false);
   const { language, setLanguage, t } = useLanguage();
-
-  const handleConnect = () => {
-    setIsConnected(!isConnected);
-  };
+  const { wallet, connect, disconnect } = useWallet();
+  const walletAddress = wallet.address ?? "";
+  const walletDisplay = walletAddress
+    ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+    : t("connectWallet");
 
   const navItems = [
     { id: "home", label: t("home") },
@@ -31,7 +31,7 @@ export function Header({ currentPage, onNavigate }: HeaderProps) {
   ];
 
   const languages = [
-    { code: "en" as const, name: "English", flag: "🇬🇧" },
+    { code: "en" as const, name: "English", flag: "🇺🇸" },
     { code: "ru" as const, name: "Русский", flag: "🇷🇺" },
     { code: "es" as const, name: "Español", flag: "🇪🇸" },
     { code: "zh" as const, name: "中文", flag: "🇨🇳" },
@@ -39,19 +39,22 @@ export function Header({ currentPage, onNavigate }: HeaderProps) {
     { code: "de" as const, name: "Deutsch", flag: "🇩🇪" },
   ];
 
-  const currentLanguage = languages.find(lang => lang.code === language) || languages[0];
+  const currentLanguage = languages.find((lang) => lang.code === language) ?? languages[0];
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 glass-strong">
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <button 
+          <button
             onClick={() => onNavigate("home")}
             className="flex items-center gap-3 hover:opacity-80 transition-opacity"
           >
             <img src={logoImage} alt="ElyxS Logo" className="w-10 h-10" />
-            <span className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+            <span
+              className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent"
+              style={{ fontFamily: "Orbitron, sans-serif" }}
+            >
               ElyxS
             </span>
           </button>
@@ -81,13 +84,16 @@ export function Header({ currentPage, onNavigate }: HeaderProps) {
                 <Button
                   variant="ghost"
                   className="glass text-white border-cyan-500/30 hover:border-cyan-400/50 px-3 py-2 rounded-xl transition-all flex items-center gap-2"
+                  aria-label="Select language"
                 >
                   <Globe className="w-4 h-4 text-cyan-400" />
-                  <span className="text-sm">{currentLanguage.flag}</span>
+                  <span className="text-sm" aria-hidden>
+                    {currentLanguage.flag}
+                  </span>
                   <ChevronDown className="w-3 h-3 text-gray-400" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent 
+              <DropdownMenuContent
                 align="end"
                 className="glass-strong border-cyan-500/30 rounded-xl p-2 min-w-[180px]"
               >
@@ -101,7 +107,9 @@ export function Header({ currentPage, onNavigate }: HeaderProps) {
                         : "text-gray-300 hover:bg-white/10 hover:text-white"
                     }`}
                   >
-                    <span className="text-lg">{lang.flag}</span>
+                    <span className="text-lg" aria-hidden>
+                      {lang.flag}
+                    </span>
                     <span className="text-sm">{lang.name}</span>
                     {language === lang.code && (
                       <span className="ml-auto w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
@@ -113,11 +121,11 @@ export function Header({ currentPage, onNavigate }: HeaderProps) {
 
             {/* Connect Wallet Button */}
             <Button
-              onClick={handleConnect}
-              className="bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-white px-6 py-2 rounded-xl glow-cyan transition-all"
+              onClick={wallet.status === "connected" ? disconnect : connect}
+              className="bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-white px-6 py-2 rounded-xl glow-cyan transition-all disabled:opacity-60"
             >
               <Wallet className="w-4 h-4 mr-2" />
-              {isConnected ? "0x1a2b...3c4d" : t("connectWallet")}
+              {walletDisplay}
             </Button>
           </div>
         </div>

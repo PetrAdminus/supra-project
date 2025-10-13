@@ -31,7 +31,6 @@ import type { AdminConfig } from "./types";
 import * as mockClient from "./mockClient";
 
 declare global {
-  // eslint-disable-next-line no-var
   var fetch: typeof fetch;
 }
 

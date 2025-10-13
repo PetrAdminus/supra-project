@@ -96,6 +96,7 @@ function formatSnapshotValue(value: unknown): string {
     try {
       return JSON.stringify(value, null, 2);
     } catch (error) {
+      console.error(error);
       return String(value);
     }
   }
@@ -152,6 +153,7 @@ function filterEvents(
       try {
         parts.push(JSON.stringify(event.data));
       } catch (error) {
+        console.error(error);
         parts.push(String(event.data));
       }
     }

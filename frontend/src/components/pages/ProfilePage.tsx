@@ -1,4 +1,4 @@
-import { User, Mail, Wallet, Trophy, Settings, Shield } from "lucide-react";
+import { Wallet, Trophy, Settings, Shield } from "lucide-react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";

@@ -1,4 +1,4 @@
-import { Mail, MessageCircle, FileText, HelpCircle, Book, Send } from "lucide-react";
+import { Mail, MessageCircle, HelpCircle, Book, Send } from "lucide-react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -25,7 +25,7 @@ export function SupportPage() {
             Support Center
           </h2>
           <p className="text-lg text-gray-400 max-w-3xl mx-auto">
-            We're here to help you with any questions or issues
+            We&apos;re here to help you with any questions or issues
           </p>
         </div>
 
@@ -182,7 +182,7 @@ export function SupportPage() {
                 How do I participate in a lottery draw?
               </AccordionTrigger>
               <AccordionContent className="text-gray-400">
-                To participate, connect your wallet, navigate to the Dashboard, and click "Buy Ticket" on any active draw. Each ticket costs 100 SUPRA tokens. Once purchased, your ticket is automatically entered into the next draw.
+                To participate, connect your wallet, navigate to the Dashboard, and click &quot;Buy Ticket&quot; on any active draw. Each ticket costs 100 SUPRA tokens. Once purchased, your ticket is automatically entered into the next draw.
               </AccordionContent>
             </AccordionItem>
 
@@ -191,7 +191,7 @@ export function SupportPage() {
                 How are winners selected?
               </AccordionTrigger>
               <AccordionContent className="text-gray-400">
-                Winners are selected using a provably fair random number generator powered by Supra's VRF (Verifiable Random Function). All draws are transparent and verifiable on the blockchain, ensuring complete fairness.
+                Winners are selected using a provably fair random number generator powered by Supra&rsquo;s VRF (Verifiable Random Function). All draws are transparent and verifiable on the blockchain, ensuring complete fairness.
               </AccordionContent>
             </AccordionItem>
 
@@ -209,7 +209,7 @@ export function SupportPage() {
                 What happens if I lose my wallet access?
               </AccordionTrigger>
               <AccordionContent className="text-gray-400">
-                Your tickets and any winnings are tied to your wallet address. Always keep your recovery phrase secure. If you lose access to your wallet, we cannot recover your funds as we don't have custody of your assets.
+                Your tickets and any winnings are tied to your wallet address. Always keep your recovery phrase secure. If you lose access to your wallet, we cannot recover your funds as we don&rsquo;t have custody of your assets.
               </AccordionContent>
             </AccordionItem>
 

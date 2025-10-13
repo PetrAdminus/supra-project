@@ -55,7 +55,10 @@ export function TicketList({ tickets }: TicketListProps): ReactElement {
                 <Ticket size={22} />
               </div>
               <div className="ticket-card__meta">
-                <span className="ticket-card__id">#{ticket.ticketId}</span>
+                <span className="ticket-card__id">
+                  <span aria-hidden="true">#</span>
+                  <span>{ticket.ticketId}</span>
+                </span>
                 <span className="ticket-card__info">
                   {t("tickets.historyCard.lotteryLabel", { id: ticket.lotteryId })}
                 </span>
@@ -63,7 +66,7 @@ export function TicketList({ tickets }: TicketListProps): ReactElement {
                   {t("tickets.purchaseCard.badgeRound", { round: ticket.round })}
                 </span>
               </div>
-              <span className={`ticket-card__badge ${status.badgeClass}`}>
+              <span className={`ticket-card__badge ${status.badgeClass}`} aria-hidden="true">
                 {t(status.labelKey)}
               </span>
             </div>
@@ -84,8 +87,8 @@ export function TicketList({ tickets }: TicketListProps): ReactElement {
 
             <div className="ticket-card__footer">
               <div className="ticket-card__status">
-                <StatusIcon size={16} />
-                <span>{t(status.labelKey)}</span>
+                <StatusIcon size={16} aria-hidden="true" />
+                <span>{`${t(status.labelKey)}\u200B`}</span>
               </div>
               <time dateTime={ticket.purchaseTime}>
                 {purchaseDate.toLocaleString()}

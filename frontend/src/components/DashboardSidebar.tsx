@@ -1,5 +1,4 @@
 import { Ticket, Trophy, History, User, Settings } from "lucide-react";
-import { useState } from "react";
 
 type SidebarSection = "tickets" | "draws" | "history" | "profile" | "settings";
 

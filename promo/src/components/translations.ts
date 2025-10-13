@@ -1,0 +1,44 @@
+﻿export const translations = {
+  en: {
+    home: "Home",
+    dashboard: "Dashboard",
+    about: "About",
+    support: "Support",
+    connectWallet: "Connect Wallet",
+    heroTitle: "Win Big on Supra Network",
+    heroSubtitle:
+      "Decentralized lottery powered by blockchain technology. Fair, transparent, and secure.",
+    playNow: "Play Now",
+    viewDraws: "View Draws",
+    account: "Account",
+    tickets: "Tickets",
+    draws: "Draws",
+    history: "History",
+    profile: "Profile",
+    loading: "Loading...",
+    error: "Error",
+    success: "Success",
+  },
+  ru: {
+    home: "Главная",
+    dashboard: "Дашборд",
+    about: "О проекте",
+    support: "Поддержка",
+    connectWallet: "Подключить кошелёк",
+    heroTitle: "Выигрывай в сети Supra",
+    heroSubtitle:
+      "Децентрализованная лотерея на блокчейне: честно, прозрачно и безопасно.",
+    playNow: "Играть сейчас",
+    viewDraws: "Смотреть розыгрыши",
+    account: "Аккаунт",
+    tickets: "Билеты",
+    draws: "Розыгрыши",
+    history: "История",
+    profile: "Профиль",
+    loading: "Загрузка...",
+    error: "Ошибка",
+    success: "Успешно",
+  },
+} as const;
+
+export type TranslationKey = keyof typeof translations.en;

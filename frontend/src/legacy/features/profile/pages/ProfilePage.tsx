@@ -55,6 +55,7 @@ function formatSettings(settings: Record<string, unknown> | undefined): string {
   try {
     return JSON.stringify(settings, null, 2);
   } catch (error) {
+    console.error(error);
     return "";
   }
 }
@@ -177,6 +178,7 @@ export function ProfilePage(): ReactElement {
     try {
       parsedSettings = parseSettings(formState.settings);
     } catch (error) {
+      console.error(error);
       setSettingsError(t("profile.form.settingsError"));
       return;
     }

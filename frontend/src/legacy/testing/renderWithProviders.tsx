@@ -2,7 +2,7 @@ import type { ReactElement, ReactNode } from "react";
 import { render, type RenderOptions } from "@testing-library/react";
 import i18next from "i18next";
 import { I18nextProvider } from "react-i18next";
-import { AppQueryProvider } from "../app/providers/QueryProvider";
+import { AppQueryProvider } from "../../app/providers/QueryProvider";
 import { initI18n } from "../i18n/initI18n";
 
 interface ProvidersProps {

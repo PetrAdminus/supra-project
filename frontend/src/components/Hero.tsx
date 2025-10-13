@@ -1,7 +1,12 @@
 import { Button } from "./ui/button";
 import { Sparkles, TrendingUp, Shield } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useLanguage } from "./LanguageContext";
 
 export function Hero() {
+  const navigate = useNavigate();
+  const { t } = useLanguage();
+
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden">
       {/* Animated background elements */}
@@ -16,29 +21,37 @@ export function Hero() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 glass px-4 py-2 rounded-full mb-6 glow-purple">
             <Sparkles className="w-4 h-4 text-cyan-400" />
-            <span className="text-sm text-gray-300">Powered by Supra Network</span>
+            <span className="text-sm text-gray-300">{t("heroBadgeSupra")}</span>
           </div>
 
           {/* Main Headline */}
-          <h1 className="text-6xl md:text-8xl mb-6 bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent" style={{ fontFamily: 'Orbitron, sans-serif', fontWeight: 800 }}>
-            Win with
-            <br />
-            ElyxS
+          <h1
+            className="text-6xl md:text-8xl mb-6 bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent"
+            style={{ fontFamily: "Orbitron, sans-serif", fontWeight: 800, whiteSpace: "pre-line" }}
+          >
+            {t("heroHeadline")}
           </h1>
 
           {/* Tagline */}
           <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-2xl mx-auto">
-            Join decentralized draws and win Supra tokens. Transparent, fair, and powered by blockchain technology.
+            {t("heroTagline")}
           </p>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <Button className="bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-white px-8 py-6 text-lg rounded-xl glow-cyan transition-all">
+            <Button
+              className="bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-white px-8 py-6 text-lg rounded-xl glow-cyan transition-all"
+              onClick={() => navigate("/tickets")}
+            >
               <Sparkles className="w-5 h-5 mr-2" />
-              Buy Ticket Now
+              {t("heroPrimaryCta")}
             </Button>
-            <Button variant="outline" className="glass text-white border-cyan-400/50 hover:border-cyan-400 px-8 py-6 text-lg rounded-xl transition-all">
-              View Draws
+            <Button
+              variant="outline"
+              className="glass text-white border-cyan-400/50 hover:border-cyan-400 px-8 py-6 text-lg rounded-xl transition-all"
+              onClick={() => navigate("/dashboard")}
+            >
+              {t("heroSecondaryCta")}
             </Button>
           </div>
 
@@ -46,18 +59,24 @@ export function Hero() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
             <div className="glass-strong p-6 rounded-2xl">
               <TrendingUp className="w-8 h-8 text-cyan-400 mb-3 mx-auto" />
-              <h3 className="text-lg mb-2 text-white" style={{ fontFamily: 'Orbitron, sans-serif' }}>High Returns</h3>
-              <p className="text-sm text-gray-400">Win big with growing prize pools</p>
+              <h3 className="text-lg mb-2 text-white" style={{ fontFamily: "Orbitron, sans-serif" }}>
+                {t("heroFeatureHighReturnsTitle")}
+              </h3>
+              <p className="text-sm text-gray-400">{t("heroFeatureHighReturnsDescription")}</p>
             </div>
             <div className="glass-strong p-6 rounded-2xl">
               <Shield className="w-8 h-8 text-purple-400 mb-3 mx-auto" />
-              <h3 className="text-lg mb-2 text-white" style={{ fontFamily: 'Orbitron, sans-serif' }}>Secure & Fair</h3>
-              <p className="text-sm text-gray-400">Blockchain-verified randomness</p>
+              <h3 className="text-lg mb-2 text-white" style={{ fontFamily: "Orbitron, sans-serif" }}>
+                {t("heroFeatureSecureFairTitle")}
+              </h3>
+              <p className="text-sm text-gray-400">{t("heroFeatureSecureFairDescription")}</p>
             </div>
             <div className="glass-strong p-6 rounded-2xl">
               <Sparkles className="w-8 h-8 text-pink-400 mb-3 mx-auto" />
-              <h3 className="text-lg mb-2 text-white" style={{ fontFamily: 'Orbitron, sans-serif' }}>Instant Payout</h3>
-              <p className="text-sm text-gray-400">Automatic winner distribution</p>
+              <h3 className="text-lg mb-2 text-white" style={{ fontFamily: "Orbitron, sans-serif" }}>
+                {t("heroFeatureInstantPayoutTitle")}
+              </h3>
+              <p className="text-sm text-gray-400">{t("heroFeatureInstantPayoutDescription")}</p>
             </div>
           </div>
         </div>

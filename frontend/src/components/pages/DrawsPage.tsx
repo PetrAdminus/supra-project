@@ -1,4 +1,4 @@
-import { Trophy, Users, Clock, Sparkles } from "lucide-react";
+import { Trophy, Clock, Sparkles } from "lucide-react";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";

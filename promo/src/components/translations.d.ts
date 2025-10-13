@@ -1,0 +1,41 @@
+export declare const translations: {
+    readonly en: {
+        readonly home: "Home";
+        readonly dashboard: "Dashboard";
+        readonly about: "About";
+        readonly support: "Support";
+        readonly connectWallet: "Connect Wallet";
+        readonly heroTitle: "Win Big on Supra Network";
+        readonly heroSubtitle: "Decentralized lottery powered by blockchain technology. Fair, transparent, and secure.";
+        readonly playNow: "Play Now";
+        readonly viewDraws: "View Draws";
+        readonly account: "Account";
+        readonly tickets: "Tickets";
+        readonly draws: "Draws";
+        readonly history: "History";
+        readonly profile: "Profile";
+        readonly loading: "Loading...";
+        readonly error: "Error";
+        readonly success: "Success";
+    };
+    readonly ru: {
+        readonly home: "Главная";
+        readonly dashboard: "Дашборд";
+        readonly about: "О проекте";
+        readonly support: "Поддержка";
+        readonly connectWallet: "Подключить кошелёк";
+        readonly heroTitle: "Выигрывай в сети Supra";
+        readonly heroSubtitle: "Децентрализованная лотерея на блокчейне: честно, прозрачно и безопасно.";
+        readonly playNow: "Играть сейчас";
+        readonly viewDraws: "Смотреть розыгрыши";
+        readonly account: "Аккаунт";
+        readonly tickets: "Билеты";
+        readonly draws: "Розыгрыши";
+        readonly history: "История";
+        readonly profile: "Профиль";
+        readonly loading: "Загрузка...";
+        readonly error: "Ошибка";
+        readonly success: "Успешно";
+    };
+};
+export type TranslationKey = keyof typeof translations.en;

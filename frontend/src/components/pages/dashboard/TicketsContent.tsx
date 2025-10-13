@@ -9,6 +9,8 @@ import { useUiStore } from "../../../store/uiStore";
 import { useLotterySelectionStore } from "../../../store/lotteryStore";
 import type { TicketStatus } from "../../../api/types";
 
+import { EMPTY_VALUE, formatDateTime, formatSupraValue } from "../../../utils/format";
+
 const statusMeta: Record<
   TicketStatus,
   {
@@ -38,28 +40,6 @@ const statusMeta: Record<
     showActiveHint: false,
   },
 };
-
-function formatSupra(value?: string | number | null): string {
-  if (value === null || value === undefined || value === "") {
-    return "—";
-  }
-  const numeric = Number(value);
-  if (Number.isNaN(numeric)) {
-    return String(value);
-  }
-  return `${numeric} $SUPRA`;
-}
-
-function formatDate(value?: string | null): string {
-  if (!value) {
-    return "—";
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return "—";
-  }
-  return parsed.toLocaleString();
-}
 
 export function TicketsContent() {
   const { data: lotteryStatus } = useLotteryStatus({ staleTime: 60_000 });
@@ -107,7 +87,7 @@ export function TicketsContent() {
     (ticket) => ticket.status === "pending" || ticket.status === "confirmed"
   ).length;
   const totalSpent =
-    ticketPriceNumeric !== null ? formatSupra(ticketPriceNumeric * totalTickets) : "—";
+    ticketPriceNumeric !== null ? formatSupraValue(ticketPriceNumeric * totalTickets) : EMPTY_VALUE;
 
   const showReadonly = apiMode === "supra";
   const ticketsToDisplay = filteredTickets.slice(0, 6);
@@ -130,9 +110,9 @@ export function TicketsContent() {
             </div>
             <div>
               <h4 className="text-2xl text-white mb-1" style={{ fontFamily: 'Orbitron, sans-serif' }}>
-                Next Draw: {selectedLottery ? `#${selectedLottery.id}` : "—"}
+                Next Draw: {selectedLottery ? `#${selectedLottery.id}` : EMPTY_VALUE}
               </h4>
-              <p className="text-gray-400">Prize Pool: {formatSupra(prizePool)}</p>
+              <p className="text-gray-400">Prize Pool: {formatSupraValue(prizePool)}</p>
             </div>
           </div>
           <Button
@@ -140,7 +120,7 @@ export function TicketsContent() {
             disabled={!selectedLottery || showReadonly}
           >
             <Plus className="w-5 h-5 mr-2" />
-            Buy Ticket ({formatSupra(ticketPrice)})
+            Buy Ticket ({formatSupraValue(ticketPrice)})
           </Button>
         </div>
         {showReadonly && (
@@ -197,12 +177,12 @@ export function TicketsContent() {
               <div className="space-y-2 mb-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Purchase Date</span>
-                  <span className="text-gray-300">{formatDate(ticket.purchaseTime)}</span>
+                  <span className="text-gray-300">{formatDateTime(ticket.purchaseTime)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Price Paid</span>
                   <span className="text-cyan-400" style={{ fontFamily: 'Orbitron, sans-serif' }}>
-                    {formatSupra(ticketPrice)}
+                    {formatSupraValue(ticketPrice)}
                   </span>
                 </div>
               </div>
@@ -242,3 +222,4 @@ export function TicketsContent() {
     </div>
   );
 }
+

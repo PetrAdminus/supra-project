@@ -7,6 +7,8 @@ import { Avatar, AvatarFallback } from "../../ui/avatar";
 import { useWallet } from "../../../features/wallet/useWallet";
 import { useLotteryStatus } from "../../../features/dashboard/hooks/useLotteryStatus";
 
+import { formatSupraValue } from "../../../utils/format";
+
 type Message = {
   id: number;
   text: string;
@@ -25,28 +27,6 @@ const statusText: Record<string, string> = {
   connecting: "Connecting…",
   connected: "Connected",
 };
-
-function formatDate(value?: string): string {
-  if (!value) {
-    return "—";
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return "—";
-  }
-  return parsed.toLocaleString();
-}
-
-function formatSupra(value?: string | number | null): string {
-  if (value === null || value === undefined || value === "") {
-    return "—";
-  }
-  const numeric = Number(value);
-  if (Number.isNaN(numeric)) {
-    return String(value);
-  }
-  return `${numeric} $SUPRA`;
-}
 
 export function WalletContent() {
   const [copied, setCopied] = useState(false);
@@ -168,7 +148,7 @@ export function WalletContent() {
           <div>
             <p className="text-sm text-gray-400 mb-2">Balance</p>
             <p className="text-3xl text-cyan-400" style={{ fontFamily: 'Orbitron, sans-serif', fontWeight: 700 }}>
-              {formatSupra(balanceLabel)}
+              {formatSupraValue(balanceLabel)}
             </p>
           </div>
           <div>

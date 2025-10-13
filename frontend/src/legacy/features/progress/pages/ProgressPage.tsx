@@ -35,6 +35,7 @@ function stringifyMetadata(metadata: Record<string, unknown> | null): string | n
   try {
     return JSON.stringify(metadata);
   } catch (error) {
+    console.error(error);
     return String(metadata);
   }
 }
