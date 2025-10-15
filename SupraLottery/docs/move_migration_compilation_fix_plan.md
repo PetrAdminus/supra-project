@@ -62,9 +62,11 @@ let share = math64::mul_div(amount, basis_points, BASIS_POINT_DENOMINATOR);
 let value = a + b;
 let rest  = a % b;
 let mul   = x * y;
-let bps64 = bps as u64;
-let share = amount * basis_points as u64 / BASIS_POINT_DENOMINATOR; // при необходимости добавить проверки вручную
+let bps64 = u64::from_u16(bps);
+let share = amount * u64::from_u16(basis_points) / BASIS_POINT_DENOMINATOR; // при необходимости добавить проверки вручную
 ```
+Supra Move не поддерживает приведение типов через `as`, поэтому для `u16 → u64` всегда используем `u64::from_u16`.
+
 Если требуется защита от переполнения, добавляем явные `assert!` перед операцией.
 
 ---
