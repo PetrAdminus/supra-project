@@ -37,12 +37,15 @@ module lottery::math {
 
     /// Converts `u16` to `u64` without using cast operators.
     public fun from_u16(input: u16): u64 {
-        let mut remaining = input;
-        let mut acc = 0u64;
-        while (remaining > 0u16) {
-            acc = checked_add(acc, 1);
-            remaining = remaining - 1;
-        };
-        acc
+        from_u16_inner(input, 0u64)
+    }
+
+    fun from_u16_inner(remaining: u16, acc: u64): u64 {
+        if (remaining == 0u16) {
+            acc
+        } else {
+            let next_acc = checked_add(acc, 1u64);
+            from_u16_inner(remaining - 1u16, next_acc)
+        }
     }
 }
