@@ -3,6 +3,7 @@ module lottery::operators {
     use std::signer;
     use std::vector;
     use vrf_hub::table;
+    use supra_framework::account;
     use supra_framework::event;
     
     const E_ALREADY_INIT: u64 = 1;
@@ -16,6 +17,11 @@ module lottery::operators {
         admin: address,
         entries: table::Table<u64, LotteryOperatorEntry>,
         lottery_ids: vector<u64>,
+        admin_events: event::EventHandle<AdminUpdatedEvent>,
+        owner_events: event::EventHandle<OwnerUpdatedEvent>,
+        grant_events: event::EventHandle<OperatorGrantedEvent>,
+        revoke_events: event::EventHandle<OperatorRevokedEvent>,
+        snapshot_events: event::EventHandle<OperatorSnapshotUpdatedEvent>,
     }
 
     struct LotteryOperatorEntry has store {
@@ -63,7 +69,7 @@ module lottery::operators {
         operators: vector<address>,
     }
 
-    public entry fun init(caller: &signer) acquires LotteryOperators {
+    public entry fun init(caller: &signer) {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED
@@ -77,6 +83,11 @@ module lottery::operators {
                 admin: addr,
                 entries: table::new(),
                 lottery_ids: vector::empty<u64>(),
+                admin_events: account::new_event_handle<AdminUpdatedEvent>(caller),
+                owner_events: account::new_event_handle<OwnerUpdatedEvent>(caller),
+                grant_events: account::new_event_handle<OperatorGrantedEvent>(caller),
+                revoke_events: account::new_event_handle<OperatorRevokedEvent>(caller),
+                snapshot_events: account::new_event_handle<OperatorSnapshotUpdatedEvent>(caller),
             },
         );
         let state = borrow_global_mut<LotteryOperators>(@lottery);
@@ -93,7 +104,7 @@ module lottery::operators {
         let state = borrow_global_mut<LotteryOperators>(@lottery);
         let previous = state.admin;
         state.admin = new_admin;
-        event::emit(AdminUpdatedEvent { previous, next: new_admin });
+        event::emit_event(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
     }
 
     public entry fun set_owner(caller: &signer, lottery_id: u64, owner: address) acquires LotteryOperators {
@@ -110,11 +121,14 @@ module lottery::operators {
                 },
             );
             record_lottery_id(&mut state.lottery_ids, lottery_id);
-            event::emit(OwnerUpdatedEvent {
-                lottery_id,
-                previous: option::none<address>(),
-                next: option::some(owner),
-            });
+            event::emit_event(
+                &mut state.owner_events,
+                OwnerUpdatedEvent {
+                    lottery_id,
+                    previous: option::none<address>(),
+                    next: option::some(owner),
+                },
+            );
         } else {
             let owner_changed = false;
             let previous_owner = owner;
@@ -127,15 +141,18 @@ module lottery::operators {
                 };
             };
             if (owner_changed) {
-                event::emit(OwnerUpdatedEvent {
-                    lottery_id,
-                    previous: option::some(previous_owner),
-                    next: option::some(owner),
-                });
+                event::emit_event(
+                    &mut state.owner_events,
+                    OwnerUpdatedEvent {
+                        lottery_id,
+                        previous: option::some(previous_owner),
+                        next: option::some(owner),
+                    },
+                );
             };
         };
 
-            emit_operator_snapshot(state, lottery_id);
+        emit_operator_snapshot(&mut state, lottery_id);
     }
 
     public entry fun grant_operator(caller: &signer, lottery_id: u64, operator: address)
@@ -150,12 +167,15 @@ module lottery::operators {
             table::add(&mut entry.operators, operator, true);
             record_operator(&mut entry.operator_list, operator);
         };
-        event::emit(OperatorGrantedEvent {
-            lottery_id,
-            operator,
-            granted_by: signer::address_of(caller),
-        });
-        emit_operator_snapshot(state, lottery_id);
+        event::emit_event(
+            &mut state.grant_events,
+            OperatorGrantedEvent {
+                lottery_id,
+                operator,
+                granted_by: signer::address_of(caller),
+            },
+        );
+        emit_operator_snapshot(&mut state, lottery_id);
     }
 
     public entry fun revoke_operator(caller: &signer, lottery_id: u64, operator: address)
@@ -170,12 +190,15 @@ module lottery::operators {
             table::remove(&mut entry.operators, operator);
             remove_operator(&mut entry.operator_list, operator);
         };
-        event::emit(OperatorRevokedEvent {
-            lottery_id,
-            operator,
-            revoked_by: signer::address_of(caller),
-        });
-        emit_operator_snapshot(state, lottery_id);
+        event::emit_event(
+            &mut state.revoke_events,
+            OperatorRevokedEvent {
+                lottery_id,
+                operator,
+                revoked_by: signer::address_of(caller),
+            },
+        );
+        emit_operator_snapshot(&mut state, lottery_id);
     }
 
     #[view]
@@ -255,7 +278,7 @@ module lottery::operators {
             }
         };
         let state = borrow_global<LotteryOperators>(@lottery);
-        build_operator_snapshot(state, lottery_id)
+        build_operator_snapshot(&state, lottery_id)
     }
 
     #[test_only]
@@ -386,30 +409,22 @@ module lottery::operators {
     }
 
     fun emit_operator_snapshot(state: &mut LotteryOperators, lottery_id: u64) {
-        let snapshot = build_operator_snapshot_from_mut(state, lottery_id);
+        let snapshot = build_operator_snapshot(state, lottery_id);
         let OperatorSnapshot { owner, operators } = snapshot;
-        event::emit(OperatorSnapshotUpdatedEvent { lottery_id, owner, operators });
+        event::emit_event(
+            &mut state.snapshot_events,
+            OperatorSnapshotUpdatedEvent { lottery_id, owner, operators },
+        );
     }
 
     fun build_operator_snapshot(state: &LotteryOperators, lottery_id: u64): OperatorSnapshot {
-        build_operator_snapshot_from_entries(&state.entries, lottery_id)
-    }
-
-    fun build_operator_snapshot_from_mut(state: &mut LotteryOperators, lottery_id: u64): OperatorSnapshot {
-        build_operator_snapshot_from_entries(&state.entries, lottery_id)
-    }
-
-    fun build_operator_snapshot_from_entries(
-        entries: &table::Table<u64, LotteryOperatorEntry>,
-        lottery_id: u64,
-    ): OperatorSnapshot {
-        if (!table::contains(entries, lottery_id)) {
+        if (!table::contains(&state.entries, lottery_id)) {
             return OperatorSnapshot {
                 owner: option::none(),
                 operators: vector::empty<address>(),
             }
         };
-        let entry = table::borrow(entries, lottery_id);
+        let entry = table::borrow(&state.entries, lottery_id);
         OperatorSnapshot {
             owner: option::some(entry.owner),
             operators: copy_address_vector(&entry.operator_list),

@@ -13,7 +13,6 @@ module lottery::instances_tests {
         factory_admin: &signer,
         lottery_admin: &signer,
     ) {
-        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -131,7 +130,6 @@ module lottery::instances_tests {
         factory_admin: &signer,
         lottery_admin: &signer,
     ) {
-        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -145,7 +143,6 @@ module lottery::instances_tests {
         factory_admin: &signer,
         lottery_admin: &signer,
     ) {
-        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -196,7 +193,6 @@ module lottery::instances_tests {
         factory_admin: &signer,
         lottery_admin: &signer,
     ) {
-        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);

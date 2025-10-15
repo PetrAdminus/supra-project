@@ -1,26 +1,12 @@
 # План исправлений для успешной компиляции пакета lottery (Move 1)
 
-## Статус выполнения
-
-- [x] Шаг 0. Подготовка
-- [x] Шаг 1. Удаление вызовов `math64::*`
-- [x] Шаг 2. Корректные заимствования (`&T`, `&mut T`, reborrow `&*`)
-- [x] Шаг 3. Доступ к полям без лишнего `*`
-- [x] Шаг 4. Настройка friend-видимости и вызовов `public(friend)`
-- [x] Шаг 5. Сигнатуры helper-функций и tuple-деструктуризация
-- [x] Шаг 6. Геттеры вместо деструктуризации чужих структур
-- [x] Шаг 7. Обновление snapshot/helper API
-- [~] Шаг 8. Проверки после правок (локальные проверки выполнены, `move tool check/test` и `python -m scripts.move_tests` заблокированы отсутствием Supra CLI в окружении)
-- [x] Шаг 9. Дополнительные места для ревизии
-- [~] Шаг 10. Финальный чек-лист (пункты, требующие Supra CLI, ожидают запуска в полноценном окружении)
-
 Документ фиксирует полный перечень шагов, необходимых для устранения текущих ошибок компиляции и приведения кода к требованиям Move 1. Все изменения выполняем последовательно и фиксируем отдельными коммитами с упоминанием выполненных пунктов.
 
 ---
 
 ## 0. Подготовка
 
-1. Snapshot/helper-функции переписаны так, чтобы принимать `&mut` напрямую: общая логика вынесена в вспомогательные `*_from_parts`, а в коде больше не требуется локальный shim `std::borrow::freeze`.
+1. Во всех модулях, где понадобится «заморозка» мутабельной ссылки, добавляем `use std::borrow;` в начало файла.
 2. Для дальнейших проверок держим под рукой быстрые команды:
    ```bash
    rg "math64::" SupraLottery/supra/move_workspace
@@ -49,8 +35,6 @@
 | `lottery/sources/Autopurchase.move` | `math64::checked_add` |
 
 Базовые замены:
-> Примечание. В Move 2024 оператор приведения `as` удалён (см. раздел *No more `as` operator* в официальной документации: <https://move-language.github.io/move/move-2024-upgrade.html#no-more-as-operator>). Вместо него используем числовые функции-преобразователи `u64::from_u16`, `u128::from_u64` и т.п.
-
 ```move
 // было
 let value = math64::checked_add(a, b);
@@ -63,24 +47,25 @@ let share = math64::mul_div(amount, basis_points, BASIS_POINT_DENOMINATOR);
 let value = a + b;
 let rest  = a % b;
 let mul   = x * y;
-let bps64 = u64::from_u16(bps);
-let basis_points_u64 = u64::from_u16(basis_points);
-let share = mul_div(amount, basis_points_u64, BASIS_POINT_DENOMINATOR); // при необходимости добавить проверки вручную
+let bps64 = bps as u64;
+let share = amount * basis_points as u64 / BASIS_POINT_DENOMINATOR; // при необходимости добавить проверки вручную
 ```
-> Примечание. Поставляемый вместе с Supra CLI стандарт пока не содержит модуль `std::u64`, поэтому для преобразований `u16 → u64` и аналогичных используем локальные вспомогательные функции (например, `lottery::rounds::u16_to_u64`).
 Если требуется защита от переполнения, добавляем явные `assert!` перед операцией.
 
 ---
 
-## 2. Корректные заимствования (`&T`, `&mut T`, reborrow `&*`)
+## 2. Корректные заимствования (`&T`, `&mut T`, `borrow::freeze`)
 
-**Проблема:** повсеместно встречаются конструкции `build_snapshot(&state)` (когда `state: &T`) и `build_snapshot(&*state)` (когда `state: &mut T`). Move 1 запрещает такое обращение без `copy` у структуры (см. раздел «error[E05001] … требует `copy`» в [официальном списке типовых ошибок Supra](move_common_errors_ru.md#5-errorE05001-ability-constraint-not-satisfied)).
+**Проблема:** повсеместно встречаются конструкции `build_snapshot(&state)` (когда `state: &T`) и `build_snapshot(&*state)` (когда `state: &mut T`). Move 1 запрещает такое обращение без `copy` у структуры.
 
 ### 2.1. Если `state: &T`
 Заменяем `build_snapshot(&state)` → `build_snapshot(state)`.
 
 ### 2.2. Если `state: &mut T`
-Добавляем перегрузки или вспомогательные функции, которые принимают `&mut T`, читают данные через отдельные `&`-заимствования полей и возвращают снимок состояния. Общий код удобно выносить в `*_from_parts`, чтобы переиспользовать реализацию между `&T` и `&mut T`.
+Заменяем `build_snapshot(&*state)` на:
+```move
+let snapshot = build_snapshot(borrow::freeze(state));
+```
 
 ### 2.3. Обязательные места (не исчерпывающий список — проверить весь модуль)
 - `lottery/sources/History.move`
@@ -173,12 +158,12 @@ rg "let [^{]*VipConfig" SupraLottery/supra/move_workspace/lottery/tests
 
 1. Функции `build_*_snapshot` должны принимать `&T`, а вызывающий код передаёт:
    ```move
-   let snapshot = build_*_snapshot(&*state, ...);
+   let snapshot = build_*_snapshot(borrow::freeze(state), ...);
    ```
 2. Если нужны мутабельные обновления + событие, последовательность следующая:
    ```move
    let state = borrow_global_mut<SomeState>(@lottery);
-   let previous = option::some(build_snapshot(&*state));
+   let previous = option::some(build_snapshot(borrow::freeze(state)));
    // ... обновление state ...
    event::emit(... { previous, current });
    ```
@@ -214,7 +199,7 @@ rg "let [^{]*VipConfig" SupraLottery/supra/move_workspace/lottery/tests
 - Модули, где ещё встречается `clone_*` без необходимости (`clone_bytes`, `clone_addresses`) — убедиться, что они вызываются только там, где действительно нужны копии.
 - Все функции `ensure_*` и `record_*`, которые вызывают helper’ы — согласно новым сигнатурам.
 - Тесты на миграцию, VIP, автопокупку — обновить кортежи и опять же убрать деструктуризацию приватных структур.
-- Документацию и комментарии: при необходимости дописать пояснения, почему теперь используется ре-заимствование `&*state`.
+- Документацию и комментарии: при необходимости дописать пояснения, почему теперь используется `borrow::freeze`.
 
 ---
 
@@ -222,7 +207,7 @@ rg "let [^{]*VipConfig" SupraLottery/supra/move_workspace/lottery/tests
 
 1. Поиск `math64::` возвращает пустой список.
 2. Нет ни одного `&*` или `*field` для типов без copy.
-3. Все вызовы snapshot/helper функций используют ре-заимствование `&*state` или прямую ссылку без двойных `&`.
+3. Все вызовы snapshot/helper функций используют `borrow::freeze` или прямую ссылку без двойных `&`.
 4. Friend-списки соответствуют фактическим зависимостям между модулями.
 5. Тесты обновлены под новые кортежи и геттеры, нет деструктуризации чужих структур.
 6. `docker compose run ... move tool check` и `move tool test` проходят для всех пакетов воркспейса.

@@ -10,7 +10,6 @@ module lottery::treasury_multi_tests {
     use lottery::test_utils;
 
     fun init_token(lottery_admin: &signer) {
-        test_utils::ensure_framework_accounts_for_test();
         account::create_account_for_test(@jackpot_pool);
         account::create_account_for_test(@operations_pool);
         account::create_account_for_test(@lottery_owner);

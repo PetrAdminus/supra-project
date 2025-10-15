@@ -5,6 +5,7 @@ module lottery::history {
     use std::signer;
     use std::vector;
     use vrf_hub::table;
+    use supra_framework::account;
     use supra_framework::event;
     use std::timestamp;
 
@@ -22,6 +23,8 @@ module lottery::history {
         admin: address,
         histories: table::Table<u64, LotteryHistory>,
         lottery_ids: vector<u64>,
+        record_events: event::EventHandle<DrawRecordedEvent>,
+        snapshot_events: event::EventHandle<HistorySnapshotUpdatedEvent>,
     }
 
     struct DrawRecord has copy, drop, store {
@@ -61,7 +64,7 @@ module lottery::history {
         current: HistorySnapshot,
     }
 
-    public entry fun init(caller: &signer) acquires HistoryCollection {
+    public entry fun init(caller: &signer) {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED
@@ -75,6 +78,8 @@ module lottery::history {
                 admin: addr,
                 histories: table::new(),
                 lottery_ids: vector::empty<u64>(),
+                record_events: account::new_event_handle<DrawRecordedEvent>(caller),
+                snapshot_events: account::new_event_handle<HistorySnapshotUpdatedEvent>(caller),
             },
         );
         let previous = option::none<HistorySnapshot>();
@@ -94,7 +99,7 @@ module lottery::history {
     public entry fun set_admin(caller: &signer, new_admin: address) acquires HistoryCollection {
         ensure_admin(caller);
         let state = borrow_global_mut<HistoryCollection>(@lottery);
-        let previous = option::some(build_snapshot_from_mut(state));
+        let previous = option::some(build_snapshot(&*state));
         state.admin = new_admin;
         emit_history_snapshot(state, previous);
     }
@@ -102,9 +107,9 @@ module lottery::history {
     public entry fun clear_history(caller: &signer, lottery_id: u64) acquires HistoryCollection {
         ensure_admin(caller);
         let state = borrow_global_mut<HistoryCollection>(@lottery);
-        if (table::contains<u64, LotteryHistory>(&state.histories, lottery_id)) {
-            let previous = option::some(build_snapshot_from_mut(state));
-            let history = table::borrow_mut<u64, LotteryHistory>(&mut state.histories, lottery_id);
+        if (table::contains(&state.histories, lottery_id)) {
+            let previous = option::some(build_snapshot(&*state));
+            let history = table::borrow_mut(&mut state.histories, lottery_id);
             clear_records(&mut history.records);
             emit_history_snapshot(state, previous);
         };
@@ -123,7 +128,7 @@ module lottery::history {
             return
         };
         let state = borrow_global_mut<HistoryCollection>(@lottery);
-        let previous = option::some(build_snapshot_from_mut(state));
+        let previous = option::some(build_snapshot(&*state));
         let history = borrow_or_create_history(state, lottery_id);
         let timestamp_seconds = timestamp::now_seconds();
         let record = DrawRecord {
@@ -137,14 +142,17 @@ module lottery::history {
         };
         vector::push_back(&mut history.records, record);
         trim_history(&mut history.records);
-        event::emit(DrawRecordedEvent {
-            lottery_id,
-            request_id,
-            winner,
-            ticket_index,
-            prize_amount,
-            timestamp_seconds,
-        });
+        event::emit_event(
+            &mut state.record_events,
+            DrawRecordedEvent {
+                lottery_id,
+                request_id,
+                winner,
+                ticket_index,
+                prize_amount,
+                timestamp_seconds,
+            },
+        );
         emit_history_snapshot(state, previous);
     }
 
@@ -154,7 +162,7 @@ module lottery::history {
             return false
         };
         let state = borrow_global<HistoryCollection>(@lottery);
-        table::contains<u64, LotteryHistory>(&state.histories, lottery_id)
+        table::contains(&state.histories, lottery_id)
     }
 
     #[view]
@@ -172,10 +180,10 @@ module lottery::history {
             return option::none<vector<DrawRecord>>()
         };
         let state = borrow_global<HistoryCollection>(@lottery);
-        if (!table::contains<u64, LotteryHistory>(&state.histories, lottery_id)) {
+        if (!table::contains(&state.histories, lottery_id)) {
             option::none<vector<DrawRecord>>()
         } else {
-            let history = table::borrow<u64, LotteryHistory>(&state.histories, lottery_id);
+            let history = table::borrow(&state.histories, lottery_id);
             option::some(clone_records(&history.records))
         }
     }
@@ -186,10 +194,10 @@ module lottery::history {
             return option::none<DrawRecord>()
         };
         let state = borrow_global<HistoryCollection>(@lottery);
-        if (!table::contains<u64, LotteryHistory>(&state.histories, lottery_id)) {
+        if (!table::contains(&state.histories, lottery_id)) {
             option::none<DrawRecord>()
         } else {
-            let history = table::borrow<u64, LotteryHistory>(&state.histories, lottery_id);
+            let history = table::borrow(&state.histories, lottery_id);
             if (vector::is_empty(&history.records)) {
                 option::none<DrawRecord>()
             } else {
@@ -207,10 +215,10 @@ module lottery::history {
             return option::none<LotteryHistorySnapshot>()
         };
         let state = borrow_global<HistoryCollection>(@lottery);
-        if (!table::contains<u64, LotteryHistory>(&state.histories, lottery_id)) {
+        if (!table::contains(&state.histories, lottery_id)) {
             option::none<LotteryHistorySnapshot>()
         } else {
-            option::some(build_lottery_snapshot(state, lottery_id))
+            option::some(build_lottery_snapshot(&state, lottery_id))
         }
     }
 
@@ -220,7 +228,7 @@ module lottery::history {
             return option::none<HistorySnapshot>()
         };
         let state = borrow_global<HistoryCollection>(@lottery);
-        option::some(build_snapshot(state))
+        option::some(build_snapshot(&state))
     }
 
     fun ensure_admin(caller: &signer) acquires HistoryCollection {
@@ -235,15 +243,11 @@ module lottery::history {
     }
 
     fun borrow_or_create_history(state: &mut HistoryCollection, lottery_id: u64): &mut LotteryHistory {
-        if (!table::contains<u64, LotteryHistory>(&state.histories, lottery_id)) {
-            table::add<u64, LotteryHistory>(
-                &mut state.histories,
-                lottery_id,
-                LotteryHistory { records: vector::empty<DrawRecord>() },
-            );
+        if (!table::contains(&state.histories, lottery_id)) {
+            table::add(&mut state.histories, lottery_id, LotteryHistory { records: vector::empty<DrawRecord>() });
             push_unique(&mut state.lottery_ids, lottery_id);
         };
-        table::borrow_mut<u64, LotteryHistory>(&mut state.histories, lottery_id)
+        table::borrow_mut(&mut state.histories, lottery_id)
     }
 
     fun trim_history(records: &mut vector<DrawRecord>) {
@@ -294,32 +298,20 @@ module lottery::history {
     }
 
     fun build_snapshot(state: &HistoryCollection): HistorySnapshot {
-        build_snapshot_from_parts(state.admin, &state.lottery_ids, &state.histories)
-    }
-
-    fun build_snapshot_from_mut(state: &mut HistoryCollection): HistorySnapshot {
-        build_snapshot_from_parts(state.admin, &state.lottery_ids, &state.histories)
-    }
-
-    fun build_snapshot_from_parts(
-        admin: address,
-        lottery_ids: &vector<u64>,
-        histories: &table::Table<u64, LotteryHistory>,
-    ): HistorySnapshot {
-        let snapshots = vector::empty<LotteryHistorySnapshot>();
-        let len = vector::length<u64>(lottery_ids);
+        let histories = vector::empty<LotteryHistorySnapshot>();
+        let len = vector::length(&state.lottery_ids);
         let index = 0;
         while (index < len) {
-            let lottery_id = *vector::borrow<u64>(lottery_ids, index);
-            if (table::contains<u64, LotteryHistory>(histories, lottery_id)) {
-                vector::push_back(&mut snapshots, build_lottery_snapshot_from_table(histories, lottery_id));
+            let lottery_id = *vector::borrow(&state.lottery_ids, index);
+            if (table::contains(&state.histories, lottery_id)) {
+                vector::push_back(&mut histories, build_lottery_snapshot(state, lottery_id));
             };
             index = index + 1;
         };
         HistorySnapshot {
-            admin,
-            lottery_ids: clone_u64_vector(lottery_ids),
-            histories: snapshots,
+            admin: state.admin,
+            lottery_ids: clone_u64_vector(&state.lottery_ids),
+            histories,
         }
     }
 
@@ -327,21 +319,7 @@ module lottery::history {
         state: &HistoryCollection,
         lottery_id: u64
     ): LotteryHistorySnapshot {
-        build_lottery_snapshot_from_table(&state.histories, lottery_id)
-    }
-
-    fun build_lottery_snapshot_from_mut(
-        state: &mut HistoryCollection,
-        lottery_id: u64
-    ): LotteryHistorySnapshot {
-        build_lottery_snapshot_from_table(&state.histories, lottery_id)
-    }
-
-    fun build_lottery_snapshot_from_table(
-        histories: &table::Table<u64, LotteryHistory>,
-        lottery_id: u64
-    ): LotteryHistorySnapshot {
-        let history = table::borrow<u64, LotteryHistory>(histories, lottery_id);
+        let history = table::borrow(&state.histories, lottery_id);
         LotteryHistorySnapshot {
             lottery_id,
             records: clone_records(&history.records),
@@ -352,8 +330,11 @@ module lottery::history {
         state: &mut HistoryCollection,
         previous: option::Option<HistorySnapshot>
     ) {
-        let current = build_snapshot_from_mut(state);
-        event::emit(HistorySnapshotUpdatedEvent { previous, current });
+        let current = build_snapshot(&*state);
+        event::emit_event(
+            &mut state.snapshot_events,
+            HistorySnapshotUpdatedEvent { previous, current },
+        );
     }
 
     #[test_only]

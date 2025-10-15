@@ -14,7 +14,6 @@ module lottery::rounds_tests {
     use supra_framework::event;
 
     fun setup_token(lottery_admin: &signer, buyer: &signer) {
-        test_utils::ensure_framework_accounts_for_test();
         account::create_account_for_test(@jackpot_pool);
         account::create_account_for_test(@operations_pool);
         treasury_v1::init_token(
@@ -44,7 +43,6 @@ module lottery::rounds_tests {
         lottery_admin: &signer,
         buyer: &signer,
     ) {
-        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -131,7 +129,6 @@ module lottery::rounds_tests {
         lottery_admin: &signer,
         buyer: &signer,
     ) {
-        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -168,7 +165,6 @@ module lottery::rounds_tests {
         lottery_admin: &signer,
         buyer: &signer,
     ) {
-        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -249,7 +245,6 @@ module lottery::rounds_tests {
         buyer: &signer,
         aggregator: &signer,
     ) {
-        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -365,7 +360,6 @@ module lottery::rounds_tests {
         factory_admin: &signer,
         lottery_admin: &signer,
     ) {
-        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);

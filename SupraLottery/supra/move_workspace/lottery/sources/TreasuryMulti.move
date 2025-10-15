@@ -4,7 +4,6 @@ module lottery::treasury_multi {
     friend lottery::referrals;
     friend lottery::rounds;
     friend lottery::store;
-    #[test_only]
     friend lottery::treasury_multi_tests;
     friend lottery::vip;
 
@@ -12,7 +11,9 @@ module lottery::treasury_multi {
     use std::signer;
     use std::vector;
     use vrf_hub::table;
+    use supra_framework::account;
     use supra_framework::event;
+    use std::math64;
     use lottery::treasury_v1;
 
     const E_NOT_AUTHORIZED: u64 = 1;
@@ -33,7 +34,6 @@ module lottery::treasury_multi {
     const E_BONUS_RECIPIENT_FROZEN: u64 = 16;
     const E_JACKPOT_WINNER_UNREGISTERED: u64 = 17;
     const E_JACKPOT_WINNER_FROZEN: u64 = 18;
-    const E_ARITHMETIC_OVERFLOW: u64 = 19;
 
     const BASIS_POINT_DENOMINATOR: u64 = 10_000;
 
@@ -59,6 +59,15 @@ module lottery::treasury_multi {
         configs: table::Table<u64, LotteryShareConfig>,
         pools: table::Table<u64, LotteryPool>,
         lottery_ids: vector<u64>,
+        config_events: event::EventHandle<LotteryConfigUpdatedEvent>,
+        allocation_events: event::EventHandle<AllocationRecordedEvent>,
+        admin_events: event::EventHandle<AdminUpdatedEvent>,
+        recipient_events: event::EventHandle<RecipientsUpdatedEvent>,
+        prize_events: event::EventHandle<PrizePaidEvent>,
+        operations_events: event::EventHandle<OperationsWithdrawnEvent>,
+        operations_income_events: event::EventHandle<OperationsIncomeRecordedEvent>,
+        operations_bonus_events: event::EventHandle<OperationsBonusPaidEvent>,
+        jackpot_events: event::EventHandle<JackpotPaidEvent>,
     }
 
     struct RecipientStatus has copy, drop, store {
@@ -171,6 +180,15 @@ module lottery::treasury_multi {
             configs: table::new(),
             pools: table::new(),
             lottery_ids: vector::empty<u64>(),
+            config_events: account::new_event_handle<LotteryConfigUpdatedEvent>(caller),
+            allocation_events: account::new_event_handle<AllocationRecordedEvent>(caller),
+            admin_events: account::new_event_handle<AdminUpdatedEvent>(caller),
+            recipient_events: account::new_event_handle<RecipientsUpdatedEvent>(caller),
+            prize_events: account::new_event_handle<PrizePaidEvent>(caller),
+            operations_events: account::new_event_handle<OperationsWithdrawnEvent>(caller),
+            operations_income_events: account::new_event_handle<OperationsIncomeRecordedEvent>(caller),
+            operations_bonus_events: account::new_event_handle<OperationsBonusPaidEvent>(caller),
+            jackpot_events: account::new_event_handle<JackpotPaidEvent>(caller),
         };
 
         emit_recipients_event(
@@ -200,7 +218,7 @@ module lottery::treasury_multi {
         let state = borrow_global_mut<TreasuryState>(@lottery);
         let previous = state.admin;
         state.admin = new_admin;
-        event::emit(AdminUpdatedEvent { previous, next: new_admin });
+        event::emit_event(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
     }
 
 
@@ -254,12 +272,15 @@ module lottery::treasury_multi {
             record_lottery_id(state, lottery_id);
             table::add(&mut state.configs, lottery_id, config);
         };
-        event::emit(LotteryConfigUpdatedEvent {
-            lottery_id,
-            prize_bps,
-            jackpot_bps,
-            operations_bps,
-        });
+        event::emit_event(
+            &mut state.config_events,
+            LotteryConfigUpdatedEvent {
+                lottery_id,
+                prize_bps,
+                jackpot_bps,
+                operations_bps,
+            },
+        );
     }
 
 
@@ -356,7 +377,7 @@ module lottery::treasury_multi {
         };
         if (table::contains(&state.pools, lottery_id)) {
             let pool = table::borrow_mut(&mut state.pools, lottery_id);
-            pool.operations_balance = safe_add(pool.operations_balance, amount);
+            pool.operations_balance = math64::checked_add(pool.operations_balance, amount);
         } else {
             table::add(
                 &mut state.pools,
@@ -364,7 +385,10 @@ module lottery::treasury_multi {
                 LotteryPool { prize_balance: 0, operations_balance: amount },
             );
         };
-        event::emit(OperationsIncomeRecordedEvent { lottery_id, amount, source });
+        event::emit_event(
+            &mut state.operations_income_events,
+            OperationsIncomeRecordedEvent { lottery_id, amount, source },
+        );
     }
 
 
@@ -476,7 +500,7 @@ module lottery::treasury_multi {
         config.jackpot_bps
     }
 
-    public(friend) fun share_config_operations_bps(config: &LotteryShareConfig): u64 {
+    fun share_config_operations_bps(config: &LotteryShareConfig): u64 {
         config.operations_bps
     }
 
@@ -537,49 +561,20 @@ module lottery::treasury_multi {
         assert!(!frozen, frozen_error);
     }
 
-    fun mul_div(amount: u64, basis_points: u64, denominator: u64): u64 {
-        assert!(denominator > 0, E_INVALID_BASIS_POINTS);
-        if (amount == 0 || basis_points == 0) {
-            return 0
-        };
-
-        let quotient = amount / denominator;
-        let remainder = amount % denominator;
-        let scaled_quotient = safe_mul(quotient, basis_points);
-        let scaled_remainder = safe_mul(remainder, basis_points) / denominator;
-        safe_add(scaled_quotient, scaled_remainder)
-    }
-
-    fun safe_add(lhs: u64, rhs: u64): u64 {
-        let sum = lhs + rhs;
-        assert!(sum >= lhs, E_ARITHMETIC_OVERFLOW);
-        sum
-    }
-
-    fun safe_mul(lhs: u64, rhs: u64): u64 {
-        if (lhs == 0 || rhs == 0) {
-            return 0
-        };
-
-        let product = lhs * rhs;
-        assert!(product / lhs == rhs, E_ARITHMETIC_OVERFLOW);
-        product
-    }
-
     fun apply_allocation(state: &mut TreasuryState, lottery_id: u64, amount: u64) {
         if (!table::contains(&state.configs, lottery_id)) {
             abort E_CONFIG_MISSING
         };
         let config = *table::borrow(&state.configs, lottery_id);
-        let prize_amount = mul_div(amount, config.prize_bps, BASIS_POINT_DENOMINATOR);
-        let jackpot_amount = mul_div(amount, config.jackpot_bps, BASIS_POINT_DENOMINATOR);
+        let prize_amount = math64::mul_div(amount, config.prize_bps, BASIS_POINT_DENOMINATOR);
+        let jackpot_amount = math64::mul_div(amount, config.jackpot_bps, BASIS_POINT_DENOMINATOR);
         let operations_amount = amount - prize_amount - jackpot_amount;
 
-        state.jackpot_balance = safe_add(state.jackpot_balance, jackpot_amount);
+        state.jackpot_balance = state.jackpot_balance + jackpot_amount;
         if (table::contains(&state.pools, lottery_id)) {
             let pool = table::borrow_mut(&mut state.pools, lottery_id);
-            pool.prize_balance = safe_add(pool.prize_balance, prize_amount);
-            pool.operations_balance = safe_add(pool.operations_balance, operations_amount);
+            pool.prize_balance = pool.prize_balance + prize_amount;
+            pool.operations_balance = pool.operations_balance + operations_amount;
         } else {
             table::add(
                 &mut state.pools,
@@ -588,13 +583,16 @@ module lottery::treasury_multi {
             );
         };
 
-        event::emit(AllocationRecordedEvent {
-            lottery_id,
-            total_amount: amount,
-            prize_amount,
-            jackpot_amount,
-            operations_amount,
-        });
+        event::emit_event(
+            &mut state.allocation_events,
+            AllocationRecordedEvent {
+                lottery_id,
+                total_amount: amount,
+                prize_amount,
+                jackpot_amount,
+                operations_amount,
+            },
+        );
     }
 
     fun distribute_prize_impl(state: &mut TreasuryState, lottery_id: u64, winner: address): u64 {
@@ -608,7 +606,10 @@ module lottery::treasury_multi {
         };
         pool.prize_balance = 0;
         treasury_v1::payout_from_treasury(winner, amount);
-        event::emit(PrizePaidEvent { lottery_id, winner, amount });
+        event::emit_event(
+            &mut state.prize_events,
+            PrizePaidEvent { lottery_id, winner, amount },
+        );
         amount
     }
 
@@ -629,7 +630,10 @@ module lottery::treasury_multi {
         );
         pool.operations_balance = 0;
         treasury_v1::payout_from_treasury(recipient, amount);
-        event::emit(OperationsWithdrawnEvent { lottery_id, recipient, amount });
+        event::emit_event(
+            &mut state.operations_events,
+            OperationsWithdrawnEvent { lottery_id, recipient, amount },
+        );
         amount
     }
 
@@ -656,7 +660,10 @@ module lottery::treasury_multi {
         );
         pool.operations_balance = pool.operations_balance - amount;
         treasury_v1::payout_from_treasury(recipient, amount);
-        event::emit(OperationsBonusPaidEvent { lottery_id, recipient, amount });
+        event::emit_event(
+            &mut state.operations_bonus_events,
+            OperationsBonusPaidEvent { lottery_id, recipient, amount },
+        );
     }
 
     fun distribute_jackpot_impl(state: &mut TreasuryState, recipient: address, amount: u64) {
@@ -673,7 +680,10 @@ module lottery::treasury_multi {
         );
         state.jackpot_balance = state.jackpot_balance - amount;
         treasury_v1::payout_from_treasury(recipient, amount);
-        event::emit(JackpotPaidEvent { recipient, amount });
+        event::emit_event(
+            &mut state.jackpot_events,
+            JackpotPaidEvent { recipient, amount },
+        );
     }
 
     fun record_lottery_id(state: &mut TreasuryState, lottery_id: u64) {
@@ -704,12 +714,15 @@ module lottery::treasury_multi {
         previous_jackpot: option::Option<RecipientStatus>,
         previous_operations: option::Option<RecipientStatus>,
     ) {
-        event::emit(RecipientsUpdatedEvent {
-            previous_jackpot,
-            previous_operations,
-            next_jackpot: build_recipient_status(state.jackpot_recipient),
-            next_operations: build_recipient_status(state.operations_recipient),
-        });
+        event::emit_event(
+            &mut state.recipient_events,
+            RecipientsUpdatedEvent {
+                previous_jackpot,
+                previous_operations,
+                next_jackpot: build_recipient_status(state.jackpot_recipient),
+                next_operations: build_recipient_status(state.operations_recipient),
+            },
+        );
     }
 
     fun build_recipient_status(recipient: address): RecipientStatus {

@@ -7,6 +7,7 @@ module lottery::migration {
     use lottery::rounds;
     use lottery::treasury_multi;
     use lottery_factory::registry;
+    use supra_framework::account;
     use supra_framework::event;
     use vrf_hub::table;
 
@@ -19,6 +20,7 @@ module lottery::migration {
     struct MigrationLedger has key {
         snapshots: table::Table<u64, MigrationSnapshot>,
         lottery_ids: vector<u64>,
+        snapshot_events: event::EventHandle<MigrationSnapshotUpdatedEvent>,
     }
 
     struct MigrationSnapshot has copy, drop, store {
@@ -48,7 +50,7 @@ module lottery::migration {
         prize_bps: u64,
         jackpot_bps: u64,
         operations_bps: u64,
-    ) acquires MigrationLedger {
+    ) {
         if (signer::address_of(caller) != @lottery) {
             abort E_NOT_AUTHORIZED
         };
@@ -163,21 +165,32 @@ module lottery::migration {
 
 
     fun record_snapshot(caller: &signer, snapshot: MigrationSnapshot) acquires MigrationLedger {
+        let state = ensure_ledger(caller);
+        let lottery_id = snapshot.lottery_id;
+        table::add(&mut state.snapshots, lottery_id, snapshot);
+        record_lottery_id(&mut state.lottery_ids, lottery_id);
+        event::emit_event(
+            &mut state.snapshot_events,
+            MigrationSnapshotUpdatedEvent {
+                lottery_id,
+                snapshot: *table::borrow(&state.snapshots, lottery_id),
+            },
+        );
+    }
+
+
+    fun ensure_ledger(caller: &signer): &mut MigrationLedger acquires MigrationLedger {
         if (!exists<MigrationLedger>(@lottery)) {
             move_to(
                 caller,
                 MigrationLedger {
                     snapshots: table::new(),
                     lottery_ids: vector::empty<u64>(),
+                    snapshot_events: account::new_event_handle<MigrationSnapshotUpdatedEvent>(caller),
                 },
             );
         };
-        let state = borrow_global_mut<MigrationLedger>(@lottery);
-        let lottery_id = snapshot.lottery_id;
-        let snapshot_for_event = snapshot;
-        table::add(&mut state.snapshots, lottery_id, snapshot);
-        record_lottery_id(&mut state.lottery_ids, lottery_id);
-        event::emit(MigrationSnapshotUpdatedEvent { lottery_id, snapshot: snapshot_for_event });
+        borrow_global_mut<MigrationLedger>(@lottery)
     }
 
 

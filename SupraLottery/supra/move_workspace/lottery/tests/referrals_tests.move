@@ -21,7 +21,6 @@ module lottery::referrals_tests {
         buyer: &signer,
         referrer: &signer,
     ) {
-        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);

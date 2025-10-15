@@ -12,7 +12,6 @@ module lottery::jackpot_tests {
     use vrf_hub::hub;
 
     fun setup_token(lottery_admin: &signer, player1: &signer, player2: &signer) {
-        test_utils::ensure_framework_accounts_for_test();
         account::create_account_for_test(@jackpot_pool);
         account::create_account_for_test(@operations_pool);
         treasury_v1::init_token(
@@ -57,7 +56,6 @@ module lottery::jackpot_tests {
         player2: &signer,
         aggregator: &signer,
     ) {
-        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         let lottery_id = hub::register_lottery(vrf_admin, @lottery_owner, @lottery_contract, b"jackpot");
         hub::set_callback_sender(vrf_admin, signer::address_of(aggregator));
@@ -199,7 +197,6 @@ module lottery::jackpot_tests {
         player2: &signer,
         aggregator: &signer,
     ) {
-        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         let lottery_id = hub::register_lottery(vrf_admin, @lottery_owner, @lottery_contract, b"jackpot-empty");
         hub::set_callback_sender(vrf_admin, signer::address_of(aggregator));

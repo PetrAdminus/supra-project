@@ -18,7 +18,6 @@ module lottery::vip_tests {
     const VIP_BONUS_TICKETS: u64 = 2;
 
     fun setup_token(lottery_admin: &signer, player: &signer) {
-        test_utils::ensure_framework_accounts_for_test();
         account::create_account_for_test(@jackpot_pool);
         account::create_account_for_test(@operations_pool);
         treasury_v1::init_token(
@@ -41,7 +40,6 @@ module lottery::vip_tests {
         factory_admin: &signer,
         lottery_admin: &signer,
     ): u64 {
-        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -91,9 +89,14 @@ module lottery::vip_tests {
         let initial_snapshot = vector::borrow(&lottery_snapshots_initial, 0);
         let (_, config_initial, members_initial, active_initial, revenue_initial, issued_initial) =
             vip::vip_lottery_snapshot_fields_for_test(initial_snapshot);
-        assert!(vip::vip_config_price(&config_initial) == VIP_PRICE, 22);
-        assert!(vip::vip_config_duration_secs(&config_initial) == VIP_DURATION, 23);
-        assert!(vip::vip_config_bonus_tickets(&config_initial) == VIP_BONUS_TICKETS, 24);
+        let vip::VipConfig {
+            price: config_price,
+            duration_secs: config_duration,
+            bonus_tickets: config_bonus,
+        } = config_initial;
+        assert!(config_price == VIP_PRICE, 22);
+        assert!(config_duration == VIP_DURATION, 23);
+        assert!(config_bonus == VIP_BONUS_TICKETS, 24);
         assert!(members_initial == 0, 25);
         assert!(active_initial == 0, 26);
         assert!(revenue_initial == 0, 27);
@@ -115,7 +118,7 @@ module lottery::vip_tests {
 
         rounds::buy_ticket(player, lottery_id);
         let round_snapshot = test_utils::unwrap(rounds::get_round_snapshot(lottery_id));
-        let (ticket_count, _, _, _, _) = rounds::round_snapshot_fields_for_test(&round_snapshot);
+        let (ticket_count, _, _, _) = rounds::round_snapshot_fields_for_test(&round_snapshot);
         assert!(ticket_count == 1 + VIP_BONUS_TICKETS, 7);
 
         let summary_after = test_utils::unwrap(vip::get_lottery_summary(lottery_id));

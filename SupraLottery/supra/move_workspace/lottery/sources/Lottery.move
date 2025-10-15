@@ -421,7 +421,7 @@ module lottery::main_v2 {
         hash::sha3_256(encoded)
     }
 
-    public entry fun init(sender: &signer) acquires LotteryData {
+    public entry fun init(sender: &signer) {
         // Only the lottery contract address can initialize
         assert!(signer::address_of(sender) == @lottery, E_NOT_OWNER);
         assert!(!exists<LotteryData>(@lottery), E_ALREADY_INITIALIZED);
@@ -787,6 +787,8 @@ module lottery::main_v2 {
         assert!(callback_gas_price > 0, E_INVALID_GAS_CONFIG);
         assert!(callback_gas_limit > 0, E_INVALID_GAS_CONFIG);
         assert!(verification_gas_value > 0, E_INVALID_GAS_CONFIG);
+        assert!(callback_gas_price <= max_gas_price, E_INVALID_GAS_CONFIG);
+        assert!(callback_gas_limit <= max_gas_limit, E_INVALID_GAS_CONFIG);
         lottery.max_gas_price = max_gas_price;
         lottery.max_gas_limit = max_gas_limit;
         lottery.callback_gas_price = callback_gas_price;
@@ -1384,8 +1386,8 @@ module lottery::main_v2 {
     public fun draw_handled_fields(
         event: &DrawHandledEvent
     ): (u64, bool, vector<u8>, address, address, u64, u8, u64, vector<u256>) {
-        let request_hash = clone_bytes(&event.request_hash);
-        let randomness = clone_u256_vector(&event.randomness);
+        let request_hash = *event.request_hash;
+        let randomness = *event.randomness;
         (
             event.nonce,
             event.success,
@@ -1743,7 +1745,7 @@ module lottery::main_v2 {
                 let requester_ref = option::borrow(&lottery.last_requester);
                 let hash_ref = option::borrow(&lottery.last_request_payload_hash);
                 let config = option::borrow(&lottery.vrf_request_config);
-                let callback_sender = ensure_callback_sender_configured(lottery);
+                let callback_sender = ensure_callback_sender_configured(&lottery);
                 option::some(PendingRequestView {
                     nonce: *nonce_ref,
                     requester: *requester_ref,

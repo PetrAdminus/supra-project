@@ -16,7 +16,6 @@ module lottery::autopurchase_tests {
     const TICKET_PRICE: u64 = 100;
 
     fun setup_token(lottery_admin: &signer, buyer: &signer) {
-        test_utils::ensure_framework_accounts_for_test();
         account::create_account_for_test(@jackpot_pool);
         account::create_account_for_test(@operations_pool);
         treasury_v1::init_token(
@@ -39,7 +38,6 @@ module lottery::autopurchase_tests {
         factory_admin: &signer,
         lottery_admin: &signer,
     ): u64 {
-        test_utils::ensure_framework_accounts_for_test();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -125,7 +123,7 @@ module lottery::autopurchase_tests {
         assert!(active, 2);
 
         let snapshot = test_utils::unwrap(rounds::get_round_snapshot(lottery_id));
-        let (ticket_count, _, _, _, _) = rounds::round_snapshot_fields_for_test(&snapshot);
+        let (ticket_count, _, _, _) = rounds::round_snapshot_fields_for_test(&snapshot);
         assert!(ticket_count == 2, 3);
 
         let summary_mid = test_utils::unwrap(autopurchase::get_lottery_summary(lottery_id));
