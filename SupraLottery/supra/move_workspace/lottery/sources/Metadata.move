@@ -276,24 +276,24 @@ module lottery::metadata {
 
     fun build_snapshot_from_parts(
         admin: address,
-        entries: &table::Table<u64, LotteryMetadata>,
+        entries_table: &table::Table<u64, LotteryMetadata>,
         lottery_ids: &vector<u64>,
     ): MetadataSnapshot {
-        let entries = vector::empty<MetadataEntry>();
+        let entries_vec = vector::empty<MetadataEntry>();
         let len = vector::length(lottery_ids);
         let i = 0;
         while (i < len) {
             let lottery_id = *vector::borrow(lottery_ids, i);
-            if (table::contains(entries, lottery_id)) {
-                let metadata = clone_metadata(table::borrow(entries, lottery_id));
+            if (table::contains(entries_table, lottery_id)) {
+                let metadata = clone_metadata(table::borrow(entries_table, lottery_id));
                 vector::push_back(
-                    &mut entries,
+                    &mut entries_vec,
                     MetadataEntry { lottery_id, metadata },
                 );
             };
             i = i + 1;
         };
-        MetadataSnapshot { admin, entries }
+        MetadataSnapshot { admin, entries: entries_vec }
     }
 
     fun build_snapshot_from_ref(state: &MetadataRegistry): MetadataSnapshot {
