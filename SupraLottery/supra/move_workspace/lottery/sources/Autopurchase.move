@@ -603,7 +603,7 @@ module lottery::autopurchase {
     }
 
     fun build_lottery_snapshot_internal(
-        lotteries: &table::Table<u64, AutopurchasePlans>,
+        lotteries: &table::Table<u64, LotteryPlans>,
         lottery_id: u64,
     ): AutopurchaseLotterySnapshot {
         let plans = table::borrow(lotteries, lottery_id);

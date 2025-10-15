@@ -5,7 +5,6 @@ module lottery::rounds {
     use std::option;
     use std::signer;
     use std::vector;
-    use std::u64;
     use vrf_hub::table;
     use supra_framework::account;
     use supra_framework::event;
@@ -384,7 +383,7 @@ module lottery::rounds {
         jackpot_share_bps: u16,
         ticket_count: u64,
     ): u64 {
-        let jackpot_bps = u64::from_u16(jackpot_share_bps);
+        let jackpot_bps = u16_to_u64(jackpot_share_bps);
         let jackpot_contribution = ticket_price * jackpot_bps / BASIS_POINT_DENOMINATOR;
         let issued = 0;
         let total_amount = 0;
@@ -534,6 +533,16 @@ module lottery::rounds {
             i = i + 1;
         };
         buffer
+    }
+
+    fun u16_to_u64(value: u16): u64 {
+        let result = 0u64;
+        let remaining = value;
+        while (remaining > 0u16) {
+            result = result + 1u64;
+            remaining = remaining - 1u16;
+        };
+        result
     }
 
     fun u8_to_u64(value: u8): u64 {

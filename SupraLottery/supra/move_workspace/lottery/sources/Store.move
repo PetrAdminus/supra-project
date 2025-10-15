@@ -487,7 +487,7 @@ module lottery::store {
     }
 
     fun build_lottery_snapshot_from_table(
-        lotteries: &table::Table<u64, StoreLottery>,
+        lotteries: &table::Table<u64, LotteryStore>,
         lottery_id: u64,
     ): StoreLotterySnapshot {
         let store = table::borrow(lotteries, lottery_id);
