@@ -1,13 +1,13 @@
 module lottery::referrals {
     friend lottery::rounds;
 
-    use supra_framework::event;
-    use std::math64;
     use std::option;
     use std::signer;
     use std::vector;
     use vrf_hub::table;
     use lottery::treasury_multi;
+    use lottery::events;
+    use lottery::math;
 
     const BASIS_POINT_DENOMINATOR: u64 = 10_000;
 
@@ -128,7 +128,7 @@ module lottery::referrals {
     public entry fun set_admin(caller: &signer, new_admin: address) acquires ReferralState {
         ensure_admin(caller);
         let state = borrow_global_mut<ReferralState>(@lottery);
-        let previous = option::some(build_referral_snapshot(&*state));
+        let previous = option::some(build_referral_snapshot_from_mut(state));
         state.admin = new_admin;
         emit_snapshot_event(state, previous);
     }
@@ -140,7 +140,8 @@ module lottery::referrals {
         referee_bps: u64,
     ) acquires ReferralState {
         ensure_admin(caller);
-        if (referrer_bps + referee_bps > BASIS_POINT_DENOMINATOR) {
+        let combined_bps = math::checked_add(referrer_bps, referee_bps);
+        if (combined_bps > BASIS_POINT_DENOMINATOR) {
             abort E_INVALID_CONFIG
         };
         let treasury_config_opt = treasury_multi::get_config(lottery_id);
@@ -149,12 +150,12 @@ module lottery::referrals {
         };
         let share_config = *option::borrow(&treasury_config_opt);
         let operations_bps = treasury_multi::share_config_operations_bps(&share_config);
-        if (referrer_bps + referee_bps > operations_bps) {
+        if (combined_bps > operations_bps) {
             abort E_INVALID_CONFIG
         };
 
         let state = borrow_global_mut<ReferralState>(@lottery);
-        let previous = option::some(build_referral_snapshot(&*state));
+        let previous = option::some(build_referral_snapshot_from_mut(state));
         let config = ReferralConfig { referrer_bps, referee_bps };
         if (table::contains(&state.configs, lottery_id)) {
             *table::borrow_mut(&mut state.configs, lottery_id) = config;
@@ -162,7 +163,7 @@ module lottery::referrals {
             table::add(&mut state.configs, lottery_id, config);
             record_lottery_id(&mut state.lottery_ids, lottery_id);
         };
-        event::emit(ReferralConfigUpdatedEvent { lottery_id, referrer_bps, referee_bps });
+        events::emit(ReferralConfigUpdatedEvent { lottery_id, referrer_bps, referee_bps });
         emit_snapshot_event(state, previous);
     }
 
@@ -175,10 +176,10 @@ module lottery::referrals {
         if (table::contains(&state.referrers, player)) {
             abort E_ALREADY_REGISTERED
         };
-        let previous = option::some(build_referral_snapshot(&*state));
+        let previous = option::some(build_referral_snapshot_from_mut(state));
         table::add(&mut state.referrers, player, referrer);
-        state.total_registered = state.total_registered + 1;
-        event::emit(ReferralRegisteredEvent { player, referrer, by_admin: false });
+        state.total_registered = math::checked_add(state.total_registered, 1);
+        events::emit(ReferralRegisteredEvent { player, referrer, by_admin: false });
         emit_snapshot_event(state, previous);
     }
 
@@ -192,14 +193,14 @@ module lottery::referrals {
             abort E_SELF_REFERRAL
         };
         let state = borrow_global_mut<ReferralState>(@lottery);
-        let previous = option::some(build_referral_snapshot(&*state));
+        let previous = option::some(build_referral_snapshot_from_mut(state));
         if (table::contains(&state.referrers, player)) {
             *table::borrow_mut(&mut state.referrers, player) = referrer;
         } else {
             table::add(&mut state.referrers, player, referrer);
-            state.total_registered = state.total_registered + 1;
+            state.total_registered = math::checked_add(state.total_registered, 1);
         };
-        event::emit(ReferralRegisteredEvent { player, referrer, by_admin: true });
+        events::emit(ReferralRegisteredEvent { player, referrer, by_admin: true });
         emit_snapshot_event(state, previous);
     }
 
@@ -209,9 +210,9 @@ module lottery::referrals {
         if (!table::contains(&state.referrers, player)) {
             return
         };
-        let previous = option::some(build_referral_snapshot(&*state));
+        let previous = option::some(build_referral_snapshot_from_mut(state));
         table::remove(&mut state.referrers, player);
-        event::emit(ReferralClearedEvent { player, by_admin: true });
+        events::emit(ReferralClearedEvent { player, by_admin: true });
         emit_snapshot_event(state, previous);
     }
 
@@ -312,8 +313,8 @@ module lottery::referrals {
         };
 
         let available_before_referrer = operations_balance;
-        let desired_referrer = math64::mul_div(amount, referrer_bps, BASIS_POINT_DENOMINATOR);
-        let desired_referee = math64::mul_div(amount, referee_bps, BASIS_POINT_DENOMINATOR);
+        let desired_referrer = math::mul_div(amount, referrer_bps, BASIS_POINT_DENOMINATOR);
+        let desired_referee = math::mul_div(amount, referee_bps, BASIS_POINT_DENOMINATOR);
 
         let referrer_paid;
         let available_after_referrer;
@@ -357,13 +358,13 @@ module lottery::referrals {
             return
         };
 
-        let previous = option::some(build_referral_snapshot(&*state));
+        let previous = option::some(build_referral_snapshot_from_mut(state));
         let stats = ensure_stats(state, lottery_id);
-        stats.rewarded_purchases = stats.rewarded_purchases + 1;
-        stats.total_referrer_rewards = stats.total_referrer_rewards + referrer_paid;
-        stats.total_referee_rewards = stats.total_referee_rewards + referee_paid;
+        stats.rewarded_purchases = math::checked_add(stats.rewarded_purchases, 1);
+        stats.total_referrer_rewards = math::checked_add(stats.total_referrer_rewards, referrer_paid);
+        stats.total_referee_rewards = math::checked_add(stats.total_referee_rewards, referee_paid);
 
-        event::emit(ReferralRewardPaidEvent {
+        events::emit(ReferralRewardPaidEvent {
             lottery_id,
             buyer,
             referrer,
@@ -440,7 +441,7 @@ module lottery::referrals {
             return empty_snapshot()
         };
         let state = borrow_global<ReferralState>(@lottery);
-        build_referral_snapshot(&state)
+        build_referral_snapshot_from_ref(&state)
     }
 
     #[test_only]
@@ -494,24 +495,62 @@ module lottery::referrals {
         event.current
     }
 
-    fun build_referral_snapshot(state: &ReferralState): ReferralSnapshot {
-        ReferralSnapshot {
-            admin: state.admin,
-            total_registered: state.total_registered,
-            lotteries: build_lottery_snapshots(state),
+    fun build_referral_snapshot_from_parts(
+        admin: address,
+        total_registered: u64,
+        lotteries: vector<LotteryReferralSnapshot>,
+    ): ReferralSnapshot {
+        ReferralSnapshot { admin, total_registered, lotteries }
+    }
+
+    fun build_referral_snapshot_from_ref(state: &ReferralState): ReferralSnapshot {
+        build_referral_snapshot_from_parts(
+            state.admin,
+            state.total_registered,
+            build_lottery_snapshots_from_refs(&state.configs, &state.stats, &state.lottery_ids),
+        )
+    }
+
+    fun build_referral_snapshot_from_mut(state: &mut ReferralState): ReferralSnapshot {
+        build_referral_snapshot_from_parts(
+            state.admin,
+            state.total_registered,
+            build_lottery_snapshots_from_refs(&state.configs, &state.stats, &state.lottery_ids),
+        )
+    }
+
+    fun build_lottery_snapshot_from_parts(
+        lottery_id: u64,
+        referrer_bps: u64,
+        referee_bps: u64,
+        rewarded_purchases: u64,
+        total_referrer_rewards: u64,
+        total_referee_rewards: u64,
+    ): LotteryReferralSnapshot {
+        LotteryReferralSnapshot {
+            lottery_id,
+            referrer_bps,
+            referee_bps,
+            rewarded_purchases,
+            total_referrer_rewards,
+            total_referee_rewards,
         }
     }
 
-    fun build_lottery_snapshots(state: &ReferralState): vector<LotteryReferralSnapshot> {
+    fun build_lottery_snapshots_from_refs(
+        configs: &table::Table<u64, ReferralConfig>,
+        stats: &table::Table<u64, ReferralStats>,
+        lottery_ids: &vector<u64>,
+    ): vector<LotteryReferralSnapshot> {
         let snapshots = vector::empty<LotteryReferralSnapshot>();
-        let total = vector::length(&state.lottery_ids);
+        let total = vector::length(lottery_ids);
         let idx = 0;
         while (idx < total) {
-            let lottery_id = *vector::borrow(&state.lottery_ids, idx);
-            if (table::contains(&state.configs, lottery_id)) {
-                let config = *table::borrow(&state.configs, lottery_id);
-                let stats = if (table::contains(&state.stats, lottery_id)) {
-                    *table::borrow(&state.stats, lottery_id)
+            let lottery_id = *vector::borrow(lottery_ids, idx);
+            if (table::contains(configs, lottery_id)) {
+                let config = *table::borrow(configs, lottery_id);
+                let stat_entry = if (table::contains(stats, lottery_id)) {
+                    *table::borrow(stats, lottery_id)
                 } else {
                     ReferralStats {
                         rewarded_purchases: 0,
@@ -521,14 +560,14 @@ module lottery::referrals {
                 };
                 vector::push_back(
                     &mut snapshots,
-                    LotteryReferralSnapshot {
+                    build_lottery_snapshot_from_parts(
                         lottery_id,
-                        referrer_bps: config.referrer_bps,
-                        referee_bps: config.referee_bps,
-                        rewarded_purchases: stats.rewarded_purchases,
-                        total_referrer_rewards: stats.total_referrer_rewards,
-                        total_referee_rewards: stats.total_referee_rewards,
-                    },
+                        config.referrer_bps,
+                        config.referee_bps,
+                        stat_entry.rewarded_purchases,
+                        stat_entry.total_referrer_rewards,
+                        stat_entry.total_referee_rewards,
+                    ),
                 );
             };
             idx = idx + 1;
@@ -540,8 +579,8 @@ module lottery::referrals {
         state: &mut ReferralState,
         previous: option::Option<ReferralSnapshot>,
     ) {
-        let current = build_referral_snapshot(&*state);
-        event::emit(ReferralSnapshotUpdatedEvent { previous, current });
+        let current = build_referral_snapshot_from_mut(state);
+        events::emit(ReferralSnapshotUpdatedEvent { previous, current });
     }
 
     fun empty_snapshot(): ReferralSnapshot {

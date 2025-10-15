@@ -475,7 +475,7 @@ module lottery::treasury_multi {
         config.jackpot_bps
     }
 
-    fun share_config_operations_bps(config: &LotteryShareConfig): u64 {
+    public(friend) fun share_config_operations_bps(config: &LotteryShareConfig): u64 {
         config.operations_bps
     }
 
