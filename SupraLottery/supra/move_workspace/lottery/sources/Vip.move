@@ -128,7 +128,7 @@ module lottery::vip {
         bonus_tickets_issued: u64,
     }
 
-    public entry fun init(caller: &signer) {
+    public entry fun init(caller: &signer) acquires VipState {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED

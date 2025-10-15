@@ -105,7 +105,7 @@ module lottery::store {
     }
 
 
-    public entry fun init(caller: &signer) {
+    public entry fun init(caller: &signer) acquires StoreState {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED

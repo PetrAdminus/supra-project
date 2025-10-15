@@ -50,7 +50,7 @@ module lottery::migration {
         prize_bps: u64,
         jackpot_bps: u64,
         operations_bps: u64,
-    ) {
+    ) acquires MigrationLedger {
         if (signer::address_of(caller) != @lottery) {
             abort E_NOT_AUTHORIZED
         };

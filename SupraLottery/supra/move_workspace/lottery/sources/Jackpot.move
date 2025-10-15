@@ -80,7 +80,7 @@ module lottery::jackpot {
         current: JackpotSnapshot,
     }
 
-    public entry fun init(caller: &signer, lottery_id: u64) {
+    public entry fun init(caller: &signer, lottery_id: u64) acquires JackpotState {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED

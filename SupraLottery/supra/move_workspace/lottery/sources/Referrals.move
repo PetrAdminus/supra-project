@@ -95,7 +95,7 @@ module lottery::referrals {
         total_amount: u64,
     }
 
-    public entry fun init(caller: &signer) {
+    public entry fun init(caller: &signer) acquires ReferralState {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED

@@ -63,7 +63,7 @@ module lottery_factory::registry {
         lotteries: vector<LotteryRegistryEntry>,
     }
 
-    public entry fun init(caller: &signer) {
+    public entry fun init(caller: &signer) acquires FactoryState {
         let addr = signer::address_of(caller);
         if (addr != @lottery_factory) {
             abort E_NOT_AUTHORIZED

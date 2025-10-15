@@ -118,7 +118,7 @@ module lottery::instances {
     }
 
 
-    public entry fun init(caller: &signer, hub: address) {
+    public entry fun init(caller: &signer, hub: address) acquires LotteryCollection {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED

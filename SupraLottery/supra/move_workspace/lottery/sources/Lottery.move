@@ -421,7 +421,7 @@ module lottery::main_v2 {
         hash::sha3_256(encoded)
     }
 
-    public entry fun init(sender: &signer) {
+    public entry fun init(sender: &signer) acquires LotteryData {
         // Only the lottery contract address can initialize
         assert!(signer::address_of(sender) == @lottery, E_NOT_OWNER);
         assert!(!exists<LotteryData>(@lottery), E_ALREADY_INITIALIZED);

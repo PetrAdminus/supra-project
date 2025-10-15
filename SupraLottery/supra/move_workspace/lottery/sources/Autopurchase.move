@@ -108,7 +108,7 @@ module lottery::autopurchase {
         snapshot: AutopurchaseLotterySnapshot,
     }
 
-    public entry fun init(caller: &signer) {
+    public entry fun init(caller: &signer) acquires AutopurchaseState {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED
