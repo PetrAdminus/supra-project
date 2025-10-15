@@ -1,9 +1,8 @@
 module lottery::treasury_v1 {
     friend lottery::autopurchase;
-    friend lottery::lottery;
+    friend lottery::main_v2;
     friend lottery::treasury_multi;
 
-    use std::math64;
     use std::option;
     use std::signer;
     use std::string;
@@ -230,7 +229,7 @@ module lottery::treasury_v1 {
             return 0
         };
 
-        math64::mul_div(total, basis_points, BASIS_POINT_DENOMINATOR)
+        total * basis_points / BASIS_POINT_DENOMINATOR
     }
 
     fun share_for_recipient(total: u64, basis_points: u64, recipient: address): u64 {

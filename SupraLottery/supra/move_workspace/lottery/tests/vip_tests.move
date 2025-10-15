@@ -89,11 +89,9 @@ module lottery::vip_tests {
         let initial_snapshot = vector::borrow(&lottery_snapshots_initial, 0);
         let (_, config_initial, members_initial, active_initial, revenue_initial, issued_initial) =
             vip::vip_lottery_snapshot_fields_for_test(initial_snapshot);
-        let vip::VipConfig {
-            price: config_price,
-            duration_secs: config_duration,
-            bonus_tickets: config_bonus,
-        } = config_initial;
+        let config_price = vip::vip_config_price(&config_initial);
+        let config_duration = vip::vip_config_duration_secs(&config_initial);
+        let config_bonus = vip::vip_config_bonus_tickets(&config_initial);
         assert!(config_price == VIP_PRICE, 22);
         assert!(config_duration == VIP_DURATION, 23);
         assert!(config_bonus == VIP_BONUS_TICKETS, 24);
@@ -118,7 +116,7 @@ module lottery::vip_tests {
 
         rounds::buy_ticket(player, lottery_id);
         let round_snapshot = test_utils::unwrap(rounds::get_round_snapshot(lottery_id));
-        let (ticket_count, _, _, _) = rounds::round_snapshot_fields_for_test(&round_snapshot);
+        let (ticket_count, _, _, _, _) = rounds::round_snapshot_fields_for_test(&round_snapshot);
         assert!(ticket_count == 1 + VIP_BONUS_TICKETS, 7);
 
         let summary_after = test_utils::unwrap(vip::get_lottery_summary(lottery_id));

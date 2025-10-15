@@ -2,13 +2,13 @@ module lottery::rounds {
     friend lottery::autopurchase;
     friend lottery::migration;
 
+    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
     use vrf_hub::table;
     use supra_framework::account;
     use supra_framework::event;
-    use std::math64;
     use lottery::history;
     use lottery::instances;
     use lottery::treasury_multi;
@@ -194,7 +194,7 @@ module lottery::rounds {
                 &mut state.schedule_events,
                 DrawScheduleUpdatedEvent { lottery_id, draw_scheduled: true },
             );
-            snapshot_from_round(&*round)
+            snapshot_from_round(borrow::freeze(round))
         };
         emit_snapshot_event(state, lottery_id, snapshot);
     }
@@ -215,7 +215,7 @@ module lottery::rounds {
                 DrawScheduleUpdatedEvent { lottery_id, draw_scheduled: false },
             );
             event::emit_event(&mut state.reset_events, RoundResetEvent { lottery_id, tickets_cleared: cleared });
-            snapshot_from_round(&*round)
+            snapshot_from_round(borrow::freeze(round))
         };
         emit_snapshot_event(state, lottery_id, snapshot);
     }
@@ -248,7 +248,7 @@ module lottery::rounds {
                 &mut state.request_events,
                 DrawRequestIssuedEvent { lottery_id, request_id: request_id_inner },
             );
-            (request_id_inner, snapshot_from_round(&*round))
+            (request_id_inner, snapshot_from_round(borrow::freeze(round)))
         };
         emit_snapshot_event(state, lottery_id, snapshot);
     }
@@ -281,13 +281,13 @@ module lottery::rounds {
                 abort E_NO_TICKETS
             };
             let random_value = randomness_to_u64(&randomness);
-            let winner_index_inner = math64::mod(random_value, ticket_count);
+            let winner_index_inner = random_value % ticket_count;
             let winner_addr = *vector::borrow(&round.tickets, winner_index_inner);
             round.draw_scheduled = false;
             round.next_ticket_id = 0;
             round.pending_request = option::none<u64>();
             clear_tickets(&mut round.tickets);
-            (winner_addr, winner_index_inner, snapshot_from_round(&*round))
+            (winner_addr, winner_index_inner, snapshot_from_round(borrow::freeze(round)))
         };
         emit_snapshot_event(state, lottery_id, snapshot);
 
@@ -384,15 +384,15 @@ module lottery::rounds {
         jackpot_share_bps: u16,
         ticket_count: u64,
     ): u64 {
-        let jackpot_bps = math64::from_u16(jackpot_share_bps);
-        let jackpot_contribution = math64::mul_div(ticket_price, jackpot_bps, BASIS_POINT_DENOMINATOR);
+        let jackpot_bps = jackpot_share_bps as u64;
+        let jackpot_contribution = ticket_price * jackpot_bps / BASIS_POINT_DENOMINATOR;
         let issued = 0;
         let total_amount = 0;
         while (issued < ticket_count) {
             let ticket_id = {
                 let round = ensure_round(state, lottery_id);
                 let ticket_id_inner = round.next_ticket_id;
-                round.next_ticket_id = math64::checked_add(ticket_id_inner, 1);
+                round.next_ticket_id = ticket_id_inner + 1;
                 vector::push_back(&mut round.tickets, buyer);
                 ticket_id_inner
             };
@@ -401,7 +401,7 @@ module lottery::rounds {
                 &mut state.ticket_events,
                 TicketPurchasedEvent { lottery_id, ticket_id, buyer, amount: ticket_price },
             );
-            total_amount = math64::checked_add(total_amount, ticket_price);
+            total_amount = total_amount + ticket_price;
             issued = issued + 1;
         };
         let bonus_tickets = vip::bonus_tickets_for(lottery_id, buyer);
@@ -411,7 +411,7 @@ module lottery::rounds {
                 let ticket_id = {
                     let round = ensure_round(state, lottery_id);
                     let ticket_id_inner = round.next_ticket_id;
-                    round.next_ticket_id = math64::checked_add(ticket_id_inner, 1);
+                    round.next_ticket_id = ticket_id_inner + 1;
                     vector::push_back(&mut round.tickets, buyer);
                     ticket_id_inner
                 };
@@ -428,7 +428,7 @@ module lottery::rounds {
         referrals::record_purchase(lottery_id, buyer, total_amount);
         let snapshot = {
             let round = ensure_round(state, lottery_id);
-            snapshot_from_round(&*round)
+            snapshot_from_round(borrow::freeze(round))
         };
         emit_snapshot_event(state, lottery_id, snapshot);
         total_amount
@@ -490,7 +490,7 @@ module lottery::rounds {
                 round.draw_scheduled = draw_scheduled;
                 round.next_ticket_id = next_ticket_id;
                 round.pending_request = pending_request;
-                snapshot_from_round(&*round)
+                snapshot_from_round(borrow::freeze(round))
             };
             emit_snapshot_event(state, lottery_id, snapshot);
             return
@@ -516,9 +516,9 @@ module lottery::rounds {
         let i = 0;
         while (i < 8) {
             let byte = *vector::borrow(randomness, i);
-            let result_mul = math64::checked_mul(result, 256);
+            let result_mul = result * 256;
             let byte_u64 = u8_to_u64(byte);
-            result = math64::checked_add(result_mul, byte_u64);
+            result = result_mul + byte_u64;
             i = i + 1;
         };
         result

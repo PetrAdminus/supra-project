@@ -16,6 +16,21 @@
    rg "VipConfig" SupraLottery/supra/move_workspace/lottery/tests
    ```
 
+### Быстрая сверка с актуальными ошибками компиляции
+
+На 2024‑05‑29 компилятор Supra Move сообщает следующие классы ошибок (см. лог `move tool check`):
+
+| Сообщение | Первопричина | Где встречается |
+|-----------|---------------|-----------------|
+| `Invalid dereference. Dereference requires the 'copy' ability` | Попытка вызвать `build_*snapshot(&*state)` или `build_*snapshot(&state)` | `metadata/Metadata.move`, `history/History.move`, `jackpot/Jackpot.move`, `lottery_instances/LotteryInstances.move`, `nft_rewards/NftRewards.move`, `operators/Operators.move`, `referrals/Referrals.move`, `rounds/LotteryRounds.move`, `vip/Vip.move` |
+| `Invalid module access. Unbound function 'checked_add' in module '(std=0x1)::math64'` и подобные | Модуль `std::math64` в Supra Move не содержит `checked_add`, `checked_mul`, `mod`, `from_u16`, `mul_div` | `treasury_multi/TreasuryMulti.move`, `lottery_instances/LotteryInstances.move`, `rounds/LotteryRounds.move`, `jackpot/Jackpot.move`, `vip/Vip.move`, `store/Store.move`, `referrals/Referrals.move`, `autopurchase/Autopurchase.move` |
+| `Invalid module '(lottery...)::lottery'` / `public(friend)` | Устаревший friend `lottery::lottery` и обращения к приватным API без friend-объявления | `treasury/Treasury.move`, `lottery/Lottery.move`, `referrals/Referrals.move`, `treasury_multi/TreasuryMulti.move` |
+| Несовпадение длины кортежа (`Expected expression list of length 4`) | Сигнатуры helper-функций расширены до 5 элементов | `tests/migration_tests.move`, `tests/vip_tests.move`, `tests/autopurchase_tests.move` |
+| `Invalid deconstruction binding` | Попытка распаковать приватный `VipConfig` в тестах | `tests/vip_tests.move` |
+| `Invalid borrow` для `build_*snapshot(&state)` | Передача `&&T` вместо `&T` после `borrow_global<T>` | `history/History.move`, `lottery_instances/LotteryInstances.move`, `vip/Vip.move`, `nft_rewards/NftRewards.move`, `referrals/Referrals.move`, `operators/Operators.move` |
+
+Эти сообщения полностью покрываются шагами ниже; таблица помогает быстро сопоставить конкретную ошибку с требуемым пунктом плана.
+
 ---
 
 ## 1. Удаление вызовов `math64::*`

@@ -13,7 +13,6 @@ module lottery::treasury_multi {
     use vrf_hub::table;
     use supra_framework::account;
     use supra_framework::event;
-    use std::math64;
     use lottery::treasury_v1;
 
     const E_NOT_AUTHORIZED: u64 = 1;
@@ -377,7 +376,7 @@ module lottery::treasury_multi {
         };
         if (table::contains(&state.pools, lottery_id)) {
             let pool = table::borrow_mut(&mut state.pools, lottery_id);
-            pool.operations_balance = math64::checked_add(pool.operations_balance, amount);
+            pool.operations_balance = pool.operations_balance + amount;
         } else {
             table::add(
                 &mut state.pools,
@@ -500,7 +499,7 @@ module lottery::treasury_multi {
         config.jackpot_bps
     }
 
-    fun share_config_operations_bps(config: &LotteryShareConfig): u64 {
+    public(friend) fun share_config_operations_bps(config: &LotteryShareConfig): u64 {
         config.operations_bps
     }
 
@@ -566,8 +565,8 @@ module lottery::treasury_multi {
             abort E_CONFIG_MISSING
         };
         let config = *table::borrow(&state.configs, lottery_id);
-        let prize_amount = math64::mul_div(amount, config.prize_bps, BASIS_POINT_DENOMINATOR);
-        let jackpot_amount = math64::mul_div(amount, config.jackpot_bps, BASIS_POINT_DENOMINATOR);
+        let prize_amount = amount * config.prize_bps / BASIS_POINT_DENOMINATOR;
+        let jackpot_amount = amount * config.jackpot_bps / BASIS_POINT_DENOMINATOR;
         let operations_amount = amount - prize_amount - jackpot_amount;
 
         state.jackpot_balance = state.jackpot_balance + jackpot_amount;

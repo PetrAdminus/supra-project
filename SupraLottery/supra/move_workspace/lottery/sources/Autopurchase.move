@@ -1,11 +1,11 @@
 module lottery::autopurchase {
+    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
     use vrf_hub::table;
     use supra_framework::account;
     use supra_framework::event;
-    use std::math64;
     use lottery::instances;
     use lottery::rounds;
     use lottery::treasury_v1;
@@ -209,9 +209,9 @@ module lottery::autopurchase {
                 );
             } else {
                 let plan = table::borrow_mut(&mut plans.plans, player);
-                plan.balance = math64::checked_add(plan.balance, amount);
+                plan.balance = plan.balance + amount;
             };
-            plans.total_balance = math64::checked_add(plans.total_balance, amount);
+            plans.total_balance = plans.total_balance + amount;
             let plan_ref = table::borrow(&plans.plans, player);
             plan_ref.balance
         };
@@ -403,7 +403,7 @@ module lottery::autopurchase {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return option::none<AutopurchaseLotterySnapshot>()
         };
-        option::some(build_lottery_snapshot(&state, lottery_id))
+        option::some(build_lottery_snapshot(state, lottery_id))
     }
 
     #[view]
@@ -414,7 +414,7 @@ module lottery::autopurchase {
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
-        option::some(build_autopurchase_snapshot(&state))
+        option::some(build_autopurchase_snapshot(state))
     }
 
     fun ensure_lottery_known(lottery_id: u64) {
@@ -642,7 +642,7 @@ module lottery::autopurchase {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return
         };
-        let snapshot = build_lottery_snapshot(state, lottery_id);
+        let snapshot = build_lottery_snapshot(borrow::freeze(state), lottery_id);
         event::emit_event(
             &mut state.snapshot_events,
             AutopurchaseSnapshotUpdatedEvent { admin: state.admin, snapshot },

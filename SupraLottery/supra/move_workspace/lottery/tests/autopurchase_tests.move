@@ -123,7 +123,7 @@ module lottery::autopurchase_tests {
         assert!(active, 2);
 
         let snapshot = test_utils::unwrap(rounds::get_round_snapshot(lottery_id));
-        let (ticket_count, _, _, _) = rounds::round_snapshot_fields_for_test(&snapshot);
+        let (ticket_count, _, _, _, _) = rounds::round_snapshot_fields_for_test(&snapshot);
         assert!(ticket_count == 2, 3);
 
         let summary_mid = test_utils::unwrap(autopurchase::get_lottery_summary(lottery_id));

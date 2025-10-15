@@ -1,9 +1,9 @@
 module lottery::store {
+    use std::borrow;
     use std::option;
     use std::vector;
     use supra_framework::account;
     use supra_framework::event;
-    use std::math64;
     use std::signer;
     use vrf_hub::table;
     use lottery::instances;
@@ -259,10 +259,10 @@ module lottery::store {
             } else {
                 option::none()
             };
-            total_price = math64::checked_mul(record.item.price, quantity);
+            total_price = record.item.price * quantity;
             treasury_v1::deposit_from_user(buyer, total_price);
             record.item.stock = stock_left;
-            record.sold = math64::checked_add(record.sold, quantity);
+            record.sold = record.sold + quantity;
         };
         treasury_multi::record_operations_income_internal(lottery_id, total_price, source_tag());
         event::emit_event(
@@ -371,7 +371,7 @@ module lottery::store {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return option::none<StoreLotterySnapshot>()
         };
-        option::some(build_lottery_snapshot(&state, lottery_id))
+        option::some(build_lottery_snapshot(state, lottery_id))
     }
 
 
@@ -381,7 +381,7 @@ module lottery::store {
             return option::none<StoreSnapshot>()
         };
         let state = borrow_global<StoreState>(@lottery);
-        option::some(build_store_snapshot(&state))
+        option::some(build_store_snapshot(state))
     }
 
     fun ensure_admin(caller: &signer) acquires StoreState {
@@ -519,7 +519,7 @@ module lottery::store {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return
         };
-        let snapshot = build_lottery_snapshot(&*state, lottery_id);
+        let snapshot = build_lottery_snapshot(borrow::freeze(state), lottery_id);
         event::emit_event(
             &mut state.snapshot_events,
             StoreSnapshotUpdatedEvent { admin: state.admin, snapshot },

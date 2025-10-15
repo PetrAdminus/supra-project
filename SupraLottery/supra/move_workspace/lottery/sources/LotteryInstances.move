@@ -2,12 +2,12 @@ module lottery::instances {
     friend lottery::migration;
     friend lottery::rounds;
 
+    use std::borrow;
     use std::option;
     use std::signer;
     use vrf_hub::table;
     use supra_framework::account;
     use supra_framework::event;
-    use std::math64;
     use std::vector;
     use lottery_factory::registry;
     use vrf_hub::hub;
@@ -397,7 +397,7 @@ module lottery::instances {
         if (!table::contains(&state.instances, lottery_id)) {
             return option::none<LotteryInstanceSnapshot>()
         };
-        option::some(build_instance_snapshot(&state, lottery_id))
+        option::some(build_instance_snapshot(state, lottery_id))
     }
 
 
@@ -408,7 +408,7 @@ module lottery::instances {
             return option::none<LotteryInstancesSnapshot>()
         };
         let state = borrow_global<LotteryCollection>(@lottery);
-        option::some(build_instances_snapshot(&state))
+        option::some(build_instances_snapshot(state))
     }
 
 
@@ -418,8 +418,8 @@ module lottery::instances {
             abort E_UNKNOWN_INSTANCE
         };
         let instance = table::borrow_mut(&mut state.instances, lottery_id);
-        instance.tickets_sold = math64::checked_add(instance.tickets_sold, 1);
-        instance.jackpot_accumulated = math64::checked_add(instance.jackpot_accumulated, jackpot_contribution);
+        instance.tickets_sold = instance.tickets_sold + 1;
+        instance.jackpot_accumulated = instance.jackpot_accumulated + jackpot_contribution;
         emit_instance_snapshot(state, lottery_id);
     }
 
@@ -493,7 +493,7 @@ module lottery::instances {
         if (!table::contains(&state.instances, lottery_id)) {
             return
         };
-        let snapshot = build_instance_snapshot(&*state, lottery_id);
+        let snapshot = build_instance_snapshot(borrow::freeze(state), lottery_id);
         event::emit_event(
             &mut state.snapshot_events,
             LotteryInstancesSnapshotUpdatedEvent { admin: state.admin, hub: state.hub, snapshot },
