@@ -5,6 +5,8 @@ module lottery::nft_rewards {
     use vrf_hub::table;
     use supra_framework::account;
     use supra_framework::event;
+    use lottery::events;
+    use lottery::math;
     
     const E_NOT_AUTHORIZED: u64 = 1;
     const E_ALREADY_INITIALIZED: u64 = 2;
@@ -138,7 +140,7 @@ module lottery::nft_rewards {
         ensure_admin(caller);
         let state = borrow_global_mut<BadgeAuthority>(@lottery);
         let badge_id = state.next_badge_id;
-        state.next_badge_id = badge_id + 1;
+        state.next_badge_id = math::checked_add(badge_id, 1);
         let metadata_for_event = clone_bytes(&metadata_uri);
 
         let collection = borrow_or_create_user(&mut state.users, &mut state.owners, owner);
@@ -151,7 +153,7 @@ module lottery::nft_rewards {
         };
         table::add(&mut collection.badges, badge_id, data);
         vector::push_back(&mut collection.badge_ids, badge_id);
-        event::emit_event(
+        events::emit(
             &mut state.mint_events,
             BadgeMintedEvent {
                 badge_id,
@@ -177,7 +179,7 @@ module lottery::nft_rewards {
         if (!option::is_some(&removed)) {
             abort E_BADGE_NOT_FOUND
         };
-        event::emit_event(&mut state.burn_events, BadgeBurnedEvent { badge_id, owner });
+        events::emit(&mut state.burn_events, BadgeBurnedEvent { badge_id, owner });
         emit_owner_snapshot(state, owner);
     }
 
@@ -248,7 +250,7 @@ module lottery::nft_rewards {
         if (!table::contains(&state.users, owner)) {
             return option::none<BadgeOwnerSnapshot>()
         };
-        option::some(build_owner_snapshot(&state, owner))
+        option::some(build_owner_snapshot_from_ref(&state, owner))
     }
 
 
@@ -258,7 +260,7 @@ module lottery::nft_rewards {
             return option::none<NftRewardsSnapshot>()
         };
         let state = borrow_global<BadgeAuthority>(@lottery);
-        option::some(build_snapshot(&state))
+        option::some(build_snapshot_from_ref(&state))
     }
 
 
@@ -372,26 +374,41 @@ module lottery::nft_rewards {
     }
 
 
-    fun build_snapshot(state: &BadgeAuthority): NftRewardsSnapshot {
-        let owners = vector::empty<BadgeOwnerSnapshot>();
-        let len = vector::length(&state.owners);
+    fun build_snapshot_from_parts(
+        admin: address,
+        next_badge_id: u64,
+        users: &table::Table<address, UserBadges>,
+        owners: &vector<address>,
+    ): NftRewardsSnapshot {
+        let owner_snapshots = vector::empty<BadgeOwnerSnapshot>();
+        let len = vector::length(owners);
         let idx = 0;
         while (idx < len) {
-            let owner = *vector::borrow(&state.owners, idx);
-            if (table::contains(&state.users, owner)) {
-                vector::push_back(&mut owners, build_owner_snapshot(state, owner));
+            let owner = *vector::borrow(owners, idx);
+            if (table::contains(users, owner)) {
+                vector::push_back(&mut owner_snapshots, build_owner_snapshot_from_parts(users, owner));
             };
             idx = idx + 1;
         };
-        NftRewardsSnapshot { admin: state.admin, next_badge_id: state.next_badge_id, owners }
+        NftRewardsSnapshot { admin, next_badge_id, owners: owner_snapshots }
     }
 
+    fun build_snapshot_from_ref(state: &BadgeAuthority): NftRewardsSnapshot {
+        build_snapshot_from_parts(state.admin, state.next_badge_id, &state.users, &state.owners)
+    }
 
-    fun build_owner_snapshot(state: &BadgeAuthority, owner: address): BadgeOwnerSnapshot {
-        if (!table::contains(&state.users, owner)) {
+    fun build_snapshot_from_mut(state: &mut BadgeAuthority): NftRewardsSnapshot {
+        build_snapshot_from_parts(state.admin, state.next_badge_id, &state.users, &state.owners)
+    }
+
+    fun build_owner_snapshot_from_parts(
+        users: &table::Table<address, UserBadges>,
+        owner: address,
+    ): BadgeOwnerSnapshot {
+        if (!table::contains(users, owner)) {
             return BadgeOwnerSnapshot { owner, badges: vector::empty<BadgeSnapshot>() }
         };
-        let collection = table::borrow(&state.users, owner);
+        let collection = table::borrow(users, owner);
         let len = vector::length(&collection.badge_ids);
         let idx = 0;
         let badges = vector::empty<BadgeSnapshot>();
@@ -404,6 +421,14 @@ module lottery::nft_rewards {
             idx = idx + 1;
         };
         BadgeOwnerSnapshot { owner, badges }
+    }
+
+    fun build_owner_snapshot_from_ref(state: &BadgeAuthority, owner: address): BadgeOwnerSnapshot {
+        build_owner_snapshot_from_parts(&state.users, owner)
+    }
+
+    fun build_owner_snapshot_from_mut(state: &mut BadgeAuthority, owner: address): BadgeOwnerSnapshot {
+        build_owner_snapshot_from_parts(&state.users, owner)
     }
 
 
@@ -419,8 +444,8 @@ module lottery::nft_rewards {
 
 
     fun emit_owner_snapshot(state: &mut BadgeAuthority, owner: address) {
-        let snapshot = build_owner_snapshot(&*state, owner);
-        event::emit_event(
+        let snapshot = build_owner_snapshot_from_mut(state, owner);
+        events::emit(
             &mut state.snapshot_events,
             NftRewardsSnapshotUpdatedEvent {
                 admin: state.admin,
