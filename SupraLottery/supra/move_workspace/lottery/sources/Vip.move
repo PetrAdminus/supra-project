@@ -1,7 +1,6 @@
 module lottery::vip {
     friend lottery::rounds;
 
-    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
@@ -516,18 +515,30 @@ module lottery::vip {
     }
 
     fun emit_vip_snapshot(state: &mut VipState) {
-        let snapshot = build_vip_snapshot(borrow::freeze(state));
+        let snapshot = build_vip_snapshot_from_mut(state);
         event::emit_event(
             &mut state.snapshot_events,
             VipSnapshotUpdatedEvent { snapshot },
         );
     }
 
+    fun build_vip_snapshot_from_mut(state: &mut VipState): VipSnapshot {
+        build_vip_snapshot_internal(state.admin, &state.lottery_ids, &state.lotteries)
+    }
+
     fun build_vip_snapshot(state: &VipState): VipSnapshot {
+        build_vip_snapshot_internal(state.admin, &state.lottery_ids, &state.lotteries)
+    }
+
+    fun build_vip_snapshot_internal(
+        admin: address,
+        lottery_ids: &vector<u64>,
+        lotteries: &table::Table<u64, VipLottery>,
+    ): VipSnapshot {
         let now = timestamp::now_seconds();
         VipSnapshot {
-            admin: state.admin,
-            lotteries: build_all_lottery_snapshots(state, now),
+            admin,
+            lotteries: build_all_lottery_snapshots_from_table(lottery_ids, lotteries, now),
         }
     }
 
@@ -535,13 +546,21 @@ module lottery::vip {
         state: &VipState,
         now: u64,
     ): vector<VipLotterySnapshot> {
+        build_all_lottery_snapshots_from_table(&state.lottery_ids, &state.lotteries, now)
+    }
+
+    fun build_all_lottery_snapshots_from_table(
+        lottery_ids: &vector<u64>,
+        lotteries: &table::Table<u64, VipLottery>,
+        now: u64,
+    ): vector<VipLotterySnapshot> {
         let snapshots = vector::empty<VipLotterySnapshot>();
-        let len = vector::length(&state.lottery_ids);
+        let len = vector::length(lottery_ids);
         let idx = 0;
         while (idx < len) {
-            let lottery_id = *vector::borrow(&state.lottery_ids, idx);
-            if (table::contains(&state.lotteries, lottery_id)) {
-                let snapshot = build_lottery_snapshot_with_now(state, lottery_id, now);
+            let lottery_id = *vector::borrow(lottery_ids, idx);
+            if (table::contains(lotteries, lottery_id)) {
+                let snapshot = build_lottery_snapshot_with_now_from_table(lotteries, lottery_id, now);
                 vector::push_back(&mut snapshots, snapshot);
             };
             idx = idx + 1;
@@ -562,7 +581,15 @@ module lottery::vip {
         lottery_id: u64,
         now: u64,
     ): VipLotterySnapshot {
-        let lottery = table::borrow(&state.lotteries, lottery_id);
+        build_lottery_snapshot_with_now_from_table(&state.lotteries, lottery_id, now)
+    }
+
+    fun build_lottery_snapshot_with_now_from_table(
+        lotteries: &table::Table<u64, VipLottery>,
+        lottery_id: u64,
+        now: u64,
+    ): VipLotterySnapshot {
+        let lottery = table::borrow(lotteries, lottery_id);
         build_lottery_snapshot_internal(lottery_id, lottery, now)
     }
 

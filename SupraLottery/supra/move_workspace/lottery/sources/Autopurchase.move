@@ -1,5 +1,4 @@
 module lottery::autopurchase {
-    use std::borrow;
     use std::option;
     use std::signer;
     use std::vector;
@@ -589,11 +588,25 @@ module lottery::autopurchase {
         AutopurchaseSnapshot { admin: state.admin, lotteries }
     }
 
+    fun build_lottery_snapshot_from_mut(
+        state: &mut AutopurchaseState,
+        lottery_id: u64,
+    ): AutopurchaseLotterySnapshot {
+        build_lottery_snapshot_internal(&state.lotteries, lottery_id)
+    }
+
     fun build_lottery_snapshot(
         state: &AutopurchaseState,
         lottery_id: u64,
     ): AutopurchaseLotterySnapshot {
-        let plans = table::borrow(&state.lotteries, lottery_id);
+        build_lottery_snapshot_internal(&state.lotteries, lottery_id)
+    }
+
+    fun build_lottery_snapshot_internal(
+        lotteries: &table::Table<u64, AutopurchasePlans>,
+        lottery_id: u64,
+    ): AutopurchaseLotterySnapshot {
+        let plans = table::borrow(lotteries, lottery_id);
         let players = vector::empty<AutopurchasePlayerSnapshot>();
         let total_players = vector::length(&plans.players);
         let idx = 0;
@@ -642,7 +655,7 @@ module lottery::autopurchase {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return
         };
-        let snapshot = build_lottery_snapshot(borrow::freeze(state), lottery_id);
+        let snapshot = build_lottery_snapshot_from_mut(state, lottery_id);
         event::emit_event(
             &mut state.snapshot_events,
             AutopurchaseSnapshotUpdatedEvent { admin: state.admin, snapshot },

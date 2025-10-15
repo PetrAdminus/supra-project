@@ -2,7 +2,6 @@ module lottery::instances {
     friend lottery::migration;
     friend lottery::rounds;
 
-    use std::borrow;
     use std::option;
     use std::signer;
     use vrf_hub::table;
@@ -493,7 +492,7 @@ module lottery::instances {
         if (!table::contains(&state.instances, lottery_id)) {
             return
         };
-        let snapshot = build_instance_snapshot(borrow::freeze(state), lottery_id);
+        let snapshot = build_instance_snapshot_from_mut(state, lottery_id);
         event::emit_event(
             &mut state.snapshot_events,
             LotteryInstancesSnapshotUpdatedEvent { admin: state.admin, hub: state.hub, snapshot },
@@ -512,8 +511,22 @@ module lottery::instances {
         };
     }
 
+    fun build_instance_snapshot_from_mut(
+        state: &mut LotteryCollection,
+        lottery_id: u64,
+    ): LotteryInstanceSnapshot {
+        build_instance_snapshot_from_table(&state.instances, lottery_id)
+    }
+
     fun build_instance_snapshot(state: &LotteryCollection, lottery_id: u64): LotteryInstanceSnapshot {
-        let instance = table::borrow(&state.instances, lottery_id);
+        build_instance_snapshot_from_table(&state.instances, lottery_id)
+    }
+
+    fun build_instance_snapshot_from_table(
+        instances: &table::Table<u64, LotteryInstance>,
+        lottery_id: u64,
+    ): LotteryInstanceSnapshot {
+        let instance = table::borrow(instances, lottery_id);
         let info_ref = &instance.info;
         let owner = registry::lottery_info_owner(info_ref);
         let lottery_addr = registry::lottery_info_lottery(info_ref);
