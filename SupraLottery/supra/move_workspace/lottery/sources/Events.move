@@ -2,7 +2,7 @@
 module lottery::events {
     use supra_framework::event;
 
-    /// Унифицированная обёртка для эмиссии событий Supra-Labs.
+    /// Unified wrapper around Supra-Labs event emission.
     public fun emit<Event: store + drop>(event: Event) {
         event::emit(event);
     }

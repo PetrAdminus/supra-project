@@ -1,18 +1,18 @@
 // sources/Math.move
 module lottery::math {
-    /// Ошибка переполнения при арифметических операциях.
+    /// Overflow error used by arithmetic helpers.
     const E_OVERFLOW: u64 = 1;
-    /// Ошибка деления на ноль при арифметических операциях.
+    /// Division by zero error used by arithmetic helpers.
     const E_DIVISION_BY_ZERO: u64 = 2;
 
-    /// Сложение `u64` с проверкой переполнения.
+    /// Adds two u64 values and checks for overflow.
     public fun checked_add(left: u64, right: u64): u64 {
         let sum = left + right;
         assert!(sum >= left, E_OVERFLOW);
         sum
     }
 
-    /// Умножение `u64` с проверкой переполнения.
+    /// Multiplies two u64 values and checks for overflow.
     public fun checked_mul(left: u64, right: u64): u64 {
         if (left == 0 || right == 0) {
             return 0
@@ -22,20 +22,20 @@ module lottery::math {
         product
     }
 
-    /// Возвращает `(value * numerator) / denominator`, проверяя переполнения и деление на ноль.
+    /// Returns `(value * numerator) / denominator` with overflow and division checks.
     public fun mul_div(value: u64, numerator: u64, denominator: u64): u64 {
         assert!(denominator > 0, E_DIVISION_BY_ZERO);
         let product = checked_mul(value, numerator);
         product / denominator
     }
 
-    /// Остаток от деления `value` на `modulus` c проверкой деления на ноль.
+    /// Returns `value % modulus` and ensures the modulus is non-zero.
     public fun rem(value: u64, modulus: u64): u64 {
         assert!(modulus > 0, E_DIVISION_BY_ZERO);
         value % modulus
     }
 
-    /// Безопасное преобразование `u16` в `u64` без использования операторов приведения.
+    /// Converts `u16` to `u64` without using cast operators.
     public fun from_u16(input: u16): u64 {
         let mut remaining = input;
         let mut acc = 0u64;
