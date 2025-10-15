@@ -205,6 +205,7 @@ rg "let [^{]*VipConfig" SupraLottery/supra/move_workspace/lottery/tests
    docker compose run --rm --entrypoint bash supra_cli -lc "/supra/supra move tool check --package-dir /supra/move_workspace/vrf_hub --skip-fetch-latest-git-deps"
    docker compose run --rm --entrypoint bash supra_cli -lc "/supra/supra move tool check --package-dir /supra/move_workspace/SupraVrf --skip-fetch-latest-git-deps"
    ```
+   Если в окружении нет Docker/Supra CLI, фиксируем блокер в таске и переносим запуск в ближайшее доступное окно; к моменту ревью релиза тесты должны быть прогнаны в полном объёме.
 3. После успешного `move tool check` запускаем `move tool test` и python-раннер.
 
 ---
