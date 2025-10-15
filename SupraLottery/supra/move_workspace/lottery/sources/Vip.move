@@ -5,7 +5,6 @@ module lottery::vip {
     use std::signer;
     use std::vector;
     use vrf_hub::table;
-    use supra_framework::account;
     use supra_framework::event;
     use std::timestamp;
     use lottery::instances;
@@ -46,11 +45,6 @@ module lottery::vip {
         admin: address,
         lotteries: table::Table<u64, VipLottery>,
         lottery_ids: vector<u64>,
-        config_events: event::EventHandle<VipConfigUpdatedEvent>,
-        subscribed_events: event::EventHandle<VipSubscribedEvent>,
-        cancelled_events: event::EventHandle<VipCancelledEvent>,
-        bonus_events: event::EventHandle<VipBonusIssuedEvent>,
-        snapshot_events: event::EventHandle<VipSnapshotUpdatedEvent>,
     }
 
     #[event]
@@ -143,11 +137,6 @@ module lottery::vip {
                 admin: addr,
                 lotteries: table::new(),
                 lottery_ids: vector::empty(),
-                config_events: account::new_event_handle<VipConfigUpdatedEvent>(caller),
-                subscribed_events: account::new_event_handle<VipSubscribedEvent>(caller),
-                cancelled_events: account::new_event_handle<VipCancelledEvent>(caller),
-                bonus_events: account::new_event_handle<VipBonusIssuedEvent>(caller),
-                snapshot_events: account::new_event_handle<VipSnapshotUpdatedEvent>(caller),
             },
         );
         let state = borrow_global_mut<VipState>(@lottery);
@@ -206,10 +195,7 @@ module lottery::vip {
             );
             record_lottery_id(&mut state.lottery_ids, lottery_id);
         };
-        event::emit_event(
-            &mut state.config_events,
-            VipConfigUpdatedEvent { lottery_id, price, duration_secs, bonus_tickets },
-        );
+        event::emit(VipConfigUpdatedEvent { lottery_id, price, duration_secs, bonus_tickets });
         emit_vip_snapshot(state);
     }
 
@@ -376,10 +362,7 @@ module lottery::vip {
         };
         let lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
         lottery.bonus_tickets_issued = safe_add(lottery.bonus_tickets_issued, bonus_tickets);
-        event::emit_event(
-            &mut state.bonus_events,
-            VipBonusIssuedEvent { lottery_id, player, bonus_tickets },
-        );
+        event::emit(VipBonusIssuedEvent { lottery_id, player, bonus_tickets });
         emit_vip_snapshot(state);
     }
 
@@ -471,17 +454,14 @@ module lottery::vip {
             );
             record_member(&mut lottery.members, player);
         };
-        event::emit_event(
-            &mut state.subscribed_events,
-            VipSubscribedEvent {
-                lottery_id,
-                player,
-                expiry_ts: actual_expiry,
-                bonus_tickets,
-                amount_paid: price,
-                renewed,
-            },
-        );
+        event::emit(VipSubscribedEvent {
+            lottery_id,
+            player,
+            expiry_ts: actual_expiry,
+            bonus_tickets,
+            amount_paid: price,
+            renewed,
+        });
         emit_vip_snapshot(state);
     }
 
@@ -508,19 +488,13 @@ module lottery::vip {
         let subscription = table::borrow_mut(&mut lottery.subscriptions, player);
         subscription.expiry_ts = timestamp::now_seconds();
         subscription.bonus_tickets = 0;
-        event::emit_event(
-            &mut state.cancelled_events,
-            VipCancelledEvent { lottery_id, player },
-        );
+        event::emit(VipCancelledEvent { lottery_id, player });
         emit_vip_snapshot(state);
     }
 
     fun emit_vip_snapshot(state: &mut VipState) {
         let snapshot = build_vip_snapshot_from_mut(state);
-        event::emit_event(
-            &mut state.snapshot_events,
-            VipSnapshotUpdatedEvent { snapshot },
-        );
+        event::emit(VipSnapshotUpdatedEvent { snapshot });
     }
 
     fun build_vip_snapshot(state: &VipState): VipSnapshot {

@@ -5,7 +5,6 @@ module lottery::history {
     use std::signer;
     use std::vector;
     use vrf_hub::table;
-    use supra_framework::account;
     use supra_framework::event;
     use std::timestamp;
 
@@ -23,8 +22,6 @@ module lottery::history {
         admin: address,
         histories: table::Table<u64, LotteryHistory>,
         lottery_ids: vector<u64>,
-        record_events: event::EventHandle<DrawRecordedEvent>,
-        snapshot_events: event::EventHandle<HistorySnapshotUpdatedEvent>,
     }
 
     struct DrawRecord has copy, drop, store {
@@ -78,8 +75,6 @@ module lottery::history {
                 admin: addr,
                 histories: table::new(),
                 lottery_ids: vector::empty<u64>(),
-                record_events: account::new_event_handle<DrawRecordedEvent>(caller),
-                snapshot_events: account::new_event_handle<HistorySnapshotUpdatedEvent>(caller),
             },
         );
         let previous = option::none<HistorySnapshot>();
@@ -142,17 +137,14 @@ module lottery::history {
         };
         vector::push_back(&mut history.records, record);
         trim_history(&mut history.records);
-        event::emit_event(
-            &mut state.record_events,
-            DrawRecordedEvent {
-                lottery_id,
-                request_id,
-                winner,
-                ticket_index,
-                prize_amount,
-                timestamp_seconds,
-            },
-        );
+        event::emit(DrawRecordedEvent {
+            lottery_id,
+            request_id,
+            winner,
+            ticket_index,
+            prize_amount,
+            timestamp_seconds,
+        });
         emit_history_snapshot(state, previous);
     }
 
@@ -361,10 +353,7 @@ module lottery::history {
         previous: option::Option<HistorySnapshot>
     ) {
         let current = build_snapshot_from_mut(state);
-        event::emit_event(
-            &mut state.snapshot_events,
-            HistorySnapshotUpdatedEvent { previous, current },
-        );
+        event::emit(HistorySnapshotUpdatedEvent { previous, current });
     }
 
     #[test_only]

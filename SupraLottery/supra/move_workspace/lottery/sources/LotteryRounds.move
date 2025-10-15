@@ -6,7 +6,6 @@ module lottery::rounds {
     use std::signer;
     use std::vector;
     use vrf_hub::table;
-    use supra_framework::account;
     use supra_framework::event;
     use lottery::history;
     use lottery::instances;
@@ -45,12 +44,6 @@ module lottery::rounds {
         admin: address,
         rounds: table::Table<u64, RoundState>,
         lottery_ids: vector<u64>,
-        ticket_events: event::EventHandle<TicketPurchasedEvent>,
-        schedule_events: event::EventHandle<DrawScheduleUpdatedEvent>,
-        reset_events: event::EventHandle<RoundResetEvent>,
-        request_events: event::EventHandle<DrawRequestIssuedEvent>,
-        fulfill_events: event::EventHandle<DrawFulfilledEvent>,
-        snapshot_events: event::EventHandle<RoundSnapshotUpdatedEvent>,
     }
 
     #[event]
@@ -118,12 +111,6 @@ module lottery::rounds {
                 admin: addr,
                 rounds: table::new(),
                 lottery_ids: vector::empty<u64>(),
-                ticket_events: account::new_event_handle<TicketPurchasedEvent>(caller),
-                schedule_events: account::new_event_handle<DrawScheduleUpdatedEvent>(caller),
-                reset_events: account::new_event_handle<RoundResetEvent>(caller),
-                request_events: account::new_event_handle<DrawRequestIssuedEvent>(caller),
-                fulfill_events: account::new_event_handle<DrawFulfilledEvent>(caller),
-                snapshot_events: account::new_event_handle<RoundSnapshotUpdatedEvent>(caller),
             },
         );
         let state = borrow_global_mut<RoundCollection>(@lottery);
@@ -195,7 +182,7 @@ module lottery::rounds {
                 DrawScheduleUpdatedEvent { lottery_id, draw_scheduled: true },
             )
         };
-        event::emit_event(&mut state.schedule_events, schedule_event);
+        event::emit(schedule_event);
         emit_snapshot_event(state, lottery_id, snapshot);
     }
 
@@ -216,8 +203,8 @@ module lottery::rounds {
                 RoundResetEvent { lottery_id, tickets_cleared: cleared },
             )
         };
-        event::emit_event(&mut state.schedule_events, schedule_event);
-        event::emit_event(&mut state.reset_events, reset_event);
+        event::emit(schedule_event);
+        event::emit(reset_event);
         emit_snapshot_event(state, lottery_id, snapshot);
     }
 
@@ -251,7 +238,7 @@ module lottery::rounds {
                 DrawRequestIssuedEvent { lottery_id, request_id: request_id_inner },
             )
         };
-        event::emit_event(&mut state.request_events, request_event);
+        event::emit(request_event);
         emit_snapshot_event(state, lottery_id, snapshot);
     }
 
@@ -298,18 +285,15 @@ module lottery::rounds {
         hub::record_fulfillment(request_id, lottery_id, randomness_for_hub);
         let random_for_event = copy randomness;
         let payload_for_event = copy payload;
-        event::emit_event(
-            &mut state.fulfill_events,
-            DrawFulfilledEvent {
-                lottery_id,
-                request_id,
-                winner,
-                ticket_index: winner_index,
-                random_bytes: random_for_event,
-                prize_amount,
-                payload: payload_for_event,
-            },
-        );
+        event::emit(DrawFulfilledEvent {
+            lottery_id,
+            request_id,
+            winner,
+            ticket_index: winner_index,
+            random_bytes: random_for_event,
+            prize_amount,
+            payload: payload_for_event,
+        });
         history::record_draw(
             lottery_id,
             request_id,
@@ -399,10 +383,7 @@ module lottery::rounds {
                 ticket_id_inner
             };
             instances::record_ticket_sale(lottery_id, jackpot_contribution);
-            event::emit_event(
-                &mut state.ticket_events,
-                TicketPurchasedEvent { lottery_id, ticket_id, buyer, amount: ticket_price },
-            );
+            event::emit(TicketPurchasedEvent { lottery_id, ticket_id, buyer, amount: ticket_price });
             total_amount = safe_add(total_amount, ticket_price);
             issued = issued + 1;
         };
@@ -418,10 +399,7 @@ module lottery::rounds {
                     ticket_id_inner
                 };
                 instances::record_ticket_sale(lottery_id, 0);
-                event::emit_event(
-                    &mut state.ticket_events,
-                    TicketPurchasedEvent { lottery_id, ticket_id, buyer, amount: 0 },
-                );
+                event::emit(TicketPurchasedEvent { lottery_id, ticket_id, buyer, amount: 0 });
                 bonus_issued = bonus_issued + 1;
             };
             vip::record_bonus_usage(lottery_id, buyer, bonus_tickets);
@@ -661,10 +639,7 @@ module lottery::rounds {
         lottery_id: u64,
         snapshot: RoundSnapshot,
     ) {
-        event::emit_event(
-            &mut state.snapshot_events,
-            RoundSnapshotUpdatedEvent { lottery_id, snapshot },
-        );
+        event::emit(RoundSnapshotUpdatedEvent { lottery_id, snapshot });
     }
 
     fun record_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {

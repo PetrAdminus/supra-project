@@ -6,7 +6,6 @@ module vrf_hub::hub {
     use std::vector;
     use std::hash;
     use vrf_hub::table;
-    use supra_framework::account;
     use supra_framework::event;
 
 
@@ -50,12 +49,6 @@ module vrf_hub::hub {
         lottery_ids: vector<u64>,
         pending_request_ids: vector<u64>,
         callback_sender: option::Option<address>,
-        register_events: event::EventHandle<LotteryRegisteredEvent>,
-        status_events: event::EventHandle<LotteryStatusChangedEvent>,
-        metadata_events: event::EventHandle<LotteryMetadataUpdatedEvent>,
-        request_events: event::EventHandle<RandomnessRequestedEvent>,
-        fulfill_events: event::EventHandle<RandomnessFulfilledEvent>,
-        callback_sender_events: event::EventHandle<CallbackSenderUpdatedEvent>,
     }
 
     #[event]
@@ -120,12 +113,6 @@ module vrf_hub::hub {
             lottery_ids: vector::empty<u64>(),
             pending_request_ids: vector::empty<u64>(),
             callback_sender: option::none(),
-            register_events: account::new_event_handle<LotteryRegisteredEvent>(caller),
-            status_events: account::new_event_handle<LotteryStatusChangedEvent>(caller),
-            metadata_events: account::new_event_handle<LotteryMetadataUpdatedEvent>(caller),
-            request_events: account::new_event_handle<RandomnessRequestedEvent>(caller),
-            fulfill_events: account::new_event_handle<RandomnessFulfilledEvent>(caller),
-            callback_sender_events: account::new_event_handle<CallbackSenderUpdatedEvent>(caller),
         });
     }
 
@@ -169,11 +156,8 @@ module vrf_hub::hub {
             LotteryRegistration { owner, lottery, metadata, active: true },
         );
         vector::push_back(&mut state.lottery_ids, id);
-        event::emit_event(&mut state.register_events, LotteryRegisteredEvent { lottery_id: id, owner, lottery });
-        event::emit_event(
-            &mut state.metadata_events,
-            LotteryMetadataUpdatedEvent { lottery_id: id, metadata: metadata_event },
-        );
+        event::emit(LotteryRegisteredEvent { lottery_id: id, owner, lottery });
+        event::emit(LotteryMetadataUpdatedEvent { lottery_id: id, metadata: metadata_event });
         id
     }
 
@@ -191,10 +175,7 @@ module vrf_hub::hub {
         };
         let registration = table::borrow_mut(&mut state.lotteries, lottery_id);
         registration.metadata = metadata;
-        event::emit_event(
-            &mut state.metadata_events,
-            LotteryMetadataUpdatedEvent { lottery_id, metadata: metadata_event },
-        );
+        event::emit(LotteryMetadataUpdatedEvent { lottery_id, metadata: metadata_event });
     }
 
 
@@ -211,10 +192,7 @@ module vrf_hub::hub {
         let registration = table::borrow_mut(&mut state.lotteries, lottery_id);
         if (registration.active != active) {
             registration.active = active;
-            event::emit_event(
-                &mut state.status_events,
-                LotteryStatusChangedEvent { lottery_id, active },
-            );
+            event::emit(LotteryStatusChangedEvent { lottery_id, active });
         };
     }
 
@@ -291,10 +269,7 @@ module vrf_hub::hub {
         let state = borrow_global_mut<HubState>(@vrf_hub);
         let previous = copy_option_address(&state.callback_sender);
         state.callback_sender = option::some(sender);
-        event::emit_event(
-            &mut state.callback_sender_events,
-            CallbackSenderUpdatedEvent { previous, current: option::some(sender) },
-        );
+        event::emit(CallbackSenderUpdatedEvent { previous, current: option::some(sender) });
     }
 
 
@@ -334,15 +309,12 @@ module vrf_hub::hub {
             RequestRecord { lottery_id, payload, payload_hash },
         );
         vector::push_back(&mut state.pending_request_ids, request_id);
-        event::emit_event(
-            &mut state.request_events,
-            RandomnessRequestedEvent {
-                request_id,
-                lottery_id,
-                payload: payload_for_event,
-                payload_hash: hash_for_event,
-            },
-        );
+        event::emit(RandomnessRequestedEvent {
+            request_id,
+            lottery_id,
+            payload: payload_for_event,
+            payload_hash: hash_for_event,
+        });
         request_id
     }
 
@@ -385,10 +357,7 @@ module vrf_hub::hub {
     ) acquires HubState {
         let state = borrow_global_mut<HubState>(@vrf_hub);
         let randomness_for_event = clone_bytes(&randomness);
-        event::emit_event(
-            &mut state.fulfill_events,
-            RandomnessFulfilledEvent { request_id, lottery_id, randomness: randomness_for_event },
-        );
+        event::emit(RandomnessFulfilledEvent { request_id, lottery_id, randomness: randomness_for_event });
     }
 
     public fun request_record_lottery_id(record: &RequestRecord): u64 {

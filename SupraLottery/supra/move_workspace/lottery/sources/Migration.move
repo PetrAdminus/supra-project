@@ -7,7 +7,6 @@ module lottery::migration {
     use lottery::rounds;
     use lottery::treasury_multi;
     use lottery_factory::registry;
-    use supra_framework::account;
     use supra_framework::event;
     use vrf_hub::table;
 
@@ -20,7 +19,6 @@ module lottery::migration {
     struct MigrationLedger has key {
         snapshots: table::Table<u64, MigrationSnapshot>,
         lottery_ids: vector<u64>,
-        snapshot_events: event::EventHandle<MigrationSnapshotUpdatedEvent>,
     }
 
     struct MigrationSnapshot has copy, drop, store {
@@ -171,7 +169,6 @@ module lottery::migration {
                 MigrationLedger {
                     snapshots: table::new(),
                     lottery_ids: vector::empty<u64>(),
-                    snapshot_events: account::new_event_handle<MigrationSnapshotUpdatedEvent>(caller),
                 },
             );
         };
@@ -180,10 +177,7 @@ module lottery::migration {
         let snapshot_for_event = snapshot;
         table::add(&mut state.snapshots, lottery_id, snapshot);
         record_lottery_id(&mut state.lottery_ids, lottery_id);
-        event::emit_event(
-            &mut state.snapshot_events,
-            MigrationSnapshotUpdatedEvent { lottery_id, snapshot: snapshot_for_event },
-        );
+        event::emit(MigrationSnapshotUpdatedEvent { lottery_id, snapshot: snapshot_for_event });
     }
 
 
