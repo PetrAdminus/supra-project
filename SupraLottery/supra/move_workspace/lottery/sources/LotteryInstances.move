@@ -5,6 +5,7 @@ module lottery::instances {
     use std::option;
     use std::signer;
     use vrf_hub::table;
+    use supra_framework::account;
     use supra_framework::event;
     use std::math64;
     use std::vector;
@@ -51,6 +52,12 @@ module lottery::instances {
         hub: address,
         instances: table::Table<u64, InstanceState>,
         lottery_ids: vector<u64>,
+        create_events: event::EventHandle<LotteryInstanceCreatedEvent>,
+        blueprint_events: event::EventHandle<LotteryInstanceBlueprintSyncedEvent>,
+        admin_events: event::EventHandle<AdminUpdatedEvent>,
+        hub_events: event::EventHandle<HubAddressUpdatedEvent>,
+        status_events: event::EventHandle<LotteryInstanceStatusUpdatedEvent>,
+        snapshot_events: event::EventHandle<LotteryInstancesSnapshotUpdatedEvent>,
     }
 
     #[event]
@@ -127,6 +134,12 @@ module lottery::instances {
                 hub,
                 instances: table::new(),
                 lottery_ids: vector::empty<u64>(),
+                create_events: account::new_event_handle<LotteryInstanceCreatedEvent>(caller),
+                blueprint_events: account::new_event_handle<LotteryInstanceBlueprintSyncedEvent>(caller),
+                admin_events: account::new_event_handle<AdminUpdatedEvent>(caller),
+                hub_events: account::new_event_handle<HubAddressUpdatedEvent>(caller),
+                status_events: account::new_event_handle<LotteryInstanceStatusUpdatedEvent>(caller),
+                snapshot_events: account::new_event_handle<LotteryInstancesSnapshotUpdatedEvent>(caller),
             },
         );
         let state = borrow_global_mut<LotteryCollection>(@lottery);
@@ -161,7 +174,7 @@ module lottery::instances {
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         let previous = state.admin;
         state.admin = new_admin;
-        event::emit(AdminUpdatedEvent { previous, next: new_admin });
+        event::emit_event(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
         emit_all_snapshots(state);
     }
 
@@ -171,7 +184,7 @@ module lottery::instances {
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         let previous = state.hub;
         state.hub = new_hub;
-        event::emit(HubAddressUpdatedEvent { previous, next: new_hub });
+        event::emit_event(&mut state.hub_events, HubAddressUpdatedEvent { previous, next: new_hub });
         emit_all_snapshots(state);
     }
 
@@ -190,7 +203,7 @@ module lottery::instances {
         let instance = table::borrow_mut(&mut state.instances, lottery_id);
         if (instance.active != active) {
             instance.active = active;
-            event::emit(LotteryInstanceStatusUpdatedEvent { lottery_id, active });
+            event::emit_event(&mut state.status_events, LotteryInstanceStatusUpdatedEvent { lottery_id, active });
         };
         emit_instance_snapshot(state, lottery_id);
     }
@@ -241,8 +254,11 @@ module lottery::instances {
         );
         vector::push_back(&mut state.lottery_ids, lottery_id);
 
-        event::emit(LotteryInstanceCreatedEvent { lottery_id, owner, lottery: lottery_addr, ticket_price, jackpot_share_bps });
-        event::emit(LotteryInstanceStatusUpdatedEvent { lottery_id, active: true });
+        event::emit_event(
+            &mut state.create_events,
+            LotteryInstanceCreatedEvent { lottery_id, owner, lottery: lottery_addr, ticket_price, jackpot_share_bps },
+        );
+        event::emit_event(&mut state.status_events, LotteryInstanceStatusUpdatedEvent { lottery_id, active: true });
         emit_instance_snapshot(state, lottery_id);
     }
 
@@ -268,7 +284,10 @@ module lottery::instances {
         let instance = table::borrow_mut(&mut state.instances, lottery_id);
         instance.info = registry::make_lottery_info(owner, lottery_addr, blueprint);
 
-        event::emit(LotteryInstanceBlueprintSyncedEvent { lottery_id, ticket_price, jackpot_share_bps });
+        event::emit_event(
+            &mut state.blueprint_events,
+            LotteryInstanceBlueprintSyncedEvent { lottery_id, ticket_price, jackpot_share_bps },
+        );
         emit_instance_snapshot(state, lottery_id);
     }
 
@@ -475,7 +494,10 @@ module lottery::instances {
             return
         };
         let snapshot = build_instance_snapshot(&*state, lottery_id);
-        event::emit(LotteryInstancesSnapshotUpdatedEvent { admin: state.admin, hub: state.hub, snapshot });
+        event::emit_event(
+            &mut state.snapshot_events,
+            LotteryInstancesSnapshotUpdatedEvent { admin: state.admin, hub: state.hub, snapshot },
+        );
     }
 
     fun emit_all_snapshots(state: &mut LotteryCollection) {

@@ -2,6 +2,7 @@ module lottery::jackpot {
     use std::option;
     use std::signer;
     use std::vector;
+    use supra_framework::account;
     use supra_framework::event;
     use std::math64;
     use lottery::treasury_multi;
@@ -28,6 +29,11 @@ module lottery::jackpot {
         tickets: vector<address>,
         draw_scheduled: bool,
         pending_request: option::Option<u64>,
+        ticket_events: event::EventHandle<JackpotTicketGrantedEvent>,
+        schedule_events: event::EventHandle<JackpotScheduleUpdatedEvent>,
+        request_events: event::EventHandle<JackpotRequestIssuedEvent>,
+        fulfill_events: event::EventHandle<JackpotFulfilledEvent>,
+        snapshot_events: event::EventHandle<JackpotSnapshotUpdatedEvent>,
     }
 
     #[event]
@@ -91,6 +97,11 @@ module lottery::jackpot {
                 tickets: vector::empty<address>(),
                 draw_scheduled: false,
                 pending_request: option::none<u64>(),
+                ticket_events: account::new_event_handle<JackpotTicketGrantedEvent>(caller),
+                schedule_events: account::new_event_handle<JackpotScheduleUpdatedEvent>(caller),
+                request_events: account::new_event_handle<JackpotRequestIssuedEvent>(caller),
+                fulfill_events: account::new_event_handle<JackpotFulfilledEvent>(caller),
+                snapshot_events: account::new_event_handle<JackpotSnapshotUpdatedEvent>(caller),
             },
         );
         let state = borrow_global_mut<JackpotState>(@lottery);
@@ -151,7 +162,10 @@ module lottery::jackpot {
         };
         state.draw_scheduled = true;
         let lottery_id = state.lottery_id;
-        event::emit(JackpotScheduleUpdatedEvent { lottery_id, draw_scheduled: true });
+        event::emit_event(
+            &mut state.schedule_events,
+            JackpotScheduleUpdatedEvent { lottery_id, draw_scheduled: true },
+        );
         emit_snapshot_event(state, previous);
     }
 
@@ -163,7 +177,10 @@ module lottery::jackpot {
         state.draw_scheduled = false;
         state.pending_request = option::none<u64>();
         let lottery_id = state.lottery_id;
-        event::emit(JackpotScheduleUpdatedEvent { lottery_id, draw_scheduled: false });
+        event::emit_event(
+            &mut state.schedule_events,
+            JackpotScheduleUpdatedEvent { lottery_id, draw_scheduled: false },
+        );
         emit_snapshot_event(state, previous);
     }
 
@@ -184,7 +201,10 @@ module lottery::jackpot {
         let lottery_id = state.lottery_id;
         let request_id = hub::request_randomness(lottery_id, payload);
         state.pending_request = option::some(request_id);
-        event::emit(JackpotRequestIssuedEvent { lottery_id, request_id });
+        event::emit_event(
+            &mut state.request_events,
+            JackpotRequestIssuedEvent { lottery_id, request_id },
+        );
         emit_snapshot_event(state, previous);
     }
 
@@ -237,15 +257,18 @@ module lottery::jackpot {
         let randomness_for_hub = clone_bytes(&randomness);
         let lottery_id = state.lottery_id;
         hub::record_fulfillment(request_id, lottery_id, randomness_for_hub);
-        event::emit(JackpotFulfilledEvent {
-            request_id,
-            lottery_id,
-            winner,
-            ticket_index: winner_index,
-            random_bytes: randomness,
-            prize_amount: jackpot_amount,
-            payload,
-        });
+        event::emit_event(
+            &mut state.fulfill_events,
+            JackpotFulfilledEvent {
+                request_id,
+                lottery_id,
+                winner,
+                ticket_index: winner_index,
+                random_bytes: randomness,
+                prize_amount: jackpot_amount,
+                payload,
+            },
+        );
         emit_snapshot_event(state, previous);
     }
 
@@ -288,7 +311,10 @@ module lottery::jackpot {
         let ticket_index = vector::length(&state.tickets);
         vector::push_back(&mut state.tickets, player);
         let lottery_id = state.lottery_id;
-        event::emit(JackpotTicketGrantedEvent { lottery_id, player, ticket_index });
+        event::emit_event(
+            &mut state.ticket_events,
+            JackpotTicketGrantedEvent { lottery_id, player, ticket_index },
+        );
         emit_snapshot_event(state, previous);
     }
 
@@ -369,7 +395,10 @@ module lottery::jackpot {
         previous: option::Option<JackpotSnapshot>,
     ) {
         let snapshot = build_snapshot(&*state);
-        event::emit(JackpotSnapshotUpdatedEvent { previous, current: snapshot });
+        event::emit_event(
+            &mut state.snapshot_events,
+            JackpotSnapshotUpdatedEvent { previous, current: snapshot },
+        );
     }
 
     fun build_snapshot(state: &JackpotState): JackpotSnapshot {

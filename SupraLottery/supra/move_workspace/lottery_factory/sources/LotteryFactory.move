@@ -2,6 +2,7 @@ module lottery_factory::registry {
     use std::option;
     use std::signer;
     use std::vector;
+    use supra_framework::account;
     use supra_framework::event;
     use vrf_hub::hub;
     use vrf_hub::table;
@@ -39,6 +40,9 @@ module lottery_factory::registry {
         admin: address,
         lotteries: table::Table<u64, LotteryInfo>,
         lottery_ids: vector<u64>,
+        planned_events: event::EventHandle<LotteryPlannedEvent>,
+        activated_events: event::EventHandle<LotteryActivatedEvent>,
+        snapshot_events: event::EventHandle<LotteryRegistrySnapshotUpdatedEvent>,
     }
 
     #[event]
@@ -71,6 +75,9 @@ module lottery_factory::registry {
             admin: addr,
             lotteries: table::new(),
             lottery_ids: vector::empty<u64>(),
+            planned_events: account::new_event_handle<LotteryPlannedEvent>(caller),
+            activated_events: account::new_event_handle<LotteryActivatedEvent>(caller),
+            snapshot_events: account::new_event_handle<LotteryRegistrySnapshotUpdatedEvent>(caller),
         };
         move_to(caller, state);
         let state_ref = borrow_global_mut<FactoryState>(@lottery_factory);
@@ -103,8 +110,8 @@ module lottery_factory::registry {
             LotteryInfo { owner, lottery, blueprint },
         );
         record_lottery_id(&mut state.lottery_ids, lottery_id);
-        event::emit(LotteryPlannedEvent { lottery_id, owner });
-        event::emit(LotteryActivatedEvent { lottery_id, lottery });
+        event::emit_event(&mut state.planned_events, LotteryPlannedEvent { lottery_id, owner });
+        event::emit_event(&mut state.activated_events, LotteryActivatedEvent { lottery_id, lottery });
         emit_registry_snapshot(state);
         lottery_id
     }
@@ -262,7 +269,10 @@ module lottery_factory::registry {
     fun emit_registry_snapshot(state: &mut FactoryState) {
         let snapshot = build_registry_snapshot(state);
         let LotteryRegistrySnapshot { admin, lotteries } = snapshot;
-        event::emit(LotteryRegistrySnapshotUpdatedEvent { admin, lotteries });
+        event::emit_event(
+            &mut state.snapshot_events,
+            LotteryRegistrySnapshotUpdatedEvent { admin, lotteries },
+        );
     }
 
     fun build_registry_snapshot(state: &FactoryState): LotteryRegistrySnapshot {

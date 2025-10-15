@@ -1,11 +1,12 @@
 module lottery::store {
     use std::option;
     use std::vector;
+    use supra_framework::account;
+    use supra_framework::event;
+    use std::math64;
     use std::signer;
     use vrf_hub::table;
-    use lottery::events;
     use lottery::instances;
-    use lottery::math;
     use lottery::treasury_multi;
     use lottery::treasury_v1;
 
@@ -43,6 +44,10 @@ module lottery::store {
         admin: address,
         lotteries: table::Table<u64, LotteryStore>,
         lottery_ids: vector<u64>,
+        admin_events: event::EventHandle<AdminUpdatedEvent>,
+        item_events: event::EventHandle<ItemConfiguredEvent>,
+        purchase_events: event::EventHandle<ItemPurchasedEvent>,
+        snapshot_events: event::EventHandle<StoreSnapshotUpdatedEvent>,
     }
 
     #[event]
@@ -111,7 +116,15 @@ module lottery::store {
         };
         move_to(
             caller,
-            StoreState { admin: addr, lotteries: table::new(), lottery_ids: vector::empty<u64>() },
+            StoreState {
+                admin: addr,
+                lotteries: table::new(),
+                lottery_ids: vector::empty<u64>(),
+                admin_events: account::new_event_handle<AdminUpdatedEvent>(caller),
+                item_events: account::new_event_handle<ItemConfiguredEvent>(caller),
+                purchase_events: account::new_event_handle<ItemPurchasedEvent>(caller),
+                snapshot_events: account::new_event_handle<StoreSnapshotUpdatedEvent>(caller),
+            },
         );
         let state = borrow_global_mut<StoreState>(@lottery);
         emit_all_snapshots(state);
@@ -136,7 +149,7 @@ module lottery::store {
         let state = borrow_global_mut<StoreState>(@lottery);
         let previous = state.admin;
         state.admin = new_admin;
-        events::emit(AdminUpdatedEvent { previous, next: new_admin });
+        event::emit_event(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
         emit_all_snapshots(state);
     }
 
@@ -175,7 +188,10 @@ module lottery::store {
                 vector::push_back(&mut store.item_ids, item_id);
             };
         };
-        events::emit(ItemConfiguredEvent { lottery_id, item_id, price, available, stock, metadata });
+        event::emit_event(
+            &mut state_ref.item_events,
+            ItemConfiguredEvent { lottery_id, item_id, price, available, stock, metadata },
+        );
         emit_store_snapshot(state_ref, lottery_id);
     }
 
@@ -199,14 +215,17 @@ module lottery::store {
             };
             let record = table::borrow_mut(&mut store.items, item_id);
             record.item.available = available;
-            events::emit(ItemConfiguredEvent {
-                lottery_id,
-                item_id,
-                price: record.item.price,
-                available,
-                stock: record.item.stock,
-                metadata: copy_vec_u8(&record.item.metadata),
-            });
+            event::emit_event(
+                &mut state_ref.item_events,
+                ItemConfiguredEvent {
+                    lottery_id,
+                    item_id,
+                    price: record.item.price,
+                    available,
+                    stock: record.item.stock,
+                    metadata: copy_vec_u8(&record.item.metadata),
+                },
+            );
         };
         emit_store_snapshot(state_ref, lottery_id);
     }
@@ -240,19 +259,16 @@ module lottery::store {
             } else {
                 option::none()
             };
-            total_price = math::checked_mul(record.item.price, quantity);
+            total_price = math64::checked_mul(record.item.price, quantity);
             treasury_v1::deposit_from_user(buyer, total_price);
             record.item.stock = stock_left;
-            record.sold = math::checked_add(record.sold, quantity);
+            record.sold = math64::checked_add(record.sold, quantity);
         };
         treasury_multi::record_operations_income_internal(lottery_id, total_price, source_tag());
-        events::emit(ItemPurchasedEvent {
-            lottery_id,
-            item_id,
-            buyer: signer::address_of(buyer),
-            quantity,
-            total_price,
-        });
+        event::emit_event(
+            &mut state_ref.purchase_events,
+            ItemPurchasedEvent { lottery_id, item_id, buyer: signer::address_of(buyer), quantity, total_price },
+        );
         emit_store_snapshot(state_ref, lottery_id);
     }
 
@@ -355,7 +371,7 @@ module lottery::store {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return option::none<StoreLotterySnapshot>()
         };
-        option::some(build_lottery_snapshot_from_ref(&state, lottery_id))
+        option::some(build_lottery_snapshot(&state, lottery_id))
     }
 
 
@@ -365,7 +381,7 @@ module lottery::store {
             return option::none<StoreSnapshot>()
         };
         let state = borrow_global<StoreState>(@lottery);
-        option::some(build_store_snapshot_from_ref(&state))
+        option::some(build_store_snapshot(&state))
     }
 
     fun ensure_admin(caller: &signer) acquires StoreState {
@@ -446,39 +462,22 @@ module lottery::store {
         table::borrow_mut(&mut state.lotteries, lottery_id)
     }
 
-    fun build_store_snapshot_from_parts(
-        admin: address,
-        lotteries: &table::Table<u64, LotteryStore>,
-        lottery_ids: &vector<u64>,
-    ): StoreSnapshot {
+    fun build_store_snapshot(state: &StoreState): StoreSnapshot {
         let snapshots = vector::empty<StoreLotterySnapshot>();
-        let len = vector::length(lottery_ids);
+        let len = vector::length(&state.lottery_ids);
         let idx = 0;
         while (idx < len) {
-            let lottery_id = *vector::borrow(lottery_ids, idx);
-            if (table::contains(lotteries, lottery_id)) {
-                vector::push_back(
-                    &mut snapshots,
-                    build_lottery_snapshot_from_parts(lottery_id, table::borrow(lotteries, lottery_id)),
-                );
+            let lottery_id = *vector::borrow(&state.lottery_ids, idx);
+            if (table::contains(&state.lotteries, lottery_id)) {
+                vector::push_back(&mut snapshots, build_lottery_snapshot(state, lottery_id));
             };
             idx = idx + 1;
         };
-        StoreSnapshot { admin, lotteries: snapshots }
+        StoreSnapshot { admin: state.admin, lotteries: snapshots }
     }
 
-    fun build_store_snapshot_from_ref(state: &StoreState): StoreSnapshot {
-        build_store_snapshot_from_parts(state.admin, &state.lotteries, &state.lottery_ids)
-    }
-
-    fun build_store_snapshot_from_mut(state: &mut StoreState): StoreSnapshot {
-        build_store_snapshot_from_parts(state.admin, &state.lotteries, &state.lottery_ids)
-    }
-
-    fun build_lottery_snapshot_from_parts(
-        lottery_id: u64,
-        store: &LotteryStore,
-    ): StoreLotterySnapshot {
+    fun build_lottery_snapshot(state: &StoreState, lottery_id: u64): StoreLotterySnapshot {
+        let store = table::borrow(&state.lotteries, lottery_id);
         let items = vector::empty<StoreItemSnapshot>();
         let len = vector::length(&store.item_ids);
         let idx = 0;
@@ -486,28 +485,14 @@ module lottery::store {
             let item_id = *vector::borrow(&store.item_ids, idx);
             if (table::contains(&store.items, item_id)) {
                 let record = table::borrow(&store.items, item_id);
-                vector::push_back(&mut items, build_item_snapshot_from_record(item_id, record));
+                vector::push_back(&mut items, build_item_snapshot(item_id, record));
             };
             idx = idx + 1;
         };
         StoreLotterySnapshot { lottery_id, items }
     }
 
-    fun build_lottery_snapshot_from_ref(
-        state: &StoreState,
-        lottery_id: u64,
-    ): StoreLotterySnapshot {
-        build_lottery_snapshot_from_parts(lottery_id, table::borrow(&state.lotteries, lottery_id))
-    }
-
-    fun build_lottery_snapshot_from_mut(
-        state: &mut StoreState,
-        lottery_id: u64,
-    ): StoreLotterySnapshot {
-        build_lottery_snapshot_from_parts(lottery_id, table::borrow(&state.lotteries, lottery_id))
-    }
-
-    fun build_item_snapshot_from_record(item_id: u64, record: &StoreRecord): StoreItemSnapshot {
+    fun build_item_snapshot(item_id: u64, record: &StoreRecord): StoreItemSnapshot {
         StoreItemSnapshot {
             item_id,
             price: record.item.price,
@@ -534,8 +519,11 @@ module lottery::store {
         if (!table::contains(&state.lotteries, lottery_id)) {
             return
         };
-        let snapshot = build_lottery_snapshot_from_mut(state, lottery_id);
-        events::emit(StoreSnapshotUpdatedEvent { admin: state.admin, snapshot });
+        let snapshot = build_lottery_snapshot(&*state, lottery_id);
+        event::emit_event(
+            &mut state.snapshot_events,
+            StoreSnapshotUpdatedEvent { admin: state.admin, snapshot },
+        );
     }
 
     fun copy_vec_u8(source: &vector<u8>): vector<u8> {
