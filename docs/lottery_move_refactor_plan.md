@@ -22,6 +22,7 @@
     - ▶️ `Store` обновлён: события через `events::emit`, арифметика через `math::*`, снапшоты — через `*_from_parts`.
     - ▶️ `NftRewards` переведён на `events::emit`, добавлены `build_*_from_mut` хелперы для владельцев и общей выборки.
     - ▶️ `Metadata` очищен от конфликтующих имён в `build_snapshot_from_parts`, снапшот-хелперы готовы к переиспользованию.
+    - ▶️ `Vip` использует `events::emit`/`math::*`, view-функции переведены на `build_*_snapshot_from_ref`, завершена миграция модуля.
     - ✅ `Referrals` переведён на `events::emit` и арифметические хелперы `math::*`; добавлены `build_referral_snapshot_from_{parts,ref,mut}` и вспомогательные функции для лотерей.
   - `Treasury` и `TreasuryMulti` — привести friend-списки к официальным, адаптировать выдачу наград через публичные API.
   - `Metadata`, `History`, `Migration` — синхронизировать снапшоты и зависимости от новых утилит.
