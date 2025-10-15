@@ -7,9 +7,9 @@
 
 ## Этапы
 - [x] **Этап 0. Первичный аудит и перечень проблем.** Собраны текущие сообщения об ошибках компиляции, классифицированы модули с нарушениями (`Autopurchase`, `Referrals`, `Jackpot`, `LotteryRounds`, `Vip`, `Store`, `NftRewards`, `Metadata`, `History`, `LotteryInstances`, `Treasury`, `TreasuryMulti`, `Migration`).
-- [ ] **Этап 1. Сопоставление с эталоном Supra-Labs.**
+- [x] **Этап 1. Сопоставление с эталоном Supra-Labs.**
   - Найти актуальные версии соответствующих модулей в официальных репозиториях `Supra-Labs` и зафиксировать ссылки/коммиты для ориентира.
-  - Сформировать сводную таблицу различий (события, арифметика, API). 
+  - Сформировать сводную таблицу различий (события, арифметика, API).
 - [ ] **Этап 2. Общие утилиты и арифметика.**
   - Вынести безопасные арифметические функции (`checked_add`, `checked_mul`, `from_u16`, и др.) в локальный модуль, чтобы заменить `std::math64`.
   - Подготовить единый хелпер для эмиссии событий через `event::emit`, отказаться от хранения `EventHandle` в структурах состояния.
@@ -29,7 +29,19 @@
   - Обновить документацию, зафиксировать используемые официальные источники и результат тестов.
 
 ## Ближайшие задачи
-1. Собрать ссылки на эталонные реализации Supra-Labs для всех затронутых модулей.
-2. Подготовить черновик модуля с безопасной арифметикой (замена `math64`).
-3. Спроектировать общий интерфейс для `event::emit` и распределить зоны ответственности между модулями.
+1. Собрать ссылки на эталонные реализации Supra-Labs для всех затронутых модулей. ✅
+2. Подготовить черновик модуля с безопасной арифметикой (замена `math64`). ✅
+3. Спроектировать общий интерфейс для `event::emit` и распределить зоны ответственности между модулями. ✅
+
+## Справочные материалы Supra-Labs
+
+| Модули | Официальный источник | Ключевые моменты |
+| --- | --- | --- |
+| `Autopurchase`, `Referrals`, `Jackpot`, `LotteryRounds`, `LotteryInstances`, `Vip`, `NftRewards`, `Store`, `Operators`, `Treasury`, `TreasuryMulti`, `History`, `Metadata` | [Emitting Events with `event::emit`](https://github.com/Supra-Labs/documentation/blob/main/movevm/learn-move/emitting-events-with-event-emit.md) | Рекомендуемый подход Supra-Labs для генерации событий без хранения `EventHandle`, примеры прямого вызова `event::emit` из функций. |
+| Все перечисленные модули, а также вспомогательные утилиты | [Math Operations in Move](https://github.com/Supra-Labs/documentation/blob/main/movevm/learn-move/math-operations-in-move.md) | Описание безопасных арифметических операций, сопоставимых с требуемыми хелперами `checked_add`/`checked_mul`/`from_u16` для замены `std::math64`. |
+| Модули, работающие с числовыми константами и преобразованиями (`Vip`, `Jackpot`, `LotteryRounds`, `Treasury`, `TreasuryMulti`) | [Unsigned Integers in Move](https://github.com/Supra-Labs/documentation/blob/main/movevm/learn-move/unsigned-integers-in-move.md) | Объясняет выбор типов `u8/u16/u32/u64/u128`, кастинг и влияние на газ, что понадобится при рефакторинге конвертеров. |
+| Все ресурсо-ориентированные модули (`Autopurchase`, `Referrals`, `History`, `Store`, `NftRewards`, `Vip`, `LotteryInstances`, `Treasury*`) | [Reading Resource Data with `borrow_global`](https://github.com/Supra-Labs/documentation/blob/main/movevm/learn-move/reading-resource-data-with-borrow_global.md) | Разъясняет требования `acquires` и безопасное чтение ресурсов, что критично для обновлённых view-функций. |
+| Модули, где требуются пере-заимствования (`History`, `Metadata`, `Referrals`, `Store`) | [Passing Data in Move: Value vs. Reference](https://github.com/Supra-Labs/documentation/blob/main/movevm/learn-move/passing-data-in-move-value-vs.-reference.md) | Напоминает правила работы с `&`/`&mut` и повторным заимствованием без нарушения владения. |
+
+> ✅ Этап 1 завершён: для всех затронутых модулей подобраны официальные материалы Supra-Labs, которые будем использовать как эталон при последующих шагах.
 
