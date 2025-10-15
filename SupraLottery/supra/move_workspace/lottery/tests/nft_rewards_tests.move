@@ -9,6 +9,7 @@ module lottery::nft_rewards_tests {
 
     #[test(admin = @lottery, owner = @0x123)]
     fun mint_flow(admin: &signer, owner: &signer) {
+        test_utils::ensure_framework_accounts_for_test();
         nft_rewards::init(admin);
         let owner_addr = signer::address_of(owner);
         let metadata = b"ipfs://badge-1";
@@ -30,6 +31,7 @@ module lottery::nft_rewards_tests {
     #[test(admin = @lottery, owner = @0x456)]
     #[expected_failure(abort_code = 1)]
     fun non_admin_cannot_mint(admin: &signer, owner: &signer) {
+        test_utils::ensure_framework_accounts_for_test();
         nft_rewards::init(admin);
         let owner_addr = signer::address_of(owner);
         nft_rewards::mint_badge(owner, owner_addr, 1, 1, vector::empty<u8>());
@@ -37,6 +39,7 @@ module lottery::nft_rewards_tests {
 
     #[test(admin = @lottery, owner = @0x789)]
     fun burn_by_owner(admin: &signer, owner: &signer) {
+        test_utils::ensure_framework_accounts_for_test();
         nft_rewards::init(admin);
         let owner_addr = signer::address_of(owner);
         nft_rewards::mint_badge(admin, owner_addr, 2, 10, vector::empty<u8>());
@@ -46,6 +49,7 @@ module lottery::nft_rewards_tests {
 
     #[test(admin = @lottery, owner1 = @0xa11ce, owner2 = @0xb0b0)]
     fun snapshot_and_events(admin: &signer, owner1: &signer, owner2: &signer) {
+        test_utils::ensure_framework_accounts_for_test();
         nft_rewards::init(admin);
         let owner1_addr = signer::address_of(owner1);
         let owner2_addr = signer::address_of(owner2);
