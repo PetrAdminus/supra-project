@@ -2671,7 +2671,7 @@ module lottery::lottery_tests {
         main_v2::whitelist_consumer(&lottery_signer, PLAYER1);
 
         let custom_max_price = 7u64;
-        let custom_max_limit = 13u64;
+        let custom_max_limit = 40u64;
         let custom_verification = 19u64;
         let custom_callback_price = 5u64;
         let custom_callback_limit = 29u64;
@@ -2726,7 +2726,7 @@ module lottery::lottery_tests {
         main_v2::whitelist_consumer(&lottery_signer, PLAYER1);
 
         let first_price = 3u64;
-        let first_limit = 20u64;
+        let first_limit = 40u64;
         let first_verification = 11u64;
         let callback_price = 4u64;
         let callback_limit = 25u64;
@@ -2742,7 +2742,7 @@ module lottery::lottery_tests {
         main_v2::set_minimum_balance_for_test(&lottery_signer);
 
         let second_price = 9u64;
-        let second_limit = 15u64;
+        let second_limit = 45u64;
         let second_verification = 17u64;
 
         main_v2::configure_vrf_gas_for_test(
