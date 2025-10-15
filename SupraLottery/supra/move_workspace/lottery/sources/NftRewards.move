@@ -3,7 +3,6 @@ module lottery::nft_rewards {
     use std::signer;
     use std::vector;
     use vrf_hub::table;
-    use supra_framework::account;
     use supra_framework::event;
     
     const E_NOT_AUTHORIZED: u64 = 1;
@@ -32,9 +31,6 @@ module lottery::nft_rewards {
         next_badge_id: u64,
         users: table::Table<address, UserBadges>,
         owners: vector<address>,
-        mint_events: event::EventHandle<BadgeMintedEvent>,
-        burn_events: event::EventHandle<BadgeBurnedEvent>,
-        snapshot_events: event::EventHandle<NftRewardsSnapshotUpdatedEvent>,
     }
 
     #[event]
@@ -97,9 +93,6 @@ module lottery::nft_rewards {
                 next_badge_id: 1,
                 users: table::new(),
                 owners: vector::empty<address>(),
-                mint_events: account::new_event_handle<BadgeMintedEvent>(caller),
-                burn_events: account::new_event_handle<BadgeBurnedEvent>(caller),
-                snapshot_events: account::new_event_handle<NftRewardsSnapshotUpdatedEvent>(caller),
             },
         );
         let state = borrow_global_mut<BadgeAuthority>(@lottery);
@@ -151,16 +144,13 @@ module lottery::nft_rewards {
         };
         table::add(&mut collection.badges, badge_id, data);
         vector::push_back(&mut collection.badge_ids, badge_id);
-        event::emit_event(
-            &mut state.mint_events,
-            BadgeMintedEvent {
-                badge_id,
-                owner,
-                lottery_id,
-                draw_id,
-                metadata_uri: metadata_for_event,
-            },
-        );
+        event::emit(BadgeMintedEvent {
+            badge_id,
+            owner,
+            lottery_id,
+            draw_id,
+            metadata_uri: metadata_for_event,
+        });
         emit_owner_snapshot(state, owner);
     }
 
@@ -177,7 +167,7 @@ module lottery::nft_rewards {
         if (!option::is_some(&removed)) {
             abort E_BADGE_NOT_FOUND
         };
-        event::emit_event(&mut state.burn_events, BadgeBurnedEvent { badge_id, owner });
+        event::emit(BadgeBurnedEvent { badge_id, owner });
         emit_owner_snapshot(state, owner);
     }
 
@@ -420,14 +410,11 @@ module lottery::nft_rewards {
 
     fun emit_owner_snapshot(state: &mut BadgeAuthority, owner: address) {
         let snapshot = build_owner_snapshot(&*state, owner);
-        event::emit_event(
-            &mut state.snapshot_events,
-            NftRewardsSnapshotUpdatedEvent {
-                admin: state.admin,
-                next_badge_id: state.next_badge_id,
-                snapshot,
-            },
-        );
+        event::emit(NftRewardsSnapshotUpdatedEvent {
+            admin: state.admin,
+            next_badge_id: state.next_badge_id,
+            snapshot,
+        });
     }
 
 
