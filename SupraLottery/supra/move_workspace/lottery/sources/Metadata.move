@@ -1,10 +1,9 @@
 module lottery::metadata {
-    use std::borrow;
     use std::option;
     use std::signer;
     use vrf_hub::table;
     use std::vector;
-    use supra_framework::event;
+    use lottery::events;
 
     const E_ALREADY_INIT: u64 = 1;
     const E_NOT_INITIALIZED: u64 = 2;
@@ -76,8 +75,8 @@ module lottery::metadata {
             },
         );
         let state = borrow_global<MetadataRegistry>(@lottery);
-        let current = build_snapshot(state);
-        event::emit(MetadataSnapshotUpdatedEvent {
+        let current = build_snapshot_from_ref(state);
+        events::emit(MetadataSnapshotUpdatedEvent {
             previous: option::none<MetadataSnapshot>(),
             current,
         });
@@ -131,12 +130,12 @@ module lottery::metadata {
     public entry fun set_admin(caller: &signer, new_admin: address) acquires MetadataRegistry {
         ensure_admin(caller);
         let state = borrow_global_mut<MetadataRegistry>(@lottery);
-        let previous_snapshot = option::some<MetadataSnapshot>(build_snapshot(borrow::freeze(state)));
+        let previous_snapshot = option::some<MetadataSnapshot>(build_snapshot_from_mut(state));
         let previous = state.admin;
         state.admin = new_admin;
-        event::emit(MetadataAdminUpdatedEvent { previous, next: new_admin });
-        let next_snapshot = build_snapshot(borrow::freeze(state));
-        event::emit(MetadataSnapshotUpdatedEvent {
+        events::emit(MetadataAdminUpdatedEvent { previous, next: new_admin });
+        let next_snapshot = build_snapshot_from_mut(state);
+        events::emit(MetadataSnapshotUpdatedEvent {
             previous: previous_snapshot,
             current: next_snapshot,
         });
@@ -171,7 +170,7 @@ module lottery::metadata {
         ensure_admin(caller);
         let metadata_for_event = clone_metadata(&metadata);
         let state = borrow_global_mut<MetadataRegistry>(@lottery);
-        let previous_snapshot = option::some<MetadataSnapshot>(build_snapshot(borrow::freeze(state)));
+        let previous_snapshot = option::some<MetadataSnapshot>(build_snapshot_from_mut(state));
         let created = if (table::contains(&state.entries, lottery_id)) {
             let entry = table::borrow_mut(&mut state.entries, lottery_id);
             *entry = metadata;
@@ -181,9 +180,9 @@ module lottery::metadata {
             vector::push_back(&mut state.lottery_ids, lottery_id);
             true
         };
-        event::emit(LotteryMetadataUpsertedEvent { lottery_id, created, metadata: metadata_for_event });
-        let next_snapshot = build_snapshot(borrow::freeze(state));
-        event::emit(MetadataSnapshotUpdatedEvent {
+        events::emit(LotteryMetadataUpsertedEvent { lottery_id, created, metadata: metadata_for_event });
+        let next_snapshot = build_snapshot_from_mut(state);
+        events::emit(MetadataSnapshotUpdatedEvent {
             previous: previous_snapshot,
             current: next_snapshot,
         });
@@ -195,12 +194,12 @@ module lottery::metadata {
         if (!table::contains(&state.entries, lottery_id)) {
             abort E_METADATA_MISSING
         };
-        let previous_snapshot = option::some<MetadataSnapshot>(build_snapshot(borrow::freeze(state)));
+        let previous_snapshot = option::some<MetadataSnapshot>(build_snapshot_from_mut(state));
         table::remove(&mut state.entries, lottery_id);
         remove_lottery_id(&mut state.lottery_ids, lottery_id);
-        event::emit(LotteryMetadataRemovedEvent { lottery_id });
-        let next_snapshot = build_snapshot(borrow::freeze(state));
-        event::emit(MetadataSnapshotUpdatedEvent {
+        events::emit(LotteryMetadataRemovedEvent { lottery_id });
+        let next_snapshot = build_snapshot_from_mut(state);
+        events::emit(MetadataSnapshotUpdatedEvent {
             previous: previous_snapshot,
             current: next_snapshot,
         });
@@ -220,7 +219,7 @@ module lottery::metadata {
     #[view]
     public fun get_metadata_snapshot(): MetadataSnapshot acquires MetadataRegistry {
         let state = borrow_global<MetadataRegistry>(@lottery);
-        build_snapshot(state)
+        build_snapshot_from_ref(state)
     }
 
     #[test_only]
@@ -275,14 +274,18 @@ module lottery::metadata {
         }
     }
 
-    fun build_snapshot(state: &MetadataRegistry): MetadataSnapshot {
+    fun build_snapshot_from_parts(
+        admin: address,
+        entries: &table::Table<u64, LotteryMetadata>,
+        lottery_ids: &vector<u64>,
+    ): MetadataSnapshot {
         let entries = vector::empty<MetadataEntry>();
-        let len = vector::length(&state.lottery_ids);
+        let len = vector::length(lottery_ids);
         let i = 0;
         while (i < len) {
-            let lottery_id = *vector::borrow(&state.lottery_ids, i);
-            if (table::contains(&state.entries, lottery_id)) {
-                let metadata = clone_metadata(table::borrow(&state.entries, lottery_id));
+            let lottery_id = *vector::borrow(lottery_ids, i);
+            if (table::contains(entries, lottery_id)) {
+                let metadata = clone_metadata(table::borrow(entries, lottery_id));
                 vector::push_back(
                     &mut entries,
                     MetadataEntry { lottery_id, metadata },
@@ -290,7 +293,15 @@ module lottery::metadata {
             };
             i = i + 1;
         };
-        MetadataSnapshot { admin: state.admin, entries }
+        MetadataSnapshot { admin, entries }
+    }
+
+    fun build_snapshot_from_ref(state: &MetadataRegistry): MetadataSnapshot {
+        build_snapshot_from_parts(state.admin, &state.entries, &state.lottery_ids)
+    }
+
+    fun build_snapshot_from_mut(state: &mut MetadataRegistry): MetadataSnapshot {
+        build_snapshot_from_parts(state.admin, &state.entries, &state.lottery_ids)
     }
 
     fun clone_bytes(source: &vector<u8>): vector<u8> {
