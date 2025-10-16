@@ -190,7 +190,8 @@ module lottery::migration {
                 },
             );
         };
-        borrow_global_mut<MigrationLedger>(@lottery)
+        let state_ref = borrow_global_mut<MigrationLedger>(@lottery);
+        state_ref
     }
 
 
