@@ -183,7 +183,7 @@ module lottery::migration {
     }
 
 
-    fun ensure_ledger(caller: &signer) acquires MigrationLedger {
+    fun ensure_ledger(caller: &signer) {
         if (!exists<MigrationLedger>(@lottery)) {
             move_to(
                 caller,
