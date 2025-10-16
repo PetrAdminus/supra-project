@@ -74,7 +74,7 @@ module lottery::autopurchase_tests {
         autopurchase::configure_plan(buyer, lottery_id, 2, true);
         autopurchase::deposit(buyer, lottery_id, TICKET_PRICE * 3);
 
-        let mut summary_before_opt = autopurchase::get_lottery_summary(lottery_id);
+        let summary_before_opt = autopurchase::get_lottery_summary(lottery_id);
         let summary_before = test_utils::unwrap(&mut summary_before_opt);
         let (balance_before, total_players, active_players) =
             autopurchase::summary_fields_for_test(&summary_before);
@@ -82,7 +82,7 @@ module lottery::autopurchase_tests {
         assert!(total_players == 1, 10);
         assert!(active_players == 1, 11);
 
-        let mut players_opt = autopurchase::list_players(lottery_id);
+        let players_opt = autopurchase::list_players(lottery_id);
         let players = test_utils::unwrap(&mut players_opt);
         assert!(vector::length(&players) == 1, 12);
         assert!(*vector::borrow(&players, 0) == @player1, 13);
@@ -91,7 +91,7 @@ module lottery::autopurchase_tests {
         assert!(vector::length(&lotteries) == 1, 14);
         assert!(*vector::borrow(&lotteries, 0) == lottery_id, 15);
 
-        let mut lottery_snapshot_opt = autopurchase::get_lottery_snapshot(lottery_id);
+        let lottery_snapshot_opt = autopurchase::get_lottery_snapshot(lottery_id);
         let lottery_snapshot = test_utils::unwrap(&mut lottery_snapshot_opt);
         let (balance_snapshot, players_count_snapshot, active_players_snapshot, player_snapshots) =
             autopurchase::lottery_snapshot_fields_for_test(&lottery_snapshot);
@@ -107,7 +107,7 @@ module lottery::autopurchase_tests {
         assert!(plan_tickets == 2, 41);
         assert!(plan_active, 42);
 
-        let mut autopurchase_snapshot_opt = autopurchase::get_autopurchase_snapshot();
+        let autopurchase_snapshot_opt = autopurchase::get_autopurchase_snapshot();
         let autopurchase_snapshot = test_utils::unwrap(&mut autopurchase_snapshot_opt);
         let (admin_addr, lotteries_snapshot) =
             autopurchase::autopurchase_snapshot_fields_for_test(&autopurchase_snapshot);
@@ -117,7 +117,7 @@ module lottery::autopurchase_tests {
 
         autopurchase::execute(lottery_admin, lottery_id, @player1);
 
-        let mut plan_after_first_opt = autopurchase::get_plan(lottery_id, @player1);
+        let plan_after_first_opt = autopurchase::get_plan(lottery_id, @player1);
         let plan_after_first = test_utils::unwrap(&mut plan_after_first_opt);
         let (balance, tickets_per_draw, active) =
             autopurchase::plan_fields_for_test(&plan_after_first);
@@ -125,12 +125,12 @@ module lottery::autopurchase_tests {
         assert!(tickets_per_draw == 2, 1);
         assert!(active, 2);
 
-        let mut snapshot_opt = rounds::get_round_snapshot(lottery_id);
+        let snapshot_opt = rounds::get_round_snapshot(lottery_id);
         let snapshot = test_utils::unwrap(&mut snapshot_opt);
         let (ticket_count, _, _, _, _) = rounds::round_snapshot_fields_for_test(&snapshot);
         assert!(ticket_count == 2, 3);
 
-        let mut summary_mid_opt = autopurchase::get_lottery_summary(lottery_id);
+        let summary_mid_opt = autopurchase::get_lottery_summary(lottery_id);
         let summary_mid = test_utils::unwrap(&mut summary_mid_opt);
         let (balance_mid, total_players_mid, active_players_mid) =
             autopurchase::summary_fields_for_test(&summary_mid);
@@ -140,17 +140,17 @@ module lottery::autopurchase_tests {
 
 
         autopurchase::execute(lottery_admin, lottery_id, @player1);
-        let mut plan_after_second_opt = autopurchase::get_plan(lottery_id, @player1);
+        let plan_after_second_opt = autopurchase::get_plan(lottery_id, @player1);
         let plan_after_second = test_utils::unwrap(&mut plan_after_second_opt);
         let (final_balance, _, _) = autopurchase::plan_fields_for_test(&plan_after_second);
         assert!(final_balance == 0, 4);
 
-        let mut summary_final_opt = autopurchase::get_lottery_summary(lottery_id);
+        let summary_final_opt = autopurchase::get_lottery_summary(lottery_id);
         let summary_final = test_utils::unwrap(&mut summary_final_opt);
         let (balance_final, _, _) = autopurchase::summary_fields_for_test(&summary_final);
         assert!(balance_final == 0, 19);
 
-        let mut pool_opt = treasury_multi::get_pool(lottery_id);
+        let pool_opt = treasury_multi::get_pool(lottery_id);
         let pool_snapshot = test_utils::unwrap(&mut pool_opt);
         let (prize_balance, operations_balance) =
             treasury_multi::pool_balances_for_test(&pool_snapshot);
@@ -231,12 +231,12 @@ module lottery::autopurchase_tests {
         let balance_after = treasury_v1::balance_of(@player3);
         assert!(balance_after == balance_before + 120, 0);
 
-        let mut plan_opt = autopurchase::get_plan(lottery_id, @player3);
+        let plan_opt = autopurchase::get_plan(lottery_id, @player3);
         let plan = test_utils::unwrap(&mut plan_opt);
         let (balance, _, _) = autopurchase::plan_fields_for_test(&plan);
         assert!(balance == 380, 1);
 
-        let mut summary_opt = autopurchase::get_lottery_summary(lottery_id);
+        let summary_opt = autopurchase::get_lottery_summary(lottery_id);
         let summary = test_utils::unwrap(&mut summary_opt);
         let (total_balance, _, _) = autopurchase::summary_fields_for_test(&summary);
         assert!(total_balance == 380, 2);

@@ -83,7 +83,7 @@ module lottery::referrals_tests {
 
         assert!(buyer_balance == 4_906, 1);
 
-        let mut stats_opt = referrals::get_lottery_stats(lottery_id);
+        let stats_opt = referrals::get_lottery_stats(lottery_id);
         let stats = test_utils::unwrap(&mut stats_opt);
         let (rewarded_purchases, total_referrer_rewards, total_referee_rewards) =
             referrals::referral_stats_for_test(&stats);
@@ -91,7 +91,7 @@ module lottery::referrals_tests {
         assert!(total_referrer_rewards == 8, 3);
         assert!(total_referee_rewards == 6, 4);
 
-        let mut referrer_opt = referrals::get_referrer(signer::address_of(buyer));
+        let referrer_opt = referrals::get_referrer(signer::address_of(buyer));
         assert!(option::is_some(&referrer_opt), 5);
         let stored_referrer = test_utils::unwrap(&mut referrer_opt);
         assert!(stored_referrer == signer::address_of(referrer), 6);

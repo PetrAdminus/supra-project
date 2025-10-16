@@ -74,14 +74,14 @@ module lottery::vip_tests {
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
         vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, VIP_BONUS_TICKETS);
-        let mut summary_before_opt = vip::get_lottery_summary(lottery_id);
+        let summary_before_opt = vip::get_lottery_summary(lottery_id);
         let summary_before = test_utils::unwrap(&mut summary_before_opt);
         let (_config_before, total_members, active_members, total_revenue, _) =
             vip::summary_fields_for_test(&summary_before);
         assert!(total_members == 0, 0);
         assert!(active_members == 0, 1);
         assert!(total_revenue == 0, 2);
-        let mut vip_snapshot_initial_opt = vip::get_vip_snapshot();
+        let vip_snapshot_initial_opt = vip::get_vip_snapshot();
         let vip_snapshot_initial = test_utils::unwrap(&mut vip_snapshot_initial_opt);
         let (snapshot_admin_initial, lottery_snapshots_initial) =
             vip::vip_snapshot_fields_for_test(&vip_snapshot_initial);
@@ -103,14 +103,14 @@ module lottery::vip_tests {
 
         vip::subscribe(player, lottery_id);
         let player_addr = signer::address_of(player);
-        let mut subscription_opt = vip::get_subscription(lottery_id, player_addr);
+        let subscription_opt = vip::get_subscription(lottery_id, player_addr);
         let subscription = test_utils::unwrap(&mut subscription_opt);
         let (_expiry, is_active, bonus_tickets) =
             vip::subscription_fields_for_test(&subscription);
         assert!(is_active, 3);
         assert!(bonus_tickets == VIP_BONUS_TICKETS, 4);
 
-        let mut treasury_summary_opt = treasury_multi::get_lottery_summary(lottery_id);
+        let treasury_summary_opt = treasury_multi::get_lottery_summary(lottery_id);
         let treasury_summary = test_utils::unwrap(&mut treasury_summary_opt);
         let (_config_summary, pool) = treasury_multi::summary_components_for_test(&treasury_summary);
         let (prize_balance, operations_balance) = treasury_multi::pool_balances_for_test(&pool);
@@ -118,12 +118,12 @@ module lottery::vip_tests {
         assert!(operations_balance == VIP_PRICE, 6);
 
         rounds::buy_ticket(player, lottery_id);
-        let mut round_snapshot_opt = rounds::get_round_snapshot(lottery_id);
+        let round_snapshot_opt = rounds::get_round_snapshot(lottery_id);
         let round_snapshot = test_utils::unwrap(&mut round_snapshot_opt);
         let (ticket_count, _, _, _, _) = rounds::round_snapshot_fields_for_test(&round_snapshot);
         assert!(ticket_count == 1 + VIP_BONUS_TICKETS, 7);
 
-        let mut summary_after_opt = vip::get_lottery_summary(lottery_id);
+        let summary_after_opt = vip::get_lottery_summary(lottery_id);
         let summary_after = test_utils::unwrap(&mut summary_after_opt);
         let (_config_after, members_after, active_after, revenue_after, bonus_tickets_issued) =
             vip::summary_fields_for_test(&summary_after);
@@ -132,7 +132,7 @@ module lottery::vip_tests {
         assert!(revenue_after == VIP_PRICE, 10);
         assert!(bonus_tickets_issued == VIP_BONUS_TICKETS, 11);
 
-        let mut lottery_snapshot_opt = vip::get_lottery_snapshot(lottery_id);
+        let lottery_snapshot_opt = vip::get_lottery_snapshot(lottery_id);
         let lottery_snapshot = test_utils::unwrap(&mut lottery_snapshot_opt);
         let (
             _lottery_id_snapshot,
@@ -147,7 +147,7 @@ module lottery::vip_tests {
         assert!(revenue_snapshot == VIP_PRICE, 31);
         assert!(issued_snapshot == VIP_BONUS_TICKETS, 32);
 
-        let mut vip_snapshot_after_opt = vip::get_vip_snapshot();
+        let vip_snapshot_after_opt = vip::get_vip_snapshot();
         let vip_snapshot_after = test_utils::unwrap(&mut vip_snapshot_after_opt);
         let (snapshot_admin_after, lottery_snapshots_after) =
             vip::vip_snapshot_fields_for_test(&vip_snapshot_after);
@@ -212,13 +212,13 @@ module lottery::vip_tests {
 
         vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, 1);
         vip::subscribe_for(gift_admin, lottery_id, signer::address_of(recipient));
-        let mut subscription_opt =
+        let subscription_opt =
             vip::get_subscription(lottery_id, signer::address_of(recipient));
         let subscription = test_utils::unwrap(&mut subscription_opt);
         let (_expiry_before_cancel, is_active_before, _bonus_before) =
             vip::subscription_fields_for_test(&subscription);
         assert!(is_active_before, 12);
-        let mut lottery_snapshot_before_cancel_opt =
+        let lottery_snapshot_before_cancel_opt =
             vip::get_lottery_snapshot(lottery_id);
         let lottery_snapshot_before_cancel =
             test_utils::unwrap(&mut lottery_snapshot_before_cancel_opt);
@@ -236,13 +236,13 @@ module lottery::vip_tests {
         assert!(issued_before_cancel == 0, 17);
 
         vip::cancel_for(lottery_admin, lottery_id, signer::address_of(recipient));
-        let mut after_cancel_opt =
+        let after_cancel_opt =
             vip::get_subscription(lottery_id, signer::address_of(recipient));
         let after_cancel = test_utils::unwrap(&mut after_cancel_opt);
         let (_expiry_after_cancel, is_active_after, _bonus_after) =
             vip::subscription_fields_for_test(&after_cancel);
         assert!(!is_active_after, 13);
-        let mut lottery_snapshot_after_cancel_opt =
+        let lottery_snapshot_after_cancel_opt =
             vip::get_lottery_snapshot(lottery_id);
         let lottery_snapshot_after_cancel =
             test_utils::unwrap(&mut lottery_snapshot_after_cancel_opt);
@@ -259,7 +259,7 @@ module lottery::vip_tests {
         assert!(revenue_after_cancel == VIP_PRICE, 20);
         assert!(issued_after_cancel == 0, 21);
 
-        let mut vip_snapshot_after_cancel_opt = vip::get_vip_snapshot();
+        let vip_snapshot_after_cancel_opt = vip::get_vip_snapshot();
         let vip_snapshot_after_cancel =
             test_utils::unwrap(&mut vip_snapshot_after_cancel_opt);
         let (_vip_admin_after_cancel, vip_lotteries_after_cancel) =

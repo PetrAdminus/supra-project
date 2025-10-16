@@ -85,21 +85,21 @@ module lottery::store_tests {
 
         store::purchase(buyer, lottery_id, 1, 2);
 
-        let mut item_stats_opt = store::get_item_with_stats(lottery_id, 1);
+        let item_stats_opt = store::get_item_with_stats(lottery_id, 1);
         let item_stats = test_utils::unwrap(&mut item_stats_opt);
         let (item, sold) = store::item_with_stats_components_for_test(&item_stats);
-        let mut stock = store::store_item_stock_for_test(&item);
+        let stock = store::store_item_stock_for_test(&item);
         assert!(sold == 2, 0);
         let remaining = test_utils::unwrap(&mut stock);
         assert!(remaining == ITEM_STOCK - 2, 1);
 
-        let mut summary_opt = treasury_multi::get_lottery_summary(lottery_id);
+        let summary_opt = treasury_multi::get_lottery_summary(lottery_id);
         let summary = test_utils::unwrap(&mut summary_opt);
         let (_config, pool) = treasury_multi::summary_components_for_test(&summary);
         let (_prize_balance, operations_balance) = treasury_multi::pool_balances_for_test(&pool);
         assert!(operations_balance == ITEM_PRICE * 2, 2);
 
-        let mut lottery_snapshot_opt = store::get_lottery_snapshot(lottery_id);
+        let lottery_snapshot_opt = store::get_lottery_snapshot(lottery_id);
         let lottery_snapshot = test_utils::unwrap(&mut lottery_snapshot_opt);
         let (snapshot_lottery_id, item_snapshots) =
             store::store_lottery_snapshot_fields_for_test(&lottery_snapshot);
@@ -117,8 +117,8 @@ module lottery::store_tests {
         assert!(snapshot_item_id == 1, 22);
         assert!(snapshot_price == ITEM_PRICE, 23);
         assert!(snapshot_available, 24);
-        let mut snapshot_stock = snapshot_stock;
-        let remaining_snapshot = test_utils::unwrap(&mut snapshot_stock);
+        let snapshot_stock_local = snapshot_stock;
+        let remaining_snapshot = test_utils::unwrap(&mut snapshot_stock_local);
         assert!(remaining_snapshot == ITEM_STOCK - 2, 25);
         assert!(snapshot_sold == 2, 26);
         let expected_metadata = b"avatar-premium";
@@ -134,7 +134,7 @@ module lottery::store_tests {
             metadata_idx = metadata_idx + 1;
         };
 
-        let mut store_snapshot_before_opt = store::get_store_snapshot();
+        let store_snapshot_before_opt = store::get_store_snapshot();
         let store_snapshot_before = test_utils::unwrap(&mut store_snapshot_before_opt);
         let (store_admin_before, store_lotteries_before) =
             store::store_snapshot_fields_for_test(&store_snapshot_before);
@@ -143,7 +143,7 @@ module lottery::store_tests {
 
         store::set_admin(lottery_admin, @lottery_owner);
 
-        let mut store_snapshot_after_opt = store::get_store_snapshot();
+        let store_snapshot_after_opt = store::get_store_snapshot();
         let store_snapshot_after = test_utils::unwrap(&mut store_snapshot_after_opt);
         let (store_admin_after, _) = store::store_snapshot_fields_for_test(&store_snapshot_after);
         assert!(store_admin_after == @lottery_owner, 31);
@@ -158,7 +158,7 @@ module lottery::store_tests {
         assert!(event_lottery_id == lottery_id, 34);
         assert!(vector::length(&event_items) == 1, 35);
         let event_item = vector::borrow(&event_items, 0);
-        let (_, _, event_available, mut event_stock, event_sold, _) =
+        let (_, _, event_available, event_stock, event_sold, _) =
             store::store_item_snapshot_fields_for_test(event_item);
         assert!(event_available, 36);
         let event_remaining = test_utils::unwrap(&mut event_stock);

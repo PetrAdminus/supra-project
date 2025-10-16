@@ -71,14 +71,14 @@ module lottery::treasury_multi_tests {
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 6_000, 2_000, 2_000);
         treasury_multi::record_allocation(lottery_admin, 1, 1_000);
 
-        let mut pool_opt = treasury_multi::get_pool(1);
+        let pool_opt = treasury_multi::get_pool(1);
         let pool = test_utils::unwrap(&mut pool_opt);
         let (prize_balance, operations_balance) = treasury_multi::pool_balances_for_test(&pool);
         assert!(prize_balance == 600, 1);
         assert!(operations_balance == 200, 2);
         assert!(treasury_multi::jackpot_balance() == 200, 3);
 
-        let mut config_opt = treasury_multi::get_config(1);
+        let config_opt = treasury_multi::get_config(1);
         let config = test_utils::unwrap(&mut config_opt);
         let (prize_bps, jackpot_bps, operations_bps) =
             treasury_multi::share_config_bps_for_test(&config);
@@ -90,7 +90,7 @@ module lottery::treasury_multi_tests {
         assert!(vector::length(&ids) == 1, 7);
         assert!(*vector::borrow(&ids, 0) == 1, 8);
 
-        let mut summary_opt = treasury_multi::get_lottery_summary(1);
+        let summary_opt = treasury_multi::get_lottery_summary(1);
         let summary = test_utils::unwrap(&mut summary_opt);
         let (summary_config, summary_pool) = treasury_multi::summary_components_for_test(&summary);
         let (s_prize, s_jackpot, s_ops) =
@@ -234,7 +234,7 @@ module lottery::treasury_multi_tests {
 
         treasury_multi::distribute_prize(lottery_admin, 1, signer::address_of(winner));
 
-        let mut pool_opt = treasury_multi::get_pool(1);
+        let pool_opt = treasury_multi::get_pool(1);
         let pool = test_utils::unwrap(&mut pool_opt);
         let (prize_balance, operations_balance) = treasury_multi::pool_balances_for_test(&pool);
         assert!(prize_balance == 0, 1);
@@ -244,7 +244,7 @@ module lottery::treasury_multi_tests {
 
         assert!(winner_balance == 940, 3);
 
-        let mut summary_after_prize_opt = treasury_multi::get_lottery_summary(1);
+        let summary_after_prize_opt = treasury_multi::get_lottery_summary(1);
         let summary_after_prize = test_utils::unwrap(&mut summary_after_prize_opt);
         let (_config_after, after_pool) =
             treasury_multi::summary_components_for_test(&summary_after_prize);
@@ -281,7 +281,7 @@ module lottery::treasury_multi_tests {
         assert!(!operations_frozen_after, 8);
         assert!(operations_balance_after == 200, 9);
 
-        let mut pool_opt = treasury_multi::get_pool(1);
+        let pool_opt = treasury_multi::get_pool(1);
         let pool = test_utils::unwrap(&mut pool_opt);
         let (prize_balance, operations_balance) = treasury_multi::pool_balances_for_test(&pool);
         assert!(operations_balance == 0, 1);
@@ -292,7 +292,7 @@ module lottery::treasury_multi_tests {
         assert!(treasury_v1::balance_of(signer::address_of(winner)) == 4_200, 3);
         assert!(treasury_multi::jackpot_balance() == 0, 4);
 
-        let mut summary_after_ops_opt = treasury_multi::get_lottery_summary(1);
+        let summary_after_ops_opt = treasury_multi::get_lottery_summary(1);
         let summary_after_ops = test_utils::unwrap(&mut summary_after_ops_opt);
         let (_config_post, post_pool) = treasury_multi::summary_components_for_test(&summary_after_ops);
         let (post_prize, post_ops) = treasury_multi::pool_balances_for_test(&post_pool);

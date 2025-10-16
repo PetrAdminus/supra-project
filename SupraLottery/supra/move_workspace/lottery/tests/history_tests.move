@@ -78,7 +78,7 @@ module lottery::history_tests {
         hub::set_callback_sender(vrf_admin, signer::address_of(aggregator));
 
         rounds::request_randomness(lottery_admin, lottery_id, b"log");
-        let mut request_id_opt = rounds::pending_request_id(lottery_id);
+        let request_id_opt = rounds::pending_request_id(lottery_id);
         let request_id = test_utils::unwrap(&mut request_id_opt);
 
         let randomness = vector::empty<u8>();
@@ -93,7 +93,7 @@ module lottery::history_tests {
 
         rounds::fulfill_draw(aggregator, request_id, randomness);
 
-        let mut history_opt = history::get_history(lottery_id);
+        let history_opt = history::get_history(lottery_id);
         let records = test_utils::unwrap(&mut history_opt);
         assert!(vector::length(&records) == 1, 0);
         let record = *vector::borrow(&records, 0);
@@ -117,20 +117,20 @@ module lottery::history_tests {
         assert!(vector::length(&ids) == 1, 7);
         assert!(*vector::borrow(&ids, 0) == lottery_id, 8);
 
-        let mut latest_opt = history::latest_record(lottery_id);
+        let latest_opt = history::latest_record(lottery_id);
         let latest = test_utils::unwrap(&mut latest_opt);
         let (latest_request, _, _, _, _, _, _) =
             history::draw_record_fields_for_test(&latest);
         assert!(latest_request == stored_request, 9);
 
-        let mut lottery_snapshot_opt = history::get_lottery_snapshot(lottery_id);
+        let lottery_snapshot_opt = history::get_lottery_snapshot(lottery_id);
         let lottery_snapshot = test_utils::unwrap(&mut lottery_snapshot_opt);
         let (snapshot_lottery_id, snapshot_records) =
             history::lottery_history_snapshot_fields_for_test(&lottery_snapshot);
         assert!(snapshot_lottery_id == lottery_id, 10);
         assert!(vector::length(&snapshot_records) == 1, 11);
 
-        let mut history_snapshot_opt = history::get_history_snapshot();
+        let history_snapshot_opt = history::get_history_snapshot();
         let history_snapshot = test_utils::unwrap(&mut history_snapshot_opt);
         let (snapshot_admin, snapshot_ids, snapshot_histories) =
             history::history_snapshot_fields_for_test(&history_snapshot);
@@ -152,7 +152,7 @@ module lottery::history_tests {
         assert!(vector::is_empty(&init_histories), 20);
 
         let draw_event = vector::borrow(&snapshot_events, 1);
-        let (mut draw_previous_opt, draw_current) =
+        let (draw_previous_opt, draw_current) =
             history::history_snapshot_event_fields_for_test(draw_event);
         let draw_previous = test_utils::unwrap(&mut draw_previous_opt);
         let (_, prev_ids, _) = history::history_snapshot_fields_for_test(&draw_previous);
@@ -209,7 +209,7 @@ module lottery::history_tests {
         rounds::schedule_draw(lottery_admin, lottery_id);
         hub::set_callback_sender(vrf_admin, signer::address_of(aggregator));
         rounds::request_randomness(lottery_admin, lottery_id, b"clear");
-        let mut request_id_opt = rounds::pending_request_id(lottery_id);
+        let request_id_opt = rounds::pending_request_id(lottery_id);
         let request_id = test_utils::unwrap(&mut request_id_opt);
 
         let randomness = vector::empty<u8>();
@@ -224,13 +224,13 @@ module lottery::history_tests {
 
         rounds::fulfill_draw(aggregator, request_id, randomness);
 
-        let mut records_before_opt = history::get_history(lottery_id);
+        let records_before_opt = history::get_history(lottery_id);
         let records_before = test_utils::unwrap(&mut records_before_opt);
         assert!(vector::length(&records_before) == 1, 0);
 
         history::clear_history(lottery_admin, lottery_id);
 
-        let mut records_after_opt = history::get_history(lottery_id);
+        let records_after_opt = history::get_history(lottery_id);
         let records_after = test_utils::unwrap(&mut records_after_opt);
         assert!(vector::is_empty(&records_after), 1);
 
@@ -240,7 +240,7 @@ module lottery::history_tests {
         let snapshot_events = event::emitted_events<history::HistorySnapshotUpdatedEvent>();
         assert!(vector::length(&snapshot_events) == 3, 3);
         let clear_event = vector::borrow(&snapshot_events, 2);
-        let (mut clear_previous_opt, clear_current) =
+        let (clear_previous_opt, clear_current) =
             history::history_snapshot_event_fields_for_test(clear_event);
         let clear_previous = test_utils::unwrap(&mut clear_previous_opt);
         let (_, _, clear_prev_histories) =

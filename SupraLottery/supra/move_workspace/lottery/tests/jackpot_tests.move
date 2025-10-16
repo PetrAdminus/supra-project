@@ -76,12 +76,12 @@ module lottery::jackpot_tests {
         jackpot::schedule_draw(lottery_admin);
         jackpot::request_randomness(lottery_admin, b"global");
 
-        let mut request_id_opt = jackpot::pending_request();
+        let request_id_opt = jackpot::pending_request();
         let request_id = test_utils::unwrap(&mut request_id_opt);
         let randomness = build_randomness(1);
         jackpot::fulfill_draw(aggregator, request_id, randomness);
 
-        let mut snapshot_opt = jackpot::get_snapshot();
+        let snapshot_opt = jackpot::get_snapshot();
         let snapshot = test_utils::unwrap(&mut snapshot_opt);
         let (
             snapshot_admin,
@@ -121,7 +121,7 @@ module lottery::jackpot_tests {
         assert!(option::is_none(&initial_pending_opt), 14);
 
         let request_event = vector::borrow(&snapshot_events, 4);
-        let (mut request_previous_opt, request_current) =
+        let (request_previous_opt, request_current) =
             jackpot::jackpot_snapshot_event_fields_for_test(request_event);
         let request_previous = test_utils::unwrap(&mut request_previous_opt);
         let (
@@ -145,12 +145,12 @@ module lottery::jackpot_tests {
         ) = jackpot::jackpot_snapshot_fields_for_test(&request_current);
         assert!(req_draw_scheduled, 18);
         assert!(req_has_pending, 19);
-        let mut req_pending_opt = req_pending_opt;
-        let req_pending_id = test_utils::unwrap(&mut req_pending_opt);
+        let req_pending_opt_local = req_pending_opt;
+        let req_pending_id = test_utils::unwrap(&mut req_pending_opt_local);
         assert!(req_pending_id == request_id, 20);
 
         let final_event = vector::borrow(&snapshot_events, 5);
-        let (mut final_previous_opt, final_current) =
+        let (final_previous_opt, final_current) =
             jackpot::jackpot_snapshot_event_fields_for_test(final_event);
         let final_previous = test_utils::unwrap(&mut final_previous_opt);
         let (
@@ -163,8 +163,9 @@ module lottery::jackpot_tests {
         ) = jackpot::jackpot_snapshot_fields_for_test(&final_previous);
         assert!(final_prev_draw_scheduled, 21);
         assert!(final_prev_has_pending, 22);
-        let mut final_prev_pending_opt = final_prev_pending_opt;
-        let final_prev_pending_id = test_utils::unwrap(&mut final_prev_pending_opt);
+        let final_prev_pending_opt_local = final_prev_pending_opt;
+        let final_prev_pending_id =
+            test_utils::unwrap(&mut final_prev_pending_opt_local);
         assert!(final_prev_pending_id == request_id, 23);
         let (
             _final_admin,
@@ -220,7 +221,7 @@ module lottery::jackpot_tests {
         jackpot::schedule_draw(lottery_admin);
         jackpot::request_randomness(lottery_admin, b"global");
 
-        let mut request_id_opt = jackpot::pending_request();
+        let request_id_opt = jackpot::pending_request();
         let request_id = test_utils::unwrap(&mut request_id_opt);
         let randomness = build_randomness(0);
         jackpot::fulfill_draw(aggregator, request_id, randomness);

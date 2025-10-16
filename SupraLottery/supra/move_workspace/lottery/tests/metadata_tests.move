@@ -41,7 +41,7 @@ module lottery::metadata_tests {
         let snapshot_event_len = vector::length(&snapshot_events);
         assert!(snapshot_event_len >= 2, 8);
         let latest_snapshot_event = vector::borrow(&snapshot_events, snapshot_event_len - 1);
-        let (mut previous_opt, current_snapshot) =
+        let (previous_opt, current_snapshot) =
             metadata::metadata_snapshot_event_fields_for_test(latest_snapshot_event);
         let _previous_snapshot = test_utils::unwrap(&mut previous_opt);
         let admin_addr = metadata::metadata_snapshot_admin(&current_snapshot);
@@ -56,7 +56,7 @@ module lottery::metadata_tests {
         assert!(vector_equals(&title, &b"Daily Lottery"), 12);
         assert!(vector_equals(&description, &b"First description"), 13);
 
-        let mut stored_opt = metadata::get_metadata(1);
+        let stored_opt = metadata::get_metadata(1);
         let stored = test_utils::unwrap(&mut stored_opt);
         let (title, description, _image_uri, _website_uri, _rules_uri) =
             metadata::metadata_fields_for_test(&stored);
@@ -88,7 +88,7 @@ module lottery::metadata_tests {
         assert!(vector_equals(&snapshot_description, &b"Updated description"), 16);
         assert!(vector_equals(&snapshot_image_uri, &b"https://img.example/lottery-v2.png"), 17);
 
-        let mut updated_opt = metadata::get_metadata(1);
+        let updated_opt = metadata::get_metadata(1);
         let updated_stored = test_utils::unwrap(&mut updated_opt);
         let (_title2, description2, image_uri2, _website2, _rules2) =
             metadata::metadata_fields_for_test(&updated_stored);
@@ -98,7 +98,7 @@ module lottery::metadata_tests {
         let snapshot_events_after_update = event::emitted_events<metadata::MetadataSnapshotUpdatedEvent>();
         let event_len_after_update = vector::length(&snapshot_events_after_update);
         let last_event = vector::borrow(&snapshot_events_after_update, event_len_after_update - 1);
-        let (mut previous_snapshot_opt, current_snapshot_after_update) =
+        let (previous_snapshot_opt, current_snapshot_after_update) =
             metadata::metadata_snapshot_event_fields_for_test(last_event);
         let previous_snapshot = test_utils::unwrap(&mut previous_snapshot_opt);
         let previous_entry = metadata::metadata_snapshot_entry_at(&previous_snapshot, 0);

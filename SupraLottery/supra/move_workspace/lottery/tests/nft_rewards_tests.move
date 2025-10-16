@@ -18,7 +18,7 @@ module lottery::nft_rewards_tests {
         let badges = nft_rewards::list_badges(owner_addr);
         assert!(vector::length(&badges) == 1, 1);
         assert!(*vector::borrow(&badges, 0) == 1, 2);
-        let mut info_opt = nft_rewards::get_badge(owner_addr, 1);
+        let info_opt = nft_rewards::get_badge(owner_addr, 1);
         assert!(option::is_some(&info_opt), 3);
         let info = test_utils::unwrap(&mut info_opt);
         let (lottery_id, draw_id, _metadata, minted_by) =
@@ -67,7 +67,7 @@ module lottery::nft_rewards_tests {
         assert!(*vector::borrow(&owners, 0) == owner1_addr, 1);
         assert!(*vector::borrow(&owners, 1) == owner2_addr, 2);
 
-        let mut snapshot_opt = nft_rewards::get_snapshot();
+        let snapshot_opt = nft_rewards::get_snapshot();
         assert!(option::is_some(&snapshot_opt), 3);
         let snapshot = test_utils::unwrap(&mut snapshot_opt);
         let (snapshot_admin, next_badge_id, owner_snapshots) =
@@ -106,7 +106,7 @@ module lottery::nft_rewards_tests {
         assert!(second_minter == signer::address_of(admin), 21);
         assert!(vector::length(&second_metadata) == vector::length(&metadata2), 22);
 
-        let mut owner2_snapshot_opt = nft_rewards::get_owner_snapshot(owner2_addr);
+        let owner2_snapshot_opt = nft_rewards::get_owner_snapshot(owner2_addr);
         assert!(option::is_some(&owner2_snapshot_opt), 23);
         let owner2_snapshot = test_utils::unwrap(&mut owner2_snapshot_opt);
         let (owner2_from_view, owner2_badges) =
@@ -143,7 +143,7 @@ module lottery::nft_rewards_tests {
         assert!(burn_owner == owner1_addr, 34);
         assert!(vector::length(&burn_badges) == 0, 35);
 
-        let mut owner1_snapshot_opt = nft_rewards::get_owner_snapshot(owner1_addr);
+        let owner1_snapshot_opt = nft_rewards::get_owner_snapshot(owner1_addr);
         assert!(option::is_some(&owner1_snapshot_opt), 36);
         let owner1_snapshot = test_utils::unwrap(&mut owner1_snapshot_opt);
         let (_, owner1_badges_after) =

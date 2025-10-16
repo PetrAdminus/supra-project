@@ -43,7 +43,7 @@ module lottery::migration_tests {
 
         migration::migrate_from_legacy(lottery, lottery_id, 9_000, 1_000, 0);
 
-        let mut stats_opt = instances::get_instance_stats(lottery_id);
+        let stats_opt = instances::get_instance_stats(lottery_id);
         assert!(option::is_some(&stats_opt), 0);
         let stats = test_utils::unwrap(&mut stats_opt);
         let (tickets_sold, jackpot_accumulated, active) =
@@ -52,7 +52,7 @@ module lottery::migration_tests {
         assert!(jackpot_accumulated == 0, jackpot_accumulated);
         assert!(active, 6);
 
-        let mut snapshot_opt = rounds::get_round_snapshot(lottery_id);
+        let snapshot_opt = rounds::get_round_snapshot(lottery_id);
         assert!(option::is_some(&snapshot_opt), 1);
         let snapshot = test_utils::unwrap(&mut snapshot_opt);
         let (
@@ -67,7 +67,7 @@ module lottery::migration_tests {
         assert!(!has_pending_request, 3);
         assert!(next_ticket_id == 2, next_ticket_id);
 
-        let mut pool_opt = treasury_multi::get_pool(lottery_id);
+        let pool_opt = treasury_multi::get_pool(lottery_id);
         assert!(option::is_some(&pool_opt), 4);
         let pool = test_utils::unwrap(&mut pool_opt);
         let (prize_balance, operations_balance) = treasury_multi::pool_balances_for_test(&pool);
@@ -83,7 +83,7 @@ module lottery::migration_tests {
         assert!(vector::length(&migrated_ids) == 1, 11);
         assert!(*vector::borrow(&migrated_ids, 0) == lottery_id, 12);
 
-        let mut snapshot_opt = migration::get_migration_snapshot(lottery_id);
+        let snapshot_opt = migration::get_migration_snapshot(lottery_id);
         assert!(option::is_some(&snapshot_opt), 13);
         let snapshot = test_utils::unwrap(&mut snapshot_opt);
         let (

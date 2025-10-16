@@ -62,7 +62,7 @@ module lottery::rounds_tests {
 
         rounds::buy_ticket(buyer, lottery_id);
 
-        let mut stats_opt = instances::get_instance_stats(lottery_id);
+        let stats_opt = instances::get_instance_stats(lottery_id);
         let stats_snapshot = test_utils::unwrap(&mut stats_opt);
         let (tickets_sold, jackpot_accumulated, active) =
             instances::instance_stats_for_test(&stats_snapshot);
@@ -70,7 +70,7 @@ module lottery::rounds_tests {
         assert!(jackpot_accumulated == 20, 1);
         assert!(active, 2);
 
-        let mut snapshot_opt = rounds::get_round_snapshot(lottery_id);
+        let snapshot_opt = rounds::get_round_snapshot(lottery_id);
         let snapshot_data = test_utils::unwrap(&mut snapshot_opt);
         let (
             ticket_count,
@@ -104,7 +104,7 @@ module lottery::rounds_tests {
         assert!(event_next_ticket_id == 1, 13);
         assert!(option::is_none(&event_pending_id_opt), 14);
 
-        let mut pool_opt = treasury_multi::get_pool(lottery_id);
+        let pool_opt = treasury_multi::get_pool(lottery_id);
         let pool_snapshot = test_utils::unwrap(&mut pool_opt);
         let (prize_balance, operations_balance) =
             treasury_multi::pool_balances_for_test(&pool_snapshot);
@@ -190,7 +190,7 @@ module lottery::rounds_tests {
         rounds::buy_ticket(buyer, lottery_id);
         rounds::schedule_draw(lottery_admin, lottery_id);
 
-        let mut scheduled_snapshot_opt = rounds::get_round_snapshot(lottery_id);
+        let scheduled_snapshot_opt = rounds::get_round_snapshot(lottery_id);
         let scheduled_snapshot = test_utils::unwrap(&mut scheduled_snapshot_opt);
         let (
             _count_sched,
@@ -203,7 +203,7 @@ module lottery::rounds_tests {
         assert!(option::is_none(&pending_sched_opt), 1);
 
         rounds::reset_round(lottery_admin, lottery_id);
-        let mut reset_snapshot_opt = rounds::get_round_snapshot(lottery_id);
+        let reset_snapshot_opt = rounds::get_round_snapshot(lottery_id);
         let reset_snapshot = test_utils::unwrap(&mut reset_snapshot_opt);
         let (
             ticket_count,
@@ -288,13 +288,13 @@ module lottery::rounds_tests {
             is_scheduled_after_request,
             has_pending_after_request,
             _next_after_request,
-            mut pending_request_opt,
+            pending_request_opt,
         ) = rounds::round_snapshot_fields_for_test(&request_snapshot);
         assert!(is_scheduled_after_request, 1);
         assert!(has_pending_after_request, 2);
         let request_id = test_utils::unwrap(&mut pending_request_opt);
 
-        let mut request_opt = rounds::pending_request_id(lottery_id);
+        let request_opt = rounds::pending_request_id(lottery_id);
         let request_id_from_view = test_utils::unwrap(&mut request_opt);
         assert!(request_id_from_view == request_id, 3);
 
@@ -328,7 +328,7 @@ module lottery::rounds_tests {
         assert!(event_next_ticket_id == 0, 8);
         assert!(option::is_none(&event_pending_opt), 9);
 
-        let mut snapshot_opt = rounds::get_round_snapshot(lottery_id);
+        let snapshot_opt = rounds::get_round_snapshot(lottery_id);
         let snapshot_values = test_utils::unwrap(&mut snapshot_opt);
         let (
             ticket_count,
@@ -348,7 +348,7 @@ module lottery::rounds_tests {
         assert!(treasury_v1::balance_of(buyer_addr) == 9_940, 15);
 
         assert!(treasury_v1::treasury_balance() == 60, 16);
-        let mut pool_opt = treasury_multi::get_pool(lottery_id);
+        let pool_opt = treasury_multi::get_pool(lottery_id);
         let pool = test_utils::unwrap(&mut pool_opt);
         let (prize_balance, operations_balance) =
             treasury_multi::pool_balances_for_test(&pool);
