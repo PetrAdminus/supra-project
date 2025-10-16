@@ -1,4 +1,3 @@
-
 #[test_only]
 module lottery::test_utils {
     use std::account;
@@ -15,7 +14,7 @@ module lottery::test_utils {
     }
 
     public fun unwrap<T>(o: &mut option::Option<T>): T {
-        assert!(option::is_some(&*o), 9);
+        assert!(option::is_some(o), 9);
         option::extract(o)
     }
 
