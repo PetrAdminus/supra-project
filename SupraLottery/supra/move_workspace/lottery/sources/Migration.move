@@ -165,21 +165,25 @@ module lottery::migration {
 
 
     fun record_snapshot(caller: &signer, snapshot: MigrationSnapshot) acquires MigrationLedger {
-        let state = ensure_ledger(caller);
+        ensure_ledger(caller);
         let lottery_id = snapshot.lottery_id;
-        table::add(&mut state.snapshots, lottery_id, snapshot);
-        record_lottery_id(&mut state.lottery_ids, lottery_id);
-        event::emit_event(
-            &mut state.snapshot_events,
-            MigrationSnapshotUpdatedEvent {
-                lottery_id,
-                snapshot: *table::borrow(&state.snapshots, lottery_id),
-            },
-        );
+        {
+            let state = borrow_global_mut<MigrationLedger>(@lottery);
+            table::add(&mut state.snapshots, lottery_id, snapshot);
+            record_lottery_id(&mut state.lottery_ids, lottery_id);
+            let snapshot_for_event = *table::borrow(&state.snapshots, lottery_id);
+            event::emit_event(
+                &mut state.snapshot_events,
+                MigrationSnapshotUpdatedEvent {
+                    lottery_id,
+                    snapshot: snapshot_for_event,
+                },
+            );
+        };
     }
 
 
-    fun ensure_ledger(caller: &signer): &mut MigrationLedger acquires MigrationLedger {
+    fun ensure_ledger(caller: &signer) acquires MigrationLedger {
         if (!exists<MigrationLedger>(@lottery)) {
             move_to(
                 caller,
@@ -190,8 +194,6 @@ module lottery::migration {
                 },
             );
         };
-        let state_ref = borrow_global_mut<MigrationLedger>(@lottery);
-        state_ref
     }
 
 
