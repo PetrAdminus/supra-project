@@ -4,6 +4,6 @@ module lottery::test_utils {
 
     public fun unwrap<T>(o: option::Option<T>): T {
         assert!(option::is_some(&o), 9);
-        *option::borrow(&o)
+        option::extract(o)
     }
 }
