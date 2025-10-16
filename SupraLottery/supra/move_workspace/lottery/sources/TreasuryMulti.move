@@ -4,7 +4,6 @@ module lottery::treasury_multi {
     friend lottery::referrals;
     friend lottery::rounds;
     friend lottery::store;
-    friend lottery::treasury_multi_tests;
     friend lottery::vip;
 
     use std::option;
@@ -359,6 +358,15 @@ module lottery::treasury_multi {
         ensure_initialized();
         let state = borrow_global_mut<TreasuryState>(@lottery);
         pay_operations_bonus_impl(state, lottery_id, recipient, amount);
+    }
+
+    #[test_only]
+    public fun pay_operations_bonus_for_tests(
+        lottery_id: u64,
+        recipient: address,
+        amount: u64,
+    ) acquires TreasuryState {
+        pay_operations_bonus_internal(lottery_id, recipient, amount);
     }
 
 

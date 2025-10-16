@@ -1879,3 +1879,43 @@ Output:
 General: {
   "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': While resolving dependency 'MoveStdlib' in package 'lottery': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_dev/aptos-move/framework/move-stdlib\""
 }
+Local: (2025-10-16 01:08:36.832333518 +00:00)	 Utc: (2025-10-16 01:08:36.832405909 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': While resolving dependency 'MoveStdlib' in package 'lottery': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_dev/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-16 01:09:25.977165166 +00:00)	 Utc: (2025-10-16 01:09:25.977340545 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: compilation failed"
+}
+Local: (2025-10-16 11:26:28.524832109 +00:00)	 Utc: (2025-10-16 11:26:28.525171557 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery': While resolving dependency 'MoveStdlib' in package 'lottery': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_dev/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-16 11:37:20.221568687 +00:00)	 Utc: (2025-10-16 11:37:20.221628253 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: compilation failed"
+}
+Local: (2025-10-16 12:04:42.600377757 +00:00)	 Utc: (2025-10-16 12:04:42.600443013 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}

@@ -329,7 +329,7 @@ module lottery::treasury_multi_tests {
         treasury_v1::deposit_from_user(payer, 400);
         treasury_multi::record_allocation(lottery_admin, 1, 400);
 
-        treasury_multi::pay_operations_bonus_internal(
+        treasury_multi::pay_operations_bonus_for_tests(
             1,
             signer::address_of(bonus_recipient),
             50,
@@ -359,7 +359,7 @@ module lottery::treasury_multi_tests {
             true,
         );
 
-        treasury_multi::pay_operations_bonus_internal(
+        treasury_multi::pay_operations_bonus_for_tests(
             1,
             signer::address_of(bonus_recipient),
             50,
