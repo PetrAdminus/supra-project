@@ -1,4 +1,4 @@
-import { Wallet, Globe, ChevronDown } from "lucide-react";
+import { Globe, ChevronDown, Menu, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState } from "react";
 import logoImage from "../assets/ba8a84f656f04b98f69152f497e1e1a3743c7fc3.png";
@@ -16,12 +16,10 @@ interface HeaderProps {
 }
 
 export function Header({ currentPage, onNavigate }: HeaderProps) {
-  const [isConnected, setIsConnected] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const { language, setLanguage, t } = useLanguage();
 
-  const handleConnect = () => {
-    setIsConnected(!isConnected);
-  };
+  const toggleMobile = () => setMobileOpen((v) => !v);
 
   const navItems = [
     { id: "home", label: t("home"), disabled: false },
@@ -81,9 +79,10 @@ export function Header({ currentPage, onNavigate }: HeaderProps) {
                   key={item.id}
                   type="button"
                   onClick={() => !item.disabled && onNavigate(item.id)}
-                  className={`transition-colors ${
-                    isActive ? "text-cyan-400" : baseStyles
-                  }`}
+                  className={[
+                    "transition-colors",
+                    isActive ? "text-cyan-400" : baseStyles,
+                  ].join(" ")}
                   aria-disabled={item.disabled}
                   tabIndex={item.disabled ? -1 : 0}
                 >
@@ -93,7 +92,7 @@ export function Header({ currentPage, onNavigate }: HeaderProps) {
             })}
           </nav>
 
-          {/* Right Side - Language Selector & Connect Wallet */}
+          {/* Right Side - Language Selector, Desktop CTA, Mobile Burger */}
           <div className="flex items-center gap-4">
             {/* Language Selector */}
             <DropdownMenu>
@@ -115,11 +114,12 @@ export function Header({ currentPage, onNavigate }: HeaderProps) {
                   <DropdownMenuItem
                     key={lang.code}
                     onClick={() => handleLanguageSelect(lang)}
-                    className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all ${
+                    className={[
+                      "flex items-center gap-3 px-4 py-2 rounded-lg transition-all",
                       language === lang.code
                         ? "bg-cyan-500/20 text-cyan-400"
-                        : "text-gray-300 hover:bg-white/10 hover:text-white"
-                    }`}
+                        : "text-gray-300 hover:bg-white/10 hover:text-white",
+                    ].join(" ")}
                   >
                     <span className="text-lg">{lang.flag}</span>
                     <span className="text-sm">{lang.name}</span>
@@ -130,20 +130,76 @@ export function Header({ currentPage, onNavigate }: HeaderProps) {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {/* Connect Wallet Button */}
+            {/* Connect Wallet (desktop only) */}
             <Button
-              disabled
-              onClick={handleConnect}
-              className="bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-white px-6 py-2 rounded-xl glow-cyan transition-all"
-              aria-disabled="true"
+              variant="default"
+              className="hidden md:flex items-center justify-center bg-gradient-to-r from-cyan-500 to-purple-600 text-white hover:from-cyan-400 hover:to-purple-500 rounded-xl px-4 py-2 shadow-[0_0_20px_rgba(56,189,248,0.25)]"
             >
-              <Wallet className="w-4 h-4 mr-2" />
-              {isConnected ? "0x1a2b...3c4d" : t("connectWallet")}
+              {t("connectWallet")}
             </Button>
+
+            {/* Burger (mobile only) */}
+            <div className="md:hidden">
+              <button
+                type="button"
+                aria-label="Toggle menu"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-xl glass border border-cyan-500/30"
+                onClick={toggleMobile}
+              >
+                {mobileOpen ? (
+                  <X className="w-5 h-5 text-white" />
+                ) : (
+                  <Menu className="w-5 h-5 text-white" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Mobile menu panel */}
+        {mobileOpen && (
+          <div className="md:hidden mt-4 rounded-xl border border-cyan-500/20 glass-strong bg-black/70 backdrop-blur-md overflow-hidden">
+            <nav className="flex flex-col">
+              {navItems.map((item) => {
+                const isActive = currentPage === item.id;
+                const baseStyles = item.disabled
+                  ? "text-gray-500 cursor-not-allowed"
+                  : "text-gray-300 hover:text-cyan-400";
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (!item.disabled) {
+                        onNavigate(item.id);
+                        setMobileOpen(false);
+                      }
+                    }}
+                    className={[
+                      "text-left px-4 py-3 transition-colors border-b border-white/5 last:border-0",
+                      isActive ? "text-cyan-400" : baseStyles,
+                    ].join(" ")}
+                    aria-disabled={item.disabled}
+                    tabIndex={item.disabled ? -1 : 0}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </nav>
+            <div className="p-4 border-t border-white/5">
+              <Button
+                className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white rounded-xl"
+              >
+                {t("connectWallet")}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );
 }
+
+
+

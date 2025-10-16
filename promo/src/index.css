@@ -694,9 +694,114 @@
     display: grid;
   }
 
-  .hidden {
+.hidden {
+  display: none;
+}
+
+@media (width >= 48rem) {
+  .md\:hidden {
     display: none;
   }
+}
+
+.pt-24 {
+  padding-top: 6rem;
+}
+
+@media (width >= 48rem) {
+  .md\:pt-28 {
+    padding-top: 7rem;
+  }
+}
+
+.bg-black\/70 {
+  background-color: rgb(0 0 0 / 0.7);
+}
+
+.backdrop-blur-md {
+  --tw-backdrop-blur: blur(12px);
+  -webkit-backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
+  backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
+}
+
+.shadow-\[0_0_20px_rgba\(56\,189\,248\,0\.25\)\] {
+  --tw-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
+  --tw-shadow-color: rgba(56, 189, 248, 0.25);
+  --tw-shadow-alpha: 100%;
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+
+.pb-24 {
+  padding-bottom: 6rem;
+}
+
+@media (width >= 48rem) {
+  .md\:pb-32 {
+    padding-bottom: 8rem;
+  }
+}
+
+.order-1 {
+  order: 1;
+}
+
+.order-2 {
+  order: 2;
+}
+
+.opacity-60 {
+  opacity: 0.6;
+}
+
+@media (width >= 26.25rem) {
+  .min-\[420px\]\:flex-row {
+    flex-direction: row;
+  }
+
+  .min-\[420px\]\:items-center {
+    align-items: center;
+  }
+
+  .min-\[420px\]\:justify-between {
+    justify-content: space-between;
+  }
+
+  .min-\[420px\]\:gap-6 {
+    gap: calc(var(--spacing) * 6);
+  }
+
+  .min-\[420px\]\:order-1 {
+    order: 1;
+  }
+
+  .min-\[420px\]\:order-2 {
+    order: 2;
+  }
+
+  .min-\[420px\]\:text-left {
+    text-align: left;
+  }
+
+  .min-\[420px\]\:opacity-40 {
+    opacity: 0.4;
+  }
+}
+
+@media (width >= 48rem) {
+  .md\:mt-0 {
+    margin-top: 0px;
+  }
+
+  .md\:text-right {
+    text-align: right;
+  }
+}
+
+@media (width >= 40rem) {
+  .sm\:gap-6 {
+    gap: calc(var(--spacing) * 6);
+  }
+}
 
   .inline-flex {
     display: inline-flex;

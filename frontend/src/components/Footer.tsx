@@ -45,7 +45,7 @@ export function Footer() {
                 <Send className="w-5 h-5 text-purple-400" />
               </a>
               <a
-                href="https://twitter.com/supra"
+                href="https://x.com/elyxs_lottery"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="glass w-12 h-12 rounded-xl flex items-center justify-center hover:bg-pink-500/20 hover:border-pink-400/50 transition-all glow-pink"

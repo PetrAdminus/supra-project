@@ -24,7 +24,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
       {/* Main content */}
       <div className="relative z-10">
         <Header currentPage={currentPage} onNavigate={onNavigate} />
-        <main className="min-h-screen">
+        <main className="min-h-screen pb-24 md:pb-32 pt-24 md:pt-28">
           {children}
         </main>
         <Footer />
@@ -32,3 +32,4 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
     </div>
   );
 }
+

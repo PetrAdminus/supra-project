@@ -1768,3 +1768,19 @@ Output:
 General: {
   "Error": "Unexpected error: Failed to run tests: Error parsing '[addresses]' section of manifest: Invalid address '{{supra_addr}}' encountered.: Hex characters are invalid: Invalid string length"
 }
+Local: (2025-10-15 09:17:06.009147599 +00:00)	 Utc: (2025-10-15 09:17:06.010284112 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to parse Move package manifest: TOML parse error at line 1, column 1\n  |\n1 | ../SupraLottery/supra/move_workspace/Move.toml\n  | ^\ninvalid key\n"
+}
+Local: (2025-10-15 09:38:20.700129052 +00:00)	 Utc: (2025-10-15 09:38:20.700446549 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to parse Move package manifest: TOML parse error at line 1, column 1\n  |\n1 | ../SupraLottery/supra/move_workspace/Move.toml\n  | ^\ninvalid key\n"
+}
