@@ -229,7 +229,7 @@ module lottery::rounds {
     ) acquires RoundCollection {
         ensure_admin(caller);
         let state = borrow_global_mut<RoundCollection>(@lottery);
-        let (request_id, request_event, snapshot) = {
+        let (_, request_event, snapshot) = {
             let round = ensure_round(state, lottery_id);
             if (!round.draw_scheduled) {
                 abort E_DRAW_NOT_SCHEDULED

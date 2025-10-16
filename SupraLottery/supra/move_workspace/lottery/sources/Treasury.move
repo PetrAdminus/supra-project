@@ -577,7 +577,7 @@ module lottery::treasury_v1 {
         VaultRecipientStatus,
         VaultRecipientStatus,
         VaultRecipientStatus,
-    ) acquires Vaults {
+    ) acquires TokenState, Vaults {
         let recipients = if (exists<Vaults>(@lottery)) {
             let vaults = borrow_global<Vaults>(@lottery);
             vaults.recipients
