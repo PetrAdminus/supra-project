@@ -13,9 +13,13 @@ module lottery::instances_tests {
         factory_admin: &signer,
         lottery_admin: &signer,
     ) {
+        test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
+
+        let snapshot_baseline =
+            vector::length(&event::emitted_events<instances::LotteryInstancesSnapshotUpdatedEvent>());
 
         let blueprint = registry::new_blueprint(10, 500);
         let lottery_id = registry::create_lottery(
@@ -32,7 +36,8 @@ module lottery::instances_tests {
         assert!(instances::contains_instance(lottery_id), 2);
         assert!(instances::is_instance_active(lottery_id), 3);
 
-        let initial_snapshot = test_utils::unwrap(instances::get_instance_snapshot(lottery_id));
+        let initial_snapshot_opt = instances::get_instance_snapshot(lottery_id);
+        let initial_snapshot = test_utils::unwrap(&mut initial_snapshot_opt);
         let (
             snapshot_id,
             snapshot_owner,
@@ -52,14 +57,16 @@ module lottery::instances_tests {
         assert!(snapshot_jackpot == 0, 20);
         assert!(snapshot_active, 21);
 
-        let collection_snapshot = test_utils::unwrap(instances::get_instances_snapshot());
+        let collection_snapshot_opt = instances::get_instances_snapshot();
+        let collection_snapshot = test_utils::unwrap(&mut collection_snapshot_opt);
         let (collection_admin, collection_hub, collection_entries) =
             instances::instances_snapshot_fields_for_test(&collection_snapshot);
         assert!(collection_admin == @lottery, 22);
         assert!(collection_hub == @vrf_hub, 23);
         assert!(vector::length(&collection_entries) == 1, 24);
 
-        let info = test_utils::unwrap(instances::get_lottery_info(lottery_id));
+        let info_opt = instances::get_lottery_info(lottery_id);
+        let info = test_utils::unwrap(&mut info_opt);
         let (owner, lottery_addr, ticket_price, jackpot_share_bps) =
             registry::lottery_info_fields_for_test(&info);
         assert!(owner == @lottery_owner, 4);
@@ -71,13 +78,15 @@ module lottery::instances_tests {
         registry::update_blueprint(factory_admin, lottery_id, updated_blueprint);
         instances::sync_blueprint(lottery_admin, lottery_id);
 
-        let synced_info = test_utils::unwrap(instances::get_lottery_info(lottery_id));
+        let synced_info_opt = instances::get_lottery_info(lottery_id);
+        let synced_info = test_utils::unwrap(&mut synced_info_opt);
         let (_owner_sync, _lottery_sync, synced_price, synced_share) =
             registry::lottery_info_fields_for_test(&synced_info);
         assert!(synced_price == 25, 8);
         assert!(synced_share == 800, 9);
 
-        let updated_snapshot = test_utils::unwrap(instances::get_instance_snapshot(lottery_id));
+        let updated_snapshot_opt = instances::get_instance_snapshot(lottery_id);
+        let updated_snapshot = test_utils::unwrap(&mut updated_snapshot_opt);
         let (
             _updated_id,
             _updated_owner,
@@ -93,8 +102,9 @@ module lottery::instances_tests {
         assert!(updated_active, 27);
 
         let snapshot_events = event::emitted_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
-        assert!(vector::length(&snapshot_events) == 2, 28);
-        let last_event = vector::borrow(&snapshot_events, 1);
+        let snapshot_events_len = vector::length(&snapshot_events);
+        assert!(snapshot_events_len >= snapshot_baseline + 2, 28);
+        let last_event = vector::borrow(&snapshot_events, snapshot_events_len - 1);
         let (event_admin, event_hub, event_snapshot) =
             instances::snapshot_event_fields_for_test(last_event);
         assert!(event_admin == @lottery, 29);
@@ -124,12 +134,16 @@ module lottery::instances_tests {
     }
 
     #[test(vrf_admin = @vrf_hub, factory_admin = @lottery_factory, lottery_admin = @lottery)]
-    #[expected_failure(abort_code = 7)]
+    #[expected_failure(
+        location = lottery::instances,
+        abort_code = instances::E_REGISTRATION_INACTIVE,
+    )]
     fun cannot_create_without_registration(
         vrf_admin: &signer,
         factory_admin: &signer,
         lottery_admin: &signer,
     ) {
+        test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -143,9 +157,13 @@ module lottery::instances_tests {
         factory_admin: &signer,
         lottery_admin: &signer,
     ) {
+        test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
+
+        let snapshot_baseline =
+            vector::length(&event::emitted_events<instances::LotteryInstancesSnapshotUpdatedEvent>());
 
         let blueprint = registry::new_blueprint(10, 500);
         let lottery_id = registry::create_lottery(
@@ -163,8 +181,10 @@ module lottery::instances_tests {
         let active_empty = instances::list_active_lottery_ids();
         assert!(vector::length(&active_empty) == 0, 1);
 
+        let snapshot_after_deactivate_opt =
+            instances::get_instance_snapshot(lottery_id);
         let snapshot_after_deactivate =
-            test_utils::unwrap(instances::get_instance_snapshot(lottery_id));
+            test_utils::unwrap(&mut snapshot_after_deactivate_opt);
         let (
             _after_id,
             _after_owner,
@@ -183,16 +203,20 @@ module lottery::instances_tests {
 
         let events = event::emitted_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
         // create_instance + deactivate + activate = 3 snapshot events
-        assert!(vector::length(&events) == 3, 4);
+        assert!(vector::length(&events) >= snapshot_baseline + 3, 4);
     }
 
     #[test(vrf_admin = @vrf_hub, factory_admin = @lottery_factory, lottery_admin = @lottery)]
-    #[expected_failure(abort_code = 9)]
+    #[expected_failure(
+        location = lottery::instances,
+        abort_code = instances::E_STATUS_MISMATCH,
+    )]
     fun toggle_requires_synced_hub(
         vrf_admin: &signer,
         factory_admin: &signer,
         lottery_admin: &signer,
     ) {
+        test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);

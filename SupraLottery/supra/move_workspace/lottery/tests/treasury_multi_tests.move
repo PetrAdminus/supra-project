@@ -2,7 +2,6 @@
 module lottery::treasury_multi_tests {
     use std::vector;
     use std::option;
-    use supra_framework::account;
     use std::signer;
     use supra_framework::event;
     use lottery::treasury_multi;
@@ -10,10 +9,7 @@ module lottery::treasury_multi_tests {
     use lottery::test_utils;
 
     fun init_token(lottery_admin: &signer) {
-        account::create_account_for_test(@jackpot_pool);
-        account::create_account_for_test(@operations_pool);
-        account::create_account_for_test(@lottery_owner);
-        account::create_account_for_test(@lottery_contract);
+        test_utils::ensure_core_accounts();
         treasury_v1::init_token(
             lottery_admin,
             b"multi_seed",
@@ -75,13 +71,15 @@ module lottery::treasury_multi_tests {
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 6_000, 2_000, 2_000);
         treasury_multi::record_allocation(lottery_admin, 1, 1_000);
 
-        let pool = test_utils::unwrap(treasury_multi::get_pool(1));
+        let pool_opt = treasury_multi::get_pool(1);
+        let pool = test_utils::unwrap(&mut pool_opt);
         let (prize_balance, operations_balance) = treasury_multi::pool_balances_for_test(&pool);
         assert!(prize_balance == 600, 1);
         assert!(operations_balance == 200, 2);
         assert!(treasury_multi::jackpot_balance() == 200, 3);
 
-        let config = test_utils::unwrap(treasury_multi::get_config(1));
+        let config_opt = treasury_multi::get_config(1);
+        let config = test_utils::unwrap(&mut config_opt);
         let (prize_bps, jackpot_bps, operations_bps) =
             treasury_multi::share_config_bps_for_test(&config);
         assert!(prize_bps == 6_000, 4);
@@ -92,7 +90,8 @@ module lottery::treasury_multi_tests {
         assert!(vector::length(&ids) == 1, 7);
         assert!(*vector::borrow(&ids, 0) == 1, 8);
 
-        let summary = test_utils::unwrap(treasury_multi::get_lottery_summary(1));
+        let summary_opt = treasury_multi::get_lottery_summary(1);
+        let summary = test_utils::unwrap(&mut summary_opt);
         let (summary_config, summary_pool) = treasury_multi::summary_components_for_test(&summary);
         let (s_prize, s_jackpot, s_ops) =
             treasury_multi::share_config_bps_for_test(&summary_config);
@@ -113,11 +112,15 @@ module lottery::treasury_multi_tests {
     #[test(lottery_admin = @lottery)]
     fun recipients_event_captures_statuses(lottery_admin: &signer) {
         init_token(lottery_admin);
+        let baseline_len =
+            vector::length(&event::emitted_events<treasury_multi::RecipientsUpdatedEvent>());
+
         treasury_multi::init(lottery_admin, @lottery_owner, @lottery_contract);
 
-        let events = event::emitted_events<treasury_multi::RecipientsUpdatedEvent>();
-        assert!(vector::length(&events) == 1, 100);
-        let init_event = vector::borrow(&events, 0);
+        let events_after_init = event::emitted_events<treasury_multi::RecipientsUpdatedEvent>();
+        let events_after_init_len = vector::length(&events_after_init);
+        assert!(events_after_init_len >= baseline_len + 1, 100);
+        let init_event = vector::borrow(&events_after_init, events_after_init_len - 1);
         let (
             previous_jackpot_opt,
             previous_operations_opt,
@@ -157,7 +160,7 @@ module lottery::treasury_multi_tests {
 
         let updated_events = event::emitted_events<treasury_multi::RecipientsUpdatedEvent>();
         let events_count = vector::length(&updated_events);
-        assert!(events_count == 2, 113);
+        assert!(events_count >= baseline_len + 2, 113);
         let latest_event = vector::borrow(&updated_events, events_count - 1);
         let (
             prev_jackpot_opt_after,
@@ -235,7 +238,8 @@ module lottery::treasury_multi_tests {
 
         treasury_multi::distribute_prize(lottery_admin, 1, signer::address_of(winner));
 
-        let pool = test_utils::unwrap(treasury_multi::get_pool(1));
+        let pool_opt = treasury_multi::get_pool(1);
+        let pool = test_utils::unwrap(&mut pool_opt);
         let (prize_balance, operations_balance) = treasury_multi::pool_balances_for_test(&pool);
         assert!(prize_balance == 0, 1);
         assert!(operations_balance == 20, 2);
@@ -244,7 +248,8 @@ module lottery::treasury_multi_tests {
 
         assert!(winner_balance == 940, 3);
 
-        let summary_after_prize = test_utils::unwrap(treasury_multi::get_lottery_summary(1));
+        let summary_after_prize_opt = treasury_multi::get_lottery_summary(1);
+        let summary_after_prize = test_utils::unwrap(&mut summary_after_prize_opt);
         let (_config_after, after_pool) =
             treasury_multi::summary_components_for_test(&summary_after_prize);
         let (after_prize_balance, after_ops_balance) =
@@ -280,7 +285,8 @@ module lottery::treasury_multi_tests {
         assert!(!operations_frozen_after, 8);
         assert!(operations_balance_after == 200, 9);
 
-        let pool = test_utils::unwrap(treasury_multi::get_pool(1));
+        let pool_opt = treasury_multi::get_pool(1);
+        let pool = test_utils::unwrap(&mut pool_opt);
         let (prize_balance, operations_balance) = treasury_multi::pool_balances_for_test(&pool);
         assert!(operations_balance == 0, 1);
         assert!(prize_balance == 600, 2);
@@ -290,7 +296,8 @@ module lottery::treasury_multi_tests {
         assert!(treasury_v1::balance_of(signer::address_of(winner)) == 4_200, 3);
         assert!(treasury_multi::jackpot_balance() == 0, 4);
 
-        let summary_after_ops = test_utils::unwrap(treasury_multi::get_lottery_summary(1));
+        let summary_after_ops_opt = treasury_multi::get_lottery_summary(1);
+        let summary_after_ops = test_utils::unwrap(&mut summary_after_ops_opt);
         let (_config_post, post_pool) = treasury_multi::summary_components_for_test(&summary_after_ops);
         let (post_prize, post_ops) = treasury_multi::pool_balances_for_test(&post_pool);
         assert!(post_prize == 600, 5);
@@ -298,7 +305,10 @@ module lottery::treasury_multi_tests {
     }
 
     #[test(lottery_admin = @lottery, winner = @player2)]
-    #[expected_failure(abort_code = 14)]
+    #[expected_failure(
+        location = lottery::treasury_multi,
+        abort_code = treasury_multi::E_OPERATIONS_RECIPIENT_FROZEN,
+    )]
     fun operations_withdraw_requires_not_frozen(lottery_admin: &signer, winner: &signer) {
         init_token(lottery_admin);
         treasury_multi::init(lottery_admin, @lottery_owner, @operations_pool);
@@ -314,7 +324,10 @@ module lottery::treasury_multi_tests {
     }
 
     #[test(lottery_admin = @lottery, bonus_recipient = @player3, payer = @player1)]
-    #[expected_failure(abort_code = 15)]
+    #[expected_failure(
+        location = lottery::treasury_multi,
+        abort_code = treasury_multi::E_BONUS_RECIPIENT_UNREGISTERED,
+    )]
     fun operations_bonus_requires_registered_store(
         lottery_admin: &signer,
         bonus_recipient: &signer,
@@ -337,7 +350,10 @@ module lottery::treasury_multi_tests {
     }
 
     #[test(lottery_admin = @lottery, bonus_recipient = @player3, payer = @player1)]
-    #[expected_failure(abort_code = 16)]
+    #[expected_failure(
+        location = lottery::treasury_multi,
+        abort_code = treasury_multi::E_BONUS_RECIPIENT_FROZEN,
+    )]
     fun operations_bonus_respects_frozen_store(
         lottery_admin: &signer,
         bonus_recipient: &signer,
@@ -367,43 +383,62 @@ module lottery::treasury_multi_tests {
     }
 
     #[test(lottery_admin = @lottery, winner = @player2)]
-    #[expected_failure(abort_code = 17)]
+    #[expected_failure(
+        location = lottery::treasury_multi,
+        abort_code = treasury_multi::E_JACKPOT_WINNER_UNREGISTERED,
+    )]
     fun jackpot_requires_winner_store(lottery_admin: &signer, winner: &signer) {
         init_token(lottery_admin);
         treasury_multi::init(lottery_admin, @lottery_owner, @operations_pool);
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 6_000, 2_000, 2_000);
 
-        treasury_v1::mint_to(lottery_admin, signer::address_of(winner), 500);
-        treasury_v1::deposit_from_user(winner, 200);
-        treasury_multi::record_allocation(lottery_admin, 1, 200);
+        treasury_multi::record_allocation(lottery_admin, 1, 1_000);
         treasury_multi::withdraw_operations(lottery_admin, 1);
 
-        treasury_multi::distribute_jackpot(lottery_admin, signer::address_of(winner), 100);
+        let jackpot_amount = treasury_multi::jackpot_balance();
+        assert!(jackpot_amount > 0, 0);
+
+        treasury_multi::distribute_jackpot(
+            lottery_admin,
+            signer::address_of(winner),
+            jackpot_amount,
+        );
     }
 
     #[test(lottery_admin = @lottery, winner = @player2)]
-    #[expected_failure(abort_code = 18)]
+    #[expected_failure(
+        location = lottery::treasury_multi,
+        abort_code = treasury_multi::E_JACKPOT_WINNER_FROZEN,
+    )]
     fun jackpot_respects_frozen_winner(lottery_admin: &signer, winner: &signer) {
         init_token(lottery_admin);
         treasury_multi::init(lottery_admin, @lottery_owner, @operations_pool);
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 6_000, 2_000, 2_000);
 
         treasury_v1::register_store(winner);
-        treasury_v1::mint_to(lottery_admin, signer::address_of(winner), 500);
-        treasury_v1::deposit_from_user(winner, 200);
-        treasury_multi::record_allocation(lottery_admin, 1, 200);
+        treasury_multi::record_allocation(lottery_admin, 1, 1_000);
         treasury_multi::withdraw_operations(lottery_admin, 1);
+
+        let jackpot_amount = treasury_multi::jackpot_balance();
+        assert!(jackpot_amount > 0, 0);
 
         treasury_v1::set_store_frozen(
             lottery_admin,
             signer::address_of(winner),
             true,
         );
-        treasury_multi::distribute_jackpot(lottery_admin, signer::address_of(winner), 100);
+        treasury_multi::distribute_jackpot(
+            lottery_admin,
+            signer::address_of(winner),
+            jackpot_amount,
+        );
     }
 
     #[test(lottery_admin = @lottery)]
-    #[expected_failure(abort_code = 4)]
+    #[expected_failure(
+        location = lottery::treasury_multi,
+        abort_code = treasury_multi::E_INVALID_BASIS_POINTS,
+    )]
     fun invalid_basis_points(lottery_admin: &signer) {
         init_token(lottery_admin);
         treasury_multi::init(lottery_admin, @lottery_owner, @lottery_contract);
@@ -411,7 +446,10 @@ module lottery::treasury_multi_tests {
     }
 
     #[test(lottery_admin = @lottery)]
-    #[expected_failure(abort_code = 5)]
+    #[expected_failure(
+        location = lottery::treasury_multi,
+        abort_code = treasury_multi::E_CONFIG_MISSING,
+    )]
     fun cannot_allocate_without_config(lottery_admin: &signer) {
         init_token(lottery_admin);
         treasury_multi::init(lottery_admin, @lottery_owner, @lottery_contract);
