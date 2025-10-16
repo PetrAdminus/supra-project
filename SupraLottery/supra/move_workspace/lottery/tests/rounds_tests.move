@@ -3,7 +3,6 @@ module lottery::rounds_tests {
     use std::vector;
     use std::option;
     use std::signer;
-    use std::account;
     use lottery::instances;
     use lottery::rounds;
     use lottery::treasury_multi;
@@ -14,8 +13,7 @@ module lottery::rounds_tests {
     use supra_framework::event;
 
     fun setup_token(lottery_admin: &signer, buyer: &signer) {
-        account::create_account_for_test(@jackpot_pool);
-        account::create_account_for_test(@operations_pool);
+        test_utils::ensure_core_accounts();
         treasury_v1::init_token(
             lottery_admin,
             b"rounds_seed",
@@ -43,6 +41,7 @@ module lottery::rounds_tests {
         lottery_admin: &signer,
         buyer: &signer,
     ) {
+        test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -63,16 +62,16 @@ module lottery::rounds_tests {
 
         rounds::buy_ticket(buyer, lottery_id);
 
-        let stats_opt = instances::get_instance_stats(lottery_id);
-        let stats_snapshot = test_utils::unwrap(stats_opt);
+        let mut stats_opt = instances::get_instance_stats(lottery_id);
+        let stats_snapshot = test_utils::unwrap(&mut stats_opt);
         let (tickets_sold, jackpot_accumulated, active) =
             instances::instance_stats_for_test(&stats_snapshot);
         assert!(tickets_sold == 1, 0);
         assert!(jackpot_accumulated == 20, 1);
         assert!(active, 2);
 
-        let snapshot_opt = rounds::get_round_snapshot(lottery_id);
-        let snapshot_data = test_utils::unwrap(snapshot_opt);
+        let mut snapshot_opt = rounds::get_round_snapshot(lottery_id);
+        let snapshot_data = test_utils::unwrap(&mut snapshot_opt);
         let (
             ticket_count,
             draw_scheduled,
@@ -105,8 +104,8 @@ module lottery::rounds_tests {
         assert!(event_next_ticket_id == 1, 13);
         assert!(option::is_none(&event_pending_id_opt), 14);
 
-        let pool_opt = treasury_multi::get_pool(lottery_id);
-        let pool_snapshot = test_utils::unwrap(pool_opt);
+        let mut pool_opt = treasury_multi::get_pool(lottery_id);
+        let pool_snapshot = test_utils::unwrap(&mut pool_opt);
         let (prize_balance, operations_balance) =
             treasury_multi::pool_balances_for_test(&pool_snapshot);
         assert!(prize_balance == 70, 15);
@@ -122,13 +121,17 @@ module lottery::rounds_tests {
         lottery_admin = @lottery,
         buyer = @player4,
     )]
-    #[expected_failure(abort_code = 12)]
+    #[expected_failure(
+        location = lottery::rounds,
+        abort_code = rounds::E_INSTANCE_INACTIVE,
+    )]
     fun cannot_buy_ticket_when_inactive(
         vrf_admin: &signer,
         factory_admin: &signer,
         lottery_admin: &signer,
         buyer: &signer,
     ) {
+        test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -165,6 +168,7 @@ module lottery::rounds_tests {
         lottery_admin: &signer,
         buyer: &signer,
     ) {
+        test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -186,7 +190,8 @@ module lottery::rounds_tests {
         rounds::buy_ticket(buyer, lottery_id);
         rounds::schedule_draw(lottery_admin, lottery_id);
 
-        let scheduled_snapshot = test_utils::unwrap(rounds::get_round_snapshot(lottery_id));
+        let mut scheduled_snapshot_opt = rounds::get_round_snapshot(lottery_id);
+        let scheduled_snapshot = test_utils::unwrap(&mut scheduled_snapshot_opt);
         let (
             _count_sched,
             is_scheduled,
@@ -198,7 +203,8 @@ module lottery::rounds_tests {
         assert!(option::is_none(&pending_sched_opt), 1);
 
         rounds::reset_round(lottery_admin, lottery_id);
-        let reset_snapshot = test_utils::unwrap(rounds::get_round_snapshot(lottery_id));
+        let mut reset_snapshot_opt = rounds::get_round_snapshot(lottery_id);
+        let reset_snapshot = test_utils::unwrap(&mut reset_snapshot_opt);
         let (
             ticket_count,
             draw_scheduled,
@@ -245,6 +251,7 @@ module lottery::rounds_tests {
         buyer: &signer,
         aggregator: &signer,
     ) {
+        test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -281,14 +288,14 @@ module lottery::rounds_tests {
             is_scheduled_after_request,
             has_pending_after_request,
             _next_after_request,
-            pending_request_opt,
+            mut pending_request_opt,
         ) = rounds::round_snapshot_fields_for_test(&request_snapshot);
         assert!(is_scheduled_after_request, 1);
         assert!(has_pending_after_request, 2);
-        let request_id = test_utils::unwrap(pending_request_opt);
+        let request_id = test_utils::unwrap(&mut pending_request_opt);
 
-        let request_opt = rounds::pending_request_id(lottery_id);
-        let request_id_from_view = test_utils::unwrap(request_opt);
+        let mut request_opt = rounds::pending_request_id(lottery_id);
+        let request_id_from_view = test_utils::unwrap(&mut request_opt);
         assert!(request_id_from_view == request_id, 3);
 
         let randomness = vector::empty<u8>();
@@ -321,8 +328,8 @@ module lottery::rounds_tests {
         assert!(event_next_ticket_id == 0, 8);
         assert!(option::is_none(&event_pending_opt), 9);
 
-        let snapshot_opt = rounds::get_round_snapshot(lottery_id);
-        let snapshot_values = test_utils::unwrap(snapshot_opt);
+        let mut snapshot_opt = rounds::get_round_snapshot(lottery_id);
+        let snapshot_values = test_utils::unwrap(&mut snapshot_opt);
         let (
             ticket_count,
             draw_scheduled,
@@ -341,7 +348,8 @@ module lottery::rounds_tests {
         assert!(treasury_v1::balance_of(buyer_addr) == 9_940, 15);
 
         assert!(treasury_v1::treasury_balance() == 60, 16);
-        let pool = test_utils::unwrap(treasury_multi::get_pool(lottery_id));
+        let mut pool_opt = treasury_multi::get_pool(lottery_id);
+        let pool = test_utils::unwrap(&mut pool_opt);
         let (prize_balance, operations_balance) =
             treasury_multi::pool_balances_for_test(&pool);
         assert!(prize_balance == 0, 17);
@@ -354,12 +362,16 @@ module lottery::rounds_tests {
         factory_admin = @lottery_factory,
         lottery_admin = @lottery,
     )]
-    #[expected_failure(abort_code = 7)]
+    #[expected_failure(
+        location = lottery::rounds,
+        abort_code = rounds::E_NO_TICKETS,
+    )]
     fun schedule_without_tickets_fails(
         vrf_admin: &signer,
         factory_admin: &signer,
         lottery_admin: &signer,
     ) {
+        test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);

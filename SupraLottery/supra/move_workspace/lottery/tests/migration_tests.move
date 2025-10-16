@@ -43,18 +43,18 @@ module lottery::migration_tests {
 
         migration::migrate_from_legacy(lottery, lottery_id, 9_000, 1_000, 0);
 
-        let stats_opt = instances::get_instance_stats(lottery_id);
+        let mut stats_opt = instances::get_instance_stats(lottery_id);
         assert!(option::is_some(&stats_opt), 0);
-        let stats = test_utils::unwrap(stats_opt);
+        let stats = test_utils::unwrap(&mut stats_opt);
         let (tickets_sold, jackpot_accumulated, active) =
             instances::instance_stats_for_test(&stats);
         assert!(tickets_sold == 2, tickets_sold);
         assert!(jackpot_accumulated == 0, jackpot_accumulated);
         assert!(active, 6);
 
-        let snapshot_opt = rounds::get_round_snapshot(lottery_id);
+        let mut snapshot_opt = rounds::get_round_snapshot(lottery_id);
         assert!(option::is_some(&snapshot_opt), 1);
-        let snapshot = test_utils::unwrap(snapshot_opt);
+        let snapshot = test_utils::unwrap(&mut snapshot_opt);
         let (
             ticket_count,
             draw_scheduled,
@@ -67,9 +67,9 @@ module lottery::migration_tests {
         assert!(!has_pending_request, 3);
         assert!(next_ticket_id == 2, next_ticket_id);
 
-        let pool_opt = treasury_multi::get_pool(lottery_id);
+        let mut pool_opt = treasury_multi::get_pool(lottery_id);
         assert!(option::is_some(&pool_opt), 4);
-        let pool = test_utils::unwrap(pool_opt);
+        let pool = test_utils::unwrap(&mut pool_opt);
         let (prize_balance, operations_balance) = treasury_multi::pool_balances_for_test(&pool);
         assert!(prize_balance == 500, prize_balance);
         assert!(operations_balance == 0, operations_balance);
@@ -83,9 +83,9 @@ module lottery::migration_tests {
         assert!(vector::length(&migrated_ids) == 1, 11);
         assert!(*vector::borrow(&migrated_ids, 0) == lottery_id, 12);
 
-        let snapshot_opt = migration::get_migration_snapshot(lottery_id);
+        let mut snapshot_opt = migration::get_migration_snapshot(lottery_id);
         assert!(option::is_some(&snapshot_opt), 13);
-        let snapshot = test_utils::unwrap(snapshot_opt);
+        let snapshot = test_utils::unwrap(&mut snapshot_opt);
         let (
             snapshot_lottery_id,
             snapshot_ticket_count,
@@ -145,7 +145,7 @@ module lottery::migration_tests {
     }
 
     #[test(lottery = @lottery)]
-    #[expected_failure(abort_code = migration::E_PENDING_REQUEST)]
+    #[expected_failure(location = lottery::migration, abort_code = migration::E_PENDING_REQUEST)]
     fun migration_rejects_pending_request(lottery: &signer) {
         setup_environment(lottery);
 
@@ -168,6 +168,7 @@ module lottery::migration_tests {
     }
 
     fun setup_environment(lottery: &signer) {
+        test_utils::ensure_core_accounts();
         if (!treasury_v1::is_initialized()) {
             treasury_v1::init_token(
                 lottery,

@@ -9,6 +9,7 @@ module lottery::nft_rewards_tests {
 
     #[test(admin = @lottery, owner = @0x123)]
     fun mint_flow(admin: &signer, owner: &signer) {
+        test_utils::ensure_core_accounts();
         nft_rewards::init(admin);
         let owner_addr = signer::address_of(owner);
         let metadata = b"ipfs://badge-1";
@@ -17,9 +18,9 @@ module lottery::nft_rewards_tests {
         let badges = nft_rewards::list_badges(owner_addr);
         assert!(vector::length(&badges) == 1, 1);
         assert!(*vector::borrow(&badges, 0) == 1, 2);
-        let info_opt = nft_rewards::get_badge(owner_addr, 1);
+        let mut info_opt = nft_rewards::get_badge(owner_addr, 1);
         assert!(option::is_some(&info_opt), 3);
-        let info = test_utils::unwrap(info_opt);
+        let info = test_utils::unwrap(&mut info_opt);
         let (lottery_id, draw_id, _metadata, minted_by) =
             nft_rewards::badge_fields_for_test(&info);
         assert!(lottery_id == 1, 4);
@@ -28,8 +29,12 @@ module lottery::nft_rewards_tests {
     }
 
     #[test(admin = @lottery, owner = @0x456)]
-    #[expected_failure(abort_code = 1)]
+    #[expected_failure(
+        location = lottery::nft_rewards,
+        abort_code = nft_rewards::E_NOT_AUTHORIZED,
+    )]
     fun non_admin_cannot_mint(admin: &signer, owner: &signer) {
+        test_utils::ensure_core_accounts();
         nft_rewards::init(admin);
         let owner_addr = signer::address_of(owner);
         nft_rewards::mint_badge(owner, owner_addr, 1, 1, vector::empty<u8>());
@@ -37,6 +42,7 @@ module lottery::nft_rewards_tests {
 
     #[test(admin = @lottery, owner = @0x789)]
     fun burn_by_owner(admin: &signer, owner: &signer) {
+        test_utils::ensure_core_accounts();
         nft_rewards::init(admin);
         let owner_addr = signer::address_of(owner);
         nft_rewards::mint_badge(admin, owner_addr, 2, 10, vector::empty<u8>());
@@ -46,6 +52,7 @@ module lottery::nft_rewards_tests {
 
     #[test(admin = @lottery, owner1 = @0xa11ce, owner2 = @0xb0b0)]
     fun snapshot_and_events(admin: &signer, owner1: &signer, owner2: &signer) {
+        test_utils::ensure_core_accounts();
         nft_rewards::init(admin);
         let owner1_addr = signer::address_of(owner1);
         let owner2_addr = signer::address_of(owner2);
@@ -60,9 +67,9 @@ module lottery::nft_rewards_tests {
         assert!(*vector::borrow(&owners, 0) == owner1_addr, 1);
         assert!(*vector::borrow(&owners, 1) == owner2_addr, 2);
 
-        let snapshot_opt = nft_rewards::get_snapshot();
+        let mut snapshot_opt = nft_rewards::get_snapshot();
         assert!(option::is_some(&snapshot_opt), 3);
-        let snapshot = test_utils::unwrap(snapshot_opt);
+        let snapshot = test_utils::unwrap(&mut snapshot_opt);
         let (snapshot_admin, next_badge_id, owner_snapshots) =
             nft_rewards::rewards_snapshot_fields_for_test(&snapshot);
         assert!(snapshot_admin == signer::address_of(admin), 4);
@@ -99,9 +106,9 @@ module lottery::nft_rewards_tests {
         assert!(second_minter == signer::address_of(admin), 21);
         assert!(vector::length(&second_metadata) == vector::length(&metadata2), 22);
 
-        let owner2_snapshot_opt = nft_rewards::get_owner_snapshot(owner2_addr);
+        let mut owner2_snapshot_opt = nft_rewards::get_owner_snapshot(owner2_addr);
         assert!(option::is_some(&owner2_snapshot_opt), 23);
-        let owner2_snapshot = test_utils::unwrap(owner2_snapshot_opt);
+        let owner2_snapshot = test_utils::unwrap(&mut owner2_snapshot_opt);
         let (owner2_from_view, owner2_badges) =
             nft_rewards::owner_snapshot_fields_for_test(&owner2_snapshot);
         assert!(owner2_from_view == owner2_addr, 24);
@@ -136,9 +143,9 @@ module lottery::nft_rewards_tests {
         assert!(burn_owner == owner1_addr, 34);
         assert!(vector::length(&burn_badges) == 0, 35);
 
-        let owner1_snapshot_opt = nft_rewards::get_owner_snapshot(owner1_addr);
+        let mut owner1_snapshot_opt = nft_rewards::get_owner_snapshot(owner1_addr);
         assert!(option::is_some(&owner1_snapshot_opt), 36);
-        let owner1_snapshot = test_utils::unwrap(owner1_snapshot_opt);
+        let owner1_snapshot = test_utils::unwrap(&mut owner1_snapshot_opt);
         let (_, owner1_badges_after) =
             nft_rewards::owner_snapshot_fields_for_test(&owner1_snapshot);
         assert!(vector::length(&owner1_badges_after) == 0, 37);

@@ -9,6 +9,7 @@ module lottery::lottery_tests {
     use std::vector;
     use lottery::main_v2;
     use lottery::treasury_v1;
+    use lottery::test_utils;
 
     const LOTTERY_ADDR: address = @lottery;
     const ADMIN: address = @0x1;
@@ -22,11 +23,11 @@ module lottery::lottery_tests {
     const TICKET_PRICE: u64 = 10_000_000;
     const DECIMALS: u8 = 9;
     const STORE_FROZEN_ABORT: u64 = 0x50003;
-    const MAX_GAS_PRICE: u128 = 100;
-    const MAX_GAS_LIMIT: u128 = 200;
-    const CALLBACK_GAS_PRICE: u128 = 10;
-    const CALLBACK_GAS_LIMIT: u128 = 40;
-    const VERIFICATION_GAS_VALUE: u128 = 50;
+    const MAX_GAS_PRICE: u128 = 1_000;
+    const MAX_GAS_LIMIT: u128 = 500_000;
+    const CALLBACK_GAS_PRICE: u128 = 100;
+    const CALLBACK_GAS_LIMIT: u128 = 150_000;
+    const VERIFICATION_GAS_VALUE: u128 = 25_000;
     const EXPECTED_GAS_ERROR: u64 = 16;
     const EXPECTED_CALLBACK_SOURCE_ERROR: u64 = 20;
     const DRAW_NOT_SCHEDULED_ERROR: u64 = 4;
@@ -67,6 +68,7 @@ module lottery::lottery_tests {
     const U64_MAX_AS_U128: u128 = 18446744073709551615;
 
     fun setup_accounts_base() {
+        test_utils::ensure_core_accounts();
         account::create_account_for_test(LOTTERY_ADDR);
         account::create_account_for_test(PLAYER1);
         account::create_account_for_test(PLAYER2);

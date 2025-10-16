@@ -2,7 +2,6 @@
 module lottery::jackpot_tests {
     use std::option;
     use std::vector;
-    use std::account;
     use std::signer;
     use supra_framework::event;
     use lottery::jackpot;
@@ -12,8 +11,7 @@ module lottery::jackpot_tests {
     use vrf_hub::hub;
 
     fun setup_token(lottery_admin: &signer, player1: &signer, player2: &signer) {
-        account::create_account_for_test(@jackpot_pool);
-        account::create_account_for_test(@operations_pool);
+        test_utils::ensure_core_accounts();
         treasury_v1::init_token(
             lottery_admin,
             b"jackpot_seed",
@@ -56,6 +54,7 @@ module lottery::jackpot_tests {
         player2: &signer,
         aggregator: &signer,
     ) {
+        test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         let lottery_id = hub::register_lottery(vrf_admin, @lottery_owner, @lottery_contract, b"jackpot");
         hub::set_callback_sender(vrf_admin, signer::address_of(aggregator));
@@ -77,11 +76,13 @@ module lottery::jackpot_tests {
         jackpot::schedule_draw(lottery_admin);
         jackpot::request_randomness(lottery_admin, b"global");
 
-        let request_id = test_utils::unwrap(jackpot::pending_request());
+        let mut request_id_opt = jackpot::pending_request();
+        let request_id = test_utils::unwrap(&mut request_id_opt);
         let randomness = build_randomness(1);
         jackpot::fulfill_draw(aggregator, request_id, randomness);
 
-        let snapshot = test_utils::unwrap(jackpot::get_snapshot());
+        let mut snapshot_opt = jackpot::get_snapshot();
+        let snapshot = test_utils::unwrap(&mut snapshot_opt);
         let (
             snapshot_admin,
             snapshot_lottery_id,
@@ -120,9 +121,9 @@ module lottery::jackpot_tests {
         assert!(option::is_none(&initial_pending_opt), 14);
 
         let request_event = vector::borrow(&snapshot_events, 4);
-        let (request_previous_opt, request_current) =
+        let (mut request_previous_opt, request_current) =
             jackpot::jackpot_snapshot_event_fields_for_test(request_event);
-        let request_previous = test_utils::unwrap(request_previous_opt);
+        let request_previous = test_utils::unwrap(&mut request_previous_opt);
         let (
             _prev_admin,
             _prev_lottery_id,
@@ -144,13 +145,14 @@ module lottery::jackpot_tests {
         ) = jackpot::jackpot_snapshot_fields_for_test(&request_current);
         assert!(req_draw_scheduled, 18);
         assert!(req_has_pending, 19);
-        let req_pending_id = test_utils::unwrap(req_pending_opt);
+        let mut req_pending_opt = req_pending_opt;
+        let req_pending_id = test_utils::unwrap(&mut req_pending_opt);
         assert!(req_pending_id == request_id, 20);
 
         let final_event = vector::borrow(&snapshot_events, 5);
-        let (final_previous_opt, final_current) =
+        let (mut final_previous_opt, final_current) =
             jackpot::jackpot_snapshot_event_fields_for_test(final_event);
-        let final_previous = test_utils::unwrap(final_previous_opt);
+        let final_previous = test_utils::unwrap(&mut final_previous_opt);
         let (
             _final_prev_admin,
             _final_prev_lottery_id,
@@ -161,7 +163,8 @@ module lottery::jackpot_tests {
         ) = jackpot::jackpot_snapshot_fields_for_test(&final_previous);
         assert!(final_prev_draw_scheduled, 21);
         assert!(final_prev_has_pending, 22);
-        let final_prev_pending_id = test_utils::unwrap(final_prev_pending_opt);
+        let mut final_prev_pending_opt = final_prev_pending_opt;
+        let final_prev_pending_id = test_utils::unwrap(&mut final_prev_pending_opt);
         assert!(final_prev_pending_id == request_id, 23);
         let (
             _final_admin,
@@ -189,7 +192,10 @@ module lottery::jackpot_tests {
         player2 = @player4,
         aggregator = @0x46,
     )]
-    #[expected_failure(abort_code = 11)]
+    #[expected_failure(
+        location = lottery::jackpot,
+        abort_code = jackpot::E_EMPTY_JACKPOT,
+    )]
     fun jackpot_requires_balance(
         vrf_admin: &signer,
         lottery_admin: &signer,
@@ -197,6 +203,7 @@ module lottery::jackpot_tests {
         player2: &signer,
         aggregator: &signer,
     ) {
+        test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         let lottery_id = hub::register_lottery(vrf_admin, @lottery_owner, @lottery_contract, b"jackpot-empty");
         hub::set_callback_sender(vrf_admin, signer::address_of(aggregator));
@@ -213,7 +220,8 @@ module lottery::jackpot_tests {
         jackpot::schedule_draw(lottery_admin);
         jackpot::request_randomness(lottery_admin, b"global");
 
-        let request_id = test_utils::unwrap(jackpot::pending_request());
+        let mut request_id_opt = jackpot::pending_request();
+        let request_id = test_utils::unwrap(&mut request_id_opt);
         let randomness = build_randomness(0);
         jackpot::fulfill_draw(aggregator, request_id, randomness);
     }
