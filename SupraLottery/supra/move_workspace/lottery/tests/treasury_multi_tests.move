@@ -2,7 +2,7 @@
 module lottery::treasury_multi_tests {
     use std::vector;
     use std::option;
-    use std::account;
+    use supra_framework::account;
     use std::signer;
     use supra_framework::event;
     use lottery::treasury_multi;

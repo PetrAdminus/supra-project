@@ -2,7 +2,8 @@
 module lottery::test_utils {
     use std::option;
 
-    public fun unwrap<T>(opt: option::Option<T>): T {
-        option::destroy_some(opt)
+    public fun unwrap<T>(o: option::Option<T>): T {
+        assert!(option::is_some(&o), 9);
+        *option::borrow(&o)
     }
 }
