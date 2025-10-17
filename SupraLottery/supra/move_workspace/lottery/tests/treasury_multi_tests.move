@@ -112,15 +112,11 @@ module lottery::treasury_multi_tests {
     #[test(lottery_admin = @lottery)]
     fun recipients_event_captures_statuses(lottery_admin: &signer) {
         init_token(lottery_admin);
-        let baseline_len =
-            vector::length(&event::emitted_events<treasury_multi::RecipientsUpdatedEvent>());
-
         treasury_multi::init(lottery_admin, @lottery_owner, @lottery_contract);
 
         let events_after_init = event::emitted_events<treasury_multi::RecipientsUpdatedEvent>();
-        let events_after_init_len = vector::length(&events_after_init);
-        assert!(events_after_init_len >= baseline_len + 1, 100);
-        let init_event = vector::borrow(&events_after_init, events_after_init_len - 1);
+        assert!(vector::length(&events_after_init) == 1, 100);
+        let init_event = vector::borrow(&events_after_init, 0);
         let (
             previous_jackpot_opt,
             previous_operations_opt,
@@ -160,7 +156,7 @@ module lottery::treasury_multi_tests {
 
         let updated_events = event::emitted_events<treasury_multi::RecipientsUpdatedEvent>();
         let events_count = vector::length(&updated_events);
-        assert!(events_count >= baseline_len + 2, 113);
+        assert!(events_count == 2, 113);
         let latest_event = vector::borrow(&updated_events, events_count - 1);
         let (
             prev_jackpot_opt_after,
@@ -392,6 +388,10 @@ module lottery::treasury_multi_tests {
         treasury_multi::init(lottery_admin, @lottery_owner, @operations_pool);
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 6_000, 2_000, 2_000);
 
+        treasury_v1::register_store(lottery_admin);
+        treasury_v1::mint_to(lottery_admin, signer::address_of(lottery_admin), 1_000);
+        treasury_v1::deposit_from_user(lottery_admin, 1_000);
+
         treasury_multi::record_allocation(lottery_admin, 1, 1_000);
         treasury_multi::withdraw_operations(lottery_admin, 1);
 
@@ -416,6 +416,9 @@ module lottery::treasury_multi_tests {
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 6_000, 2_000, 2_000);
 
         treasury_v1::register_store(winner);
+        treasury_v1::register_store(lottery_admin);
+        treasury_v1::mint_to(lottery_admin, signer::address_of(lottery_admin), 1_000);
+        treasury_v1::deposit_from_user(lottery_admin, 1_000);
         treasury_multi::record_allocation(lottery_admin, 1, 1_000);
         treasury_multi::withdraw_operations(lottery_admin, 1);
 

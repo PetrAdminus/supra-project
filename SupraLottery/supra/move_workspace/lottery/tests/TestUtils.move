@@ -5,7 +5,7 @@ module lottery::test_utils {
     use std::option;
     use std::timestamp;
 
-    const FRAMEWORK_ADDRESS: address = @0x1;
+    const FRAMEWORK_ADDRESS: address = @SupraFramework;
 
     public fun ensure_core_accounts() {
         account::create_account_for_test(FRAMEWORK_ADDRESS);

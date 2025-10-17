@@ -18,9 +18,6 @@ module lottery::instances_tests {
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
 
-        let snapshot_baseline =
-            vector::length(&event::emitted_events<instances::LotteryInstancesSnapshotUpdatedEvent>());
-
         let blueprint = registry::new_blueprint(10, 500);
         let lottery_id = registry::create_lottery(
             factory_admin,
@@ -102,9 +99,8 @@ module lottery::instances_tests {
         assert!(updated_active, 27);
 
         let snapshot_events = event::emitted_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= snapshot_baseline + 2, 28);
-        let last_event = vector::borrow(&snapshot_events, snapshot_events_len - 1);
+        assert!(vector::length(&snapshot_events) == 2, 28);
+        let last_event = vector::borrow(&snapshot_events, 1);
         let (event_admin, event_hub, event_snapshot) =
             instances::snapshot_event_fields_for_test(last_event);
         assert!(event_admin == @lottery, 29);
@@ -162,9 +158,6 @@ module lottery::instances_tests {
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
 
-        let snapshot_baseline =
-            vector::length(&event::emitted_events<instances::LotteryInstancesSnapshotUpdatedEvent>());
-
         let blueprint = registry::new_blueprint(10, 500);
         let lottery_id = registry::create_lottery(
             factory_admin,
@@ -203,7 +196,7 @@ module lottery::instances_tests {
 
         let events = event::emitted_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
         // create_instance + deactivate + activate = 3 snapshot events
-        assert!(vector::length(&events) >= snapshot_baseline + 3, 4);
+        assert!(vector::length(&events) == 3, 4);
     }
 
     #[test(vrf_admin = @vrf_hub, factory_admin = @lottery_factory, lottery_admin = @lottery)]

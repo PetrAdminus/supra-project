@@ -50,8 +50,6 @@ module lottery::history_tests {
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
         rounds::init(lottery_admin);
-        let snapshot_baseline =
-            vector::length(&event::emitted_events<history::HistorySnapshotUpdatedEvent>());
         history::init(lottery_admin);
         setup_token(lottery_admin, buyer);
         treasury_multi::init(lottery_admin, @jackpot_pool, @operations_pool);
@@ -135,9 +133,8 @@ module lottery::history_tests {
         assert!(vector::length(&snapshot_histories) == 1, 15);
 
         let snapshot_events = event::emitted_events<history::HistorySnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= snapshot_baseline + 2, 16);
-        let init_event = vector::borrow(&snapshot_events, snapshot_baseline);
+        assert!(vector::length(&snapshot_events) == 2, 16);
+        let init_event = vector::borrow(&snapshot_events, 0);
         let (init_previous, init_current) =
             history::history_snapshot_event_fields_for_test(init_event);
         assert!(option::is_none(&init_previous), 17);
@@ -147,8 +144,8 @@ module lottery::history_tests {
         assert!(vector::is_empty(&init_ids), 19);
         assert!(vector::is_empty(&init_histories), 20);
 
-        let draw_event = vector::borrow(&snapshot_events, snapshot_events_len - 1);
-        let (draw_previous_opt, draw_current) =
+        let draw_event = vector::borrow(&snapshot_events, 1);
+        let (mut draw_previous_opt, draw_current) =
             history::history_snapshot_event_fields_for_test(draw_event);
         let draw_previous = test_utils::unwrap(&mut draw_previous_opt);
         let (_, prev_ids, _) = history::history_snapshot_fields_for_test(&draw_previous);
@@ -186,8 +183,6 @@ module lottery::history_tests {
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
         rounds::init(lottery_admin);
-        let snapshot_baseline =
-            vector::length(&event::emitted_events<history::HistorySnapshotUpdatedEvent>());
         history::init(lottery_admin);
         setup_token(lottery_admin, buyer);
         treasury_multi::init(lottery_admin, @jackpot_pool, @operations_pool);
@@ -236,10 +231,9 @@ module lottery::history_tests {
         assert!(option::is_none(&latest_opt), 2);
 
         let snapshot_events = event::emitted_events<history::HistorySnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= snapshot_baseline + 3, 3);
-        let clear_event = vector::borrow(&snapshot_events, snapshot_events_len - 1);
-        let (clear_previous_opt, clear_current) =
+        assert!(vector::length(&snapshot_events) == 3, 3);
+        let clear_event = vector::borrow(&snapshot_events, 2);
+        let (mut clear_previous_opt, clear_current) =
             history::history_snapshot_event_fields_for_test(clear_event);
         let clear_previous = test_utils::unwrap(&mut clear_previous_opt);
         let (_, _, clear_prev_histories) =

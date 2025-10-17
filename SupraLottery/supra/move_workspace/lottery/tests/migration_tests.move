@@ -22,9 +22,6 @@ module lottery::migration_tests {
     ) {
         setup_environment(lottery);
 
-        let snapshot_baseline =
-            vector::length(&event::emitted_events<migration::MigrationSnapshotUpdatedEvent>());
-
         let metadata = vector::empty<u8>();
         let blueprint = registry::new_blueprint(100, 1_000);
         let lottery_id = registry::create_lottery(
@@ -116,7 +113,7 @@ module lottery::migration_tests {
 
         let snapshot_events = event::emitted_events<migration::MigrationSnapshotUpdatedEvent>();
         let events_len = vector::length(&snapshot_events);
-        assert!(events_len >= snapshot_baseline + 1, 18);
+        assert!(events_len >= 1, 18);
         let latest_event = vector::borrow(&snapshot_events, events_len - 1);
         let (event_lottery_id, event_snapshot) =
             migration::migration_snapshot_event_fields_for_test(latest_event);
