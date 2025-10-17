@@ -12,8 +12,6 @@ module lottery::instances_tests {
         factory_admin: &signer,
         lottery_admin: &signer,
     ) {
-        let _ =
-            test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
         test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
@@ -101,9 +99,8 @@ module lottery::instances_tests {
 
         let snapshot_events =
             test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 2, 28);
-        let last_event = test_utils::last_event_ref(&snapshot_events);
+        assert!(vector::length(&snapshot_events) == 2, 28);
+        let last_event = vector::borrow(&snapshot_events, 1);
         let (event_admin, event_hub, event_snapshot) =
             instances::snapshot_event_fields_for_test(last_event);
         assert!(event_admin == @lottery, 29);
@@ -156,8 +153,6 @@ module lottery::instances_tests {
         factory_admin: &signer,
         lottery_admin: &signer,
     ) {
-        let _ =
-            test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
         test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
@@ -202,7 +197,7 @@ module lottery::instances_tests {
         let events =
             test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
         // create_instance + deactivate + activate = 3 snapshot events
-        assert!(vector::length(&events) >= 3, 4);
+        assert!(vector::length(&events) == 3, 4);
     }
 
     #[test(vrf_admin = @vrf_hub, factory_admin = @lottery_factory, lottery_admin = @lottery)]

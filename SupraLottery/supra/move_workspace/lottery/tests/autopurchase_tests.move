@@ -70,8 +70,6 @@ module lottery::autopurchase_tests {
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
-        let _ = test_utils::drain_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
-
         autopurchase::configure_plan(buyer, lottery_id, 2, true);
         autopurchase::deposit(buyer, lottery_id, TICKET_PRICE * 3);
 
@@ -162,9 +160,8 @@ module lottery::autopurchase_tests {
 
         let snapshot_events =
             test_utils::drain_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 4, 45);
-        let last_event = test_utils::last_event_ref(&snapshot_events);
+        assert!(vector::length(&snapshot_events) == 4, 45);
+        let last_event = vector::borrow(&snapshot_events, 3);
         let (event_admin, event_snapshot) =
             autopurchase::autopurchase_snapshot_event_fields_for_test(last_event);
         assert!(event_admin == signer::address_of(lottery_admin), 46);
@@ -226,8 +223,6 @@ module lottery::autopurchase_tests {
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
-        let _ = test_utils::drain_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
-
         autopurchase::configure_plan(buyer, lottery_id, 1, true);
         autopurchase::deposit(buyer, lottery_id, 500);
 
@@ -248,9 +243,8 @@ module lottery::autopurchase_tests {
 
         let snapshot_events =
             test_utils::drain_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 3, 54);
-        let last_event = test_utils::last_event_ref(&snapshot_events);
+        assert!(vector::length(&snapshot_events) == 3, 54);
+        let last_event = vector::borrow(&snapshot_events, 2);
         let (event_admin, event_snapshot) =
             autopurchase::autopurchase_snapshot_event_fields_for_test(last_event);
         assert!(event_admin == signer::address_of(lottery_admin), 55);

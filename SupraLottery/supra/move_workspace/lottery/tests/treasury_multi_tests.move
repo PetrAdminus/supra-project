@@ -111,12 +111,11 @@ module lottery::treasury_multi_tests {
     #[test(lottery_admin = @lottery)]
     fun recipients_event_captures_statuses(lottery_admin: &signer) {
         init_token(lottery_admin);
-        let _ = test_utils::drain_events<treasury_multi::RecipientsUpdatedEvent>();
         treasury_multi::init(lottery_admin, @lottery_owner, @lottery_contract);
 
         let init_events =
             test_utils::drain_events<treasury_multi::RecipientsUpdatedEvent>();
-        assert!(vector::length(&init_events) >= 1, 100);
+        assert!(vector::length(&init_events) == 1, 100);
         let init_event = vector::borrow(&init_events, 0);
         let (
             previous_jackpot_opt,
@@ -157,8 +156,8 @@ module lottery::treasury_multi_tests {
 
         let events_after_update =
             test_utils::drain_events<treasury_multi::RecipientsUpdatedEvent>();
-        assert!(vector::length(&events_after_update) >= 1, 113);
-        let latest_event = test_utils::last_event_ref(&events_after_update);
+        assert!(vector::length(&events_after_update) == 1, 113);
+        let latest_event = vector::borrow(&events_after_update, 0);
         let (
             prev_jackpot_opt_after,
             prev_operations_opt_after,
@@ -381,23 +380,23 @@ module lottery::treasury_multi_tests {
 
     #[test(lottery_admin = @lottery, winner = @player2)]
     #[expected_failure(
-        location = lottery::treasury_v1,
-        abort_code = treasury_v1::E_STORE_NOT_REGISTERED,
+        location = lottery::treasury_multi,
+        abort_code = treasury_multi::E_JACKPOT_WINNER_UNREGISTERED,
     )]
     fun jackpot_requires_winner_store(lottery_admin: &signer, winner: &signer) {
         init_token(lottery_admin);
         treasury_multi::init(lottery_admin, @lottery_owner, @operations_pool);
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 6_000, 2_000, 2_000);
 
-        treasury_v1::register_store(lottery_admin);
-        treasury_v1::mint_to(lottery_admin, signer::address_of(lottery_admin), 2_000);
-        treasury_v1::deposit_from_user(lottery_admin, 1_000);
-        treasury_multi::record_allocation(lottery_admin, 1, 1_000);
+        treasury_v1::mint_to(lottery_admin, signer::address_of(winner), 500);
+        treasury_v1::deposit_from_user(winner, 200);
+        treasury_multi::record_allocation(lottery_admin, 1, 200);
+        treasury_multi::withdraw_operations(lottery_admin, 1);
 
-        treasury_multi::distribute_jackpot(lottery_admin, signer::address_of(winner), 50);
+        treasury_multi::distribute_jackpot(lottery_admin, signer::address_of(winner), 40);
     }
 
-    #[test(lottery_admin = @lottery, winner = @0x502)]
+    #[test(lottery_admin = @lottery, winner = @player2)]
     #[expected_failure(
         location = lottery::treasury_multi,
         abort_code = treasury_multi::E_JACKPOT_WINNER_FROZEN,
@@ -408,12 +407,10 @@ module lottery::treasury_multi_tests {
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 6_000, 2_000, 2_000);
 
         treasury_v1::register_store(winner);
-        treasury_v1::register_store(lottery_admin);
-        treasury_v1::mint_to(lottery_admin, @lottery, 5_000);
-
-        treasury_v1::mint_to(lottery_admin, signer::address_of(lottery_admin), 2_000);
-        treasury_v1::deposit_from_user(lottery_admin, 1_000);
-        treasury_multi::record_allocation(lottery_admin, 1, 1_000);
+        treasury_v1::mint_to(lottery_admin, signer::address_of(winner), 500);
+        treasury_v1::deposit_from_user(winner, 200);
+        treasury_multi::record_allocation(lottery_admin, 1, 200);
+        treasury_multi::withdraw_operations(lottery_admin, 1);
 
         treasury_v1::set_store_frozen(
             lottery_admin,
@@ -423,7 +420,7 @@ module lottery::treasury_multi_tests {
         treasury_multi::distribute_jackpot(
             lottery_admin,
             signer::address_of(winner),
-            1,
+            40,
         );
     }
 

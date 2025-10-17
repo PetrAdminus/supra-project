@@ -123,9 +123,8 @@ module lottery::referrals_tests {
 
         let snapshot_events =
             test_utils::drain_events<referrals::ReferralSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 1, 17);
-        let latest_snapshot = test_utils::last_event_ref(&snapshot_events);
+        assert!(vector::length(&snapshot_events) == 1, 17);
+        let latest_snapshot = vector::borrow(&snapshot_events, 0);
         let latest_previous_opt =
             referrals::referral_snapshot_event_previous_for_test(latest_snapshot);
         assert!(option::is_some(&latest_previous_opt), 18);

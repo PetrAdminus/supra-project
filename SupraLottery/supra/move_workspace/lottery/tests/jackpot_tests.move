@@ -101,8 +101,7 @@ module lottery::jackpot_tests {
 
         let snapshot_events =
             test_utils::drain_events<jackpot::JackpotSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 6, 7);
+        assert!(vector::length(&snapshot_events) == 6, 7);
 
         let initial_event = vector::borrow(&snapshot_events, 0);
         let (initial_previous_opt, initial_current) =

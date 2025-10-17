@@ -120,9 +120,8 @@ module lottery::nft_rewards_tests {
 
         let snapshot_events =
             test_utils::drain_events<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 2, 27);
-        let last_event = test_utils::last_event_ref(&snapshot_events);
+        assert!(vector::length(&snapshot_events) == 2, 27);
+        let last_event = vector::borrow(&snapshot_events, 1);
         let (event_admin, event_next_id, event_snapshot) =
             nft_rewards::snapshot_event_fields_for_test(last_event);
         assert!(event_admin == signer::address_of(admin), 28);
@@ -136,8 +135,8 @@ module lottery::nft_rewards_tests {
 
         let events_after_burn =
             test_utils::drain_events<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
-        assert!(vector::length(&events_after_burn) >= 1, 32);
-        let burn_event = test_utils::last_event_ref(&events_after_burn);
+        assert!(vector::length(&events_after_burn) == 3, 32);
+        let burn_event = vector::borrow(&events_after_burn, 2);
         let (_, burn_next_id, burn_snapshot) =
             nft_rewards::snapshot_event_fields_for_test(burn_event);
         assert!(burn_next_id == 3, 33);
