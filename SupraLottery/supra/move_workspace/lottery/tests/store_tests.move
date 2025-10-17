@@ -141,6 +141,8 @@ module lottery::store_tests {
         assert!(store_admin_before == signer::address_of(lottery_admin), 29);
         assert!(vector::length(&store_lotteries_before) == 1, 30);
 
+        let _ = test_utils::drain_events<store::StoreSnapshotUpdatedEvent>();
+
         store::set_admin(lottery_admin, @lottery_owner);
 
         let store_snapshot_after_opt = store::get_store_snapshot();

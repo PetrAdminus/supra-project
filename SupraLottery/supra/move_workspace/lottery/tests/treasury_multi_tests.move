@@ -311,8 +311,8 @@ module lottery::treasury_multi_tests {
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 6_000, 2_000, 2_000);
 
         treasury_v1::register_store(winner);
-        treasury_v1::mint_to(lottery_admin, signer::address_of(winner), 500);
-        treasury_v1::deposit_from_user(winner, 200);
+        treasury_v1::mint_to(lottery_admin, signer::address_of(lottery_admin), 500);
+        treasury_v1::deposit_from_user(lottery_admin, 200);
         treasury_multi::record_allocation(lottery_admin, 1, 200);
 
         treasury_v1::set_store_frozen(lottery_admin, @operations_pool, true);

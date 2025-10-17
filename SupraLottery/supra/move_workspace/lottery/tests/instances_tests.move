@@ -17,6 +17,8 @@ module lottery::instances_tests {
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
 
+        let _ = test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
+
         let blueprint = registry::new_blueprint(10, 500);
         let lottery_id = registry::create_lottery(
             factory_admin,
@@ -157,6 +159,8 @@ module lottery::instances_tests {
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
+
+        let _ = test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
 
         let blueprint = registry::new_blueprint(10, 500);
         let lottery_id = registry::create_lottery(

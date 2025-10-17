@@ -179,6 +179,7 @@ module lottery::history_tests {
         buyer: &signer,
         aggregator: &signer,
     ) {
+        let _ = test_utils::drain_events<history::HistorySnapshotUpdatedEvent>();
         test_utils::ensure_core_accounts();
         test_utils::ensure_time_started();
         hub::init(vrf_admin);

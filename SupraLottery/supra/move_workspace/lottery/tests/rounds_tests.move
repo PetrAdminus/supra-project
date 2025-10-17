@@ -59,6 +59,8 @@ module lottery::rounds_tests {
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
+        let _ = test_utils::drain_events<rounds::RoundSnapshotUpdatedEvent>();
+
         rounds::buy_ticket(buyer, lottery_id);
 
         let stats_opt = instances::get_instance_stats(lottery_id);
@@ -187,6 +189,8 @@ module lottery::rounds_tests {
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
+        let _ = test_utils::drain_events<rounds::RoundSnapshotUpdatedEvent>();
+
         rounds::buy_ticket(buyer, lottery_id);
         rounds::schedule_draw(lottery_admin, lottery_id);
 
@@ -270,6 +274,8 @@ module lottery::rounds_tests {
         );
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
+
+        let _ = test_utils::drain_events<rounds::RoundSnapshotUpdatedEvent>();
 
         rounds::buy_ticket(buyer, lottery_id);
         rounds::buy_ticket(buyer, lottery_id);

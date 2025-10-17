@@ -70,6 +70,8 @@ module lottery::autopurchase_tests {
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
+        let _ = test_utils::drain_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
+
         autopurchase::configure_plan(buyer, lottery_id, 2, true);
         autopurchase::deposit(buyer, lottery_id, TICKET_PRICE * 3);
 
@@ -222,6 +224,8 @@ module lottery::autopurchase_tests {
         let lottery_id = setup_lottery(vrf_admin, factory_admin, lottery_admin);
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
+
+        let _ = test_utils::drain_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
 
         autopurchase::configure_plan(buyer, lottery_id, 1, true);
         autopurchase::deposit(buyer, lottery_id, 500);

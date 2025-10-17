@@ -13,6 +13,7 @@ module lottery::operators_tests {
     ) {
         test_utils::ensure_core_accounts();
         operators::init(lottery_admin);
+        let _ = test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
         operators::set_owner(lottery_admin, 0, signer::address_of(owner));
 
         let owner_opt = operators::get_owner(0);
@@ -78,6 +79,7 @@ module lottery::operators_tests {
     ) {
         test_utils::ensure_core_accounts();
         operators::init(lottery_admin);
+        let _ = test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
         operators::set_owner(lottery_admin, 7, signer::address_of(owner));
 
         operators::grant_operator(owner, 7, signer::address_of(operator));
