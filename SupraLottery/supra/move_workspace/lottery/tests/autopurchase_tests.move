@@ -230,6 +230,9 @@ module lottery::autopurchase_tests {
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
+        let snapshot_events_baseline =
+            vector::length(&event::emitted_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>());
+
         autopurchase::configure_plan(buyer, lottery_id, 1, true);
         autopurchase::deposit(buyer, lottery_id, 500);
 

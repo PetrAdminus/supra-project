@@ -2,7 +2,6 @@
 module lottery::lottery_tests {
     use std::account;
     use supra_framework::event;
-    use std::timestamp;
     use std::option;
     use std::hash;
     use std::string;

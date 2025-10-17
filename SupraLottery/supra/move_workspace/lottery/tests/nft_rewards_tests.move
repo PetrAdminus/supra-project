@@ -61,6 +61,9 @@ module lottery::nft_rewards_tests {
         let metadata1 = b"badge-one";
         let metadata2 = b"badge-two";
 
+        let snapshot_baseline =
+            vector::length(&event::emitted_events<nft_rewards::NftRewardsSnapshotUpdatedEvent>());
+
         nft_rewards::mint_badge(admin, owner1_addr, 42, 7, metadata1);
         nft_rewards::mint_badge(admin, owner2_addr, 99, 3, metadata2);
 

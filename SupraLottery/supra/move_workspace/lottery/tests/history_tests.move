@@ -2,7 +2,6 @@
 module lottery::history_tests {
     use std::option;
     use std::vector;
-    use std::account;
     use std::signer;
     use supra_framework::event;
     use lottery::history;
