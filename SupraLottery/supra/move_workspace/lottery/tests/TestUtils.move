@@ -9,6 +9,7 @@ module lottery::test_utils {
 
     public fun ensure_core_accounts() {
         account::create_account_for_test(FRAMEWORK_ADDRESS);
+        ensure_time_started_internal();
         account::create_account_for_test(@lottery);
         account::create_account_for_test(@lottery_factory);
         account::create_account_for_test(@lottery_owner);
@@ -33,12 +34,7 @@ module lottery::test_utils {
 
     public fun ensure_time_started() {
         account::create_account_for_test(FRAMEWORK_ADDRESS);
-        let framework_signer = account::create_signer_for_test(FRAMEWORK_ADDRESS);
-        timestamp::set_time_has_started_for_testing(&framework_signer);
-        let current_time = timestamp::now_microseconds();
-        if (current_time < 1) {
-            timestamp::update_global_time_for_test(1);
-        };
+        ensure_time_started_internal();
     }
 
     public fun unwrap<T>(o: &mut option::Option<T>): T {
@@ -48,5 +44,14 @@ module lottery::test_utils {
     public fun unwrap_copy<T: copy>(o: &option::Option<T>): T {
         assert!(option::is_some(o), 9);
         *option::borrow(o)
+    }
+
+    fun ensure_time_started_internal() {
+        let framework_signer = account::create_signer_for_test(FRAMEWORK_ADDRESS);
+        timestamp::set_time_has_started_for_testing(&framework_signer);
+        let current_time = timestamp::now_microseconds();
+        if (current_time < 1) {
+            timestamp::update_global_time_for_test(1);
+        };
     }
 }
