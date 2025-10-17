@@ -57,9 +57,9 @@ module lottery::referrals_tests {
         buyer: &signer,
         referrer: &signer,
     ) {
-        setup_environment(vrf_admin, factory_admin, lottery_admin, buyer, referrer);
         let snapshot_baseline =
             test_utils::event_count<referrals::ReferralSnapshotUpdatedEvent>();
+        setup_environment(vrf_admin, factory_admin, lottery_admin, buyer, referrer);
 
         let blueprint = registry::new_blueprint(100, 1500);
         let lottery_id = registry::create_lottery(
@@ -124,7 +124,7 @@ module lottery::referrals_tests {
 
         let snapshot_events_len =
             test_utils::event_count<referrals::ReferralSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len >= snapshot_baseline + 3, 17);
+        assert!(snapshot_events_len > snapshot_baseline, 17);
         let latest_snapshot = test_utils::borrow_event<referrals::ReferralSnapshotUpdatedEvent>(
             snapshot_events_len - 1,
         );

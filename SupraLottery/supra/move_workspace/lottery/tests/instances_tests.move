@@ -12,9 +12,9 @@ module lottery::instances_tests {
         factory_admin: &signer,
         lottery_admin: &signer,
     ) {
-        test_utils::ensure_core_accounts();
         let snapshot_baseline =
             test_utils::event_count<instances::LotteryInstancesSnapshotUpdatedEvent>();
+        test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -102,9 +102,10 @@ module lottery::instances_tests {
         let snapshot_events_len =
             test_utils::event_count<instances::LotteryInstancesSnapshotUpdatedEvent>();
         assert!(snapshot_events_len >= snapshot_baseline + 2, 28);
-        let last_event = test_utils::borrow_event<instances::LotteryInstancesSnapshotUpdatedEvent>(
-            snapshot_events_len - 1,
-        );
+        let last_event =
+            test_utils::borrow_event<instances::LotteryInstancesSnapshotUpdatedEvent>(
+                snapshot_events_len - 1,
+            );
         let (event_admin, event_hub, event_snapshot) =
             instances::snapshot_event_fields_for_test(last_event);
         assert!(event_admin == @lottery, 29);
@@ -157,9 +158,9 @@ module lottery::instances_tests {
         factory_admin: &signer,
         lottery_admin: &signer,
     ) {
-        test_utils::ensure_core_accounts();
         let snapshot_baseline =
             test_utils::event_count<instances::LotteryInstancesSnapshotUpdatedEvent>();
+        test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -202,7 +203,7 @@ module lottery::instances_tests {
 
         let events_len =
             test_utils::event_count<instances::LotteryInstancesSnapshotUpdatedEvent>();
-        // create_instance + deactivate + activate = 3 new snapshot events
+        // create_instance + deactivate + activate = 3 snapshot events
         assert!(events_len >= snapshot_baseline + 3, 4);
     }
 

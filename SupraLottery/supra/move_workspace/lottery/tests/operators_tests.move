@@ -11,9 +11,9 @@ module lottery::operators_tests {
         owner: &signer,
         operator: &signer,
     ) {
-        test_utils::ensure_core_accounts();
         let snapshot_baseline =
             test_utils::event_count<operators::OperatorSnapshotUpdatedEvent>();
+        test_utils::ensure_core_accounts();
         operators::init(lottery_admin);
         operators::set_owner(lottery_admin, 0, signer::address_of(owner));
 
@@ -51,8 +51,9 @@ module lottery::operators_tests {
         let snapshot_events_len =
             test_utils::event_count<operators::OperatorSnapshotUpdatedEvent>();
         assert!(snapshot_events_len >= snapshot_baseline + 2, 11);
-        let initial_event =
-            test_utils::borrow_event<operators::OperatorSnapshotUpdatedEvent>(snapshot_baseline);
+        let initial_event = test_utils::borrow_event<operators::OperatorSnapshotUpdatedEvent>(
+            snapshot_baseline,
+        );
         let (
             initial_lottery,
             initial_owner_opt,
@@ -63,8 +64,9 @@ module lottery::operators_tests {
         assert!(initial_owner == signer::address_of(owner), 13);
         assert!(vector::length(&initial_operators) == 0, 14);
 
-        let grant_event =
-            test_utils::borrow_event<operators::OperatorSnapshotUpdatedEvent>(snapshot_baseline + 1);
+        let grant_event = test_utils::borrow_event<operators::OperatorSnapshotUpdatedEvent>(
+            snapshot_baseline + 1,
+        );
         let (grant_lottery, grant_owner_opt, grant_operators) =
             operators::operator_snapshot_event_fields_for_test(grant_event);
         assert!(grant_lottery == 0, 15);
@@ -80,9 +82,9 @@ module lottery::operators_tests {
         owner: &signer,
         operator: &signer,
     ) {
-        test_utils::ensure_core_accounts();
         let snapshot_baseline =
             test_utils::event_count<operators::OperatorSnapshotUpdatedEvent>();
+        test_utils::ensure_core_accounts();
         operators::init(lottery_admin);
         operators::set_owner(lottery_admin, 7, signer::address_of(owner));
 

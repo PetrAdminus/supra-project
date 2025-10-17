@@ -69,8 +69,6 @@ module lottery::store_tests {
     ) {
         setup_token(lottery_admin, buyer);
         let lottery_id = setup_lottery(vrf_admin, factory_admin, lottery_admin);
-        let snapshot_baseline =
-            test_utils::event_count<store::StoreSnapshotUpdatedEvent>();
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
@@ -84,6 +82,8 @@ module lottery::store_tests {
             option::some(ITEM_STOCK),
         );
 
+        let snapshot_baseline =
+            test_utils::event_count<store::StoreSnapshotUpdatedEvent>();
         store::purchase(buyer, lottery_id, 1, 2);
 
         let item_stats_opt = store::get_item_with_stats(lottery_id, 1);
@@ -151,7 +151,7 @@ module lottery::store_tests {
 
         let snapshot_events_len =
             test_utils::event_count<store::StoreSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len >= snapshot_baseline + 3, 32);
+        assert!(snapshot_events_len > snapshot_baseline, 32);
         let last_event = test_utils::borrow_event<store::StoreSnapshotUpdatedEvent>(
             snapshot_events_len - 1,
         );

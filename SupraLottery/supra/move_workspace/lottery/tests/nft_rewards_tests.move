@@ -10,8 +10,6 @@ module lottery::nft_rewards_tests {
     fun mint_flow(admin: &signer, owner: &signer) {
         test_utils::ensure_core_accounts();
         nft_rewards::init(admin);
-        let snapshot_baseline =
-            test_utils::event_count<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
         let owner_addr = signer::address_of(owner);
         let metadata = b"ipfs://badge-1";
         nft_rewards::mint_badge(admin, owner_addr, 1, 7, metadata);
@@ -53,6 +51,8 @@ module lottery::nft_rewards_tests {
 
     #[test(admin = @lottery, owner1 = @0xa11ce, owner2 = @0xb0b0)]
     fun snapshot_and_events(admin: &signer, owner1: &signer, owner2: &signer) {
+        let snapshot_baseline =
+            test_utils::event_count<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
         test_utils::ensure_core_accounts();
         nft_rewards::init(admin);
         let owner1_addr = signer::address_of(owner1);
@@ -134,12 +134,11 @@ module lottery::nft_rewards_tests {
         assert!(event_owner == owner2_addr, 30);
         assert!(vector::length(&event_badges) == 1, 31);
 
-        let burn_baseline = snapshot_events_len;
         nft_rewards::burn_badge(admin, owner1_addr, 1);
 
         let events_after_burn_len =
             test_utils::event_count<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
-        assert!(events_after_burn_len >= burn_baseline + 1, 32);
+        assert!(events_after_burn_len >= snapshot_baseline + 3, 32);
         let burn_event = test_utils::borrow_event<nft_rewards::NftRewardsSnapshotUpdatedEvent>(
             events_after_burn_len - 1,
         );

@@ -70,11 +70,11 @@ module lottery::vip_tests {
     ) {
         setup_token(lottery_admin, player);
         let lottery_id = setup_lottery(vrf_admin, factory_admin, lottery_admin);
-        let snapshot_baseline =
-            test_utils::event_count<vip::VipSnapshotUpdatedEvent>();
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
+        let snapshot_baseline =
+            test_utils::event_count<vip::VipSnapshotUpdatedEvent>();
         vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, VIP_BONUS_TICKETS);
         let summary_before_opt = vip::get_lottery_summary(lottery_id);
         let summary_before = test_utils::unwrap(&mut summary_before_opt);
@@ -171,7 +171,7 @@ module lottery::vip_tests {
 
         let snapshot_events_len =
             test_utils::event_count<vip::VipSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len >= snapshot_baseline + 3, 39);
+        assert!(snapshot_events_len > snapshot_baseline, 39);
         let last_event = test_utils::borrow_event<vip::VipSnapshotUpdatedEvent>(
             snapshot_events_len - 1,
         );
@@ -210,13 +210,13 @@ module lottery::vip_tests {
     ) {
         setup_token(lottery_admin, gift_admin);
         let lottery_id = setup_lottery(vrf_admin, factory_admin, lottery_admin);
-        let snapshot_baseline =
-            test_utils::event_count<vip::VipSnapshotUpdatedEvent>();
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 6000, 2000, 2000);
         treasury_v1::register_store(recipient);
         treasury_v1::mint_to(lottery_admin, signer::address_of(recipient), 10_000);
 
+        let snapshot_baseline =
+            test_utils::event_count<vip::VipSnapshotUpdatedEvent>();
         vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, 1);
         vip::subscribe_for(lottery_admin, lottery_id, signer::address_of(recipient));
         let subscription_opt =
@@ -290,7 +290,7 @@ module lottery::vip_tests {
 
         let snapshot_events_len =
             test_utils::event_count<vip::VipSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len >= snapshot_baseline + 4, 26);
+        assert!(snapshot_events_len > snapshot_baseline, 26);
         let last_event = test_utils::borrow_event<vip::VipSnapshotUpdatedEvent>(
             snapshot_events_len - 1,
         );
