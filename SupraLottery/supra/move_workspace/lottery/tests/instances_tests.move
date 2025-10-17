@@ -107,7 +107,7 @@ module lottery::instances_tests {
                 snapshot_events_len - 1,
             );
         let (event_admin, event_hub, event_snapshot) =
-            instances::snapshot_event_fields_for_test(last_event);
+            instances::snapshot_event_fields_for_test(&last_event);
         assert!(event_admin == @lottery, 29);
         assert!(event_hub == @vrf_hub, 30);
         let (

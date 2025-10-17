@@ -155,7 +155,7 @@ module lottery::store_tests {
         let last_event = test_utils::borrow_event<store::StoreSnapshotUpdatedEvent>(
             snapshot_events_len - 1,
         );
-        let (event_admin, event_snapshot) = store::store_snapshot_event_fields_for_test(last_event);
+        let (event_admin, event_snapshot) = store::store_snapshot_event_fields_for_test(&last_event);
         assert!(event_admin == @lottery_owner, 33);
         let (event_lottery_id, event_items) =
             store::store_lottery_snapshot_fields_for_test(&event_snapshot);

@@ -140,7 +140,7 @@ module lottery::history_tests {
             snapshot_baseline,
         );
         let (init_previous, init_current) =
-            history::history_snapshot_event_fields_for_test(init_event);
+            history::history_snapshot_event_fields_for_test(&init_event);
         assert!(option::is_none(&init_previous), 17);
         let (init_admin, init_ids, init_histories) =
             history::history_snapshot_fields_for_test(&init_current);
@@ -152,7 +152,7 @@ module lottery::history_tests {
             snapshot_events_len - 1,
         );
         let (draw_previous_opt, draw_current) =
-            history::history_snapshot_event_fields_for_test(draw_event);
+            history::history_snapshot_event_fields_for_test(&draw_event);
         assert!(option::is_some(&draw_previous_opt), 30);
         let draw_previous = option::borrow(&draw_previous_opt);
         let (_, prev_ids, _) = history::history_snapshot_fields_for_test(draw_previous);
@@ -246,7 +246,7 @@ module lottery::history_tests {
             snapshot_events_len - 1,
         );
         let (clear_previous_opt, clear_current) =
-            history::history_snapshot_event_fields_for_test(clear_event);
+            history::history_snapshot_event_fields_for_test(&clear_event);
         assert!(option::is_some(&clear_previous_opt), 31);
         let clear_previous = option::borrow(&clear_previous_opt);
         let (_, _, clear_prev_histories) =

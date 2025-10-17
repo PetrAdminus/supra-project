@@ -108,7 +108,7 @@ module lottery::jackpot_tests {
             snapshot_baseline,
         );
         let (initial_previous_opt, initial_current) =
-            jackpot::jackpot_snapshot_event_fields_for_test(initial_event);
+            jackpot::jackpot_snapshot_event_fields_for_test(&initial_event);
         assert!(option::is_none(&initial_previous_opt), 8);
         let (
             initial_admin,
@@ -129,7 +129,7 @@ module lottery::jackpot_tests {
             snapshot_baseline + 4,
         );
         let (request_previous_opt, request_current) =
-            jackpot::jackpot_snapshot_event_fields_for_test(request_event);
+            jackpot::jackpot_snapshot_event_fields_for_test(&request_event);
         assert!(option::is_some(&request_previous_opt), 32);
         let request_previous = option::borrow(&request_previous_opt);
         let (
@@ -162,7 +162,7 @@ module lottery::jackpot_tests {
             snapshot_baseline + 5,
         );
         let (final_previous_opt, final_current) =
-            jackpot::jackpot_snapshot_event_fields_for_test(final_event);
+            jackpot::jackpot_snapshot_event_fields_for_test(&final_event);
         assert!(option::is_some(&final_previous_opt), 34);
         let final_previous = option::borrow(&final_previous_opt);
         let (

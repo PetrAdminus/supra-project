@@ -168,7 +168,7 @@ module lottery::autopurchase_tests {
             snapshot_events_len - 1,
         );
         let (event_admin, event_snapshot) =
-            autopurchase::autopurchase_snapshot_event_fields_for_test(last_event);
+            autopurchase::autopurchase_snapshot_event_fields_for_test(&last_event);
         assert!(event_admin == signer::address_of(lottery_admin), 46);
         let (event_balance, event_players, event_active_players, event_player_snapshots) =
             autopurchase::lottery_snapshot_fields_for_test(&event_snapshot);
@@ -256,7 +256,7 @@ module lottery::autopurchase_tests {
             snapshot_events_len - 1,
         );
         let (event_admin, event_snapshot) =
-            autopurchase::autopurchase_snapshot_event_fields_for_test(last_event);
+            autopurchase::autopurchase_snapshot_event_fields_for_test(&last_event);
         assert!(event_admin == signer::address_of(lottery_admin), 55);
         let (event_balance, _, _, players) =
             autopurchase::lottery_snapshot_fields_for_test(&event_snapshot);

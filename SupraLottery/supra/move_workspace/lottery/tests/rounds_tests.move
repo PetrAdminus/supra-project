@@ -93,7 +93,7 @@ module lottery::rounds_tests {
             snapshot_events_len - 1,
         );
         let (event_lottery_id, event_snapshot) =
-            rounds::round_snapshot_event_fields_for_test(last_event);
+            rounds::round_snapshot_event_fields_for_test(&last_event);
         assert!(event_lottery_id == lottery_id, 9);
         let (
             event_ticket_count,
@@ -230,7 +230,7 @@ module lottery::rounds_tests {
             snapshot_baseline + 2,
         );
         let (event_lottery_id, event_snapshot) =
-            rounds::round_snapshot_event_fields_for_test(last_event);
+            rounds::round_snapshot_event_fields_for_test(&last_event);
         assert!(event_lottery_id == lottery_id, 7);
         let (
             event_ticket_count,
@@ -295,7 +295,7 @@ module lottery::rounds_tests {
             events_after_request_len - 1,
         );
         let (request_event_lottery, request_snapshot) =
-            rounds::round_snapshot_event_fields_for_test(request_event);
+            rounds::round_snapshot_event_fields_for_test(&request_event);
         assert!(request_event_lottery == lottery_id, 0);
         let (
             _tickets_after_request,
@@ -335,7 +335,7 @@ module lottery::rounds_tests {
             events_after_fulfill_len - 1,
         );
         let (fulfill_event_lottery, fulfill_snapshot) =
-            rounds::round_snapshot_event_fields_for_test(fulfill_event);
+            rounds::round_snapshot_event_fields_for_test(&fulfill_event);
         assert!(fulfill_event_lottery == lottery_id, 4);
         let (
             event_ticket_count,

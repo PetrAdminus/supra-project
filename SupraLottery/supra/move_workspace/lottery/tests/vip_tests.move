@@ -176,7 +176,7 @@ module lottery::vip_tests {
             snapshot_events_len - 1,
         );
         let (event_admin, event_snapshots) =
-            vip::vip_snapshot_event_fields_for_test(last_event);
+            vip::vip_snapshot_event_fields_for_test(&last_event);
         assert!(event_admin == signer::address_of(lottery_admin), 40);
         assert!(vector::length(&event_snapshots) == 1, 41);
         let event_snapshot = vector::borrow(&event_snapshots, 0);
@@ -295,7 +295,7 @@ module lottery::vip_tests {
             snapshot_events_len - 1,
         );
         let (_event_admin, event_snapshots) =
-            vip::vip_snapshot_event_fields_for_test(last_event);
+            vip::vip_snapshot_event_fields_for_test(&last_event);
         assert!(vector::length(&event_snapshots) == 1, 27);
         let event_entry = vector::borrow(&event_snapshots, 0);
         let (

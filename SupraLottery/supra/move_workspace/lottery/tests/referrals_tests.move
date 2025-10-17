@@ -128,9 +128,11 @@ module lottery::referrals_tests {
         let latest_snapshot = test_utils::borrow_event<referrals::ReferralSnapshotUpdatedEvent>(
             snapshot_events_len - 1,
         );
-        let latest_previous_opt = referrals::referral_snapshot_event_previous_for_test(latest_snapshot);
+        let latest_previous_opt =
+            referrals::referral_snapshot_event_previous_for_test(&latest_snapshot);
         assert!(option::is_some(&latest_previous_opt), 18);
-        let latest_snapshot_state = referrals::referral_snapshot_event_current_for_test(latest_snapshot);
+        let latest_snapshot_state =
+            referrals::referral_snapshot_event_current_for_test(&latest_snapshot);
         let latest_total_registered = referrals::referral_snapshot_total_registered(&latest_snapshot_state);
         assert!(latest_total_registered == 1, 19);
         let latest_count = referrals::referral_snapshot_lottery_count(&latest_snapshot_state);

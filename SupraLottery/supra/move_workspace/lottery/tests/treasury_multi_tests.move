@@ -125,7 +125,7 @@ module lottery::treasury_multi_tests {
             previous_operations_opt,
             next_jackpot_status,
             next_operations_status,
-        ) = treasury_multi::recipient_event_fields_for_test(init_event);
+        ) = treasury_multi::recipient_event_fields_for_test(&init_event);
         assert!(!option::is_some(&previous_jackpot_opt), 101);
         assert!(!option::is_some(&previous_operations_opt), 102);
 
@@ -168,7 +168,7 @@ module lottery::treasury_multi_tests {
             prev_operations_opt_after,
             next_jackpot_after,
             next_operations_after,
-        ) = treasury_multi::recipient_event_fields_for_test(latest_event);
+        ) = treasury_multi::recipient_event_fields_for_test(&latest_event);
         assert!(option::is_some(&prev_jackpot_opt_after), 114);
         assert!(option::is_some(&prev_operations_opt_after), 115);
 
