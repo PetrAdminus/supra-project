@@ -41,6 +41,9 @@ module lottery::migration_tests {
         main_v2::set_next_ticket_id_for_test(3);
         main_v2::set_pending_request_for_test(option::none());
 
+        let snapshot_events_baseline =
+            vector::length(&event::emitted_events<migration::MigrationSnapshotUpdatedEvent>());
+
         migration::migrate_from_legacy(lottery, lottery_id, 9_000, 1_000, 0);
 
         let stats_opt = instances::get_instance_stats(lottery_id);
@@ -113,7 +116,7 @@ module lottery::migration_tests {
 
         let snapshot_events = event::emitted_events<migration::MigrationSnapshotUpdatedEvent>();
         let events_len = vector::length(&snapshot_events);
-        assert!(events_len >= 1, 18);
+        assert!(events_len == snapshot_events_baseline + 1, 18);
         let latest_event = vector::borrow(&snapshot_events, events_len - 1);
         let (event_lottery_id, event_snapshot) =
             migration::migration_snapshot_event_fields_for_test(latest_event);

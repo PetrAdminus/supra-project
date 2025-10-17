@@ -42,6 +42,8 @@ module lottery::rounds_tests {
         buyer: &signer,
     ) {
         test_utils::ensure_core_accounts();
+        let snapshot_events_baseline =
+            vector::length(&event::emitted_events<rounds::RoundSnapshotUpdatedEvent>());
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -86,8 +88,9 @@ module lottery::rounds_tests {
         assert!(option::is_none(&pending_request_id_opt), 7);
 
         let snapshot_events = event::emitted_events<rounds::RoundSnapshotUpdatedEvent>();
-        assert!(vector::length(&snapshot_events) == 1, 8);
-        let last_event = vector::borrow(&snapshot_events, 0);
+        let snapshot_events_len = vector::length(&snapshot_events);
+        assert!(snapshot_events_len == snapshot_events_baseline + 1, 8);
+        let last_event = vector::borrow(&snapshot_events, snapshot_events_len - 1);
         let (event_lottery_id, event_snapshot) =
             rounds::round_snapshot_event_fields_for_test(last_event);
         assert!(event_lottery_id == lottery_id, 9);
@@ -132,6 +135,8 @@ module lottery::rounds_tests {
         buyer: &signer,
     ) {
         test_utils::ensure_core_accounts();
+        let snapshot_events_baseline =
+            vector::length(&event::emitted_events<rounds::RoundSnapshotUpdatedEvent>());
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -218,8 +223,9 @@ module lottery::rounds_tests {
         assert!(option::is_none(&pending_reset_opt), 5);
 
         let events = event::emitted_events<rounds::RoundSnapshotUpdatedEvent>();
-        assert!(vector::length(&events) == 3, 6);
-        let last_event = vector::borrow(&events, 2);
+        let events_len = vector::length(&events);
+        assert!(events_len == snapshot_events_baseline + 3, 6);
+        let last_event = vector::borrow(&events, events_len - 1);
         let (event_lottery_id, event_snapshot) =
             rounds::round_snapshot_event_fields_for_test(last_event);
         assert!(event_lottery_id == lottery_id, 7);
@@ -252,6 +258,8 @@ module lottery::rounds_tests {
         aggregator: &signer,
     ) {
         test_utils::ensure_core_accounts();
+        let snapshot_events_baseline =
+            vector::length(&event::emitted_events<rounds::RoundSnapshotUpdatedEvent>());
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -279,7 +287,8 @@ module lottery::rounds_tests {
         rounds::request_randomness(lottery_admin, lottery_id, b"payload");
         let events_after_request = event::emitted_events<rounds::RoundSnapshotUpdatedEvent>();
         let request_events_count = vector::length(&events_after_request);
-        assert!(request_events_count >= 1, 40);
+        let new_request_events = request_events_count - snapshot_events_baseline;
+        assert!(new_request_events >= 1, 40);
         let request_event = vector::borrow(&events_after_request, request_events_count - 1);
         let (request_event_lottery, request_snapshot) =
             rounds::round_snapshot_event_fields_for_test(request_event);
@@ -313,7 +322,8 @@ module lottery::rounds_tests {
 
         let events_after_fulfill = event::emitted_events<rounds::RoundSnapshotUpdatedEvent>();
         let events_after_fulfill_len = vector::length(&events_after_fulfill);
-        assert!(events_after_fulfill_len >= 1, 41);
+        let new_fulfill_events = events_after_fulfill_len - snapshot_events_baseline;
+        assert!(new_fulfill_events >= 2, 41);
         let fulfill_event = vector::borrow(&events_after_fulfill, events_after_fulfill_len - 1);
         let (fulfill_event_lottery, fulfill_snapshot) =
             rounds::round_snapshot_event_fields_for_test(fulfill_event);
