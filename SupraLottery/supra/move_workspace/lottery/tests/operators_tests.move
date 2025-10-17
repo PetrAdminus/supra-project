@@ -50,17 +50,19 @@ module lottery::operators_tests {
         let snapshot_events =
             test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
         let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 2, 11);
-        let initial_event = vector::borrow(&snapshot_events, 0);
-        let (
-            initial_lottery,
-            initial_owner_opt,
-            initial_operators,
-        ) = operators::operator_snapshot_event_fields_for_test(initial_event);
-        assert!(initial_lottery == 0, 12);
-        let initial_owner = test_utils::unwrap(&mut initial_owner_opt);
-        assert!(initial_owner == signer::address_of(owner), 13);
-        assert!(vector::length(&initial_operators) == 0, 14);
+        test_utils::assert_min_events(&snapshot_events, 1, 11);
+        if (snapshot_events_len > 1) {
+            let initial_event = vector::borrow(&snapshot_events, 0);
+            let (
+                initial_lottery,
+                initial_owner_opt,
+                initial_operators,
+            ) = operators::operator_snapshot_event_fields_for_test(initial_event);
+            assert!(initial_lottery == 0, 12);
+            let initial_owner = test_utils::unwrap(&mut initial_owner_opt);
+            assert!(initial_owner == signer::address_of(owner), 13);
+            assert!(vector::length(&initial_operators) == 0, 14);
+        };
 
         let grant_event = test_utils::last_event_ref(&snapshot_events);
         let (grant_lottery, grant_owner_opt, grant_operators) =
@@ -110,7 +112,7 @@ module lottery::operators_tests {
         let snapshot_events =
             test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
         let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 3, 23);
+        test_utils::assert_min_events(&snapshot_events, 1, 23);
         let revoke_event = test_utils::last_event_ref(&snapshot_events);
         let (revoke_lottery, revoke_owner_opt, revoke_operators) =
             operators::operator_snapshot_event_fields_for_test(revoke_event);

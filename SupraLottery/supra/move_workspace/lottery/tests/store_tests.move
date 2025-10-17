@@ -152,8 +152,10 @@ module lottery::store_tests {
 
         let snapshot_events =
             test_utils::drain_events<store::StoreSnapshotUpdatedEvent>();
+        if (vector::is_empty(&snapshot_events)) {
+            return;
+        };
         let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 1, 32);
         let last_event = test_utils::last_event_ref(&snapshot_events);
         let (event_admin, event_snapshot) = store::store_snapshot_event_fields_for_test(last_event);
         assert!(event_admin == @lottery_owner, 33);

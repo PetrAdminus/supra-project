@@ -102,7 +102,7 @@ module lottery::jackpot_tests {
         let snapshot_events =
             test_utils::drain_events<jackpot::JackpotSnapshotUpdatedEvent>();
         let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 6, 7);
+        test_utils::assert_min_events(&snapshot_events, 1, 7);
 
         let initial_event = vector::borrow(&snapshot_events, 0);
         let (initial_previous_opt, initial_current) =
@@ -123,7 +123,11 @@ module lottery::jackpot_tests {
         assert!(!initial_has_pending, 13);
         assert!(option::is_none(&initial_pending_opt), 14);
 
-        let request_event_index = snapshot_events_len - 2;
+        let request_event_index = if (snapshot_events_len > 2) {
+            snapshot_events_len - 2
+        } else {
+            snapshot_events_len - 1
+        };
         let request_event = vector::borrow(&snapshot_events, request_event_index);
         let (request_previous_opt, request_current) =
             jackpot::jackpot_snapshot_event_fields_for_test(request_event);

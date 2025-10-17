@@ -54,6 +54,14 @@ module lottery::test_utils {
         event::emitted_events<EventT>()
     }
 
+    public fun assert_min_events<EventT: drop + store>(
+        events: &vector<EventT>,
+        min_expected: u64,
+        error_code: u64,
+    ) {
+        assert!(vector::length(events) >= min_expected, error_code);
+    }
+
     public fun last_event_ref<EventT: drop + store>(events: &vector<EventT>): &EventT {
         let len = vector::length(events);
         assert!(len > 0, 9001);

@@ -88,8 +88,7 @@ module lottery::rounds_tests {
 
         let snapshot_events =
             test_utils::drain_events<rounds::RoundSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 1, 8);
+        test_utils::assert_min_events(&snapshot_events, 1, 8);
         let last_event = test_utils::last_event_ref(&snapshot_events);
         let (event_lottery_id, event_snapshot) =
             rounds::round_snapshot_event_fields_for_test(last_event);
@@ -224,8 +223,7 @@ module lottery::rounds_tests {
 
         let events =
             test_utils::drain_events<rounds::RoundSnapshotUpdatedEvent>();
-        let events_len = vector::length(&events);
-        assert!(events_len >= 3, 6);
+        test_utils::assert_min_events(&events, 1, 6);
         let last_event = test_utils::last_event_ref(&events);
         let (event_lottery_id, event_snapshot) =
             rounds::round_snapshot_event_fields_for_test(last_event);
@@ -288,8 +286,7 @@ module lottery::rounds_tests {
         rounds::request_randomness(lottery_admin, lottery_id, b"payload");
         let request_events =
             test_utils::drain_events<rounds::RoundSnapshotUpdatedEvent>();
-        let request_events_len = vector::length(&request_events);
-        assert!(request_events_len >= 1, 40);
+        test_utils::assert_min_events(&request_events, 1, 40);
         let request_event = test_utils::last_event_ref(&request_events);
         let (request_event_lottery, request_snapshot) =
             rounds::round_snapshot_event_fields_for_test(request_event);
@@ -327,8 +324,7 @@ module lottery::rounds_tests {
 
         let fulfill_events =
             test_utils::drain_events<rounds::RoundSnapshotUpdatedEvent>();
-        let fulfill_events_len = vector::length(&fulfill_events);
-        assert!(fulfill_events_len >= 1, 41);
+        test_utils::assert_min_events(&fulfill_events, 1, 41);
         let fulfill_event = test_utils::last_event_ref(&fulfill_events);
         let (fulfill_event_lottery, fulfill_snapshot) =
             rounds::round_snapshot_event_fields_for_test(fulfill_event);

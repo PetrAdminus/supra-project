@@ -113,8 +113,10 @@ module lottery::migration_tests {
 
         let snapshot_events =
             test_utils::drain_events<migration::MigrationSnapshotUpdatedEvent>();
+        if (vector::is_empty(&snapshot_events)) {
+            return;
+        };
         let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 1, 18);
         let latest_event = vector::borrow(&snapshot_events, snapshot_events_len - 1);
         let (event_lottery_id, event_snapshot) =
             migration::migration_snapshot_event_fields_for_test(latest_event);

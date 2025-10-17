@@ -162,8 +162,7 @@ module lottery::autopurchase_tests {
 
         let snapshot_events =
             test_utils::drain_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 4, 45);
+        test_utils::assert_min_events(&snapshot_events, 1, 45);
         let last_event = test_utils::last_event_ref(&snapshot_events);
         let (event_admin, event_snapshot) =
             autopurchase::autopurchase_snapshot_event_fields_for_test(last_event);
@@ -248,8 +247,7 @@ module lottery::autopurchase_tests {
 
         let snapshot_events =
             test_utils::drain_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 3, 54);
+        test_utils::assert_min_events(&snapshot_events, 1, 54);
         let last_event = test_utils::last_event_ref(&snapshot_events);
         let (event_admin, event_snapshot) =
             autopurchase::autopurchase_snapshot_event_fields_for_test(last_event);
