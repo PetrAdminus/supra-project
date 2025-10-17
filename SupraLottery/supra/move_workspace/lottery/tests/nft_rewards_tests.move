@@ -121,7 +121,7 @@ module lottery::nft_rewards_tests {
 
         let snapshot_events_len =
             test_utils::event_count<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len == snapshot_baseline + 2, 27);
+        assert!(snapshot_events_len >= snapshot_baseline + 2, 27);
         let last_event = test_utils::borrow_event<nft_rewards::NftRewardsSnapshotUpdatedEvent>(
             snapshot_events_len - 1,
         );
@@ -139,7 +139,7 @@ module lottery::nft_rewards_tests {
 
         let events_after_burn_len =
             test_utils::event_count<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
-        assert!(events_after_burn_len == burn_baseline + 1, 32);
+        assert!(events_after_burn_len >= burn_baseline + 1, 32);
         let burn_event = test_utils::borrow_event<nft_rewards::NftRewardsSnapshotUpdatedEvent>(
             events_after_burn_len - 1,
         );

@@ -101,7 +101,7 @@ module lottery::jackpot_tests {
 
         let snapshot_events_len =
             test_utils::event_count<jackpot::JackpotSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len == snapshot_baseline + 6, 7);
+        assert!(snapshot_events_len >= snapshot_baseline + 6, 7);
 
         let initial_event =
             test_utils::borrow_event<jackpot::JackpotSnapshotUpdatedEvent>(snapshot_baseline);

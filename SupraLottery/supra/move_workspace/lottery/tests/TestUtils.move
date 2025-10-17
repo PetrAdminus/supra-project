@@ -32,6 +32,8 @@ module lottery::test_utils {
         account::create_account_for_test(@0x789);
         account::create_account_for_test(@0xa11ce);
         account::create_account_for_test(@0xb0b0);
+        account::create_account_for_test(@0x501);
+        account::create_account_for_test(@0x502);
     }
 
     public fun ensure_time_started() {

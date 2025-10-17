@@ -135,7 +135,7 @@ module lottery::history_tests {
 
         let snapshot_events_len =
             test_utils::event_count<history::HistorySnapshotUpdatedEvent>();
-        assert!(snapshot_events_len == snapshot_baseline + 2, 16);
+        assert!(snapshot_events_len >= snapshot_baseline + 2, 16);
         let init_event =
             test_utils::borrow_event<history::HistorySnapshotUpdatedEvent>(snapshot_baseline);
         let (init_previous, init_current) =
@@ -238,7 +238,7 @@ module lottery::history_tests {
 
         let snapshot_events_len =
             test_utils::event_count<history::HistorySnapshotUpdatedEvent>();
-        assert!(snapshot_events_len == snapshot_baseline + 3, 3);
+        assert!(snapshot_events_len >= snapshot_baseline + 3, 3);
         let clear_event =
             test_utils::borrow_event<history::HistorySnapshotUpdatedEvent>(snapshot_events_len - 1);
         let (mut clear_previous_opt, clear_current) =

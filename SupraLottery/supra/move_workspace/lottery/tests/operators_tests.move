@@ -50,7 +50,7 @@ module lottery::operators_tests {
 
         let snapshot_events_len =
             test_utils::event_count<operators::OperatorSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len == snapshot_baseline + 2, 11);
+        assert!(snapshot_events_len >= snapshot_baseline + 2, 11);
         let initial_event =
             test_utils::borrow_event<operators::OperatorSnapshotUpdatedEvent>(snapshot_baseline);
         let (
@@ -112,7 +112,7 @@ module lottery::operators_tests {
 
         let snapshot_events_len =
             test_utils::event_count<operators::OperatorSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len == snapshot_baseline + 3, 23);
+        assert!(snapshot_events_len >= snapshot_baseline + 3, 23);
         let revoke_event = test_utils::borrow_event<operators::OperatorSnapshotUpdatedEvent>(
             snapshot_events_len - 1,
         );

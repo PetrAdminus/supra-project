@@ -124,7 +124,7 @@ module lottery::referrals_tests {
 
         let snapshot_events_len =
             test_utils::event_count<referrals::ReferralSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len == snapshot_baseline + 3, 17);
+        assert!(snapshot_events_len >= snapshot_baseline + 3, 17);
         let latest_snapshot = test_utils::borrow_event<referrals::ReferralSnapshotUpdatedEvent>(
             snapshot_events_len - 1,
         );

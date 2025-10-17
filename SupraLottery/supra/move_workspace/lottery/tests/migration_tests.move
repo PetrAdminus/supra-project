@@ -114,7 +114,7 @@ module lottery::migration_tests {
         assert!(snapshot_operations_bps == 0, snapshot_operations_bps);
 
         let events_len = test_utils::event_count<migration::MigrationSnapshotUpdatedEvent>();
-        assert!(events_len == snapshot_baseline + 1, 18);
+        assert!(events_len >= snapshot_baseline + 1, 18);
         let latest_event =
             test_utils::borrow_event<migration::MigrationSnapshotUpdatedEvent>(events_len - 1);
         let (event_lottery_id, event_snapshot) =

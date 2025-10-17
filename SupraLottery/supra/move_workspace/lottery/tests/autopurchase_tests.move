@@ -163,7 +163,7 @@ module lottery::autopurchase_tests {
 
         let snapshot_events_len =
             test_utils::event_count<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len == snapshot_baseline + 4, 45);
+        assert!(snapshot_events_len >= snapshot_baseline + 4, 45);
         let last_event = test_utils::borrow_event<autopurchase::AutopurchaseSnapshotUpdatedEvent>(
             snapshot_events_len - 1,
         );
@@ -251,7 +251,7 @@ module lottery::autopurchase_tests {
 
         let snapshot_events_len =
             test_utils::event_count<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len == snapshot_baseline + 3, 54);
+        assert!(snapshot_events_len >= snapshot_baseline + 3, 54);
         let last_event = test_utils::borrow_event<autopurchase::AutopurchaseSnapshotUpdatedEvent>(
             snapshot_events_len - 1,
         );

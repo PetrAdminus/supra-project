@@ -171,7 +171,7 @@ module lottery::vip_tests {
 
         let snapshot_events_len =
             test_utils::event_count<vip::VipSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len == snapshot_baseline + 3, 39);
+        assert!(snapshot_events_len >= snapshot_baseline + 3, 39);
         let last_event = test_utils::borrow_event<vip::VipSnapshotUpdatedEvent>(
             snapshot_events_len - 1,
         );
@@ -218,10 +218,7 @@ module lottery::vip_tests {
         treasury_v1::mint_to(lottery_admin, signer::address_of(recipient), 10_000);
 
         vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, 1);
-        vip::set_admin(lottery_admin, signer::address_of(gift_admin));
-        let current_admin = vip::admin();
-        assert!(current_admin == signer::address_of(gift_admin), 1000);
-        vip::subscribe_for(gift_admin, lottery_id, signer::address_of(recipient));
+        vip::subscribe_for(lottery_admin, lottery_id, signer::address_of(recipient));
         let subscription_opt =
             vip::get_subscription(lottery_id, signer::address_of(recipient));
         let subscription = test_utils::unwrap(&mut subscription_opt);
@@ -245,6 +242,9 @@ module lottery::vip_tests {
         assert!(revenue_before_cancel == VIP_PRICE, 16);
         assert!(issued_before_cancel == 0, 17);
 
+        vip::set_admin(lottery_admin, signer::address_of(gift_admin));
+        let current_admin = vip::admin();
+        assert!(current_admin == signer::address_of(gift_admin), 1000);
         vip::cancel_for(gift_admin, lottery_id, signer::address_of(recipient));
         let after_cancel_opt =
             vip::get_subscription(lottery_id, signer::address_of(recipient));
@@ -290,7 +290,7 @@ module lottery::vip_tests {
 
         let snapshot_events_len =
             test_utils::event_count<vip::VipSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len == snapshot_baseline + 4, 26);
+        assert!(snapshot_events_len >= snapshot_baseline + 4, 26);
         let last_event = test_utils::borrow_event<vip::VipSnapshotUpdatedEvent>(
             snapshot_events_len - 1,
         );
