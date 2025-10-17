@@ -57,8 +57,7 @@ module lottery::referrals_tests {
         buyer: &signer,
         referrer: &signer,
     ) {
-        let snapshot_baseline =
-            test_utils::event_count<referrals::ReferralSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<referrals::ReferralSnapshotUpdatedEvent>();
         setup_environment(vrf_admin, factory_admin, lottery_admin, buyer, referrer);
 
         let blueprint = registry::new_blueprint(100, 1500);
@@ -122,17 +121,16 @@ module lottery::referrals_tests {
         assert!(entry_total_referrer_rewards == 8, 15);
         assert!(entry_total_referee_rewards == 6, 16);
 
-        let snapshot_events_len =
-            test_utils::event_count<referrals::ReferralSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len > snapshot_baseline, 17);
-        let latest_snapshot = test_utils::borrow_event<referrals::ReferralSnapshotUpdatedEvent>(
-            snapshot_events_len - 1,
-        );
+        let snapshot_events =
+            test_utils::drain_events<referrals::ReferralSnapshotUpdatedEvent>();
+        let snapshot_events_len = vector::length(&snapshot_events);
+        assert!(snapshot_events_len >= 1, 17);
+        let latest_snapshot = test_utils::last_event_ref(&snapshot_events);
         let latest_previous_opt =
-            referrals::referral_snapshot_event_previous_for_test(&latest_snapshot);
+            referrals::referral_snapshot_event_previous_for_test(latest_snapshot);
         assert!(option::is_some(&latest_previous_opt), 18);
         let latest_snapshot_state =
-            referrals::referral_snapshot_event_current_for_test(&latest_snapshot);
+            referrals::referral_snapshot_event_current_for_test(latest_snapshot);
         let latest_total_registered = referrals::referral_snapshot_total_registered(&latest_snapshot_state);
         assert!(latest_total_registered == 1, 19);
         let latest_count = referrals::referral_snapshot_lottery_count(&latest_snapshot_state);

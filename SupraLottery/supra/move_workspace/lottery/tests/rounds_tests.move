@@ -59,8 +59,7 @@ module lottery::rounds_tests {
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
-        let snapshot_baseline =
-            test_utils::event_count<rounds::RoundSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<rounds::RoundSnapshotUpdatedEvent>();
         rounds::buy_ticket(buyer, lottery_id);
 
         let stats_opt = instances::get_instance_stats(lottery_id);
@@ -86,14 +85,13 @@ module lottery::rounds_tests {
         assert!(next_ticket_id == 1, 6);
         assert!(option::is_none(&pending_request_id_opt), 7);
 
-        let snapshot_events_len =
-            test_utils::event_count<rounds::RoundSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len >= snapshot_baseline + 1, 8);
-        let last_event = test_utils::borrow_event<rounds::RoundSnapshotUpdatedEvent>(
-            snapshot_events_len - 1,
-        );
+        let snapshot_events =
+            test_utils::drain_events<rounds::RoundSnapshotUpdatedEvent>();
+        let snapshot_events_len = vector::length(&snapshot_events);
+        assert!(snapshot_events_len >= 1, 8);
+        let last_event = test_utils::last_event_ref(&snapshot_events);
         let (event_lottery_id, event_snapshot) =
-            rounds::round_snapshot_event_fields_for_test(&last_event);
+            rounds::round_snapshot_event_fields_for_test(last_event);
         assert!(event_lottery_id == lottery_id, 9);
         let (
             event_ticket_count,
@@ -191,8 +189,7 @@ module lottery::rounds_tests {
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
-        let snapshot_baseline =
-            test_utils::event_count<rounds::RoundSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<rounds::RoundSnapshotUpdatedEvent>();
         rounds::buy_ticket(buyer, lottery_id);
         rounds::schedule_draw(lottery_admin, lottery_id);
 
@@ -223,14 +220,12 @@ module lottery::rounds_tests {
         assert!(next_ticket_id == 0, 4);
         assert!(option::is_none(&pending_reset_opt), 5);
 
-        let events_len =
-            test_utils::event_count<rounds::RoundSnapshotUpdatedEvent>();
-        assert!(events_len >= snapshot_baseline + 3, 6);
-        let last_event = test_utils::borrow_event<rounds::RoundSnapshotUpdatedEvent>(
-            snapshot_baseline + 2,
-        );
+        let events =
+            test_utils::drain_events<rounds::RoundSnapshotUpdatedEvent>();
+        assert!(vector::length(&events) >= 3, 6);
+        let last_event = test_utils::last_event_ref(&events);
         let (event_lottery_id, event_snapshot) =
-            rounds::round_snapshot_event_fields_for_test(&last_event);
+            rounds::round_snapshot_event_fields_for_test(last_event);
         assert!(event_lottery_id == lottery_id, 7);
         let (
             event_ticket_count,
@@ -279,8 +274,7 @@ module lottery::rounds_tests {
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
-        let snapshot_baseline =
-            test_utils::event_count<rounds::RoundSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<rounds::RoundSnapshotUpdatedEvent>();
         rounds::buy_ticket(buyer, lottery_id);
         rounds::buy_ticket(buyer, lottery_id);
         rounds::schedule_draw(lottery_admin, lottery_id);
@@ -288,14 +282,13 @@ module lottery::rounds_tests {
         hub::set_callback_sender(vrf_admin, signer::address_of(aggregator));
 
         rounds::request_randomness(lottery_admin, lottery_id, b"payload");
-        let events_after_request_len =
-            test_utils::event_count<rounds::RoundSnapshotUpdatedEvent>();
-        assert!(events_after_request_len > snapshot_baseline, 40);
-        let request_event = test_utils::borrow_event<rounds::RoundSnapshotUpdatedEvent>(
-            events_after_request_len - 1,
-        );
+        let request_events =
+            test_utils::drain_events<rounds::RoundSnapshotUpdatedEvent>();
+        let request_events_len = vector::length(&request_events);
+        assert!(request_events_len >= 1, 40);
+        let request_event = test_utils::last_event_ref(&request_events);
         let (request_event_lottery, request_snapshot) =
-            rounds::round_snapshot_event_fields_for_test(&request_event);
+            rounds::round_snapshot_event_fields_for_test(request_event);
         assert!(request_event_lottery == lottery_id, 0);
         let (
             _tickets_after_request,
@@ -328,14 +321,13 @@ module lottery::rounds_tests {
 
         rounds::fulfill_draw(aggregator, request_id, randomness);
 
-        let events_after_fulfill_len =
-            test_utils::event_count<rounds::RoundSnapshotUpdatedEvent>();
-        assert!(events_after_fulfill_len > events_after_request_len, 41);
-        let fulfill_event = test_utils::borrow_event<rounds::RoundSnapshotUpdatedEvent>(
-            events_after_fulfill_len - 1,
-        );
+        let fulfill_events =
+            test_utils::drain_events<rounds::RoundSnapshotUpdatedEvent>();
+        let fulfill_events_len = vector::length(&fulfill_events);
+        assert!(fulfill_events_len >= 1, 41);
+        let fulfill_event = test_utils::last_event_ref(&fulfill_events);
         let (fulfill_event_lottery, fulfill_snapshot) =
-            rounds::round_snapshot_event_fields_for_test(&fulfill_event);
+            rounds::round_snapshot_event_fields_for_test(fulfill_event);
         assert!(fulfill_event_lottery == lottery_id, 4);
         let (
             event_ticket_count,

@@ -82,8 +82,7 @@ module lottery::store_tests {
             option::some(ITEM_STOCK),
         );
 
-        let snapshot_baseline =
-            test_utils::event_count<store::StoreSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<store::StoreSnapshotUpdatedEvent>();
         store::purchase(buyer, lottery_id, 1, 2);
 
         let item_stats_opt = store::get_item_with_stats(lottery_id, 1);
@@ -149,12 +148,10 @@ module lottery::store_tests {
         let (store_admin_after, _) = store::store_snapshot_fields_for_test(&store_snapshot_after);
         assert!(store_admin_after == @lottery_owner, 31);
 
-        let snapshot_events_len =
-            test_utils::event_count<store::StoreSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len > snapshot_baseline, 32);
-        let last_event = test_utils::borrow_event<store::StoreSnapshotUpdatedEvent>(
-            snapshot_events_len - 1,
-        );
+        let snapshot_events =
+            test_utils::drain_events<store::StoreSnapshotUpdatedEvent>();
+        assert!(vector::length(&snapshot_events) >= 1, 32);
+        let last_event = test_utils::last_event_ref(&snapshot_events);
         let (event_admin, event_snapshot) = store::store_snapshot_event_fields_for_test(&last_event);
         assert!(event_admin == @lottery_owner, 33);
         let (event_lottery_id, event_items) =

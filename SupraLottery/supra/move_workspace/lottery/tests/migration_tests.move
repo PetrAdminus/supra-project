@@ -19,8 +19,7 @@ module lottery::migration_tests {
         lottery_owner: &signer,
         lottery_contract: &signer,
     ) {
-        let snapshot_baseline =
-            test_utils::event_count<migration::MigrationSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<migration::MigrationSnapshotUpdatedEvent>();
         setup_environment(lottery);
 
         let metadata = vector::empty<u8>();
@@ -112,15 +111,13 @@ module lottery::migration_tests {
         assert!(snapshot_jackpot_bps == 1_000, snapshot_jackpot_bps);
         assert!(snapshot_operations_bps == 0, snapshot_operations_bps);
 
-        let snapshot_events_len =
-            test_utils::event_count<migration::MigrationSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len > snapshot_baseline, 18);
-        let latest_event =
-            test_utils::borrow_event<migration::MigrationSnapshotUpdatedEvent>(
-                snapshot_events_len - 1,
-            );
+        let snapshot_events =
+            test_utils::drain_events<migration::MigrationSnapshotUpdatedEvent>();
+        let snapshot_events_len = vector::length(&snapshot_events);
+        assert!(snapshot_events_len >= 1, 18);
+        let latest_event = test_utils::last_event_ref(&snapshot_events);
         let (event_lottery_id, event_snapshot) =
-            migration::migration_snapshot_event_fields_for_test(&latest_event);
+            migration::migration_snapshot_event_fields_for_test(latest_event);
         assert!(event_lottery_id == lottery_id, 19);
         let (
             event_snapshot_lottery_id,

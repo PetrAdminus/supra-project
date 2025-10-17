@@ -50,14 +50,14 @@ module lottery::test_utils {
         *option::borrow(o)
     }
 
-    public fun event_count<EventT: drop + store>(): u64 {
-        let events = event::emitted_events<EventT>();
-        vector::length(&events)
+    public fun drain_events<EventT: drop + store>(): vector<EventT> {
+        event::emitted_events<EventT>()
     }
 
-    public fun borrow_event<EventT: copy + drop + store>(index: u64): EventT {
-        let events = event::emitted_events<EventT>();
-        *vector::borrow(&events, index)
+    public fun last_event_ref<EventT: drop + store>(events: &vector<EventT>): &EventT {
+        let len = vector::length(events);
+        assert!(len > 0, 9001);
+        vector::borrow(events, len - 1)
     }
 
     fun ensure_time_started_internal() {

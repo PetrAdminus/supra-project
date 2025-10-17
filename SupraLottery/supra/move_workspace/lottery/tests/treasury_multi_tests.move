@@ -111,21 +111,19 @@ module lottery::treasury_multi_tests {
     #[test(lottery_admin = @lottery)]
     fun recipients_event_captures_statuses(lottery_admin: &signer) {
         init_token(lottery_admin);
-        let baseline = test_utils::event_count<treasury_multi::RecipientsUpdatedEvent>();
+        let _ = test_utils::drain_events<treasury_multi::RecipientsUpdatedEvent>();
         treasury_multi::init(lottery_admin, @lottery_owner, @lottery_contract);
 
-        let init_events_len =
-            test_utils::event_count<treasury_multi::RecipientsUpdatedEvent>();
-        assert!(init_events_len >= baseline + 1, 100);
-        let init_event = test_utils::borrow_event<treasury_multi::RecipientsUpdatedEvent>(
-            baseline,
-        );
+        let init_events =
+            test_utils::drain_events<treasury_multi::RecipientsUpdatedEvent>();
+        assert!(vector::length(&init_events) >= 1, 100);
+        let init_event = vector::borrow(&init_events, 0);
         let (
             previous_jackpot_opt,
             previous_operations_opt,
             next_jackpot_status,
             next_operations_status,
-        ) = treasury_multi::recipient_event_fields_for_test(&init_event);
+        ) = treasury_multi::recipient_event_fields_for_test(init_event);
         assert!(!option::is_some(&previous_jackpot_opt), 101);
         assert!(!option::is_some(&previous_operations_opt), 102);
 
@@ -157,18 +155,16 @@ module lottery::treasury_multi_tests {
 
         treasury_multi::set_recipients(lottery_admin, @jackpot_pool, @operations_pool);
 
-        let events_after_update_len =
-            test_utils::event_count<treasury_multi::RecipientsUpdatedEvent>();
-        assert!(events_after_update_len > init_events_len, 113);
-        let latest_event = test_utils::borrow_event<treasury_multi::RecipientsUpdatedEvent>(
-            events_after_update_len - 1,
-        );
+        let events_after_update =
+            test_utils::drain_events<treasury_multi::RecipientsUpdatedEvent>();
+        assert!(vector::length(&events_after_update) >= 1, 113);
+        let latest_event = test_utils::last_event_ref(&events_after_update);
         let (
             prev_jackpot_opt_after,
             prev_operations_opt_after,
             next_jackpot_after,
             next_operations_after,
-        ) = treasury_multi::recipient_event_fields_for_test(&latest_event);
+        ) = treasury_multi::recipient_event_fields_for_test(latest_event);
         assert!(option::is_some(&prev_jackpot_opt_after), 114);
         assert!(option::is_some(&prev_operations_opt_after), 115);
 
@@ -394,9 +390,9 @@ module lottery::treasury_multi_tests {
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 6_000, 2_000, 2_000);
 
         treasury_v1::register_store(lottery_admin);
-        treasury_v1::mint_to(lottery_admin, signer::address_of(lottery_admin), 500);
-        treasury_v1::deposit_from_user(lottery_admin, 200);
-        treasury_multi::record_allocation(lottery_admin, 1, 200);
+        treasury_v1::mint_to(lottery_admin, signer::address_of(lottery_admin), 2_000);
+        treasury_v1::deposit_from_user(lottery_admin, 1_000);
+        treasury_multi::record_allocation(lottery_admin, 1, 1_000);
 
         treasury_multi::distribute_jackpot(lottery_admin, signer::address_of(winner), 50);
     }

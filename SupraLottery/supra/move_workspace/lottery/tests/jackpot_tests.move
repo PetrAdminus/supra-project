@@ -53,8 +53,7 @@ module lottery::jackpot_tests {
         player2: &signer,
         aggregator: &signer,
     ) {
-        let snapshot_baseline =
-            test_utils::event_count<jackpot::JackpotSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<jackpot::JackpotSnapshotUpdatedEvent>();
         test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         let lottery_id =
@@ -100,15 +99,14 @@ module lottery::jackpot_tests {
         assert!(!has_pending_request, 5);
         assert!(option::is_none(&pending_request_opt), 6);
 
-        let snapshot_events_len =
-            test_utils::event_count<jackpot::JackpotSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len >= snapshot_baseline + 6, 7);
+        let snapshot_events =
+            test_utils::drain_events<jackpot::JackpotSnapshotUpdatedEvent>();
+        let snapshot_events_len = vector::length(&snapshot_events);
+        assert!(snapshot_events_len >= 6, 7);
 
-        let initial_event = test_utils::borrow_event<jackpot::JackpotSnapshotUpdatedEvent>(
-            snapshot_baseline,
-        );
+        let initial_event = vector::borrow(&snapshot_events, 0);
         let (initial_previous_opt, initial_current) =
-            jackpot::jackpot_snapshot_event_fields_for_test(&initial_event);
+            jackpot::jackpot_snapshot_event_fields_for_test(initial_event);
         assert!(option::is_none(&initial_previous_opt), 8);
         let (
             initial_admin,
@@ -125,11 +123,9 @@ module lottery::jackpot_tests {
         assert!(!initial_has_pending, 13);
         assert!(option::is_none(&initial_pending_opt), 14);
 
-        let request_event = test_utils::borrow_event<jackpot::JackpotSnapshotUpdatedEvent>(
-            snapshot_baseline + 4,
-        );
+        let request_event = vector::borrow(&snapshot_events, 4);
         let (request_previous_opt, request_current) =
-            jackpot::jackpot_snapshot_event_fields_for_test(&request_event);
+            jackpot::jackpot_snapshot_event_fields_for_test(request_event);
         assert!(option::is_some(&request_previous_opt), 32);
         let request_previous = option::borrow(&request_previous_opt);
         let (
@@ -158,11 +154,9 @@ module lottery::jackpot_tests {
         let req_pending_id = *req_pending_id_ref;
         assert!(req_pending_id == request_id, 20);
 
-        let final_event = test_utils::borrow_event<jackpot::JackpotSnapshotUpdatedEvent>(
-            snapshot_baseline + 5,
-        );
+        let final_event = vector::borrow(&snapshot_events, 5);
         let (final_previous_opt, final_current) =
-            jackpot::jackpot_snapshot_event_fields_for_test(&final_event);
+            jackpot::jackpot_snapshot_event_fields_for_test(final_event);
         assert!(option::is_some(&final_previous_opt), 34);
         let final_previous = option::borrow(&final_previous_opt);
         let (

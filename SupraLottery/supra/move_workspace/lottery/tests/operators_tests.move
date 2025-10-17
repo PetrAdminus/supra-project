@@ -11,8 +11,7 @@ module lottery::operators_tests {
         owner: &signer,
         operator: &signer,
     ) {
-        let snapshot_baseline =
-            test_utils::event_count<operators::OperatorSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
         test_utils::ensure_core_accounts();
         operators::init(lottery_admin);
         operators::set_owner(lottery_admin, 0, signer::address_of(owner));
@@ -48,27 +47,23 @@ module lottery::operators_tests {
         assert!(vector::length(&lotteries) == 1, 4);
         assert!(*vector::borrow(&lotteries, 0) == 0, 5);
 
-        let snapshot_events_len =
-            test_utils::event_count<operators::OperatorSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len >= snapshot_baseline + 2, 11);
-        let initial_event = test_utils::borrow_event<operators::OperatorSnapshotUpdatedEvent>(
-            snapshot_baseline,
-        );
+        let snapshot_events =
+            test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
+        assert!(vector::length(&snapshot_events) >= 2, 11);
+        let initial_event = vector::borrow(&snapshot_events, 0);
         let (
             initial_lottery,
             initial_owner_opt,
             initial_operators,
-        ) = operators::operator_snapshot_event_fields_for_test(&initial_event);
+        ) = operators::operator_snapshot_event_fields_for_test(initial_event);
         assert!(initial_lottery == 0, 12);
         let initial_owner = test_utils::unwrap(&mut initial_owner_opt);
         assert!(initial_owner == signer::address_of(owner), 13);
         assert!(vector::length(&initial_operators) == 0, 14);
 
-        let grant_event = test_utils::borrow_event<operators::OperatorSnapshotUpdatedEvent>(
-            snapshot_baseline + 1,
-        );
+        let grant_event = vector::borrow(&snapshot_events, 1);
         let (grant_lottery, grant_owner_opt, grant_operators) =
-            operators::operator_snapshot_event_fields_for_test(&grant_event);
+            operators::operator_snapshot_event_fields_for_test(grant_event);
         assert!(grant_lottery == 0, 15);
         let grant_owner = test_utils::unwrap(&mut grant_owner_opt);
         assert!(grant_owner == signer::address_of(owner), 16);
@@ -82,8 +77,7 @@ module lottery::operators_tests {
         owner: &signer,
         operator: &signer,
     ) {
-        let snapshot_baseline =
-            test_utils::event_count<operators::OperatorSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
         test_utils::ensure_core_accounts();
         operators::init(lottery_admin);
         operators::set_owner(lottery_admin, 7, signer::address_of(owner));
@@ -112,14 +106,12 @@ module lottery::operators_tests {
         assert!(owner_after_revoke == signer::address_of(owner), 21);
         assert!(vector::length(&operators_after_revoke) == 0, 22);
 
-        let snapshot_events_len =
-            test_utils::event_count<operators::OperatorSnapshotUpdatedEvent>();
-        assert!(snapshot_events_len >= snapshot_baseline + 3, 23);
-        let revoke_event = test_utils::borrow_event<operators::OperatorSnapshotUpdatedEvent>(
-            snapshot_events_len - 1,
-        );
+        let snapshot_events =
+            test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
+        assert!(vector::length(&snapshot_events) >= 3, 23);
+        let revoke_event = test_utils::last_event_ref(&snapshot_events);
         let (revoke_lottery, revoke_owner_opt, revoke_operators) =
-            operators::operator_snapshot_event_fields_for_test(&revoke_event);
+            operators::operator_snapshot_event_fields_for_test(revoke_event);
         assert!(revoke_lottery == 7, 24);
         let revoke_owner = test_utils::unwrap(&mut revoke_owner_opt);
         assert!(revoke_owner == signer::address_of(owner), 25);
