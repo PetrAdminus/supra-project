@@ -139,7 +139,7 @@ module lottery::jackpot_tests {
             prev_draw_scheduled,
             prev_has_pending,
             prev_pending_opt,
-        ) = jackpot::jackpot_snapshot_fields_for_test(&request_previous);
+        ) = jackpot::jackpot_snapshot_fields_for_test(request_previous);
         assert!(prev_draw_scheduled, 15);
         assert!(!prev_has_pending, 16);
         assert!(option::is_none(&prev_pending_opt), 17);
@@ -172,7 +172,7 @@ module lottery::jackpot_tests {
             final_prev_draw_scheduled,
             final_prev_has_pending,
             final_prev_pending_opt,
-        ) = jackpot::jackpot_snapshot_fields_for_test(&final_previous);
+        ) = jackpot::jackpot_snapshot_fields_for_test(final_previous);
         assert!(final_prev_draw_scheduled, 21);
         assert!(final_prev_has_pending, 22);
         assert!(option::is_some(&final_prev_pending_opt), 35);

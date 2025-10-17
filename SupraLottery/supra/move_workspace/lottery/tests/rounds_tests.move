@@ -226,7 +226,9 @@ module lottery::rounds_tests {
         let events_len =
             test_utils::event_count<rounds::RoundSnapshotUpdatedEvent>();
         assert!(events_len >= snapshot_baseline + 3, 6);
-        let last_event = vector::borrow(&events, 2);
+        let last_event = test_utils::borrow_event<rounds::RoundSnapshotUpdatedEvent>(
+            snapshot_baseline + 2,
+        );
         let (event_lottery_id, event_snapshot) =
             rounds::round_snapshot_event_fields_for_test(last_event);
         assert!(event_lottery_id == lottery_id, 7);

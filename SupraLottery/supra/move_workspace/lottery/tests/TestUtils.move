@@ -50,11 +50,11 @@ module lottery::test_utils {
         *option::borrow(o)
     }
 
-    public fun event_count<EventT>(): u64 {
+    public fun event_count<EventT: drop + store>(): u64 {
         vector::length(&event::emitted_events<EventT>())
     }
 
-    public fun borrow_event<EventT>(index: u64): &EventT {
+    public fun borrow_event<EventT: drop + store>(index: u64): &EventT {
         vector::borrow(&event::emitted_events<EventT>(), index)
     }
 
