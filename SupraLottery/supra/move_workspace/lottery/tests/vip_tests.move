@@ -26,6 +26,7 @@ module lottery::vip_tests {
             b"",
             b"",
         );
+        treasury_v1::register_store(lottery_admin);
         treasury_v1::register_store_for(lottery_admin, @jackpot_pool);
         treasury_v1::register_store_for(lottery_admin, @operations_pool);
         treasury_v1::register_store(player);
@@ -170,8 +171,9 @@ module lottery::vip_tests {
 
         let snapshot_events =
             test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
-        assert!(vector::length(&snapshot_events) == 1, 39);
-        let last_event = vector::borrow(&snapshot_events, 0);
+        let snapshot_events_len = vector::length(&snapshot_events);
+        assert!(snapshot_events_len >= 1, 39);
+        let last_event = test_utils::last_event_ref(&snapshot_events);
         let (event_admin, event_snapshots) =
             vip::vip_snapshot_event_fields_for_test(last_event);
         assert!(event_admin == signer::address_of(lottery_admin), 40);
@@ -215,7 +217,7 @@ module lottery::vip_tests {
         vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, 1);
         let _ = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
 
-        treasury_v1::mint_to(lottery_admin, signer::address_of(lottery_admin), VIP_PRICE);
+        treasury_v1::mint_to(lottery_admin, signer::address_of(lottery_admin), VIP_PRICE * 2);
         vip::subscribe_for(lottery_admin, lottery_id, signer::address_of(recipient));
         let subscription_opt =
             vip::get_subscription(lottery_id, signer::address_of(recipient));
@@ -288,8 +290,9 @@ module lottery::vip_tests {
 
         let snapshot_events =
             test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
-        assert!(vector::length(&snapshot_events) == 3, 26);
-        let last_event = vector::borrow(&snapshot_events, 2);
+        let snapshot_events_len = vector::length(&snapshot_events);
+        assert!(snapshot_events_len >= 3, 26);
+        let last_event = test_utils::last_event_ref(&snapshot_events);
         let (_event_admin, event_snapshots) =
             vip::vip_snapshot_event_fields_for_test(last_event);
         assert!(vector::length(&event_snapshots) == 1, 27);

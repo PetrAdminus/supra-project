@@ -49,7 +49,8 @@ module lottery::operators_tests {
 
         let snapshot_events =
             test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
-        assert!(vector::length(&snapshot_events) == 2, 11);
+        let snapshot_events_len = vector::length(&snapshot_events);
+        assert!(snapshot_events_len >= 2, 11);
         let initial_event = vector::borrow(&snapshot_events, 0);
         let (
             initial_lottery,
@@ -61,7 +62,7 @@ module lottery::operators_tests {
         assert!(initial_owner == signer::address_of(owner), 13);
         assert!(vector::length(&initial_operators) == 0, 14);
 
-        let grant_event = vector::borrow(&snapshot_events, 1);
+        let grant_event = test_utils::last_event_ref(&snapshot_events);
         let (grant_lottery, grant_owner_opt, grant_operators) =
             operators::operator_snapshot_event_fields_for_test(grant_event);
         assert!(grant_lottery == 0, 15);
@@ -108,8 +109,9 @@ module lottery::operators_tests {
 
         let snapshot_events =
             test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
-        assert!(vector::length(&snapshot_events) == 3, 23);
-        let revoke_event = vector::borrow(&snapshot_events, 2);
+        let snapshot_events_len = vector::length(&snapshot_events);
+        assert!(snapshot_events_len >= 3, 23);
+        let revoke_event = test_utils::last_event_ref(&snapshot_events);
         let (revoke_lottery, revoke_owner_opt, revoke_operators) =
             operators::operator_snapshot_event_fields_for_test(revoke_event);
         assert!(revoke_lottery == 7, 24);

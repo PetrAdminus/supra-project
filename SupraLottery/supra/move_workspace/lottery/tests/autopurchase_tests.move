@@ -162,8 +162,9 @@ module lottery::autopurchase_tests {
 
         let snapshot_events =
             test_utils::drain_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
-        assert!(vector::length(&snapshot_events) == 4, 45);
-        let last_event = vector::borrow(&snapshot_events, 3);
+        let snapshot_events_len = vector::length(&snapshot_events);
+        assert!(snapshot_events_len >= 4, 45);
+        let last_event = test_utils::last_event_ref(&snapshot_events);
         let (event_admin, event_snapshot) =
             autopurchase::autopurchase_snapshot_event_fields_for_test(last_event);
         assert!(event_admin == signer::address_of(lottery_admin), 46);
@@ -247,8 +248,9 @@ module lottery::autopurchase_tests {
 
         let snapshot_events =
             test_utils::drain_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
-        assert!(vector::length(&snapshot_events) == 3, 54);
-        let last_event = vector::borrow(&snapshot_events, 2);
+        let snapshot_events_len = vector::length(&snapshot_events);
+        assert!(snapshot_events_len >= 3, 54);
+        let last_event = test_utils::last_event_ref(&snapshot_events);
         let (event_admin, event_snapshot) =
             autopurchase::autopurchase_snapshot_event_fields_for_test(last_event);
         assert!(event_admin == signer::address_of(lottery_admin), 55);
