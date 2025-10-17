@@ -3,16 +3,15 @@ module lottery::nft_rewards_tests {
     use std::option;
     use std::vector;
     use std::signer;
-    use supra_framework::event;
     use lottery::nft_rewards;
     use lottery::test_utils;
 
     #[test(admin = @lottery, owner = @0x123)]
     fun mint_flow(admin: &signer, owner: &signer) {
         test_utils::ensure_core_accounts();
-        let snapshot_baseline =
-            vector::length(&event::emitted_events<nft_rewards::NftRewardsSnapshotUpdatedEvent>());
         nft_rewards::init(admin);
+        let snapshot_baseline =
+            test_utils::event_count<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
         let owner_addr = signer::address_of(owner);
         let metadata = b"ipfs://badge-1";
         nft_rewards::mint_badge(admin, owner_addr, 1, 7, metadata);
@@ -120,10 +119,12 @@ module lottery::nft_rewards_tests {
             nft_rewards::badge_snapshot_fields_for_test(badge_from_view);
         assert!(view_badge_id == 2, 26);
 
-        let snapshot_events = event::emitted_events<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
+        let snapshot_events_len =
+            test_utils::event_count<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
         assert!(snapshot_events_len == snapshot_baseline + 2, 27);
-        let last_event = vector::borrow(&snapshot_events, snapshot_events_len - 1);
+        let last_event = test_utils::borrow_event<nft_rewards::NftRewardsSnapshotUpdatedEvent>(
+            snapshot_events_len - 1,
+        );
         let (event_admin, event_next_id, event_snapshot) =
             nft_rewards::snapshot_event_fields_for_test(last_event);
         assert!(event_admin == signer::address_of(admin), 28);
@@ -133,12 +134,15 @@ module lottery::nft_rewards_tests {
         assert!(event_owner == owner2_addr, 30);
         assert!(vector::length(&event_badges) == 1, 31);
 
+        let burn_baseline = snapshot_events_len;
         nft_rewards::burn_badge(admin, owner1_addr, 1);
 
-        let events_after_burn = event::emitted_events<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
-        let events_after_burn_len = vector::length(&events_after_burn);
-        assert!(events_after_burn_len == snapshot_baseline + 3, 32);
-        let burn_event = vector::borrow(&events_after_burn, events_after_burn_len - 1);
+        let events_after_burn_len =
+            test_utils::event_count<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
+        assert!(events_after_burn_len == burn_baseline + 1, 32);
+        let burn_event = test_utils::borrow_event<nft_rewards::NftRewardsSnapshotUpdatedEvent>(
+            events_after_burn_len - 1,
+        );
         let (_, burn_next_id, burn_snapshot) =
             nft_rewards::snapshot_event_fields_for_test(burn_event);
         assert!(burn_next_id == 3, 33);

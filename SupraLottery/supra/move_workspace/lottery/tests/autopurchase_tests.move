@@ -2,7 +2,6 @@
 module lottery::autopurchase_tests {
     use std::vector;
     use std::signer;
-    use supra_framework::event;
     use lottery::autopurchase;
     use lottery::instances;
     use lottery::rounds;
@@ -71,8 +70,8 @@ module lottery::autopurchase_tests {
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
-        let snapshot_events_baseline =
-            vector::length(&event::emitted_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>());
+        let snapshot_baseline =
+            test_utils::event_count<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
 
         autopurchase::configure_plan(buyer, lottery_id, 2, true);
         autopurchase::deposit(buyer, lottery_id, TICKET_PRICE * 3);
@@ -162,10 +161,12 @@ module lottery::autopurchase_tests {
         assert!(treasury_multi::jackpot_balance() == 60, 7);
         assert!(treasury_v1::balance_of(@player1) == 20_000 - (TICKET_PRICE * 3), 8);
 
-        let snapshot_events = event::emitted_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len == snapshot_events_baseline + 4, 45);
-        let last_event = vector::borrow(&snapshot_events, snapshot_events_len - 1);
+        let snapshot_events_len =
+            test_utils::event_count<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
+        assert!(snapshot_events_len == snapshot_baseline + 4, 45);
+        let last_event = test_utils::borrow_event<autopurchase::AutopurchaseSnapshotUpdatedEvent>(
+            snapshot_events_len - 1,
+        );
         let (event_admin, event_snapshot) =
             autopurchase::autopurchase_snapshot_event_fields_for_test(last_event);
         assert!(event_admin == signer::address_of(lottery_admin), 46);
@@ -227,8 +228,8 @@ module lottery::autopurchase_tests {
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
-        let snapshot_events_baseline =
-            vector::length(&event::emitted_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>());
+        let snapshot_baseline =
+            test_utils::event_count<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
 
         autopurchase::configure_plan(buyer, lottery_id, 1, true);
         autopurchase::deposit(buyer, lottery_id, 500);
@@ -248,10 +249,12 @@ module lottery::autopurchase_tests {
         let (total_balance, _, _) = autopurchase::summary_fields_for_test(&summary);
         assert!(total_balance == 380, 2);
 
-        let snapshot_events = event::emitted_events<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len == snapshot_events_baseline + 3, 54);
-        let last_event = vector::borrow(&snapshot_events, snapshot_events_len - 1);
+        let snapshot_events_len =
+            test_utils::event_count<autopurchase::AutopurchaseSnapshotUpdatedEvent>();
+        assert!(snapshot_events_len == snapshot_baseline + 3, 54);
+        let last_event = test_utils::borrow_event<autopurchase::AutopurchaseSnapshotUpdatedEvent>(
+            snapshot_events_len - 1,
+        );
         let (event_admin, event_snapshot) =
             autopurchase::autopurchase_snapshot_event_fields_for_test(last_event);
         assert!(event_admin == signer::address_of(lottery_admin), 55);

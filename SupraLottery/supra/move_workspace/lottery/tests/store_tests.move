@@ -3,7 +3,6 @@ module lottery::store_tests {
     use std::option;
     use std::vector;
     use std::signer;
-    use supra_framework::event;
     use lottery::instances;
     use lottery::rounds;
     use lottery::store;
@@ -70,8 +69,8 @@ module lottery::store_tests {
     ) {
         setup_token(lottery_admin, buyer);
         let lottery_id = setup_lottery(vrf_admin, factory_admin, lottery_admin);
-        let snapshot_events_baseline =
-            vector::length(&event::emitted_events<store::StoreSnapshotUpdatedEvent>());
+        let snapshot_baseline =
+            test_utils::event_count<store::StoreSnapshotUpdatedEvent>();
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
@@ -150,10 +149,12 @@ module lottery::store_tests {
         let (store_admin_after, _) = store::store_snapshot_fields_for_test(&store_snapshot_after);
         assert!(store_admin_after == @lottery_owner, 31);
 
-        let snapshot_events = event::emitted_events<store::StoreSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len == snapshot_events_baseline + 3, 32);
-        let last_event = vector::borrow(&snapshot_events, snapshot_events_len - 1);
+        let snapshot_events_len =
+            test_utils::event_count<store::StoreSnapshotUpdatedEvent>();
+        assert!(snapshot_events_len == snapshot_baseline + 3, 32);
+        let last_event = test_utils::borrow_event<store::StoreSnapshotUpdatedEvent>(
+            snapshot_events_len - 1,
+        );
         let (event_admin, event_snapshot) = store::store_snapshot_event_fields_for_test(last_event);
         assert!(event_admin == @lottery_owner, 33);
         let (event_lottery_id, event_items) =

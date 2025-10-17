@@ -4,6 +4,8 @@ module lottery::test_utils {
     use std::account;
     use std::option;
     use std::timestamp;
+    use std::vector;
+    use supra_framework::event;
 
     const FRAMEWORK_ADDRESS: address = @SupraFramework;
 
@@ -44,6 +46,14 @@ module lottery::test_utils {
     public fun unwrap_copy<T: copy>(o: &option::Option<T>): T {
         assert!(option::is_some(o), 9);
         *option::borrow(o)
+    }
+
+    public fun event_count<EventT>(): u64 {
+        vector::length(&event::emitted_events<EventT>())
+    }
+
+    public fun borrow_event<EventT>(index: u64): &EventT {
+        vector::borrow(&event::emitted_events<EventT>(), index)
     }
 
     fun ensure_time_started_internal() {

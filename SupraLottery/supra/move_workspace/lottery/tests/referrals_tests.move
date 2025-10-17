@@ -11,7 +11,6 @@ module lottery::referrals_tests {
     use lottery::treasury_v1;
     use lottery_factory::registry;
     use vrf_hub::hub;
-    use supra_framework::event;
 
     fun setup_environment(
         vrf_admin: &signer,
@@ -59,8 +58,8 @@ module lottery::referrals_tests {
         referrer: &signer,
     ) {
         setup_environment(vrf_admin, factory_admin, lottery_admin, buyer, referrer);
-        let snapshot_events_baseline =
-            vector::length(&event::emitted_events<referrals::ReferralSnapshotUpdatedEvent>());
+        let snapshot_baseline =
+            test_utils::event_count<referrals::ReferralSnapshotUpdatedEvent>();
 
         let blueprint = registry::new_blueprint(100, 1500);
         let lottery_id = registry::create_lottery(
@@ -123,11 +122,12 @@ module lottery::referrals_tests {
         assert!(entry_total_referrer_rewards == 8, 15);
         assert!(entry_total_referee_rewards == 6, 16);
 
-        let snapshot_events = event::emitted_events<referrals::ReferralSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        let new_events = snapshot_events_len - snapshot_events_baseline;
-        assert!(new_events >= 4, 17);
-        let latest_snapshot = vector::borrow(&snapshot_events, snapshot_events_len - 1);
+        let snapshot_events_len =
+            test_utils::event_count<referrals::ReferralSnapshotUpdatedEvent>();
+        assert!(snapshot_events_len == snapshot_baseline + 3, 17);
+        let latest_snapshot = test_utils::borrow_event<referrals::ReferralSnapshotUpdatedEvent>(
+            snapshot_events_len - 1,
+        );
         let latest_previous_opt = referrals::referral_snapshot_event_previous_for_test(latest_snapshot);
         assert!(option::is_some(&latest_previous_opt), 18);
         let latest_snapshot_state = referrals::referral_snapshot_event_current_for_test(latest_snapshot);
