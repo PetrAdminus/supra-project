@@ -130,8 +130,8 @@ module lottery::jackpot_tests {
         );
         let (request_previous_opt, request_current) =
             jackpot::jackpot_snapshot_event_fields_for_test(request_event);
-        let mut request_previous_opt = request_previous_opt;
-        let request_previous = test_utils::unwrap(&mut request_previous_opt);
+        assert!(option::is_some(&request_previous_opt), 32);
+        let request_previous = option::borrow(&request_previous_opt);
         let (
             _prev_admin,
             _prev_lottery_id,
@@ -153,8 +153,9 @@ module lottery::jackpot_tests {
         ) = jackpot::jackpot_snapshot_fields_for_test(&request_current);
         assert!(req_draw_scheduled, 18);
         assert!(req_has_pending, 19);
-        let mut req_pending_opt_local = req_pending_opt;
-        let req_pending_id = test_utils::unwrap(&mut req_pending_opt_local);
+        assert!(option::is_some(&req_pending_opt), 33);
+        let req_pending_id_ref = option::borrow(&req_pending_opt);
+        let req_pending_id = *req_pending_id_ref;
         assert!(req_pending_id == request_id, 20);
 
         let final_event = test_utils::borrow_event<jackpot::JackpotSnapshotUpdatedEvent>(
@@ -162,8 +163,8 @@ module lottery::jackpot_tests {
         );
         let (final_previous_opt, final_current) =
             jackpot::jackpot_snapshot_event_fields_for_test(final_event);
-        let mut final_previous_opt = final_previous_opt;
-        let final_previous = test_utils::unwrap(&mut final_previous_opt);
+        assert!(option::is_some(&final_previous_opt), 34);
+        let final_previous = option::borrow(&final_previous_opt);
         let (
             _final_prev_admin,
             _final_prev_lottery_id,
@@ -174,9 +175,9 @@ module lottery::jackpot_tests {
         ) = jackpot::jackpot_snapshot_fields_for_test(&final_previous);
         assert!(final_prev_draw_scheduled, 21);
         assert!(final_prev_has_pending, 22);
-        let mut final_prev_pending_opt_local = final_prev_pending_opt;
-        let final_prev_pending_id =
-            test_utils::unwrap(&mut final_prev_pending_opt_local);
+        assert!(option::is_some(&final_prev_pending_opt), 35);
+        let final_prev_pending_id_ref = option::borrow(&final_prev_pending_opt);
+        let final_prev_pending_id = *final_prev_pending_id_ref;
         assert!(final_prev_pending_id == request_id, 23);
         let (
             _final_admin,

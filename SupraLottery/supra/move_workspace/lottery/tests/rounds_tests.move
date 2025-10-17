@@ -304,11 +304,14 @@ module lottery::rounds_tests {
         ) = rounds::round_snapshot_fields_for_test(&request_snapshot);
         assert!(is_scheduled_after_request, 1);
         assert!(has_pending_after_request, 2);
-        let mut pending_request_opt = pending_request_opt;
-        let request_id = test_utils::unwrap(&mut pending_request_opt);
+        assert!(option::is_some(&pending_request_opt), 42);
+        let request_id_ref = option::borrow(&pending_request_opt);
+        let request_id = *request_id_ref;
 
         let request_opt = rounds::pending_request_id(lottery_id);
-        let request_id_from_view = test_utils::unwrap(&mut request_opt);
+        assert!(option::is_some(&request_opt), 43);
+        let request_id_from_view_ref = option::borrow(&request_opt);
+        let request_id_from_view = *request_id_from_view_ref;
         assert!(request_id_from_view == request_id, 3);
 
         let randomness = vector::empty<u8>();
