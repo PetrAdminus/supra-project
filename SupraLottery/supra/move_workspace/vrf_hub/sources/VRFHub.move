@@ -152,7 +152,28 @@ module vrf_hub::hub {
     }
 
 
-    public entry fun register_lottery(
+    // Entry wrapper: no return value
+    public entry fun register_lottery_entry(
+        caller: &signer,
+        owner: address,
+        lottery: address,
+        metadata: vector<u8>,
+    ) acquires HubState {
+        let _id = register_lottery_internal(caller, owner, lottery, metadata);
+    }
+
+    // Non-entry API for internal calls (keeps original name/signature but not entry)
+    public fun register_lottery(
+        caller: &signer,
+        owner: address,
+        lottery: address,
+        metadata: vector<u8>,
+    ): u64 acquires HubState {
+        register_lottery_internal(caller, owner, lottery, metadata)
+    }
+
+    // Internal implementation with return value
+    public fun register_lottery_internal(
         caller: &signer,
         owner: address,
         lottery: address,
