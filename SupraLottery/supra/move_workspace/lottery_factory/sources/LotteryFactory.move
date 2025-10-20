@@ -94,7 +94,21 @@ module lottery_factory::registry {
         LotteryBlueprint { ticket_price, jackpot_share_bps }
     }
 
-    public entry fun create_lottery(
+    // Entry wrapper: accepts only primitive params and does not return a value
+    public entry fun create_lottery_entry(
+        caller: &signer,
+        owner: address,
+        lottery: address,
+        ticket_price: u64,
+        jackpot_share_bps: u16,
+        metadata: vector<u8>,
+    ) acquires FactoryState {
+        let blueprint = new_blueprint(ticket_price, jackpot_share_bps);
+        let _lottery_id = create_lottery_internal(caller, owner, lottery, blueprint, metadata);
+    }
+
+    // Internal function with full logic and return value
+    public fun create_lottery_internal(
         caller: &signer,
         owner: address,
         lottery: address,
@@ -116,7 +130,35 @@ module lottery_factory::registry {
         lottery_id
     }
 
-    public entry fun update_blueprint(
+    // Non-entry API preserving the original signature for internal/tests usage
+    public fun create_lottery(
+        caller: &signer,
+        owner: address,
+        lottery: address,
+        blueprint: LotteryBlueprint,
+        metadata: vector<u8>,
+    ): u64 acquires FactoryState {
+        create_lottery_internal(caller, owner, lottery, blueprint, metadata)
+    }
+
+    public entry fun update_blueprint_entry(
+        caller: &signer,
+        lottery_id: u64,
+        ticket_price: u64,
+        jackpot_share_bps: u16,
+    ) acquires FactoryState {
+        ensure_admin(caller);
+        let state = borrow_global_mut<FactoryState>(@lottery_factory);
+        if (!table::contains(&state.lotteries, lottery_id)) {
+            abort E_UNKNOWN_LOTTERY
+        };
+        let info = table::borrow_mut(&mut state.lotteries, lottery_id);
+        info.blueprint = LotteryBlueprint { ticket_price, jackpot_share_bps };
+        emit_registry_snapshot(state);
+    }
+
+    // Non-entry variant for internal/tests usage preserving original signature
+    public fun update_blueprint(
         caller: &signer,
         lottery_id: u64,
         blueprint: LotteryBlueprint,

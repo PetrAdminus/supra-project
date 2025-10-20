@@ -110,7 +110,6 @@ module lottery::operators {
     public entry fun set_owner(caller: &signer, lottery_id: u64, owner: address) acquires LotteryOperators {
         ensure_admin(caller);
         let state = borrow_global_mut<LotteryOperators>(@lottery);
-        let changed = false;
         if (!table::contains(&state.entries, lottery_id)) {
             table::add(
                 &mut state.entries,
@@ -130,7 +129,8 @@ module lottery::operators {
                     next: option::some(owner),
                 },
             );
-            changed = true;
+            // state changed: emit snapshot
+            emit_operator_snapshot(state, lottery_id);
         } else {
             let owner_changed = false;
             let previous_owner = owner;
@@ -151,13 +151,9 @@ module lottery::operators {
                         next: option::some(owner),
                     },
                 );
+                // state changed: emit snapshot
+                emit_operator_snapshot(state, lottery_id);
             };
-            changed = owner_changed;
-        };
-
-        // Emit snapshot only if state actually changed
-        if (changed) {
-            emit_operator_snapshot(state, lottery_id);
         };
     }
 
