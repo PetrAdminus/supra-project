@@ -21,7 +21,7 @@ Supra Lottery — пакет смарт-контрактов на Move для б
 
 ### Быстрый старт
 1. Запустите Docker Desktop (или совместимый рантайм).
-2. Клонируйте репозиторий и перейдите в корень проекта: `cd SupraLottery`.
+2. Клонируйте репозиторий и перейдите в корень проекта: `cd supra-project` (монорепозиторий включает Move-контракты, фронтенд и документацию).
 3. Работайте из ветки `main`; фича-потоки создавайте в отдельных ветках и оформляйте merge request’ы в `main`.
 4. При необходимости откройте shell внутри контейнера Supra CLI: `docker compose run --rm --entrypoint bash supra_cli`.
 5. Все команды Supra CLI и вспомогательные скрипты запускайте внутри `script -q`, чтобы сохранять логи (см. `docs/testnet_runbook.md`).
@@ -40,7 +40,7 @@ docker compose run --rm \
 
 ### Единый скрипт Move-тестов и отчётов
 
-Помимо алиаса `python -m supra.scripts.cli move-test`, в репозитории есть самостоятельный раннер `supra/scripts/move_tests.py`, который напрямую управляет Supra/Aptos/Move CLI, формирует JSON/JUnit-отчёты и ведёт лог `tmp/unittest.log` по умолчанию. Он автоматически подставляет workspace и адреса из `.move/config`, а при отсутствии Supra CLI переключается на Aptos или vanilla Move.
+Помимо алиаса `python -m supra.scripts.cli move-test`, в репозитории есть самостоятельный раннер `SupraLottery/supra/scripts/move_tests.py`, который напрямую управляет Supra/Aptos/Move CLI, формирует JSON/JUnit-отчёты и ведёт лог `tmp/unittest.log` по умолчанию. Он автоматически подставляет workspace и адреса из `.move/config`, а при отсутствии Supra CLI переключается на Aptos или vanilla Move.
 
 ```bash
 PYTHONPATH=SupraLottery python -m supra.scripts.move_tests \
@@ -59,12 +59,14 @@ PYTHONPATH=SupraLottery python -m supra.scripts.move_tests \
 ### Структура проекта
 - `docker-compose.yml` — описание контейнера Supra CLI.
 - `supra/configs/` — локальные конфиги Supra с ключами и историей (только для разработки).
-- `supra/move_workspace/lottery/Move.toml` — манифест Move-пакета.
-- `supra/move_workspace/lottery/sources/` — контракт лотереи (`Lottery.move`) и FA-казначейство (`Treasury.move`).
-- `supra/move_workspace/lottery/tests/` — Move-тесты, покрывающие события, поток VRF и админские сценарии.
-- `supra/move_workspace/vrf_hub/` — заготовка VRF-хаба для маршрутизации запросов случайности между дочерними лотереями.
-- `supra/move_workspace/lottery_factory/` — фабрика для выдачи идентификаторов и описаний лотерей.
-- `supra/scripts/` — вспомогательные скрипты (build/publish/migration), включая CLI-команду `vrf-audit`.
+- `SupraLottery/supra/move_workspace/lottery/Move.toml` — манифест Move-пакета и список именованных адресов.
+- `SupraLottery/supra/move_workspace/lottery/sources/` — Move-модули лотереи: ядро (`Lottery.move`), раунды (`LotteryRounds.move`), экземпляры (`LotteryInstances.move`), автопокупка (`Autopurchase.move`), VIP/рефералы/магазин (`Vip.move`, `Referrals.move`, `Store.move`), история и метаданные (`History.move`, `Metadata.move`), операторы и NFT-награды (`Operators.move`, `NftRewards.move`), казначейство (`Treasury.move`, `TreasuryMulti.move`) и миграции (`Migration.move`).
+- `SupraLottery/supra/move_workspace/lottery/tests/` — Move-тесты для всех подсистем (ядро, раунды, автопокупка, VIP, рефералы, магазин, миграции).
+- `SupraLottery/supra/move_workspace/vrf_hub/` — VRF-хаб с таблицами запросов, событиями и юнит-тестами.
+- `SupraLottery/supra/move_workspace/lottery_factory/` — фабрика идентификаторов лотерей и тесты распределения.
+- `SupraLottery/supra/move_workspace/SupraVrf/` — локальная копия модулей `supra_vrf` и `deposit`, используемых тестами и скриптами.
+- `SupraLottery/supra/scripts/` — основной набор Python- и shell-утилит: CLI (`cli.py`), API-сервер (`api_server.py`), мониторинг (`lib/`), сервисы аккаунтов/прогресса/поддержки (`accounts/`, `progress/`, `support/`, `realtime/`), а также runbook-скрипты (`testnet_*.sh`).
+- `supra/move_workspace` и `supra/scripts` — симлинки на одноимённые каталоги внутри `SupraLottery/`, сохранены для совместимости (например, `supra/scripts/testnet_migration.sh`).
 - `docs/` — runbook’и, миграционные заметки по dVRF и эксплуатационная документация.
 - `frontend/` — SPA, мок-данные, Storybook-истории и юнит-тесты.
 
@@ -92,7 +94,7 @@ PYTHONPATH=SupraLottery python -m supra.scripts.move_tests \
 - `treasury_v1::store_frozen(account)` — статус заморозки primary store (при `true` модуль `fungible_asset` заблокирует минт/депозиты/выводы).
 - `treasury_v1::total_supply()` и `treasury_v1::metadata_address()` — мониторинг выпуска и адреса Metadata.
 
-Юнит-тесты в `supra/move_workspace/lottery/tests/lottery_tests.move` включают регистрацию store, минт в пользу тестовых аккаунтов и проверку, что покупка билетов/выплата приза расходуют FA-токен. Добавлены негативные сценарии: покупка билета, минт и депозит без предварительной регистрации store завершаются abort с кодами `13` (на уровне `main_v2`) и `4` (в `treasury_v1`).
+Юнит-тесты в `SupraLottery/supra/move_workspace/lottery/tests/lottery_tests.move` включают регистрацию store, минт в пользу тестовых аккаунтов и проверку, что покупка билетов/выплата приза расходуют FA-токен. Добавлены негативные сценарии: покупка билета, минт и депозит без предварительной регистрации store завершаются abort с кодами `13` (на уровне `main_v2`) и `4` (в `treasury_v1`).
 
 ### План версионирования
 - Текущая версия Move-пакета: `0.0.1`.
@@ -106,8 +108,8 @@ PYTHONPATH=SupraLottery python -m supra.scripts.move_tests \
 ### Запуск на Supra testnet
 - RPC testnet: `https://rpc-testnet.supra.com` (chain id 6).
 - Подробный runbook: см. `docs/testnet_runbook.md`.
-- Все команды выполняем через Docker (`supra_cli`), указывая профиль testnet.
-- Перед запуском заполните `supra/configs/<profile>.yaml` (RPC, адрес, приватный ключ, параметры газа) — формат и параметры описаны в [официальной инструкции Supra CLI](https://docs.supra.com/network/move/getting-started/supra-cli-with-docker).
+- Все команды выполняем через Docker (`supra_cli`), указывая профиль testnet (`/supra/supra move tool ... --profile <PROFILE>`).
+- Перед запуском создайте профиль `supra profile new <NAME> <PRIVATE_KEY>` и при необходимости экспортируйте `SUPRA_CONFIG=/supra/configs/<profile>.yaml`, чтобы CLI подтянула RPC и лимиты газа (формат описан в [официальной инструкции Supra CLI](https://docs.supra.com/network/move/getting-started/supra-cli-with-docker)).
 - Для миграции и whitelisting используйте функции `record_client_whitelist_snapshot`, `record_consumer_whitelist_snapshot`, `configure_vrf_request` — они логируют события для аудита и соответствуют разделу dVRF в [официальной документации](https://docs.supra.com/dvrf).
 - В разделе 8 runbook-а есть чеклист деплоя FA + VRF, а в разделе 9 — план отката на случай инцидентов.
 - `record_client_whitelist_snapshot` фиксирует maxGasPrice/maxGasLimit и снапшот `minBalanceLimit`; данные попадают в событие `ClientWhitelistRecordedEvent`.
