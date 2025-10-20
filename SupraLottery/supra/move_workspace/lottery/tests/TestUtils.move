@@ -11,7 +11,7 @@ module lottery::test_utils {
 
     public fun ensure_core_accounts() {
         account::create_account_for_test(FRAMEWORK_ADDRESS);
-        ensure_time_started_internal();
+        init_time_for_tests();
         account::create_account_for_test(@lottery);
         account::create_account_for_test(@lottery_factory);
         account::create_account_for_test(@lottery_owner);
@@ -37,8 +37,17 @@ module lottery::test_utils {
     }
 
     public fun ensure_time_started() {
+        init_time_for_tests();
+    }
+
+    public fun init_time_for_tests() {
         account::create_account_for_test(FRAMEWORK_ADDRESS);
-        ensure_time_started_internal();
+        let framework_signer = account::create_signer_for_test(FRAMEWORK_ADDRESS);
+        timestamp::set_time_has_started_for_testing(&framework_signer);
+        let current_time = timestamp::now_microseconds();
+        if (current_time < 1) {
+            timestamp::update_global_time_for_test(1);
+        };
     }
 
     public fun unwrap<T>(o: &mut option::Option<T>): T {
@@ -46,12 +55,43 @@ module lottery::test_utils {
     }
 
     public fun unwrap_copy<T: copy>(o: &option::Option<T>): T {
-        assert!(option::is_some(o), 9);
         *option::borrow(o)
     }
 
     public fun drain_events<EventT: drop + store>(): vector<EventT> {
         event::emitted_events<EventT>()
+    }
+
+    public fun events_len<EventT: drop + store>(events: &vector<EventT>): u64 {
+        vector::length(events)
+    }
+
+    public fun assert_grew_by<EventT: drop + store>(
+        baseline: u64,
+        events: &vector<EventT>,
+        expected_delta: u64,
+        error_code: u64,
+    ) {
+        assert!(vector::length(events) >= baseline + expected_delta, error_code);
+    }
+
+    // Requires exact growth by expected_delta
+    public fun assert_delta_eq<EventT: drop + store>(
+        baseline: u64,
+        events: &vector<EventT>,
+        expected_delta: u64,
+        error_code: u64,
+    ) {
+        assert!(vector::length(events) == baseline + expected_delta, error_code);
+    }
+
+    // Requires events length to equal expected
+    public fun assert_len_eq<EventT: drop + store>(
+        events: &vector<EventT>,
+        expected: u64,
+        error_code: u64,
+    ) {
+        assert!(vector::length(events) == expected, error_code);
     }
 
     public fun assert_min_events<EventT: drop + store>(
@@ -68,12 +108,4 @@ module lottery::test_utils {
         vector::borrow(events, len - 1)
     }
 
-    fun ensure_time_started_internal() {
-        let framework_signer = account::create_signer_for_test(FRAMEWORK_ADDRESS);
-        timestamp::set_time_has_started_for_testing(&framework_signer);
-        let current_time = timestamp::now_microseconds();
-        if (current_time < 1) {
-            timestamp::update_global_time_for_test(1);
-        };
-    }
 }

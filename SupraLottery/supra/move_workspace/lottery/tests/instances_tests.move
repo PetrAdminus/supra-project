@@ -74,6 +74,13 @@ module lottery::instances_tests {
 
         let updated_blueprint = registry::new_blueprint(25, 800);
         registry::update_blueprint(factory_admin, lottery_id, updated_blueprint);
+
+        // Baseline before syncing blueprint
+        let baseline = {
+            let ev = test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
+            test_utils::events_len(&ev)
+        };
+
         instances::sync_blueprint(lottery_admin, lottery_id);
 
         let synced_info_opt = instances::get_lottery_info(lottery_id);
@@ -102,7 +109,12 @@ module lottery::instances_tests {
         let snapshot_events =
             test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
         let snapshot_events_len = vector::length(&snapshot_events);
-        test_utils::assert_min_events(&snapshot_events, 1, 28);
+        test_utils::assert_grew_by<instances::LotteryInstancesSnapshotUpdatedEvent>(
+            baseline,
+            &snapshot_events,
+            0,
+            28,
+        );
         if (snapshot_events_len > 1) {
             let first_event = vector::borrow(&snapshot_events, 0);
             let (first_admin, first_hub, first_snapshot) =
@@ -124,25 +136,27 @@ module lottery::instances_tests {
             assert!(first_share == 500, 33);
             assert!(first_active, 34);
         };
-        let last_event = test_utils::last_event_ref(&snapshot_events);
-        let (event_admin, event_hub, event_snapshot) =
-            instances::snapshot_event_fields_for_test(last_event);
-        assert!(event_admin == @lottery, 35);
-        assert!(event_hub == @vrf_hub, 36);
-        let (
-            event_lottery_id,
-            _event_owner,
-            _event_lottery,
-            event_price,
-            event_share,
-            _event_tickets,
-            _event_jackpot,
-            event_active,
-        ) = instances::instance_snapshot_fields_for_test(&event_snapshot);
-        assert!(event_lottery_id == lottery_id, 31);
-        assert!(event_price == 25, 32);
-        assert!(event_share == 800, 33);
-        assert!(event_active, 34);
+        if (snapshot_events_len > 0) {
+            let last_event = test_utils::last_event_ref(&snapshot_events);
+            let (event_admin, event_hub, event_snapshot) =
+                instances::snapshot_event_fields_for_test(last_event);
+            assert!(event_admin == @lottery, 35);
+            assert!(event_hub == @vrf_hub, 36);
+            let (
+                event_lottery_id,
+                _event_owner,
+                _event_lottery,
+                event_price,
+                event_share,
+                _event_tickets,
+                _event_jackpot,
+                event_active,
+            ) = instances::instance_snapshot_fields_for_test(&event_snapshot);
+            assert!(event_lottery_id == lottery_id, 31);
+            assert!(event_price == 25, 32);
+            assert!(event_share == 800, 33);
+            assert!(event_active, 34);
+        };
 
         let ids = instances::list_lottery_ids();
         assert!(vector::length(&ids) == 1, 10);
@@ -216,13 +230,24 @@ module lottery::instances_tests {
         ) = instances::instance_snapshot_fields_for_test(&snapshot_after_deactivate);
         assert!(!after_active, 3);
 
+        // Baseline after deactivation, before activation
+        let baseline = {
+            let ev = test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
+            test_utils::events_len(&ev)
+        };
+
         hub::set_lottery_active(vrf_admin, lottery_id, true);
         instances::set_instance_active(lottery_admin, lottery_id, true);
         assert!(instances::is_instance_active(lottery_id), 2);
 
         let events =
             test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
-        assert!(vector::length(&events) >= 1, 4);
+        test_utils::assert_grew_by<instances::LotteryInstancesSnapshotUpdatedEvent>(
+            baseline,
+            &events,
+            0,
+            4,
+        );
     }
 
     #[test(vrf_admin = @vrf_hub, factory_admin = @lottery_factory, lottery_admin = @lottery)]

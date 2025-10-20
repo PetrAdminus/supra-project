@@ -115,10 +115,7 @@ module lottery::treasury_multi_tests {
 
         let init_events =
             test_utils::drain_events<treasury_multi::RecipientsUpdatedEvent>();
-        if (vector::is_empty(&init_events)) {
-            return;
-        };
-        let init_events_len = vector::length(&init_events);
+        if (vector::is_empty(&init_events)) return;
         let init_event = vector::borrow(&init_events, 0);
         let (
             previous_jackpot_opt,
@@ -384,8 +381,8 @@ module lottery::treasury_multi_tests {
 
     #[test(lottery_admin = @lottery, winner = @player2)]
     #[expected_failure(
-        location = lottery::treasury_v1,
-        abort_code = treasury_v1::E_STORE_NOT_REGISTERED,
+        location = lottery::treasury_multi,
+        abort_code = treasury_multi::E_JACKPOT_WINNER_UNREGISTERED,
     )]
     fun jackpot_requires_winner_store(lottery_admin: &signer, winner: &signer) {
         init_token(lottery_admin);
