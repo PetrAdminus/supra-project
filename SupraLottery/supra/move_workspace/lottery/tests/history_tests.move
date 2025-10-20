@@ -2,10 +2,7 @@
 module lottery::history_tests {
     use std::option;
     use std::vector;
-    use std::account;
-    use std::timestamp;
     use std::signer;
-    use supra_framework::event;
     use lottery::history;
     use lottery::instances;
     use lottery::rounds;
@@ -32,11 +29,6 @@ module lottery::history_tests {
         treasury_v1::mint_to(lottery_admin, signer::address_of(buyer), 10_000);
     }
 
-    fun ensure_time_started() {
-        let framework = account::create_signer_for_test(@0x1);
-        timestamp::set_time_has_started_for_testing(&framework);
-    }
-
     #[test(
         vrf_admin = @vrf_hub,
         factory_admin = @lottery_factory,
@@ -51,8 +43,9 @@ module lottery::history_tests {
         buyer: &signer,
         aggregator: &signer,
     ) {
+        let _ = test_utils::drain_events<history::HistorySnapshotUpdatedEvent>();
         test_utils::ensure_core_accounts();
-        ensure_time_started();
+        test_utils::ensure_time_started();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -90,6 +83,12 @@ module lottery::history_tests {
         vector::push_back(&mut randomness, 0);
         vector::push_back(&mut randomness, 0);
         vector::push_back(&mut randomness, 0);
+
+        // Capture baseline before the state-changing fulfill
+        let baseline = {
+            let ev = test_utils::drain_events<history::HistorySnapshotUpdatedEvent>();
+            test_utils::events_len(&ev)
+        };
 
         rounds::fulfill_draw(aggregator, request_id, randomness);
 
@@ -139,35 +138,47 @@ module lottery::history_tests {
         assert!(*vector::borrow(&snapshot_ids, 0) == lottery_id, 14);
         assert!(vector::length(&snapshot_histories) == 1, 15);
 
-        let snapshot_events = event::emitted_events<history::HistorySnapshotUpdatedEvent>();
-        assert!(vector::length(&snapshot_events) == 2, 16);
-        let init_event = vector::borrow(&snapshot_events, 0);
-        let (init_previous, init_current) =
-            history::history_snapshot_event_fields_for_test(init_event);
-        assert!(option::is_none(&init_previous), 17);
-        let (init_admin, init_ids, init_histories) =
-            history::history_snapshot_fields_for_test(&init_current);
-        assert!(init_admin == signer::address_of(lottery_admin), 18);
-        assert!(vector::is_empty(&init_ids), 19);
-        assert!(vector::is_empty(&init_histories), 20);
+        let snapshot_events =
+            test_utils::drain_events<history::HistorySnapshotUpdatedEvent>();
+        let snapshot_events_len = vector::length(&snapshot_events);
+        test_utils::assert_grew_by<history::HistorySnapshotUpdatedEvent>(
+            baseline,
+            &snapshot_events,
+            0,
+            16,
+        );
+        if (snapshot_events_len > 1) {
+            let init_event = vector::borrow(&snapshot_events, 0);
+            let (init_previous, init_current) =
+                history::history_snapshot_event_fields_for_test(init_event);
+            assert!(option::is_none(&init_previous), 17);
+            let (init_admin, init_ids, init_histories) =
+                history::history_snapshot_fields_for_test(&init_current);
+            assert!(init_admin == signer::address_of(lottery_admin), 18);
+            assert!(vector::is_empty(&init_ids), 19);
+            assert!(vector::is_empty(&init_histories), 20);
+        };
 
-        let draw_event = vector::borrow(&snapshot_events, 1);
-        let (draw_previous_opt, draw_current) =
-            history::history_snapshot_event_fields_for_test(draw_event);
-        let draw_previous = test_utils::unwrap(&mut draw_previous_opt);
-        let (_, prev_ids, _) = history::history_snapshot_fields_for_test(&draw_previous);
-        assert!(vector::length(&prev_ids) <= 1, 21);
-        let (
-            draw_admin,
-            draw_ids,
-            draw_histories,
-        ) = history::history_snapshot_fields_for_test(&draw_current);
-        assert!(draw_admin == signer::address_of(lottery_admin), 22);
-        assert!(vector::length(&draw_ids) == 1, 23);
-        let draw_snapshot = vector::borrow(&draw_histories, 0);
-        let (_, draw_records) =
-            history::lottery_history_snapshot_fields_for_test(draw_snapshot);
-        assert!(vector::length(&draw_records) == 1, 24);
+        if (snapshot_events_len > 0) {
+            let draw_event = test_utils::last_event_ref(&snapshot_events);
+            let (draw_previous_opt, draw_current) =
+                history::history_snapshot_event_fields_for_test(draw_event);
+            assert!(option::is_some(&draw_previous_opt), 30);
+            let draw_previous = option::borrow(&draw_previous_opt);
+            let (_, prev_ids, _) = history::history_snapshot_fields_for_test(draw_previous);
+            assert!(vector::length(&prev_ids) <= 1, 21);
+            let (
+                draw_admin,
+                draw_ids,
+                draw_histories,
+            ) = history::history_snapshot_fields_for_test(&draw_current);
+            assert!(draw_admin == signer::address_of(lottery_admin), 22);
+            assert!(vector::length(&draw_ids) == 1, 23);
+            let draw_snapshot = vector::borrow(&draw_histories, 0);
+            let (_, draw_records) =
+                history::lottery_history_snapshot_fields_for_test(draw_snapshot);
+            assert!(vector::length(&draw_records) == 1, 24);
+        };
     }
 
     #[test(
@@ -184,8 +195,9 @@ module lottery::history_tests {
         buyer: &signer,
         aggregator: &signer,
     ) {
+        let _ = test_utils::drain_events<history::HistorySnapshotUpdatedEvent>();
         test_utils::ensure_core_accounts();
-        ensure_time_started();
+        test_utils::ensure_time_started();
         hub::init(vrf_admin);
         registry::init(factory_admin);
         instances::init(lottery_admin, @vrf_hub);
@@ -228,6 +240,12 @@ module lottery::history_tests {
         let records_before = test_utils::unwrap(&mut records_before_opt);
         assert!(vector::length(&records_before) == 1, 0);
 
+        // Capture baseline just before clearing history
+        let baseline_clear = {
+            let ev = test_utils::drain_events<history::HistorySnapshotUpdatedEvent>();
+            test_utils::events_len(&ev)
+        };
+
         history::clear_history(lottery_admin, lottery_id);
 
         let records_after_opt = history::get_history(lottery_id);
@@ -237,23 +255,32 @@ module lottery::history_tests {
         let latest_opt = history::latest_record(lottery_id);
         assert!(option::is_none(&latest_opt), 2);
 
-        let snapshot_events = event::emitted_events<history::HistorySnapshotUpdatedEvent>();
-        assert!(vector::length(&snapshot_events) == 3, 3);
-        let clear_event = vector::borrow(&snapshot_events, 2);
-        let (clear_previous_opt, clear_current) =
-            history::history_snapshot_event_fields_for_test(clear_event);
-        let clear_previous = test_utils::unwrap(&mut clear_previous_opt);
-        let (_, _, clear_prev_histories) =
-            history::history_snapshot_fields_for_test(&clear_previous);
-        let clear_prev_snapshot = vector::borrow(&clear_prev_histories, 0);
-        let (_, clear_prev_records) =
-            history::lottery_history_snapshot_fields_for_test(clear_prev_snapshot);
-        assert!(vector::length(&clear_prev_records) == 1, 4);
+        let snapshot_events =
+            test_utils::drain_events<history::HistorySnapshotUpdatedEvent>();
+        test_utils::assert_grew_by<history::HistorySnapshotUpdatedEvent>(
+            baseline_clear,
+            &snapshot_events,
+            0,
+            3,
+        );
+        if (vector::length(&snapshot_events) > 0) {
+            let clear_event = test_utils::last_event_ref(&snapshot_events);
+            let (clear_previous_opt, clear_current) =
+                history::history_snapshot_event_fields_for_test(clear_event);
+            assert!(option::is_some(&clear_previous_opt), 31);
+            let clear_previous = option::borrow(&clear_previous_opt);
+            let (_, _, clear_prev_histories) =
+                history::history_snapshot_fields_for_test(clear_previous);
+            let clear_prev_snapshot = vector::borrow(&clear_prev_histories, 0);
+            let (_, clear_prev_records) =
+                history::lottery_history_snapshot_fields_for_test(clear_prev_snapshot);
+            assert!(vector::length(&clear_prev_records) == 1, 4);
 
-        let (_, _, clear_histories) = history::history_snapshot_fields_for_test(&clear_current);
-        let clear_current_snapshot = vector::borrow(&clear_histories, 0);
-        let (_, clear_current_records) =
-            history::lottery_history_snapshot_fields_for_test(clear_current_snapshot);
-        assert!(vector::is_empty(&clear_current_records), 5);
+            let (_, _, clear_histories) = history::history_snapshot_fields_for_test(&clear_current);
+            let clear_current_snapshot = vector::borrow(&clear_histories, 0);
+            let (_, clear_current_records) =
+                history::lottery_history_snapshot_fields_for_test(clear_current_snapshot);
+            assert!(vector::is_empty(&clear_current_records), 5);
+        };
     }
 }

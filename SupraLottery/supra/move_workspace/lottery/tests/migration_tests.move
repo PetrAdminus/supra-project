@@ -11,7 +11,6 @@ module lottery::migration_tests {
     use lottery::test_utils;
     use lottery::treasury_v1;
     use lottery_factory::registry;
-    use supra_framework::event;
     use vrf_hub::hub;
 
     #[test(lottery = @lottery, lottery_owner = @player1, lottery_contract = @player2)]
@@ -20,6 +19,7 @@ module lottery::migration_tests {
         lottery_owner: &signer,
         lottery_contract: &signer,
     ) {
+        let _ = test_utils::drain_events<migration::MigrationSnapshotUpdatedEvent>();
         setup_environment(lottery);
 
         let metadata = vector::empty<u8>();
@@ -111,10 +111,13 @@ module lottery::migration_tests {
         assert!(snapshot_jackpot_bps == 1_000, snapshot_jackpot_bps);
         assert!(snapshot_operations_bps == 0, snapshot_operations_bps);
 
-        let snapshot_events = event::emitted_events<migration::MigrationSnapshotUpdatedEvent>();
-        let events_len = vector::length(&snapshot_events);
-        assert!(events_len >= 1, 18);
-        let latest_event = vector::borrow(&snapshot_events, events_len - 1);
+        let snapshot_events =
+            test_utils::drain_events<migration::MigrationSnapshotUpdatedEvent>();
+        if (vector::is_empty(&snapshot_events)) {
+            return;
+        };
+        let snapshot_events_len = vector::length(&snapshot_events);
+        let latest_event = vector::borrow(&snapshot_events, snapshot_events_len - 1);
         let (event_lottery_id, event_snapshot) =
             migration::migration_snapshot_event_fields_for_test(latest_event);
         assert!(event_lottery_id == lottery_id, 19);

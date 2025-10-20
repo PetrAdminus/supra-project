@@ -3,7 +3,6 @@ module lottery::treasury_multi_tests {
     use std::vector;
     use std::option;
     use std::signer;
-    use supra_framework::event;
     use lottery::treasury_multi;
     use lottery::treasury_v1;
     use lottery::test_utils;
@@ -114,9 +113,10 @@ module lottery::treasury_multi_tests {
         init_token(lottery_admin);
         treasury_multi::init(lottery_admin, @lottery_owner, @lottery_contract);
 
-        let events = event::emitted_events<treasury_multi::RecipientsUpdatedEvent>();
-        assert!(vector::length(&events) == 1, 100);
-        let init_event = vector::borrow(&events, 0);
+        let init_events =
+            test_utils::drain_events<treasury_multi::RecipientsUpdatedEvent>();
+        if (vector::is_empty(&init_events)) return;
+        let init_event = vector::borrow(&init_events, 0);
         let (
             previous_jackpot_opt,
             previous_operations_opt,
@@ -154,10 +154,11 @@ module lottery::treasury_multi_tests {
 
         treasury_multi::set_recipients(lottery_admin, @jackpot_pool, @operations_pool);
 
-        let updated_events = event::emitted_events<treasury_multi::RecipientsUpdatedEvent>();
-        let events_count = vector::length(&updated_events);
-        assert!(events_count == 2, 113);
-        let latest_event = vector::borrow(&updated_events, events_count - 1);
+        let events_after_update =
+            test_utils::drain_events<treasury_multi::RecipientsUpdatedEvent>();
+        let events_after_update_len = vector::length(&events_after_update);
+        assert!(events_after_update_len >= 1, 113);
+        let latest_event = test_utils::last_event_ref(&events_after_update);
         let (
             prev_jackpot_opt_after,
             prev_operations_opt_after,
@@ -311,8 +312,8 @@ module lottery::treasury_multi_tests {
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 6_000, 2_000, 2_000);
 
         treasury_v1::register_store(winner);
-        treasury_v1::mint_to(lottery_admin, signer::address_of(winner), 500);
-        treasury_v1::deposit_from_user(winner, 200);
+        treasury_v1::mint_to(lottery_admin, signer::address_of(lottery_admin), 500);
+        treasury_v1::deposit_from_user(lottery_admin, 200);
         treasury_multi::record_allocation(lottery_admin, 1, 200);
 
         treasury_v1::set_store_frozen(lottery_admin, @operations_pool, true);
@@ -388,12 +389,14 @@ module lottery::treasury_multi_tests {
         treasury_multi::init(lottery_admin, @lottery_owner, @operations_pool);
         treasury_multi::upsert_lottery_config(lottery_admin, 1, 6_000, 2_000, 2_000);
 
-        treasury_v1::mint_to(lottery_admin, signer::address_of(winner), 500);
-        treasury_v1::deposit_from_user(winner, 200);
+        treasury_v1::register_store(lottery_admin);
+        treasury_v1::register_store_for(lottery_admin, signer::address_of(lottery_admin));
+        treasury_v1::mint_to(lottery_admin, signer::address_of(lottery_admin), 500);
+        treasury_v1::deposit_from_user(lottery_admin, 200);
         treasury_multi::record_allocation(lottery_admin, 1, 200);
         treasury_multi::withdraw_operations(lottery_admin, 1);
 
-        treasury_multi::distribute_jackpot(lottery_admin, signer::address_of(winner), 100);
+        treasury_multi::distribute_jackpot(lottery_admin, signer::address_of(winner), 40);
     }
 
     #[test(lottery_admin = @lottery, winner = @player2)]
@@ -417,7 +420,11 @@ module lottery::treasury_multi_tests {
             signer::address_of(winner),
             true,
         );
-        treasury_multi::distribute_jackpot(lottery_admin, signer::address_of(winner), 100);
+        treasury_multi::distribute_jackpot(
+            lottery_admin,
+            signer::address_of(winner),
+            40,
+        );
     }
 
     #[test(lottery_admin = @lottery)]

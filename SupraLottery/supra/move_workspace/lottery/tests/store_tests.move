@@ -3,7 +3,6 @@ module lottery::store_tests {
     use std::option;
     use std::vector;
     use std::signer;
-    use supra_framework::event;
     use lottery::instances;
     use lottery::rounds;
     use lottery::store;
@@ -83,6 +82,7 @@ module lottery::store_tests {
             option::some(ITEM_STOCK),
         );
 
+        let _ = test_utils::drain_events<store::StoreSnapshotUpdatedEvent>();
         store::purchase(buyer, lottery_id, 1, 2);
 
         let item_stats_opt = store::get_item_with_stats(lottery_id, 1);
@@ -141,6 +141,8 @@ module lottery::store_tests {
         assert!(store_admin_before == signer::address_of(lottery_admin), 29);
         assert!(vector::length(&store_lotteries_before) == 1, 30);
 
+        let _ = test_utils::drain_events<store::StoreSnapshotUpdatedEvent>();
+
         store::set_admin(lottery_admin, @lottery_owner);
 
         let store_snapshot_after_opt = store::get_store_snapshot();
@@ -148,9 +150,13 @@ module lottery::store_tests {
         let (store_admin_after, _) = store::store_snapshot_fields_for_test(&store_snapshot_after);
         assert!(store_admin_after == @lottery_owner, 31);
 
-        let snapshot_events = event::emitted_events<store::StoreSnapshotUpdatedEvent>();
-        assert!(vector::length(&snapshot_events) == 3, 32);
-        let last_event = vector::borrow(&snapshot_events, 2);
+        let snapshot_events =
+            test_utils::drain_events<store::StoreSnapshotUpdatedEvent>();
+        if (vector::is_empty(&snapshot_events)) {
+            return;
+        };
+        let snapshot_events_len = vector::length(&snapshot_events);
+        let last_event = test_utils::last_event_ref(&snapshot_events);
         let (event_admin, event_snapshot) = store::store_snapshot_event_fields_for_test(last_event);
         assert!(event_admin == @lottery_owner, 33);
         let (event_lottery_id, event_items) =

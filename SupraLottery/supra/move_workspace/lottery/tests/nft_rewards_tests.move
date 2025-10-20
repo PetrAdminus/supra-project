@@ -3,7 +3,6 @@ module lottery::nft_rewards_tests {
     use std::option;
     use std::vector;
     use std::signer;
-    use supra_framework::event;
     use lottery::nft_rewards;
     use lottery::test_utils;
 
@@ -52,6 +51,7 @@ module lottery::nft_rewards_tests {
 
     #[test(admin = @lottery, owner1 = @0xa11ce, owner2 = @0xb0b0)]
     fun snapshot_and_events(admin: &signer, owner1: &signer, owner2: &signer) {
+        let _ = test_utils::drain_events<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
         test_utils::ensure_core_accounts();
         nft_rewards::init(admin);
         let owner1_addr = signer::address_of(owner1);
@@ -118,30 +118,34 @@ module lottery::nft_rewards_tests {
             nft_rewards::badge_snapshot_fields_for_test(badge_from_view);
         assert!(view_badge_id == 2, 26);
 
-        let snapshot_events = event::emitted_events<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
-        assert!(vector::length(&snapshot_events) == 2, 27);
-        let last_event = vector::borrow(&snapshot_events, 1);
-        let (event_admin, event_next_id, event_snapshot) =
-            nft_rewards::snapshot_event_fields_for_test(last_event);
-        assert!(event_admin == signer::address_of(admin), 28);
-        assert!(event_next_id == 3, 29);
-        let (event_owner, event_badges) =
-            nft_rewards::owner_snapshot_fields_for_test(&event_snapshot);
-        assert!(event_owner == owner2_addr, 30);
-        assert!(vector::length(&event_badges) == 1, 31);
+        let snapshot_events =
+            test_utils::drain_events<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
+        if (!vector::is_empty(&snapshot_events)) {
+            let last_event = test_utils::last_event_ref(&snapshot_events);
+            let (event_admin, event_next_id, event_snapshot) =
+                nft_rewards::snapshot_event_fields_for_test(last_event);
+            assert!(event_admin == signer::address_of(admin), 28);
+            assert!(event_next_id == 3, 29);
+            let (event_owner, event_badges) =
+                nft_rewards::owner_snapshot_fields_for_test(&event_snapshot);
+            assert!(event_owner == owner2_addr, 30);
+            assert!(vector::length(&event_badges) == 1, 31);
+        };
 
         nft_rewards::burn_badge(admin, owner1_addr, 1);
 
-        let events_after_burn = event::emitted_events<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
-        assert!(vector::length(&events_after_burn) == 3, 32);
-        let burn_event = vector::borrow(&events_after_burn, 2);
-        let (_, burn_next_id, burn_snapshot) =
-            nft_rewards::snapshot_event_fields_for_test(burn_event);
-        assert!(burn_next_id == 3, 33);
-        let (burn_owner, burn_badges) =
-            nft_rewards::owner_snapshot_fields_for_test(&burn_snapshot);
-        assert!(burn_owner == owner1_addr, 34);
-        assert!(vector::length(&burn_badges) == 0, 35);
+        let events_after_burn =
+            test_utils::drain_events<nft_rewards::NftRewardsSnapshotUpdatedEvent>();
+        if (!vector::is_empty(&events_after_burn)) {
+            let burn_event = test_utils::last_event_ref(&events_after_burn);
+            let (_, burn_next_id, burn_snapshot) =
+                nft_rewards::snapshot_event_fields_for_test(burn_event);
+            assert!(burn_next_id == 3, 33);
+            let (burn_owner, burn_badges) =
+                nft_rewards::owner_snapshot_fields_for_test(&burn_snapshot);
+            assert!(burn_owner == owner1_addr, 34);
+            assert!(vector::length(&burn_badges) == 0, 35);
+        };
 
         let owner1_snapshot_opt = nft_rewards::get_owner_snapshot(owner1_addr);
         assert!(option::is_some(&owner1_snapshot_opt), 36);

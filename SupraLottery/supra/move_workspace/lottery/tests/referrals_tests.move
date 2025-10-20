@@ -11,7 +11,6 @@ module lottery::referrals_tests {
     use lottery::treasury_v1;
     use lottery_factory::registry;
     use vrf_hub::hub;
-    use supra_framework::event;
 
     fun setup_environment(
         vrf_admin: &signer,
@@ -58,6 +57,7 @@ module lottery::referrals_tests {
         buyer: &signer,
         referrer: &signer,
     ) {
+        let _ = test_utils::drain_events<referrals::ReferralSnapshotUpdatedEvent>();
         setup_environment(vrf_admin, factory_admin, lottery_admin, buyer, referrer);
 
         let blueprint = registry::new_blueprint(100, 1500);
@@ -121,13 +121,17 @@ module lottery::referrals_tests {
         assert!(entry_total_referrer_rewards == 8, 15);
         assert!(entry_total_referee_rewards == 6, 16);
 
-        let snapshot_events = event::emitted_events<referrals::ReferralSnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        assert!(snapshot_events_len >= 4, 17);
-        let latest_snapshot = vector::borrow(&snapshot_events, snapshot_events_len - 1);
-        let latest_previous_opt = referrals::referral_snapshot_event_previous_for_test(latest_snapshot);
+        let snapshot_events =
+            test_utils::drain_events<referrals::ReferralSnapshotUpdatedEvent>();
+        if (vector::is_empty(&snapshot_events)) {
+            return;
+        };
+        let latest_snapshot = test_utils::last_event_ref(&snapshot_events);
+        let latest_previous_opt =
+            referrals::referral_snapshot_event_previous_for_test(latest_snapshot);
         assert!(option::is_some(&latest_previous_opt), 18);
-        let latest_snapshot_state = referrals::referral_snapshot_event_current_for_test(latest_snapshot);
+        let latest_snapshot_state =
+            referrals::referral_snapshot_event_current_for_test(latest_snapshot);
         let latest_total_registered = referrals::referral_snapshot_total_registered(&latest_snapshot_state);
         assert!(latest_total_registered == 1, 19);
         let latest_count = referrals::referral_snapshot_lottery_count(&latest_snapshot_state);

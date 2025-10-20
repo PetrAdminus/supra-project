@@ -2,7 +2,6 @@
 module lottery::lottery_tests {
     use std::account;
     use supra_framework::event;
-    use std::timestamp;
     use std::option;
     use std::hash;
     use std::string;
@@ -54,6 +53,7 @@ module lottery::lottery_tests {
     const UNEXPECTED_RNG_COUNT_ERROR: u64 = 18;
     const CALLBACK_CALLER_NOT_ALLOWED_ERROR: u64 = 21;
     const STORE_NOT_REGISTERED_ERROR: u64 = 4;
+    const RECIPIENT_STORE_NOT_REGISTERED_ERROR: u64 = 7;
     const JACKPOT_OVERFLOW_ERROR: u64 = 32;
     const TICKET_ID_OVERFLOW_ERROR: u64 = 33;
     const RNG_REQUEST_OVERFLOW_ERROR: u64 = 34;
@@ -81,8 +81,7 @@ module lottery::lottery_tests {
         account::create_account_for_test(UNAUTHORIZED_CALLBACK);
         account::create_account_for_test(SECOND_AGGREGATOR);
 
-        let framework = account::create_signer_for_test(ADMIN);
-        timestamp::set_time_has_started_for_testing(&framework);
+        test_utils::ensure_time_started();
 
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
         treasury_v1::init_token(
@@ -1167,7 +1166,10 @@ module lottery::lottery_tests {
     }
 
     #[test]
-    #[expected_failure(location = lottery::treasury_v1, abort_code = STORE_NOT_REGISTERED_ERROR)]
+    #[expected_failure(
+        location = lottery::treasury_v1,
+        abort_code = RECIPIENT_STORE_NOT_REGISTERED_ERROR,
+    )]
     fun set_recipients_requires_registered_store() {
         setup_accounts_base();
         let lottery_signer = account::create_signer_for_test(LOTTERY_ADDR);
@@ -2673,10 +2675,10 @@ module lottery::lottery_tests {
         main_v2::whitelist_consumer(&lottery_signer, PLAYER1);
 
         let custom_max_price = 7u64;
-        let custom_max_limit = 13u64;
+        let custom_max_limit = 30u64;
         let custom_verification = 19u64;
         let custom_callback_price = 5u64;
-        let custom_callback_limit = 29u64;
+        let custom_callback_limit = 18u64;
 
         main_v2::configure_vrf_gas_for_test(
             &lottery_signer,
@@ -2727,11 +2729,11 @@ module lottery::lottery_tests {
         main_v2::whitelist_callback_sender(&lottery_signer, VRF_AGGREGATOR);
         main_v2::whitelist_consumer(&lottery_signer, PLAYER1);
 
-        let first_price = 3u64;
-        let first_limit = 20u64;
+        let first_price = 5u64;
+        let first_limit = 25u64;
         let first_verification = 11u64;
         let callback_price = 4u64;
-        let callback_limit = 25u64;
+        let callback_limit = 20u64;
 
         main_v2::configure_vrf_gas_for_test(
             &lottery_signer,
@@ -2744,7 +2746,7 @@ module lottery::lottery_tests {
         main_v2::set_minimum_balance_for_test(&lottery_signer);
 
         let second_price = 9u64;
-        let second_limit = 15u64;
+        let second_limit = 30u64;
         let second_verification = 17u64;
 
         main_v2::configure_vrf_gas_for_test(
