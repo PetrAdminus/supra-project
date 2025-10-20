@@ -70,3 +70,4 @@ migration_dvrf3.txt
 tmp_update.py
 .codex-tmp/
 SupraLottery.backup/
+SupraLottery/supra/configs/testnet.local.yaml

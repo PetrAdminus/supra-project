@@ -652,3 +652,15 @@ docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/con
 - `error[E04001]`/`error[E04013]` при доступе к константам модулей — обращайтесь через публичные view-функции и тестовые обёртки.
 - `error[E04004]`/`error[E04005]` при оборачивании кортежей в `Option` — заменяйте кортежи отдельными структурами `*_View`.
 - Полный справочник с кодами ошибок см. в документе [docs/move_common_errors_ru.md](move_common_errors_ru.md).
+
+### Публикация vrf_hub
+
+````powershell
+docker compose run --rm -e SUPRA_PROFILE=my_new_profile --entrypoint bash supra_cli -lc "/supra/supra move tool publish --package-dir /supra/move_workspace/vrf_hub --skip-fetch-latest-git-deps --gas-unit-price 100 --max-gas 100000 --expiration-secs 600 --assume-yes"
+````
+
+### Публикация lottery_factory
+
+````powershell
+docker compose run --rm -e SUPRA_PROFILE=my_new_profile --entrypoint bash supra_cli -lc "/supra/supra move tool publish --package-dir /supra/move_workspace/lottery_factory --skip-fetch-latest-git-deps --gas-unit-price 100 --max-gas 100000 --expiration-secs 600 --assume-yes"
+````
