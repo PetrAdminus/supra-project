@@ -30,7 +30,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y unzip
-          curl -sSLo aptos-cli.zip https://github.com/aptos-labs/aptos-core/releases/download/aptos-cli-v2.0.2/aptos-cli-2.0.2-Ubuntu-x86_64.zip
+          curl -sSLo aptos-cli.zip https://github.com/aptos-labs/aptos-core/releases/download/aptos-cli-v7.9.1/aptos-cli-7.9.1-Ubuntu-22.04-x86_64.zip
           unzip -o aptos-cli.zip -d aptos-cli
           sudo mv aptos-cli/aptos /usr/local/bin/aptos
           aptos --version
@@ -50,7 +50,7 @@ jobs:
 
       - name: Upload move-test reports
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: move-test-reports
           path: |
