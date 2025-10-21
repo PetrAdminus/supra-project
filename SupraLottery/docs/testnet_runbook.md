@@ -310,9 +310,9 @@ docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_C
 **Снапшот NFT-бейджей.** Supra просила публиковать агрегированное состояние наград, поэтому проверяйте как view, так и поток событий:
 
 ```bash
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::nft_rewards::get_snapshot"
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::nft_rewards::get_owner_snapshot --args address:<PLAYER_ADDR>"
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool events list --profile <PROFILE> --address @lottery --event-type lottery::nft_rewards::NftRewardsSnapshotUpdatedEvent --limit 5"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_rewards::nft_rewards::get_snapshot"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_rewards::nft_rewards::get_owner_snapshot --args address:<PLAYER_ADDR>"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool events list --profile <PROFILE> --address @lottery --event-type lottery_rewards::nft_rewards::NftRewardsSnapshotUpdatedEvent --limit 5"
 ```
 
 View `get_snapshot` возвращает администратора, `next_badge_id` и массив владельцев с их `BadgeSnapshot` (лотерея, розыгрыш, URI метаданных, адрес минтера). `get_owner_snapshot` позволяет проверять конкретного игрока, а событие `NftRewardsSnapshotUpdatedEvent` публикуется после `init`, `mint_badge` и `burn_badge`. Если после бёрна владелец по-прежнему числится с бейджами, убедитесь, что транзакция завершилась успешно и повторите команду для очистки состояния.

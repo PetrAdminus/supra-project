@@ -1,4 +1,4 @@
-module lottery::nft_rewards {
+module lottery_rewards::nft_rewards {
     use std::option;
     use std::signer;
     use std::vector;

@@ -1,4 +1,4 @@
-module lottery::operators {
+module lottery_core::operators {
     use std::option;
     use std::signer;
     use std::vector;

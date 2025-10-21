@@ -5,7 +5,7 @@ module lottery::autopurchase {
     use vrf_hub::table;
     use supra_framework::account;
     use supra_framework::event;
-    use lottery::instances;
+    use lottery_core::instances;
     use lottery::rounds;
     use lottery::treasury_v1;
     use lottery_factory::registry;

@@ -1,10 +1,10 @@
 #[test_only]
-module lottery::nft_rewards_tests {
+module lottery_rewards::nft_rewards_tests {
     use std::option;
     use std::vector;
     use std::signer;
-    use lottery::nft_rewards;
-    use lottery::test_utils;
+    use lottery_rewards::nft_rewards;
+    use lottery_rewards::test_utils;
 
     #[test(admin = @lottery, owner = @0x123)]
     fun mint_flow(admin: &signer, owner: &signer) {
@@ -29,7 +29,7 @@ module lottery::nft_rewards_tests {
 
     #[test(admin = @lottery, owner = @0x456)]
     #[expected_failure(
-        location = lottery::nft_rewards,
+        location = lottery_rewards::nft_rewards,
         abort_code = nft_rewards::E_NOT_AUTHORIZED,
     )]
     fun non_admin_cannot_mint(admin: &signer, owner: &signer) {

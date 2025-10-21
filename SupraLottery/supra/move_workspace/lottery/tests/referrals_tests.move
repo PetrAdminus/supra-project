@@ -3,7 +3,7 @@ module lottery::referrals_tests {
     use std::option;
     use std::vector;
     use std::signer;
-    use lottery::instances;
+    use lottery_core::instances;
     use lottery::referrals;
     use lottery::rounds;
     use lottery::treasury_multi;

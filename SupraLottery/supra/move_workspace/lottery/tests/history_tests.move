@@ -4,7 +4,7 @@ module lottery::history_tests {
     use std::vector;
     use std::signer;
     use lottery::history;
-    use lottery::instances;
+    use lottery_core::instances;
     use lottery::rounds;
     use lottery::treasury_multi;
     use lottery::test_utils;

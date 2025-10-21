@@ -1,4 +1,4 @@
-module lottery::migration {
+module lottery_support::migration {
     use std::option;
     use std::signer;
     use std::vector;
@@ -15,7 +15,6 @@ module lottery::migration {
     const E_INSTANCE_MISSING: u64 = 2;
     const E_PENDING_REQUEST: u64 = 3;
     const E_ALREADY_MIGRATED: u64 = 4;
-
 
     struct MigrationLedger has key {
         snapshots: table::Table<u64, MigrationSnapshot>,
@@ -43,7 +42,6 @@ module lottery::migration {
         snapshot: MigrationSnapshot,
     }
 
-
     public entry fun migrate_from_legacy(
         caller: &signer,
         lottery_id: u64,
@@ -68,8 +66,7 @@ module lottery::migration {
             next_ticket_id_legacy,
             pending_request,
             jackpot_amount,
-        ) =
-            main_v2::export_state_for_migration();
+        ) = main_v2::export_state_for_migration();
 
         let pending_request_present = option::is_some(&pending_request);
         if (pending_request_present) {
@@ -109,7 +106,6 @@ module lottery::migration {
         main_v2::clear_state_after_migration();
     }
 
-
     #[view]
     public fun list_migrated_lottery_ids(): vector<u64> acquires MigrationLedger {
         if (!exists<MigrationLedger>(@lottery)) {
@@ -118,7 +114,6 @@ module lottery::migration {
         let state = borrow_global<MigrationLedger>(@lottery);
         copy_u64_vector(&state.lottery_ids)
     }
-
 
     #[view]
     public fun get_migration_snapshot(
@@ -134,7 +129,6 @@ module lottery::migration {
             option::some(*table::borrow(&state.snapshots, lottery_id))
         }
     }
-
 
     #[test_only]
     public fun migration_snapshot_fields_for_test(
@@ -155,14 +149,12 @@ module lottery::migration {
         )
     }
 
-
     #[test_only]
     public fun migration_snapshot_event_fields_for_test(
         event: &MigrationSnapshotUpdatedEvent
     ): (u64, MigrationSnapshot) {
         (event.lottery_id, event.snapshot)
     }
-
 
     fun record_snapshot(caller: &signer, snapshot: MigrationSnapshot) acquires MigrationLedger {
         ensure_ledger(caller);
@@ -182,7 +174,6 @@ module lottery::migration {
         };
     }
 
-
     fun ensure_ledger(caller: &signer) {
         if (!exists<MigrationLedger>(@lottery)) {
             move_to(
@@ -196,7 +187,6 @@ module lottery::migration {
         };
     }
 
-
     fun record_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
         let len = vector::length(ids);
         let idx = 0;
@@ -208,7 +198,6 @@ module lottery::migration {
         };
         vector::push_back(ids, lottery_id);
     }
-
 
     fun copy_u64_vector(values: &vector<u64>): vector<u64> {
         let out = vector::empty<u64>();

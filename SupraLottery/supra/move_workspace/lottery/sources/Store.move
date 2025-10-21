@@ -5,7 +5,7 @@ module lottery::store {
     use supra_framework::event;
     use std::signer;
     use vrf_hub::table;
-    use lottery::instances;
+    use lottery_core::instances;
     use lottery::treasury_multi;
     use lottery::treasury_v1;
 

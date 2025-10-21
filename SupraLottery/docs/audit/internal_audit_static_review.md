@@ -22,7 +22,7 @@
 - Джекпот (`lottery::jackpot`) экспортирует view `get_snapshot` и события fulfil/ticket, фиксирующие pending-заявки и розыгрыши.【F:SupraLottery/supra/move_workspace/lottery/sources/Jackpot.move†L274-L280】
 - Раунды (`lottery::rounds`) публикуют `RoundSnapshotUpdatedEvent` и view `get_round_snapshot`/`pending_request_id` для аудита состояния draw.【F:SupraLottery/supra/move_workspace/lottery/sources/LotteryRounds.move†L317-L341】
 - Реферальная программа (`lottery::referrals`) предоставляет агрегированный `ReferralSnapshotUpdatedEvent` и view `get_referral_snapshot` с полным списком лотерей и статистикой бонусов.【F:SupraLottery/supra/move_workspace/lottery/sources/Referrals.move†L464-L505】
-- NFT-бейджи (`lottery::nft_rewards`) поддерживают view `get_snapshot`/`get_owner_snapshot` и снапшоты победителей, обеспечивая наблюдаемость наград.【F:SupraLottery/supra/move_workspace/lottery/sources/NftRewards.move†L242-L263】
+- NFT-бейджи (`lottery_rewards::nft_rewards`) поддерживают view `get_snapshot`/`get_owner_snapshot` и снапшоты победителей, обеспечивая наблюдаемость наград.【F:SupraLottery/supra/move_workspace/lottery_rewards/sources/NftRewards.move†L242-L263】
 
 ## 4. Выводы и следующие шаги
 - Статические проверки подтверждают, что ключевые требования Supra к событиям, snapshot-view и использованию Supra Framework выполнены. Отметки перенесены в чек-лист `internal_audit_checklist.md`.

@@ -8,7 +8,7 @@ module lottery::vip {
     use supra_framework::account;
     use supra_framework::event;
     use std::timestamp;
-    use lottery::instances;
+    use lottery_core::instances;
     use lottery::treasury_multi;
     use lottery::treasury_v1;
 

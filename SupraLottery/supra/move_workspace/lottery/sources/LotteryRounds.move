@@ -9,7 +9,7 @@ module lottery::rounds {
     use supra_framework::account;
     use supra_framework::event;
     use lottery::history;
-    use lottery::instances;
+    use lottery_core::instances;
     use lottery::treasury_multi;
     use lottery::referrals;
     use lottery::treasury_v1;

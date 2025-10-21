@@ -2,7 +2,7 @@
 module lottery::vip_tests {
     use std::signer;
     use std::vector;
-    use lottery::instances;
+    use lottery_core::instances;
     use lottery::rounds;
     use lottery::treasury_multi;
     use lottery::treasury_v1;

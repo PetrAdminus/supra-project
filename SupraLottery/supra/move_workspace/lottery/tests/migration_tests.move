@@ -3,7 +3,7 @@ module lottery::migration_tests {
     use std::option;
     use std::signer;
     use std::vector;
-    use lottery::instances;
+    use lottery_core::instances;
     use lottery::main_v2;
     use lottery::migration;
     use lottery::rounds;

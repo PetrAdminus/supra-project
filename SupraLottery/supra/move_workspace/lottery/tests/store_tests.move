@@ -3,7 +3,7 @@ module lottery::store_tests {
     use std::option;
     use std::vector;
     use std::signer;
-    use lottery::instances;
+    use lottery_core::instances;
     use lottery::rounds;
     use lottery::store;
     use lottery::treasury_multi;

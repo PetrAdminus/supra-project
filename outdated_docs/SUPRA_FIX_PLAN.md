@@ -142,7 +142,7 @@ treasury_v1::register_store_for(lottery_admin, @operations_pool);
 treasury_multi::init(lottery_admin, @lottery_owner, @operations_pool);
 
 // доп. шаг для тестов NFT-вознаграждений
-lottery::nft_rewards::init(lottery_admin, @nft_rewards);
+lottery_rewards::nft_rewards::init(lottery_admin, @nft_rewards);
 ```
 
 📘 **Источник:**  

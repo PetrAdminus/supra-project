@@ -1,14 +1,6 @@
 [package]
-name = "lottery"
-version = "0.0.1"
-
-[dependencies]
-MoveStdlib = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/move-stdlib", rev = "dev" }
-SupraFramework = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/supra-framework", rev = "dev" }
-vrf_hub = { local = "../vrf_hub" }
-lottery_factory = { local = "../lottery_factory" }
-SupraVrf = { local = "../SupraVrf" }
-lottery_core = { local = "../lottery_core" }
+name = "lottery_support"
+version = "0.1.0"
 
 [addresses]
 std = "0x1"
@@ -17,6 +9,7 @@ SupraFramework = "0x1"
 supra_addr = "0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e"
 lottery = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
 lottery_core = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
+lottery_support = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
 vrf_hub = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
 lottery_factory = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
 lottery_owner = "0x103"
@@ -27,3 +20,10 @@ player3 = "0x107"
 player4 = "0x108"
 jackpot_pool = "0x109"
 operations_pool = "0x10a"
+
+[dependencies]
+MoveStdlib = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/move-stdlib", rev = "dev" }
+SupraFramework = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/supra-framework", rev = "dev" }
+lottery_core = { local = "../lottery_core" }
+lottery = { local = "../lottery" }
+vrf_hub = { local = "../vrf_hub" }

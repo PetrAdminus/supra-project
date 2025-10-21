@@ -1,9 +1,9 @@
 #[test_only]
-module lottery::operators_tests {
+module lottery_core::operators_tests {
     use std::vector;
     use std::signer;
-    use lottery::operators;
-    use lottery::test_utils;
+    use lottery_core::operators;
+    use lottery_core::test_utils;
 
     #[test(lottery_admin = @lottery, owner = @player1, operator = @player2)]
     fun admin_assigns_and_grants(
@@ -180,7 +180,7 @@ module lottery::operators_tests {
 
     #[test(lottery_admin = @lottery, owner = @player1, intruder = @player2, operator = @player3)]
     #[expected_failure(
-        location = lottery::operators,
+        location = lottery_core::operators,
         abort_code = operators::E_NOT_AUTHORIZED,
     )]
     fun unauthorized_cannot_grant(
