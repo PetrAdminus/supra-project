@@ -25,5 +25,4 @@ operations_pool = "0x10a"
 MoveStdlib = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/move-stdlib", rev = "dev" }
 SupraFramework = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/supra-framework", rev = "dev" }
 lottery_core = { local = "../lottery_core" }
-lottery = { local = "../lottery" }
 vrf_hub = { local = "../vrf_hub" }

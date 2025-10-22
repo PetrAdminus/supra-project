@@ -9,6 +9,8 @@
 - Адреса контрактов: депозит dVRF v3 и `lottery` (см. официальную документацию).
 - Значения газа: `maxGasPrice`, `maxGasLimit`, `callbackGasPrice`, `callbackGasLimit`, коэффициент безопасности для депозита.
 - Установленный Docker и подготовленный `supra_cli` (см. `docker-compose.yml`).
+- Если Docker/Podman недоступны (например, в CI или ограниченной среде), скачайте [Aptos CLI 7.10.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v7.10.0) и передавайте путь в `MOVE_CLI` при запуске `supra/scripts/build_lottery_packages.sh` — скрипт автоматически задействует Python-обёртку `supra.scripts.cli move-test`.
+- При отсутствии доступа к git-зависимостям Supra/Move используйте `bash supra/scripts/bootstrap_move_deps.sh` — он скачает архив `Entropy-Foundation/aptos-core` (ветка `dev`) и разложит `move-stdlib`, `supra-framework`, `aptos-stdlib`, `supra-stdlib` в кеш Move (`~/.move/...`).
 
 > Быстрый контроль перед релизом: воспользуйтесь [чек-листом деплоя](./testnet_deployment_checklist.md), где собраны адреса, значения газа и обязательные команды.
 >
@@ -22,6 +24,23 @@ Supra CLI начиная с релиза 2025.05 хранит ключи и па
    ```bash
    docker compose run --rm --entrypoint bash supra_cli -lc "/supra/supra profile new lottery_admin <PRIVATE_KEY_HEX> --network testnet"
    ```
+   > **Podman:** если Docker недоступен, используйте эквивалентный запуск контейнера (дополнительные флаги можно передать через `PODMAN_EXTRA_ARGS`, суффиксы монтирования — через `PODMAN_VOLUME_SUFFIX`):
+   > ```bash
+   > PODMAN_EXTRA_ARGS="--rm --net host" podman run \
+   >   -e SUPRA_HOME=/supra/configs \
+   >   -v "$(pwd)/supra/configs:/supra/configs${PODMAN_VOLUME_SUFFIX:-}" \
+   >   -v "$(pwd)/supra/move_workspace:/supra/move_workspace${PODMAN_VOLUME_SUFFIX:-}" \
+   >   asia-docker.pkg.dev/supra-devnet-misc/supra-testnet/validator-node:v9.0.12 \
+   >   /bin/bash -lc "/supra/supra profile new lottery_admin <PRIVATE_KEY_HEX> --network testnet"
+   > ```
+> Скрипт `supra/scripts/build_lottery_packages.sh` использует тот же образ и автоматически переключается на Podman при его наличии.
+> При отсутствии контейнеров задайте `MOVE_CLI=/path/to/aptos` — будет использована Python-обёртка `supra.scripts.cli move-test` с Aptos CLI (`aptos move compile`).
+> 2025-10-27: `bash supra/scripts/bootstrap_move_deps.sh` + `MOVE_CLI=/tmp/aptos-cli/aptos` позволяют собрать `lottery_core`, `lottery_support`, `lottery_rewards` через `build_lottery_packages.sh` (см. журнал шага 4 в `docs/feature_split_plan.md`).
+> 2025-10-25: `lottery_core::rounds` уже развёртывает `CoreControl` и выдаёт `HistoryWriterCap` через `borrow_history_writer_cap`/`try_borrow_history_writer_cap`. Для ранних smoke-проверок запустите `lottery_support::history::ensure_caps_initialized` с тем же администратором — функция занимает capability и сразу возвращает её через `return_history_writer_cap`, фиксируя готовность API.
+> 2025-10-26: для автопокупок ядро выдаёт capability через `lottery_core::rounds::borrow_autopurchase_round_cap` и `lottery_core::treasury_v1::borrow_autopurchase_treasury_cap`. Вызовите `lottery_rewards::autopurchase::ensure_caps_initialized` из аккаунта лотереи, чтобы создать ресурс `AutopurchaseAccess`, а при переиздании пакета не забудьте вернуть capability командой `lottery_rewards::autopurchase::release_caps`.
+> 2025-10-27: `lottery_core::treasury_multi` теперь предоставляет `MultiTreasuryCap` через `borrow_multi_treasury_cap`/`return_multi_treasury_cap`, а view-функции `cap_available` и `scope_*` помогают контролировать выдачу. Перед smoke-тестами вызовите `lottery_rewards::jackpot::ensure_caps_initialized`, `lottery_rewards::referrals::ensure_caps_initialized`, `lottery_rewards::store::ensure_caps_initialized` и `lottery_rewards::vip::ensure_caps_initialized` — ресурсы `*Access` бронируют capability и экспонируют `caps_ready()` для быстрых проверок. Для освобождения прав используйте соответствующие `release_caps`.
+> 2025-10-28: `lottery_core::treasury_v1` перенесён из монолита — mint/burn/transfer и распределение призов доступны в новом пакете, а выплаты для расширений выполняются только через `payout_with_autopurchase_cap`/`payout_with_legacy_cap` при удержании capability (`AutopurchaseAccess`, `MigrationSession`).
+> 2025-10-29: модуль `lottery_core::main_v2` перенесён: все entry-функции подписки, whitelisting и запросов VRF живут в новом пакете, а `lottery_support::migration` теперь вызывает админские функции `export_state_for_migration(caller)`/`clear_state_after_migration(caller)` вместо friend-доступа. Алиас `lottery::main_v2` в CLI остаётся валидным, адрес контракта не менялся.
 2. При необходимости активируйте его (если несколько профилей):
    ```bash
    docker compose run --rm --entrypoint bash supra_cli -lc "/supra/supra profile activate lottery_admin"

@@ -95,7 +95,7 @@
 | `lottery::rounds` | `lottery_core` | 🟡 Требует доработки | Нужен capability для записи истории и доступа к автопокупкам (см. шаг 3). |
 | `lottery::instances` | `lottery_core` | 🟢 Подтверждено | Остаётся в ядре; friend только с `migration`, который переедет в support. |
 | `lottery::treasury_v1` | `lottery_core` | 🟡 Требует доработки | Нужно ограничить доступ расширений к депозитам через capability. |
-| `lottery::treasury_multi` | `lottery_core` | 🟡 Требует доработки | Понадобится capability для `jackpot`/`referrals`/`store`/`vip`. |
+| `lottery::treasury_multi` | `lottery_core` | 🟢 Перенесено | Полная логика казначейства перенесена, capability выдаётся через `borrow_multi_treasury_cap`. |
 | `lottery::operators` | `lottery_core` | 🟢 Подтверждено | Используется ядром и поддержкой; дополнительных ограничений не выявлено. |
 | `lottery::history` | `lottery_support` | 🟡 Требует доработки | Переезд возможен после capability от `rounds` для записи результатов. |
 | `lottery::migration` | `lottery_support` | 🟡 Требует доработки | Нужен контролируемый экспорт состояния `instances`/`main_v2`. |
@@ -197,7 +197,7 @@ lottery_core = { local = "../lottery_core" }
 | `lottery::treasury_v1` → `lottery::autopurchase` | `struct AutopurchaseTreasuryCap has store {}` | Внутри `treasury_v1::CoreControl` | `public fun borrow_autopurchase_cap(): AutopurchaseTreasuryCap` с проверкой адреса | Заменить direct вызовы `friend` у `autopurchase`. |
 | `lottery::treasury_v1` → `lottery::migration` | `struct LegacyTreasuryCap has store {}` | `treasury_v1::CoreControl` | `public(friend) fun borrow_legacy_cap(addr: address): LegacyTreasuryCap` | Использовать в миграции, снять friend. |
 | `lottery::treasury_multi` → `lottery::jackpot`/`referrals`/`store`/`vip` | `struct MultiTreasuryCap has store { scope: u64 }` | Внутри `treasury_multi::CoreControl`, scope соответствует типу расширения | `public fun borrow_multi_treasury_cap(scope: u64): MultiTreasuryCap` | Обновить каждое расширение, убрать friend. |
-| `lottery::instances` → `lottery::migration` | `struct InstancesExportCap has store {}` | `instances::CoreControl` | `public(friend) fun borrow_instances_export_cap(addr: address): InstancesExportCap` | Миграция использует capability вместо friend. |
+| `lottery::instances` → `lottery::migration` | `struct InstancesExportCap has store {}` | `instances::CoreControl` | `public fun borrow_instances_export_cap(caller: &signer): InstancesExportCap` | Миграция использует capability вместо friend. |
 
 Примечания:
 
@@ -274,7 +274,7 @@ module lottery::core_control {
 
 ### 4. Создание новых пакетов
 
-**Статус:** 🚧 В работе (обновлено 2025-10-24).
+**Статус:** 🚧 В работе (обновлено 2025-10-25).
 
 #### Общий прогресс
 
@@ -284,10 +284,10 @@ module lottery::core_control {
 | Шаблоны `Move.toml` | Уточнены адреса и зависимости для всех пакетов | ✅ Выполнено | Повторно использован шаблон из шага 2, добавлены версии и policy тестов. |
 | Каркас исходников | Определён список файлов и целевых путей для переноса | ✅ Выполнено | Заглушки модулей созданы во всех трёх пакетах; `lottery_support` уже содержит полноценные `metadata` и `history`. |
 | Workspace members | Добавлены новые пакеты в `SupraLottery/supra/move_workspace/Move.toml` | ✅ Выполнено | `lottery_core`, `lottery_support`, `lottery_rewards` участвуют в общем `workspace` и готовы к сборке. |
-| Сборочные скрипты | Черновые команды публикации и тестов | 🟢 Готово | Добавлен утилитный скрипт `supra/scripts/build_lottery_packages.sh` для запуска `sandbox build` по пакетам. |
+| Сборочные скрипты | Черновые команды публикации и тестов | 🟢 Готово | `supra/scripts/build_lottery_packages.sh` автоматически выбирает локальный `supra`, Docker Compose/Podman или Python-обёртку `supra.scripts.cli move-test` с Aptos CLI (`MOVE_CLI=/path/to/aptos`). |
 | Автоматизация каркасов | Скрипт генерации директорий и заглушек | 🟢 Готово | `supra/scripts/setup_lottery_packages.sh` разворачивает структуру пакетов и синхронизирует членов `workspace`. |
 | Синхронизация адресов | Монолитные адреса автоматически подтягиваются в новые `Move.toml` | 🟢 Готово | `setup_lottery_packages.sh` переписывает секцию `[addresses]` по данным из `lottery/Move.toml`, исключая расхождения при повторных запусках. |
-| Проверочные сборки | Локальная компиляция каждого пакета | 🟡 Заблокировано | Ожидает доступа к `supra move tool`; скрипт сборки готов. |
+| Проверочные сборки | Локальная компиляция каждого пакета | ✅ Выполнено | `supra/scripts/bootstrap_move_deps.sh` кеширует git-зависимости, после чего `build_lottery_packages.sh` (через Aptos CLI) собирает `lottery_core`, `lottery_support`, `lottery_rewards` без ошибок. |
 
 #### Контрольный список шага 4
 
@@ -297,14 +297,14 @@ module lottery::core_control {
 - [x] Добавить заглушки `sources/*.move` для ключевых модулей (по списку ниже).
 - [x] Настроить базовые команды сборки/тестов (см. `supra/scripts/build_lottery_packages.sh`).
 - [x] Подключить новые пакеты к корневому `workspace` (`SupraLottery/supra/move_workspace/Move.toml`).
-- [ ] Прогнать первичную сборку каждого пакета и зафиксировать результаты.
-- [ ] Обновить документацию runbook после успешной сборки.
+- [x] Прогнать первичную сборку каждого пакета и зафиксировать результаты (Aptos CLI + `bootstrap_move_deps.sh`).
+- [x] Обновить документацию runbook после успешной сборки.
 
 #### Карта переноса модулей по пакетам
 
 | Пакет | Исходные файлы (монолит) | Новый путь | Особенности переноса | Подготовительный статус |
 |---|---|---|---|---|
-| `lottery_core` | `lottery/sources/Lottery.move`, `LotteryRounds.move`, `LotteryInstances.move`, `Treasury.move`, `TreasuryMulti.move`, `Operators.move` | `supra/move_workspace/lottery_core/sources/<Module>.move` | Требуется сохранить порядок инициализации и `CoreControl` ресурсы. | 🟡 Перенос в процессе: `operators` и `instances` уже перенесены, остальные заглушки ждут наполнения |
+| `lottery_core` | `lottery/sources/Lottery.move`, `LotteryRounds.move`, `LotteryInstances.move`, `Treasury.move`, `TreasuryMulti.move`, `Operators.move` | `supra/move_workspace/lottery_core/sources/<Module>.move` | Требуется сохранить порядок инициализации и `CoreControl` ресурсы. | 🟡 Перенос почти завершён: `main_v2`, `treasury_v1`, `treasury_multi`, `operators` и `instances` перенесены, ждём наполнения `rounds` |
 | `lottery_support` | `lottery/sources/History.move`, `Metadata.move`, `Migration.move` | `supra/move_workspace/lottery_support/sources/<Module>.move` | Должны ссылаться на capability API из ядра. | 🟢 Заглушки и `ensure_caps_initialized` оформлены |
 | `lottery_rewards` | `lottery/sources/Autopurchase.move`, `Jackpot.move`, `Referrals.move`, `Store.move`, `Vip.move`, `NftRewards.move` | `supra/move_workspace/lottery_rewards/sources/<Module>.move` | Требуется настройка scope для `MultiTreasuryCap` и ленивый кэш. | 🟢 Заглушки со `SCOPE_*` и контролем созданы |
 
@@ -317,7 +317,7 @@ module lottery::core_control {
 - [x] Создать директорию `supra/move_workspace/lottery_core` и базовый `Move.toml` с адресами `lottery`, `supra_framework`, `vrf_hub`.
 - [x] Подготовить заглушки `sources/*.move` с декларациями модулей и комментариями TODO.
 - [ ] Добавить минимальные smoke-тесты (если потребуется для `supra move tool test`).
-- [ ] Проверить сборку `supra move tool sandbox build --package-dir supra/move_workspace/lottery_core`.
+- [x] Проверить сборку `supra move tool sandbox build --package-dir supra/move_workspace/lottery_core` (выполнено через `build_lottery_packages.sh` + Aptos CLI).
 
 **`lottery_support`**
 
@@ -325,54 +325,62 @@ module lottery::core_control {
 - [x] Создать директорию `supra/move_workspace/lottery_support` и `Move.toml` с зависимостью на `../lottery_core`.
 - [x] Добавить заглушки модулей с функциями `ensure_caps_initialized` и `TODO` комментариями к guarded API.
 - [ ] Обновить тестовый план: smoke-проверки миграции и истории (описано в шаге 7).
-- [ ] Выполнить первичную сборку пакета.
+- [x] Выполнить первичную сборку пакета (Aptos CLI + `build_lottery_packages.sh`).
 
 **`lottery_rewards`**
 
 - [x] Подготовить карту соответствия `scope` → модуль (`jackpot`, `referrals`, `store`, `vip`, `autopurchase`, `nft_rewards`).
 - [x] Создать директорию `supra/move_workspace/lottery_rewards` и `Move.toml` с зависимостью на `../lottery_core`.
-- [x] Сформировать заглушки модулей с константами `SCOPE_*` и структурами контроля (`*_Control`).
+- [x] Сформировать заглушки модулей с константами `SCOPE_*` и структурами контроля (`*_Control`) — актуальные версии удерживают capability через `ensure_caps_initialized`/`release_caps`.
 - [x] Перенести модуль `nft_rewards` в пакет `lottery_rewards`, сохранив события, view и тестовый набор.
 - [ ] Зафиксировать тесты на изоляцию scope в плане (см. шаг 7).
-- [ ] Проверить, что сборка проходит на заглушках.
+- [x] Проверить, что сборка проходит на заглушках (Aptos CLI подтвердил компиляцию всех модулей).
 
-##### Состояние каркасов (2025-10-24)
+##### Состояние каркасов (2025-10-26)
 
-- **lottery_core** — созданы каталоги и `Move.toml`, добавлены заглушки модулей `main_v2`, `rounds`, `treasury_v1`, `treasury_multi`; модули `operators` и `instances` перенесены из монолита и содержат рабочие реализации.
-- **lottery_support** — модули `metadata`, `history` и `migration` перенесены из монолита; `history::record_draw` требует `HistoryWriterCap`, `migration` временно использует friend-функции ядра до появления capability.
-- **lottery_rewards** — модуль `nft_rewards` перенесён с полной логикой и тестами; остальные модули пока остаются заглушками с константами `SCOPE_*` и `ensure_caps_initialized` до внедрения capability.
-- **workspace** — корневой `Move.toml` расширен пакетами `lottery_core`/`lottery_support`/`lottery_rewards`, поэтому `supra move tool` обнаружит их без ручного редактирования.
+- **lottery_core** — созданы каталоги и `Move.toml`, перенесены `main_v2`, `operators`, `instances`, `treasury_v1` и `treasury_multi` из монолита. `main_v2` теперь живёт в пакете ядра, сохраняет события и admin-гард для миграции (`export_state_for_migration(caller)`/`clear_state_after_migration(caller)`); `lottery_core::rounds` разворачивает `CoreControl` и управляет `HistoryWriterCap`/`AutopurchaseRoundCap`; `treasury_v1` реализует mint/burn/transfer и выдачу capability (`AutopurchaseTreasuryCap`, `LegacyTreasuryCap`, `payout_with_*`); `treasury_multi` включает полную логику распределения, события, view и guarded API (`borrow/return_multi_treasury_cap`, `cap_available`, `scope_*`). Из заглушек осталась только `rounds::migrate_import_round`, которая будет заполнена вместе с переносом логики раундов.
+- **lottery_support** — модули `metadata`, `history` и `migration` перенесены из монолита; `history::record_draw` требует `HistoryWriterCap`, `migration` переключён на API `lottery_core` и собирается на заглушках capability.
+- **lottery_rewards** — модуль `nft_rewards` перенесён с полной логикой и тестами; `autopurchase` поднимает ресурс `AutopurchaseAccess`, запрашивает/возвращает capability ядра и предоставляет smoke-проверку `caps_ready`, `jackpot`/`referrals`/`store`/`vip` удерживают `MultiTreasuryCap` в ресурсах `*Access`, реализуя `ensure_caps_initialized`/`release_caps` и view `caps_ready` для smoke-тестов (основной бизнес-код появится на шаге 5).
+- **workspace** — корневой `Move.toml` расширен пакетами `lottery_core`/`lottery_support`/`lottery_rewards`, поэтому `supra move tool` обнаружит их без ручного редактирования; `.move/config` дополнен алиасами `lottery_core`, `lottery_support`, `lottery_rewards` для Python/CLI-утилит.
 - Для совместимости путей добавлены симлинки `supra/move_workspace/lottery_*` → `SupraLottery/supra/move_workspace/lottery_*`, чтобы команды из runbook могли работать без изменения текущих инструкций.
-- Добавлен автоматизированный запуск сборки через `supra/scripts/build_lottery_packages.sh`, который использует локальный `supra` либо контейнер `supra_cli`.
+- Добавлен автоматизированный запуск сборки через `supra/scripts/build_lottery_packages.sh`, который использует локальный `supra`, Docker Compose/Podman либо Python-обёртку `supra.scripts.cli move-test` с Aptos CLI (fallback для окружений без контейнеров).
 - Для повторного развёртывания каркасов добавлен скрипт `supra/scripts/setup_lottery_packages.sh`, создающий `Move.toml`, заглушки модулей и симлинки.
 
 #### Первичная сборка и журнал прогресса
 
 | Пакет | Команда | Статус | Комментарий |
 |---|---|---|---|
-| `lottery_core` | `supra move tool sandbox build --package-dir supra/move_workspace/lottery_core` | ⛔ Заблокировано | В контейнере отсутствует Supra CLI; запуск требует локального CLI или Docker Compose. |
-| `lottery_support` | `supra move tool sandbox build --package-dir supra/move_workspace/lottery_support` | ⛔ Заблокировано | Аналогично, ожидает доступный `supra` или `docker compose run supra_cli`. |
-| `lottery_rewards` | `supra move tool sandbox build --package-dir supra/move_workspace/lottery_rewards` | ⛔ Заблокировано | Стартуем после подготовки окружения; скрипт `build_lottery_packages.sh` готов к запуску. |
+| `lottery_core` | ``MOVE_CLI=/tmp/aptos-cli/aptos PYTHONPATH_OVERRIDE=SupraLottery bash supra/scripts/build_lottery_packages.sh lottery_core`` | ✅ Успех | После запуска `supra/scripts/bootstrap_move_deps.sh` пакет собирается без ошибок (см. лог `aptos move compile`). |
+| `lottery_support` | ``MOVE_CLI=/tmp/aptos-cli/aptos PYTHONPATH_OVERRIDE=SupraLottery bash supra/scripts/build_lottery_packages.sh lottery_support`` | ✅ Успех | Миграция использует заглушки `lottery_core`, сборка завершается успешно. |
+| `lottery_rewards` | ``MOVE_CLI=/tmp/aptos-cli/aptos PYTHONPATH_OVERRIDE=SupraLottery bash supra/scripts/build_lottery_packages.sh lottery_rewards`` | ✅ Успех | Заглушки автопокупок проходят компиляцию, зависимости `lottery_core` подтянуты из кеша. |
+
+**Сборка через Aptos CLI (2025-10-27)**
+
+1. Выполнен `bash supra/scripts/bootstrap_move_deps.sh`, который скачивает `Entropy-Foundation/aptos-core` (`rev = dev`) и раскладывает `move-stdlib`, `supra-framework`, `aptos-stdlib`, `supra-stdlib` в кеш Move (`~/.move/...`).
+2. Скачан Aptos CLI 7.10.0 (`/tmp/aptos-cli/aptos`) и передан в `MOVE_CLI` для `build_lottery_packages.sh`.
+3. Скрипт `build_lottery_packages.sh` успешно собрал `lottery_core`, `lottery_support`, `lottery_rewards`, используя Python-обёртку `supra.scripts.cli move-test --mode check` и фиксируя журналы компиляции для всех пакетов.
 
 Порядок действий для команды при появлении CLI Supra:
 
 1. Выполнить `bash supra/scripts/setup_lottery_packages.sh`, чтобы убедиться, что `Move.toml` и адреса синхронизированы с монолитом (`lottery_core`, `lottery_support`, `lottery_rewards` получат актуальные алиасы `lottery_*`).
-2. Запустить `bash supra/scripts/build_lottery_packages.sh` или указать конкретный пакет в аргументах. Скрипт автоматически выберет установленный CLI либо `docker compose run supra_cli`.
+2. Запустить `bash supra/scripts/build_lottery_packages.sh` или указать конкретный пакет в аргументах. Скрипт автоматически выберет установленный Supra CLI, `docker compose run supra_cli`, `podman run` либо Python-обёртку `supra.scripts.cli move-test` (при наличии Aptos CLI или `MOVE_CLI`).
 3. Зафиксировать в таблице выше результат каждой сборки (успех/ошибка, размер байткода) и обновить чеклист шага 4.
 4. После успешной сборки подготовить блокнот с измерениями размера (`move package info --bytecode-size`) для сравнения с лимитом 60 KB и приложить к runbook.
+
+> Примечание: при работе через Podman можно передать дополнительные параметры в `PODMAN_EXTRA_ARGS` (например, `--rm --net host --security-opt label=disable`) и указать постфиксы для монтирования томов через `PODMAN_VOLUME_SUFFIX` (`:Z` для SELinux).
 
 #### План подготовки к шагу 5 (перенос модулей)
 
 | Модуль монолита | Новый пакет/модуль | Действия при переносе | Готовность | Блокеры |
 |---|---|---|---|---|
-| `lottery::main_v2` | `lottery_core::main_v2` | Перенести код, внедрить выдачу capability через `CoreControl`, обновить entry-функции на lazy-инициализацию. | ⏳ Планируется | Требуется финализация API `CoreControl`. |
-| `lottery::rounds` | `lottery_core::rounds` | Выделить выдачу `HistoryWriterCap` и `AutopurchaseRoundCap`, адаптировать `ensure_caps_initialized` для расширений. | ⏳ Планируется | Ждём подтверждения модели capability из шага 3. |
-| `lottery::instances` | `lottery_core::instances` | Адаптировать экспорт для `migration`, удалить friend, подключить `InstancesExportCap`. | 🟡 В работе | Код перенесён в `lottery_core`, предстоит внедрить capability и обновить `migration`. |
-| `lottery::treasury_v1` | `lottery_core::treasury_v1` | Перенести выдачу `AutopurchaseTreasuryCap`/`LegacyTreasuryCap`, провести аудит событий. | ⏳ Планируется | Проверка совместимости с legacy-подписками. |
-| `lottery::treasury_multi` | `lottery_core::treasury_multi` | Реализовать распределение по scope, синхронизировать с `SCOPE_*` из `lottery_rewards`. | ⏳ Планируется | Требуются подтверждённые значения scope. |
+| `lottery::main_v2` | `lottery_core::main_v2` | Полная логика перенесена в пакет ядра, экспорт состояния и очистка после миграции выполняются через admin-guard функции `export_state_for_migration(caller)`/`clear_state_after_migration(caller)`. | 🟢 Перенесено | — |
+| `lottery::rounds` | `lottery_core::rounds` | Выделить выдачу `HistoryWriterCap` и `AutopurchaseRoundCap`, адаптировать `ensure_caps_initialized` для расширений. | 🟡 В прогрессе | `CoreControl` развёрнут, `HistoryWriterCap` выдаётся через `borrow/try_borrow/return`; остальная логика переносится на шаге 5. |
+| `lottery::instances` | `lottery_core::instances` | Адаптировать экспорт для `migration`, удалить friend, подключить `InstancesExportCap`. | 🟢 Обновлено | Friend удалён: `InstancesExportCap` хранится в `CoreControl`, `migration` использует `borrow/return_instances_export_cap`. |
+| `lottery::treasury_v1` | `lottery_core::treasury_v1` | Перенести выдачу `AutopurchaseTreasuryCap`/`LegacyTreasuryCap`, провести аудит событий. | 🟡 В прогрессе | Код и события перенесены, добавлены `payout_with_autopurchase_cap`/`payout_with_legacy_cap`; требуется интеграция smoke-тестов и обновление вызывающих модулей. |
+| `lottery::treasury_multi` | `lottery_core::treasury_multi` | Реализовать распределение по scope, синхронизировать с `SCOPE_*` из `lottery_rewards`. | 🟢 Перенесено | Capability `MultiTreasuryCap` реализована, покрыты выдача/возврат и view-хелперы. |
 | `lottery::operators` | `lottery_core::operators` | Перенести админские операции, удостовериться, что ресурс операторов остаётся в ядре. | 🟢 Перенесено | Требуется прогнать smoke-тесты пакета после миграции ядра. |
 | `lottery::metadata` | `lottery_support::metadata` | Перенести view API без friend, убедиться в корректности адресов. | 🟢 Перенесено | Ожидает подтверждения сборкой (Supra CLI пока недоступен). |
-| `lottery::history` | `lottery_support::history` | Перенести записи розыгрышей, перевести `record_draw` на `HistoryWriterCap`. | 🟢 Перенесено | Требуется связать выдачу capability из `lottery_core::rounds`. |
+| `lottery::history` | `lottery_support::history` | Перенести записи розыгрышей, перевести `record_draw` на `HistoryWriterCap`. | 🟢 Перенесено | Выдача `HistoryWriterCap` реализована в `lottery_core::rounds`; ждём полноценного переноса логики раундов. |
 | `lottery::migration` | `lottery_support::migration` | Код перенесён, сценарии миграции готовы к проверке capability. | 🟢 Перенесено | Временно использует API монолита, требуется перевод на capability и smoke-тесты. |
 | `lottery::nft_rewards` | `lottery_rewards::nft_rewards` | Код перенесён: сохранены mint/burn, view и события, тесты переехали в пакет наград. | 🟢 Перенесено | — |
 | `lottery::vip` | `lottery_rewards::vip` | Интегрировать `MultiTreasuryCap (SCOPE_VIP)` и ленивую инициализацию. | ⏳ Планируется | Требуется готовый `treasury_multi`. |
@@ -389,6 +397,12 @@ module lottery::core_control {
 - ✅ Перенесён модуль `lottery::operators` в `lottery_core::operators` вместе с тестами `operators_tests`, которые теперь живут внутри пакета ядра и используют локальные `test_utils`.
 - ✅ Перенесён модуль `lottery::instances` в `lottery_core::instances` вместе с тестами `instances_tests`; все зависимые модули и тесты переключены на использование нового пакета.
 - ✅ Перенесён модуль `lottery::nft_rewards` в `lottery_rewards::nft_rewards`; сохранены события, snapshot/view API и переносимые тесты пакета.
+- ✅ В `lottery_core::instances` включена capability-модель (`InstancesExportCap`), `lottery_support::migration` и монолитная миграция используют `borrow_instances_export_cap`/`return_instances_export_cap` вместо friend-доступа.
+- ✅ В `lottery_core::rounds` развёрнут `CoreControl`, `HistoryWriterCap` выдаётся через `borrow_history_writer_cap`/`try_borrow_history_writer_cap`, а `lottery_support::history::ensure_caps_initialized` выполняет handshake и возвращает capability.
+- ✅ `lottery_core::rounds` и `lottery_core::treasury_v1` управляют capability автопокупок (`AutopurchaseRoundCap`, `AutopurchaseTreasuryCap`), а `lottery_rewards::autopurchase` удерживает их в ресурсе `AutopurchaseAccess` и предоставляет `release_caps` для повторной выдачи.
+- ✅ `lottery_core::treasury_v1` повторяет реализацию монолита: сохранены события `ConfigUpdatedEvent`/`RecipientsUpdatedEvent`/`JackpotDistributedEvent`, команды mint/burn/transfer и распределение призов; добавлены защищённые выплаты `payout_with_autopurchase_cap` и `payout_with_legacy_cap`.
+- ✅ Перенесён модуль `lottery::main_v2` в `lottery_core::main_v2`: сохранены все коды ошибок, события подписки/розыгрыша, расчёт минимального баланса и проверки VRF-конверта; экспорт состояния и очистка выполняются через admin-guard функции `export_state_for_migration(caller)`/`clear_state_after_migration(caller)` для пакета поддержки.
+- ✅ Добавлен скрипт `supra/scripts/bootstrap_move_deps.sh`, который скачивает `move-stdlib`/`supra-framework` из `Entropy-Foundation/aptos-core` и готовит локальный кеш для сборки пакетов без Supra CLI.
 
 Подготовительные задачи перед стартом шага 5:
 

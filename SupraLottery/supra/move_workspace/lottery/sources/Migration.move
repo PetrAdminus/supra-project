@@ -88,7 +88,8 @@ module lottery::migration {
         let effective_draw = draw_scheduled && ticket_count > 0;
 
         treasury_multi::migrate_seed_pool(lottery_id, jackpot_amount, 0, 0);
-        instances::migrate_override_stats(lottery_id, ticket_count, 0);
+        let instances_cap = instances::borrow_instances_export_cap(caller);
+        instances::migrate_override_stats(&instances_cap, lottery_id, ticket_count, 0);
         rounds::migrate_import_round(lottery_id, tickets, effective_draw, next_ticket_id, pending_request);
 
         let snapshot = MigrationSnapshot {
@@ -107,6 +108,7 @@ module lottery::migration {
         record_snapshot(caller, snapshot);
 
         main_v2::clear_state_after_migration();
+        instances::return_instances_export_cap(caller, instances_cap);
     }
 
 

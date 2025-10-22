@@ -3,9 +3,9 @@ module lottery_support::migration {
     use std::signer;
     use std::vector;
     use lottery_core::instances;
-    use lottery::main_v2;
-    use lottery::rounds;
-    use lottery::treasury_multi;
+    use lottery_core::main_v2;
+    use lottery_core::rounds;
+    use lottery_core::treasury_multi;
     use lottery_factory::registry;
     use supra_framework::account;
     use supra_framework::event;
@@ -66,7 +66,7 @@ module lottery_support::migration {
             next_ticket_id_legacy,
             pending_request,
             jackpot_amount,
-        ) = main_v2::export_state_for_migration();
+        ) = main_v2::export_state_for_migration(caller);
 
         let pending_request_present = option::is_some(&pending_request);
         if (pending_request_present) {
@@ -84,8 +84,9 @@ module lottery_support::migration {
         let next_ticket_id = ticket_count;
         let effective_draw = draw_scheduled && ticket_count > 0;
 
-        treasury_multi::migrate_seed_pool(lottery_id, jackpot_amount, 0, 0);
-        instances::migrate_override_stats(lottery_id, ticket_count, 0);
+        treasury_multi::migrate_seed_pool(caller, lottery_id, jackpot_amount, 0, 0);
+        let instances_cap = instances::borrow_instances_export_cap(caller);
+        instances::migrate_override_stats(&instances_cap, lottery_id, ticket_count, 0);
         rounds::migrate_import_round(lottery_id, tickets, effective_draw, next_ticket_id, pending_request);
 
         let snapshot = MigrationSnapshot {
@@ -103,7 +104,8 @@ module lottery_support::migration {
         };
         record_snapshot(caller, snapshot);
 
-        main_v2::clear_state_after_migration();
+        main_v2::clear_state_after_migration(caller);
+        instances::return_instances_export_cap(caller, instances_cap);
     }
 
     #[view]

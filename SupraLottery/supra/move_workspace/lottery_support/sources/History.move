@@ -63,9 +63,19 @@ module lottery_support::history {
         current: HistorySnapshot,
     }
 
-    /// Временная функция: будет запрашивать capability у `lottery_core::rounds` после переноса ядра.
+    /// Проверка наличия capability истории.
+    ///
+    /// При наличии доступа запускает handshake с `lottery_core::rounds`,
+    /// временно занимая и возвращая `HistoryWriterCap`. Это позволяет ранним
+    /// smoke-тестам убедиться, что ядро корректно выдаёт capability даже до
+    /// полного переноса логики розыгрышей.
     public fun ensure_caps_initialized(admin: &signer) {
-        let _ = signer::address_of(admin);
+        let cap_opt = lottery_core::rounds::try_borrow_history_writer_cap(admin);
+        if (option::is_some(&cap_opt)) {
+            let cap = option::extract(&mut cap_opt);
+            lottery_core::rounds::return_history_writer_cap(admin, cap);
+        };
+        option::destroy_none(cap_opt);
     }
 
     public entry fun init(caller: &signer) acquires HistoryCollection {
