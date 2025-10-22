@@ -1,6 +1,5 @@
 module lottery_core::instances {
     friend lottery_core::rounds;
-    friend lottery_support::migration;
 
     use std::option;
     use std::signer;
@@ -20,6 +19,16 @@ module lottery_core::instances {
     const E_REGISTRATION_INACTIVE: u64 = 7;
     const E_REGISTRATION_MISMATCH: u64 = 8;
     const E_STATUS_MISMATCH: u64 = 9;
+    const E_EXPORT_CAP_ALREADY_BORROWED: u64 = 10;
+    const E_EXPORT_CAP_NOT_BORROWED: u64 = 11;
+
+    /// Capability, выдаваемая административным модулем миграции для изменения статистики.
+    /// Храним единственный экземпляр в `CoreControl` и возвращаем после завершения операции.
+    public struct InstancesExportCap has store {}
+
+    struct CoreControl has key {
+        export_cap: option::Option<InstancesExportCap>,
+    }
 
     struct InstanceStats has copy, drop, store {
         tickets_sold: u64,
@@ -127,6 +136,10 @@ module lottery_core::instances {
                 status_events: account::new_event_handle<LotteryInstanceStatusUpdatedEvent>(caller),
                 snapshot_events: account::new_event_handle<LotteryInstancesSnapshotUpdatedEvent>(caller),
             },
+        );
+        move_to(
+            caller,
+            CoreControl { export_cap: option::some(InstancesExportCap {}) },
         );
         let state = borrow_global_mut<LotteryCollection>(@lottery);
         emit_all_snapshots(state);
@@ -384,7 +397,31 @@ module lottery_core::instances {
         emit_instance_snapshot(state, lottery_id);
     }
 
-    public(friend) fun migrate_override_stats(
+    public fun borrow_instances_export_cap(caller: &signer): InstancesExportCap acquires CoreControl, LotteryCollection {
+        ensure_initialized();
+        ensure_admin(caller);
+        let control = borrow_global_mut<CoreControl>(@lottery);
+        if (!option::is_some(&control.export_cap)) {
+            abort E_EXPORT_CAP_ALREADY_BORROWED
+        };
+        option::extract(&mut control.export_cap)
+    }
+
+    public fun return_instances_export_cap(
+        caller: &signer,
+        cap: InstancesExportCap,
+    ) acquires CoreControl, LotteryCollection {
+        ensure_initialized();
+        ensure_admin(caller);
+        let control = borrow_global_mut<CoreControl>(@lottery);
+        if (option::is_some(&control.export_cap)) {
+            abort E_EXPORT_CAP_NOT_BORROWED
+        };
+        option::fill(&mut control.export_cap, cap);
+    }
+
+    public fun migrate_override_stats(
+        _cap: &InstancesExportCap,
         lottery_id: u64,
         tickets_sold: u64,
         jackpot_accumulated: u64,
@@ -410,6 +447,9 @@ module lottery_core::instances {
 
     fun ensure_initialized() {
         if (!exists<LotteryCollection>(@lottery)) {
+            abort E_NOT_INITIALIZED
+        };
+        if (!exists<CoreControl>(@lottery)) {
             abort E_NOT_INITIALIZED
         };
     }
