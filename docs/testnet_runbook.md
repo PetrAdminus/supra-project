@@ -12,6 +12,7 @@ This runbook describes how to prepare the environment, build, publish and verify
 ```bash
 bash supra/scripts/bootstrap_move_deps.sh
 ```
+This pulls commit `7d1e62c9a5394a279a73515a150e880200640f06` of aptos-core and hydrates the local Move cache.
 This downloads `aptos-core` (branch `dev`) and seeds the `~/.move` cache so further builds do not fetch git deps every time.
 
 ## 3. Build packages

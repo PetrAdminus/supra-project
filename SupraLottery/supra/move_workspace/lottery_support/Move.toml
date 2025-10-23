@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "lottery_support"
 version = "0.1.0"
 
@@ -22,7 +22,8 @@ jackpot_pool = "0x109"
 operations_pool = "0x10a"
 
 [dependencies]
-MoveStdlib = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/move-stdlib", rev = "dev" }
-SupraFramework = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/supra-framework", rev = "dev" }
+MoveStdlib = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/move-stdlib", rev = "7d1e62c9a5394a279a73515a150e880200640f06" }
+SupraFramework = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/supra-framework", rev = "7d1e62c9a5394a279a73515a150e880200640f06" }
 lottery_core = { local = "../lottery_core" }
 vrf_hub = { local = "../vrf_hub" }
+
