@@ -1,19 +1,34 @@
-# SupraLottery Testnet Runbook
+# SupraLottery – Testnet Runbook
 
-This runbook describes how to prepare the environment, build, publish and verify the modular SupraLottery contracts on Supra testnet.
+Полный сценарий подготовки, сборки, публикации и проверки модульных контрактов SupraLottery на Supra testnet.
 
-## 1. Requirements
-- Docker Desktop (or Podman) with `docker compose`.
-- Python 3.10+ for helper scripts.
-- Local Supra CLI profile: copy `supra/configs/testnet.yaml` to `supra/configs/testnet.local.yaml`, fill `account_address` and `private_key`.
-- Test SUPRA balance on the selected account.
+---
 
-## 2. Bootstrap Move dependencies
+## 0. Предварительные требования
+- Docker Desktop или Podman (поддержка `docker compose`).
+- Python 3.10+.
+- Тестовые токены SUPRA на аккаунте.
+- Профиль Supra CLI:
+  1. Скопируйте `supra/configs/testnet.yaml` → `supra/configs/testnet.local.yaml`.
+  2. Заполните `account_address`, `private_key`, параметры газа.
+  3. Файл уже исключён `.gitignore`.
+
+Проверка баланса:
+```powershell
+docker compose run --rm -e SUPRA_PROFILE=my_profile --entrypoint bash supra_cli `
+  -lc "/supra/supra move account balance --profile my_profile"
+```
+
+---
+
+## 1. Зависимости Move (aptos-core)
+### Linux / WSL
 ```bash
 bash supra/scripts/bootstrap_move_deps.sh
 ```
-This pulls commit `7d1e62c9a5394a279a73515a150e880200640f06` of aptos-core and hydrates the local Move cache.
-If you are on Windows without WSL/bash, run the Python fallback:
+Команда скачает aptos-core commit `7d1e62c9a5394a279a73515a150e880200640f06` и заполнит кеш `~/.move`.
+
+### Windows без WSL
 ```powershell
 python -c "import os, tarfile, tempfile, shutil, urllib.request; from pathlib import Path; commit='7d1e62c9a5394a279a73515a150e880200640f06'; repo_url='https://github.com/Entropy-Foundation/aptos-core'; framework_subpath=Path('aptos-move/framework'); needed_dirs=['move-stdlib','supra-framework','aptos-stdlib','supra-stdlib']; move_home=Path(os.environ.get('MOVE_HOME', Path.home()/'.move')); cache_prefix=f'https___github_com_Entropy-Foundation_aptos-core_git_{commit}'; target_base=move_home/cache_prefix/framework_subpath;
 if all((target_base/d).exists() for d in needed_dirs):
@@ -30,57 +45,87 @@ with tempfile.TemporaryDirectory() as tmpdir:
         if dst.exists(): shutil.rmtree(dst); shutil.copytree(src, dst); print('Installed', dst)
 print('Move dependencies installed at', target_base)"
 ```
-This downloads `aptos-core` (branch `dev`) and seeds the `~/.move` cache so further builds do not fetch git deps every time.
 
-## 3. Build packages
+---
+
+## 2. Компиляция пакетов
+Все команды выполняются внутри контейнера `supra_cli`.
 ```powershell
+# lottery_core
 docker compose run --rm --entrypoint bash supra_cli `
-  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_core \
-        --skip-fetch-latest-git-deps"
+  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_core         --skip-fetch-latest-git-deps"
+# lottery_support
 docker compose run --rm --entrypoint bash supra_cli `
-  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_support \
-        --skip-fetch-latest-git-deps"
+  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_support         --skip-fetch-latest-git-deps"
+# lottery_rewards
 docker compose run --rm --entrypoint bash supra_cli `
-  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_rewards \
-        --skip-fetch-latest-git-deps"
+  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_rewards         --skip-fetch-latest-git-deps"
 ```
-These commands execute inside the `supra_cli` container, so no local bash/WSL is required. Podman users can adapt the command.
+(Для Podman адаптируйте команду.)
 
-## 4. Run unit tests
+---
+
+## 3. Unit-тесты
 ```bash
 python -m supra.scripts.cli move-test --workspace supra/move_workspace --package lottery_core --skip-fetch-latest-git-deps
 python -m supra.scripts.cli move-test --workspace supra/move_workspace --package lottery_support --skip-fetch-latest-git-deps
 python -m supra.scripts.cli move-test --workspace supra/move_workspace --package lottery_rewards --skip-fetch-latest-git-deps
 ```
+или
+```powershell
+docker compose run --rm --entrypoint bash supra_cli `
+  -lc "/supra/supra move tool test --package-dir /supra/move_workspace/lottery_core --skip-fetch-latest-git-deps"
+```
 
-## 5. Publish packages
-Example for Docker (replace `my_profile`):
+---
+
+## 4. Публикация пакетов (Supra testnet)
+Последовательность: core → support → rewards.
 ```powershell
 docker compose run --rm -e SUPRA_PROFILE=my_profile --entrypoint bash supra_cli `
   -lc "/supra/supra move tool publish --package-dir /supra/move_workspace/lottery_core         --included-artifacts none --skip-fetch-latest-git-deps         --gas-unit-price 100 --max-gas 150000 --expiration-secs 600 --assume-yes"
 ```
-Run the same command for `lottery_support` and `lottery_rewards`. For Podman see `supra/scripts/publish_lottery_packages.sh` (handles volume suffixes and extra args).
+После выполнения сохраните хеш транзакции и повторите команду для `lottery_support`, `lottery_rewards`.
 
-## 6. Post-publish initialisation
-```bash
+---
+
+## 5. Инициализация после публикации
+```powershell
 bash supra/scripts/sync_lottery_queues.sh
 ```
-Use capability APIs to drain/initialise history and purchase queues. Ensure VRF whitelisting and deposits are configured (see docs).
+Если bash недоступен, выполните команды из скрипта через контейнер `supra_cli`. Скрипт синхронизирует очереди истории/покупок и проверяет capability.
 
-## 7. Validation checklist
-- Inspect events via `supra move tool show` or `supra move tool view`.
-- Confirm treasury and queue state via view functions (`lottery_core::treasury_v1::is_initialized`, etc.).
-- Execute a manual draw or integration script.
+Дополнительно выполните whitelisting VRF и депозиты согласно `SupraLottery/docs/testnet_deployment_checklist.md`.
 
-## 8. Legacy fallback
-If monolithic deployment is required:
+---
+
+## 6. Проверки
+- `supra move tool show --query module ...` — модули опубликованы.
+- `lottery_core::treasury_v1::is_initialized`, `lottery_core::rounds::history_queue_length` — состояние ресурсов.
+- Тестовый сценарий: покупка билета, ручной розыгрыш.
+- Сохраните хеши транзакций и параметры газа в runbook/чеклисте.
+
+---
+
+## 7. Legacy fallback
+Для возврата к монолитной версии:
 ```powershell
 docker compose run --rm -e SUPRA_PROFILE=my_profile --entrypoint bash supra_cli `
   -lc "/supra/supra move tool publish --package-dir /supra/move_workspace/lottery_backup         --included-artifacts none --skip-fetch-latest-git-deps         --gas-unit-price 100 --max-gas 200000 --expiration-secs 600 --assume-yes"
 ```
-Follow historical instructions for initialisation (see `SupraLottery/docs/testnet_deployment_checklist.md`).
+Дальнейшие шаги — по разделу Legacy в чеклисте.
 
-## 9. References
-- https://docs.supra.com
+---
+
+## 8. Полезные ссылки
+- <https://docs.supra.com>
 - `supra/scripts/publish_lottery_packages.sh`
 - `supra/scripts/sync_lottery_queues.sh`
+- `SupraLottery/docs/testnet_deployment_checklist.md`
+
+---
+
+## 9. Завершение релиза
+- Чеклист выполнен, хеши/параметры задокументированы.
+- Создан git-тег (`release/testnet-YYYYMMDD`) или релизная ветка.
+- Обновлены фронтенд/интеграционные конфиги при необходимости.
