@@ -14,10 +14,10 @@ Supra Lottery — пакет смарт-контрактов на Move для б
 
 ### Технологический стек
 - Язык Move под Supra VM
-- Клиент Supra dVRF v3 (модули `supra_vrf`, `deposit` и интеграция `lottery::main_v2`)
-- Fungible Asset-токен, развёрнутый через обёртку `lottery::treasury_v1`
+- Клиент Supra dVRF v3 (модули `supra_vrf`, `deposit` и интеграция `lottery_core::main_v2`)
+- Fungible Asset-токен, развёрнутый через обёртку `lottery_core::treasury_v1`
 - Среда Supra CLI в Docker (`docker-compose.yml`)
-- Расширенные Move-юнит-тесты, покрывающие whitelisting, обработку VRF и негативные сценарии (`supra/move_workspace/lottery/tests`)
+- Расширенные Move-юнит-тесты, покрывающие whitelisting, обработку VRF и негативные сценарии (`supra/move_workspace/lottery_core/tests`, `lottery_support/tests`, `lottery_rewards/tests`)
 
 ### Быстрый старт
 1. Запустите Docker Desktop (или совместимый рантайм).
@@ -30,13 +30,15 @@ Supra Lottery — пакет смарт-контрактов на Move для б
 
 ### Запуск Move-тестов
 ```bash
-docker compose run --rm \
-  --entrypoint bash supra_cli \
-  -lc "/supra/supra move tool test --package-dir /supra/move_workspace/lottery --named-addresses lottery=$(grep '^lottery' /supra/.move/config | cut -d'=' -f2) --skip-fetch-latest-git-deps"
+for package in lottery_core lottery_support lottery_rewards; do
+  docker compose run --rm \
+    --entrypoint bash supra_cli \
+    -lc "/supra/supra move tool test --package-dir /supra/move_workspace/${package} --skip-fetch-latest-git-deps"
+done
 ```
-Команда собирает пакет и прогоняет полный набор Move-юнит-тестов (позитивные и негативные сценарии VRF, whitelisting, переполнения счётчиков) внутри контейнера. При ручном запуске вне репозитория обязательно пробрасывайте именованные адреса через `--named-addresses` (адреса можно взять из `.move/config`), иначе компилятор Move 1 вернёт ошибку о недостающих адресах. Удобно оборачивать запуск в `script -q` для фиксации журналов.
+Цикл последовательно прогоняет тесты для всех трёх пакетов (`lottery_core`, `lottery_support`, `lottery_rewards`) внутри контейнера Supra CLI. При ручном запуске вне репозитория обязательно указывайте именованные адреса через `--named-addresses` (см. примеры в `supra/scripts/build_lottery_packages.sh`), иначе компилятор Move 1 вернёт ошибку о недостающих адресах. Удобно оборачивать запуск в `script -q`, чтобы фиксировать журналы.
 
-> Для запуска из локальной оболочки без Docker экспортируйте переменную `MOVE_HOME=.move`, чтобы Supra CLI автоматически прочитал `workspace_dir` и адреса из `.move/config`, и используйте ту же команду с `--named-addresses`.
+> Для запуска из локальной оболочки без Docker экспортируйте переменную `MOVE_HOME=.move`, чтобы Supra CLI автоматически прочитал `workspace_dir` и адреса из `.move/config`, и используйте ту же конструкцию с явным списком пакетов.
 
 ### Единый скрипт Move-тестов и отчётов
 
@@ -59,9 +61,9 @@ PYTHONPATH=SupraLottery python -m supra.scripts.move_tests \
 ### Структура проекта
 - `docker-compose.yml` — описание контейнера Supra CLI.
 - `supra/configs/` — локальные конфиги Supra с ключами и историей (только для разработки).
-- `SupraLottery/supra/move_workspace/lottery/Move.toml` — манифест Move-пакета и список именованных адресов.
-- `SupraLottery/supra/move_workspace/lottery/sources/` — Move-модули лотереи: ядро (`Lottery.move`), раунды (`LotteryRounds.move`), экземпляры (`LotteryInstances.move`), автопокупка (`Autopurchase.move`), VIP/рефералы/магазин (`Vip.move`, `Referrals.move`, `Store.move`), история и метаданные (`History.move`, `Metadata.move`), операторы и NFT-награды (`Operators.move`, `NftRewards.move`), казначейство (`Treasury.move`, `TreasuryMulti.move`) и миграции (`Migration.move`).
-- `SupraLottery/supra/move_workspace/lottery/tests/` — Move-тесты для всех подсистем (ядро, раунды, автопокупка, VIP, рефералы, магазин, миграции).
+- `SupraLottery/supra/move_workspace/lottery_core/Move.toml` — манифест ядра и набор именованных адресов; `sources/` содержит `Lottery.move`, `LotteryRounds.move`, `LotteryInstances.move`, `Treasury.move`, `TreasuryMulti.move`, `Operators.move` и другие базовые модули, а `tests/` включает smoke-тесты раундов и вспомогательные утилиты.
+- `SupraLottery/supra/move_workspace/lottery_support/Move.toml` — манифест пакета поддержки; в `sources/` находятся `History.move`, `Metadata.move`, `Migration.move`, а `tests/` содержит smoke-наборы `history_sync_tests` и `migration_tests`.
+- `SupraLottery/supra/move_workspace/lottery_rewards/Move.toml` — манифест пакета наград; директория `sources/` объединяет `Autopurchase.move`, `Jackpot.move`, `Referrals.move`, `Store.move`, `Vip.move`, `RoundsSync.move`, `NftRewards.move`, а `tests/` содержит smoke-тесты автопокупок, джекпота, магазина, VIP и реферальных выплат.
 - `SupraLottery/supra/move_workspace/vrf_hub/` — VRF-хаб с таблицами запросов, событиями и юнит-тестами.
 - `SupraLottery/supra/move_workspace/lottery_factory/` — фабрика идентификаторов лотерей и тесты распределения.
 - `SupraLottery/supra/move_workspace/SupraVrf/` — локальная копия модулей `supra_vrf` и `deposit`, используемых тестами и скриптами.
@@ -73,7 +75,7 @@ PYTHONPATH=SupraLottery python -m supra.scripts.move_tests \
 > Зеркальные каталоги (`SupraLottery/supra/...` и `supra/...`) заменены симлинками на единый Move-workspace; дальнейшие правки выполняем только в `SupraLottery/supra/...`.
 
 ### Казначейство на Fungible Asset
-Модуль `lottery::treasury_v1` оборачивает стандарт `0x1::fungible_asset` и предоставляет следующие сценарии:
+Модуль `lottery_core::treasury_v1` оборачивает стандарт `0x1::fungible_asset` и предоставляет следующие сценарии:
 
 1. **Инициализация токена** — `treasury_v1::init_token` создаёт Metadata-объект, включает primary store и сохраняет mint/burn/transfer capability на адресе лотереи.
 2. **Регистрация хранилищ** — `treasury_v1::register_store` позволяет пользователям завести primary store, `register_store_for` даёт администратору возможность подготовить store для любого адреса, а `register_stores_for` регистрирует несколько адресов за один вызов.
@@ -81,7 +83,7 @@ PYTHONPATH=SupraLottery python -m supra.scripts.move_tests \
 4. **Заморозка store** — `treasury_v1::set_store_frozen` позволяет администратору временно заблокировать вывод и депозиты конкретного primary store (например, при разборе инцидентов). Повторный вызов с `false` снимает блокировку.
 5. **Назначение получателей** — перед вызовом `set_recipients` администратор обязан зарегистрировать primary store на каждом целевом адресе (`register_store_for`/`register_stores_for`), иначе функция завершится `E_RECIPIENT_STORE_NOT_REGISTERED`; это соответствует требованиям Supra FA о переводах только между зарегистрированными store.
 6. **Управление конфигурацией распределения** — `treasury_v1::set_config` обновляет доли (basis points) между джекпотом, призовым пулом и операционными направлениями, а `ConfigUpdatedEvent` фиксирует изменения; `get_config` предоставляет актуальные значения для фронтенда и скриптов.
-7. **Интеграция с лотереей** — `treasury_v1::deposit_from_user` списывает токены при покупке билета, а `payout_from_treasury` (пакетная функция, доступная всем модулям `lottery`) распределяет джекпот из казначейства; обе операции проверяют наличие store у плательщика и получателя.
+7. **Интеграция с лотереей** — `treasury_v1::deposit_from_user` списывает токены при покупке билета, а `payout_from_treasury` (пакетная функция, доступная остальным модулям `lottery_core`) распределяет джекпот из казначейства; обе операции проверяют наличие store у плательщика и получателя.
 
 Просмотр балансов и состояния:
 
@@ -94,7 +96,7 @@ PYTHONPATH=SupraLottery python -m supra.scripts.move_tests \
 - `treasury_v1::store_frozen(account)` — статус заморозки primary store (при `true` модуль `fungible_asset` заблокирует минт/депозиты/выводы).
 - `treasury_v1::total_supply()` и `treasury_v1::metadata_address()` — мониторинг выпуска и адреса Metadata.
 
-Юнит-тесты в `SupraLottery/supra/move_workspace/lottery/tests/lottery_tests.move` включают регистрацию store, минт в пользу тестовых аккаунтов и проверку, что покупка билетов/выплата приза расходуют FA-токен. Добавлены негативные сценарии: покупка билета, минт и депозит без предварительной регистрации store завершаются abort с кодами `13` (на уровне `main_v2`) и `4` (в `treasury_v1`).
+Юнит-тесты в `SupraLottery/supra/move_workspace/lottery_core/tests/rounds_queue_tests.move` и вспомогательные функции `SupraLottery/supra/move_workspace/lottery_core/tests/TestUtils.move` включают регистрацию store, минт в пользу тестовых аккаунтов и проверку, что покупка билетов/выплата приза расходуют FA-токен. Добавлены негативные сценарии: покупка билета, минт и депозит без предварительной регистрации store завершаются abort с кодами `13` (на уровне `main_v2`) и `4` (в `treasury_v1`).
 
 ### План версионирования
 - Текущая версия Move-пакета: `0.0.1`.
@@ -116,7 +118,7 @@ PYTHONPATH=SupraLottery python -m supra.scripts.move_tests \
 - `configure_vrf_request` задаёт желаемую мощность запроса (`rng_count`, `client_seed`) и генерирует событие `VrfRequestConfigUpdatedEvent` для аудита.
 - `record_consumer_whitelist_snapshot` отмечает `callbackGasPrice`/`callbackGasLimit` для контракта; факт логируется событием `ConsumerWhitelistSnapshotRecordedEvent`.
 - Текущий статус узнаём через `get_whitelist_status`, а снапшот минимального баланса доступен в `get_min_balance_limit_snapshot`.
-- Стоимость билета можно получить через view-функцию `lottery::main_v2::get_ticket_price()`, что упрощает синхронизацию фронтенда.
+- Стоимость билета можно получить через view-функцию `lottery_core::main_v2::get_ticket_price()`, что упрощает синхронизацию фронтенда.
 
 ### Дорожная карта
 - Отслеживать обновления Supra dVRF 3.x и при изменении API оперативно обновлять клиент и тестовый стенд.
@@ -184,6 +186,7 @@ PYTHONPATH=SupraLottery python -m supra.scripts.move_tests \
 ### Дополнительные директории и скрипты
 - `supra/move_workspace/Move.toml` объединяет пакеты `lottery`, `vrf_hub` и `lottery_factory`.
 - `supra/scripts/` содержит сценарии build/publish/migration; CLI-команда `python -m supra.scripts.cli vrf-audit --lottery-id <ID>` собирает события VRF для панели честности, а FastAPI-служба отдаёт агрегированный лог по маршруту `/lotteries/{id}/vrf-log`.
+- `supra/scripts/publish_lottery_packages.sh` автоматически подбирает доступный Supra CLI (локальный бинарь, Docker Compose или Podman) и публикует `lottery_core`/`lottery_support`/`lottery_rewards` в заданном порядке, принимая дополнительные флаги через `SUPRA_PUBLISH_EXTRA_ARGS`.
 
 ### После получения whitelisting
 1. Следуйте разделу 4 `docs/testnet_runbook.md`, чтобы завершить dVRF-флоу и опубликовать пакет.

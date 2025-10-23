@@ -1,12 +1,20 @@
 #[test_only]
 module lottery_core::test_utils {
+    use lottery_core::instances;
+    use lottery_core::rounds;
+    use lottery_core::treasury_multi;
+    use lottery_core::treasury_v1;
+    use lottery_factory::registry;
     use std::account;
     use std::option;
+    use std::signer;
     use std::timestamp;
     use std::vector;
     use supra_framework::event;
+    use vrf_hub::hub;
 
     const FRAMEWORK_ADDRESS: address = @SupraFramework;
+    const TREASURY_TEST_FUNDS: u64 = 1_000_000;
 
     public fun ensure_core_accounts() {
         account::create_account_for_test(FRAMEWORK_ADDRESS);
@@ -105,5 +113,95 @@ module lottery_core::test_utils {
         let len = vector::length(events);
         assert!(len > 0, 9001);
         vector::borrow(events, len - 1)
+    }
+
+    public fun treasury_test_funds(): u64 {
+        TREASURY_TEST_FUNDS
+    }
+
+    public fun sample_randomness(): vector<u8> {
+        let mut randomness = vector::empty<u8>();
+        vector::push_back(&mut randomness, 1);
+        vector::push_back(&mut randomness, 2);
+        vector::push_back(&mut randomness, 3);
+        vector::push_back(&mut randomness, 4);
+        vector::push_back(&mut randomness, 5);
+        vector::push_back(&mut randomness, 6);
+        vector::push_back(&mut randomness, 7);
+        vector::push_back(&mut randomness, 8);
+        randomness
+    }
+
+    public fun setup_round_with_pending_draw(
+        lottery_admin: &signer,
+        factory_admin: &signer,
+        vrf_admin: &signer,
+        player: &signer,
+    ): (u64, u64, u64) {
+        ensure_core_accounts();
+        if (!hub::is_initialized()) {
+            hub::init(vrf_admin);
+        };
+        if (!registry::is_initialized()) {
+            registry::init(factory_admin);
+        };
+        if (!treasury_v1::is_initialized()) {
+            treasury_v1::init_token(
+                lottery_admin,
+                b"seed",
+                b"Lottery Token",
+                b"LOT",
+                6,
+                b"",
+                b"",
+            );
+        };
+        if (!treasury_v1::is_core_control_initialized()) {
+            treasury_v1::init(lottery_admin);
+        };
+        treasury_v1::register_store(player);
+        treasury_v1::register_store_for(lottery_admin, @jackpot_pool);
+        treasury_v1::register_store_for(lottery_admin, @operations_pool);
+        treasury_v1::register_store_for(lottery_admin, signer::address_of(player));
+        let current_balance = treasury_v1::balance_of(@lottery);
+        if (current_balance < TREASURY_TEST_FUNDS) {
+            let missing = TREASURY_TEST_FUNDS - current_balance;
+            treasury_v1::mint_to(lottery_admin, @lottery, missing);
+        };
+        if (!treasury_multi::is_initialized()) {
+            treasury_multi::init(lottery_admin, @jackpot_pool, @operations_pool);
+        };
+        if (!instances::is_initialized()) {
+            instances::init(lottery_admin, @vrf_hub);
+        };
+        if (!rounds::is_initialized()) {
+            rounds::init(lottery_admin);
+        };
+
+        let blueprint = registry::new_blueprint(100, 1_000);
+        let lottery_id = registry::create_lottery(
+            factory_admin,
+            @lottery_owner,
+            @lottery_contract,
+            blueprint,
+            vector::empty<u8>(),
+        );
+        instances::create_instance(lottery_admin, lottery_id);
+        treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 6_000, 3_000, 1_000);
+
+        let autop_cap = rounds::borrow_autopurchase_round_cap(lottery_admin);
+        let total_paid = rounds::record_prepaid_purchase(
+            &autop_cap,
+            lottery_id,
+            signer::address_of(player),
+            2,
+        );
+        rounds::return_autopurchase_round_cap(lottery_admin, autop_cap);
+
+        rounds::schedule_draw(lottery_admin, lottery_id);
+        rounds::request_randomness(lottery_admin, lottery_id, vector::empty<u8>());
+        let mut pending = rounds::pending_request_id(lottery_id);
+        let request_id = unwrap(&mut pending);
+        (lottery_id, request_id, total_paid)
     }
 }

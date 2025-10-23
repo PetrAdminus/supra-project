@@ -1,4 +1,5 @@
 module lottery_support::history {
+    use lottery_core::rounds;
     use lottery_core::rounds::HistoryWriterCap;
     use std::option;
     use std::signer;
@@ -24,6 +25,10 @@ module lottery_support::history {
         lottery_ids: vector<u64>,
         record_events: event::EventHandle<DrawRecordedEvent>,
         snapshot_events: event::EventHandle<HistorySnapshotUpdatedEvent>,
+    }
+
+    struct HistoryWarden has key {
+        writer: HistoryWriterCap,
     }
 
     struct DrawRecord has copy, drop, store {
@@ -63,22 +68,48 @@ module lottery_support::history {
         current: HistorySnapshot,
     }
 
-    /// Проверка наличия capability истории.
+    /// Убеждаемся, что capability истории захвачена модулем поддержки.
     ///
-    /// При наличии доступа запускает handshake с `lottery_core::rounds`,
-    /// временно занимая и возвращая `HistoryWriterCap`. Это позволяет ранним
-    /// smoke-тестам убедиться, что ядро корректно выдаёт capability даже до
-    /// полного переноса логики розыгрышей.
-    public fun ensure_caps_initialized(admin: &signer) {
-        let cap_opt = lottery_core::rounds::try_borrow_history_writer_cap(admin);
-        if (option::is_some(&cap_opt)) {
-            let cap = option::extract(&mut cap_opt);
-            lottery_core::rounds::return_history_writer_cap(admin, cap);
+    /// При первом вызове запрашивает `HistoryWriterCap` у ядра и кэширует
+    /// его в ресурсе `HistoryWarden`. Повторные вызовы являются no-op.
+    /// Используется в smoke-сценариях перед записью истории, а также при
+    /// повторной инициализации после обновления пакета.
+    public fun ensure_caps_initialized(admin: &signer) acquires HistoryWarden {
+        if (signer::address_of(admin) != @lottery) {
+            abort E_NOT_AUTHORIZED
         };
+        if (exists<HistoryWarden>(@lottery)) {
+            return
+        };
+        let mut cap_opt = rounds::try_borrow_history_writer_cap(admin);
+        if (!option::is_some(&cap_opt)) {
+            option::destroy_none(cap_opt);
+            return
+        };
+        let cap = option::extract(&mut cap_opt);
+        move_to(admin, HistoryWarden { writer: cap });
         option::destroy_none(cap_opt);
     }
 
-    public entry fun init(caller: &signer) acquires HistoryCollection {
+    /// Проверяет, что capability истории находится в распоряжении поддержки.
+    #[view]
+    public fun caps_ready(): bool {
+        exists<HistoryWarden>(@lottery)
+    }
+
+    /// Возвращает capability истории обратно в ядро (например, перед переизданием пакета).
+    public fun release_caps(admin: &signer) acquires HistoryWarden {
+        if (signer::address_of(admin) != @lottery) {
+            abort E_NOT_AUTHORIZED
+        };
+        if (!exists<HistoryWarden>(@lottery)) {
+            abort E_NOT_INITIALIZED
+        };
+        let HistoryWarden { writer } = move_from<HistoryWarden>(@lottery);
+        rounds::return_history_writer_cap(admin, writer);
+    }
+
+    public entry fun init(caller: &signer) acquires HistoryCollection, HistoryWarden {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED
@@ -99,6 +130,9 @@ module lottery_support::history {
         let previous = option::none<HistorySnapshot>();
         let state = borrow_global_mut<HistoryCollection>(@lottery);
         emit_history_snapshot(state, previous);
+        if (!exists<HistoryWarden>(@lottery)) {
+            ensure_caps_initialized(caller);
+        };
     }
 
     public fun is_initialized(): bool {
@@ -138,7 +172,8 @@ module lottery_support::history {
         prize_amount: u64,
         random_bytes: vector<u8>,
         payload: vector<u8>,
-    ) acquires HistoryCollection {
+    ) acquires HistoryCollection, HistoryWarden {
+        let _ = borrow_history_cap();
         if (!exists<HistoryCollection>(@lottery)) {
             return
         };
@@ -169,6 +204,74 @@ module lottery_support::history {
             },
         );
         emit_history_snapshot(state, previous);
+    }
+
+    /// Записывает результат розыгрыша от имени ядра, используя кэшированную capability.
+    ///
+    /// Вызывается администратором лотереи сразу после `lottery_core::rounds::fulfill_draw_request`
+    /// (например, агрегатором VRF). Функция автоматически проверяет, что capability
+    /// выдана `HistoryWarden`, и повторно использует общий хук `record_draw`.
+    public entry fun record_draw_from_rounds(
+        caller: &signer,
+        lottery_id: u64,
+        request_id: u64,
+        winner: address,
+        ticket_index: u64,
+        prize_amount: u64,
+        random_bytes: vector<u8>,
+        payload: vector<u8>,
+    ) acquires HistoryCollection, HistoryWarden {
+        if (signer::address_of(caller) != @lottery) {
+            abort E_NOT_AUTHORIZED
+        };
+        let cap_ref = borrow_history_cap();
+        record_draw(
+            cap_ref,
+            lottery_id,
+            request_id,
+            winner,
+            ticket_index,
+            prize_amount,
+            random_bytes,
+            payload,
+        );
+    }
+
+    /// Синхронизирует накопленные результаты розыгрышей из ядра.
+    ///
+    /// `lottery_core::rounds` складывает каждый исполненный розыгрыш в очередь,
+    /// доступ к которой защищён capability `HistoryWriterCap`. Эта функция
+    /// извлекает ограниченное число записей (если `limit = 0`, берутся все)
+    /// и пересоздаёт их через `record_draw`, обновляя события истории и снапшоты.
+    public entry fun sync_draws_from_rounds(caller: &signer, limit: u64)
+    acquires HistoryCollection, HistoryWarden {
+        if (signer::address_of(caller) != @lottery) {
+            abort E_NOT_AUTHORIZED
+        };
+        let cap_ref = borrow_history_cap();
+        let mut pending = rounds::drain_history_queue(cap_ref, limit);
+        while (!vector::is_empty(&pending)) {
+            let record = vector::remove(&mut pending, 0);
+            let rounds::PendingHistoryRecord {
+                lottery_id,
+                request_id,
+                winner,
+                ticket_index,
+                prize_amount,
+                random_bytes,
+                payload,
+            } = record;
+            record_draw(
+                cap_ref,
+                lottery_id,
+                request_id,
+                winner,
+                ticket_index,
+                prize_amount,
+                random_bytes,
+                payload,
+            );
+        };
     }
 
     #[view]
@@ -255,6 +358,14 @@ module lottery_support::history {
         if (addr != state.admin) {
             abort E_NOT_AUTHORIZED
         };
+    }
+
+    fun borrow_history_cap(): &HistoryWriterCap acquires HistoryWarden {
+        if (!exists<HistoryWarden>(@lottery)) {
+            abort E_NOT_INITIALIZED
+        };
+        let warden = borrow_global<HistoryWarden>(@lottery);
+        &warden.writer
     }
 
     fun borrow_or_create_history(state: &mut HistoryCollection, lottery_id: u64): &mut LotteryHistory {

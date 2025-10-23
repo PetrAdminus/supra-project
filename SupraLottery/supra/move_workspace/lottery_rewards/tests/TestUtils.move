@@ -1,10 +1,17 @@
 #[test_only]
 module lottery_rewards::test_utils {
+    use lottery_core::instances;
+    use lottery_core::rounds;
+    use lottery_core::treasury_multi;
+    use lottery_core::treasury_v1;
+    use lottery_factory::registry;
     use std::account;
     use std::option;
     use std::timestamp;
     use std::vector;
     use supra_framework::event;
+    use vrf_hub::hub;
+    use lottery_rewards::autopurchase;
 
     const FRAMEWORK_ADDRESS: address = @SupraFramework;
 
@@ -105,5 +112,53 @@ module lottery_rewards::test_utils {
         let len = vector::length(events);
         assert!(len > 0, 9001);
         vector::borrow(events, len - 1)
+    }
+
+    public fun bootstrap_multi_treasury(
+        admin: &signer,
+        factory: &signer,
+        vrf_admin: &signer,
+    ) {
+        ensure_core_accounts();
+        ensure_time_started();
+        if (!hub::is_initialized()) {
+            hub::init(vrf_admin);
+        };
+        if (!registry::is_initialized()) {
+            registry::init(factory);
+        };
+        if (!treasury_v1::is_initialized()) {
+            treasury_v1::init_token(
+                admin,
+                b"seed",
+                b"Lottery Token",
+                b"LOT",
+                6,
+                b"",
+                b"",
+            );
+        };
+        if (!treasury_v1::is_core_control_initialized()) {
+            treasury_v1::init(admin);
+        };
+        treasury_v1::register_store_for(admin, @jackpot_pool);
+        treasury_v1::register_store_for(admin, @operations_pool);
+        if (!treasury_multi::is_initialized()) {
+            treasury_multi::init(admin, @jackpot_pool, @operations_pool);
+        };
+        if (!instances::is_initialized()) {
+            instances::init(admin, @vrf_hub);
+        };
+        if (!rounds::is_initialized()) {
+            rounds::init(admin);
+        };
+    }
+
+    public fun ensure_autopurchase_initialized(admin: &signer) {
+        if (!autopurchase::is_initialized()) {
+            autopurchase::init(admin);
+        } else {
+            autopurchase::ensure_caps_initialized(admin);
+        };
     }
 }

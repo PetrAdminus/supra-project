@@ -36,11 +36,12 @@ Supra CLI начиная с релиза 2025.05 хранит ключи и па
 > Скрипт `supra/scripts/build_lottery_packages.sh` использует тот же образ и автоматически переключается на Podman при его наличии.
 > При отсутствии контейнеров задайте `MOVE_CLI=/path/to/aptos` — будет использована Python-обёртка `supra.scripts.cli move-test` с Aptos CLI (`aptos move compile`).
 > 2025-10-27: `bash supra/scripts/bootstrap_move_deps.sh` + `MOVE_CLI=/tmp/aptos-cli/aptos` позволяют собрать `lottery_core`, `lottery_support`, `lottery_rewards` через `build_lottery_packages.sh` (см. журнал шага 4 в `docs/feature_split_plan.md`).
-> 2025-10-25: `lottery_core::rounds` уже развёртывает `CoreControl` и выдаёт `HistoryWriterCap` через `borrow_history_writer_cap`/`try_borrow_history_writer_cap`. Для ранних smoke-проверок запустите `lottery_support::history::ensure_caps_initialized` с тем же администратором — функция занимает capability и сразу возвращает её через `return_history_writer_cap`, фиксируя готовность API.
+> 2025-10-25: `lottery_core::rounds` уже развёртывает `CoreControl` и выдаёт `HistoryWriterCap` через `borrow_history_writer_cap`/`try_borrow_history_writer_cap`. Для ранних smoke-проверок запустите `lottery_support::history::ensure_caps_initialized` с тем же администратором — теперь функция кэширует capability в ресурсе `HistoryWarden`, а освободить его перед переизданием пакета можно через `lottery_support::history::release_caps`.
 > 2025-10-26: для автопокупок ядро выдаёт capability через `lottery_core::rounds::borrow_autopurchase_round_cap` и `lottery_core::treasury_v1::borrow_autopurchase_treasury_cap`. Вызовите `lottery_rewards::autopurchase::ensure_caps_initialized` из аккаунта лотереи, чтобы создать ресурс `AutopurchaseAccess`, а при переиздании пакета не забудьте вернуть capability командой `lottery_rewards::autopurchase::release_caps`.
 > 2025-10-27: `lottery_core::treasury_multi` теперь предоставляет `MultiTreasuryCap` через `borrow_multi_treasury_cap`/`return_multi_treasury_cap`, а view-функции `cap_available` и `scope_*` помогают контролировать выдачу. Перед smoke-тестами вызовите `lottery_rewards::jackpot::ensure_caps_initialized`, `lottery_rewards::referrals::ensure_caps_initialized`, `lottery_rewards::store::ensure_caps_initialized` и `lottery_rewards::vip::ensure_caps_initialized` — ресурсы `*Access` бронируют capability и экспонируют `caps_ready()` для быстрых проверок. Для освобождения прав используйте соответствующие `release_caps`.
 > 2025-10-28: `lottery_core::treasury_v1` перенесён из монолита — mint/burn/transfer и распределение призов доступны в новом пакете, а выплаты для расширений выполняются только через `payout_with_autopurchase_cap`/`payout_with_legacy_cap` при удержании capability (`AutopurchaseAccess`, `MigrationSession`).
-> 2025-10-29: модуль `lottery_core::main_v2` перенесён: все entry-функции подписки, whitelisting и запросов VRF живут в новом пакете, а `lottery_support::migration` теперь вызывает админские функции `export_state_for_migration(caller)`/`clear_state_after_migration(caller)` вместо friend-доступа. Алиас `lottery::main_v2` в CLI остаётся валидным, адрес контракта не менялся.
+> 2025-10-29: модуль `lottery_core::main_v2` перенесён: все entry-функции подписки, whitelisting и запросов VRF живут в новом пакете, а `lottery_support::migration` теперь вызывает админские функции `export_state_for_migration(caller)`/`clear_state_after_migration(caller)` вместо friend-доступа. Алиас `lottery_core::main_v2` в CLI остаётся валидным, адрес контракта не менялся.
+> 2025-10-30: `lottery_support::migration` кэширует `InstancesExportCap` и `LegacyTreasuryCap` в ресурсе `MigrationSession`. Перед запуском `migrate_from_legacy` вызовите `lottery_support::migration::ensure_caps_initialized`, статус можно проверить через `caps_ready()`, а перед переизданием пакета освободите capability командой `release_caps`.
 2. При необходимости активируйте его (если несколько профилей):
    ```bash
    docker compose run --rm --entrypoint bash supra_cli -lc "/supra/supra profile activate lottery_admin"
@@ -55,82 +56,82 @@ Supra CLI начиная с релиза 2025.05 хранит ключи и па
 ## 3. Миграция на dVRF v3
 > Все команды ниже запускаются одной строкой через Docker. Подставляйте своё имя профиля (например, `lottery_admin`) и при необх
 одимости экспортируйте `SUPRA_CONFIG=/supra/configs/testnet.yaml`, чтобы CLI подхватил общий YAML.
-> Примеры используют алиас `lottery::` из `Move.toml`; при запуске вне репозитория указывайте полный адрес, например `0xbc95…::main_v2::configure_vrf_gas`.
+> Примеры используют алиасы `lottery_core::`, `lottery_support::` и `lottery_rewards::` из `Move.toml`; при запуске вне репозитория указывайте полный адрес, например `0xbc95…::lottery_core::main_v2::configure_vrf_gas`.
 
 ### 3.1 Инициализация Fungible Asset для казначейства
 > Ориентируемся на официальные стандарты Supra: [token-standards](https://docs.supra.com/network/move/token-standards) и [описание `fungible_asset`](https://docs.supra.com/network/move/supra-fungible-asset-fa-module).
 
 1. Проверяем, развёрнут ли токен казначейства:
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::treasury_v1::is_initialized"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_core::treasury_v1::is_initialized"
    ```
 2. Если ответ `false`, инициализируем Metadata (значения hex соответствуют ASCII-строкам `Lottery Ticket`, `LOT` и сид `lottery_fa_seed`):
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::treasury_v1::init_token --args hex:0x6c6f74746572795f66615f73656564 hex:0x4c6f7474657279205469636b6574 hex:0x4c4f54 u8:9 hex:0x hex:0x"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery_core::treasury_v1::init_token --args hex:0x6c6f74746572795f66615f73656564 hex:0x4c6f7474657279205469636b6574 hex:0x4c4f54 u8:9 hex:0x hex:0x"
    ```
 3. Зарегистрируйте primary store для всех аккаунтов, которые будут получать токены:
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::treasury_v1::register_store_for --args address:<ACCOUNT>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery_core::treasury_v1::register_store_for --args address:<ACCOUNT>"
    ```
-   Пользователи также могут вызвать `lottery::treasury_v1::register_store` самостоятельно через свой кошелёк.
+   Пользователи также могут вызвать `lottery_core::treasury_v1::register_store` самостоятельно через свой кошелёк.
    Для массовой подготовки можно использовать батч-функцию администратора:
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::treasury_v1::register_stores_for --args address_vector:<ADDR1,ADDR2,...>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery_core::treasury_v1::register_stores_for --args address_vector:<ADDR1,ADDR2,...>"
    ```
    > Подробнее об аргументе `address_vector` см. раздел "Vector arguments" в [Supra CLI with Docker](https://docs.supra.com/network/move/getting-started/supra-cli-with-docker).
-   > ⚠️ Перед запуском `lottery::treasury_multi::init` убедитесь, что адреса джекпота и операционного пула уже зарегистрированы как primary store; контракт валидирует условие и при нарушении вернёт коды `E_TREASURY_NOT_READY`, `E_JACKPOT_RECIPIENT_UNREGISTERED` или `E_OPERATIONS_RECIPIENT_UNREGISTERED`.
+   > ⚠️ Перед запуском `lottery_core::treasury_multi::init` убедитесь, что адреса джекпота и операционного пула уже зарегистрированы как primary store; контракт валидирует условие и при нарушении вернёт коды `E_TREASURY_NOT_READY`, `E_JACKPOT_RECIPIENT_UNREGISTERED` или `E_OPERATIONS_RECIPIENT_UNREGISTERED`.
 4. Для тестовых аккаунтов можно заранее минтить баланс, чтобы они смогли купить билеты (после регистрации store):
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::treasury_v1::mint_to --args address:<PLAYER_ADDR> u64:<AMOUNT>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery_core::treasury_v1::mint_to --args address:<PLAYER_ADDR> u64:<AMOUNT>"
    ```
 5. Проверяем метаданные и адреса store через view-функции (каждая команда — отдельный запуск):
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::treasury_v1::metadata_summary"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_core::treasury_v1::metadata_summary"
    ```
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::treasury_v1::primary_store_address --args address:<ACCOUNT>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_core::treasury_v1::primary_store_address --args address:<ACCOUNT>"
 
     Функция возвращает детерминированный адрес объекта primary store из `supra_framework::primary_fungible_store`. Значение можно
     сравнить с `object::create_user_derived_object_address` на бэкенде и использовать в мониторинге для сверки freeze-статуса и
     баланса.
    ```
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::treasury_v1::get_config"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_core::treasury_v1::get_config"
    ```
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::treasury_v1::account_status --args address:<ACCOUNT>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_core::treasury_v1::account_status --args address:<ACCOUNT>"
    ```
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::treasury_v1::account_extended_status --args address:<ACCOUNT>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_core::treasury_v1::account_extended_status --args address:<ACCOUNT>"
    ```
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::treasury_v1::store_frozen --args address:<ACCOUNT>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_core::treasury_v1::store_frozen --args address:<ACCOUNT>"
    ```
 
    С миграцией на Move 1 все события казначейства создаются через `supra_framework::account::new_event_handle`, поэтому GUID определяется адресом лотереи и `creation_num`. Сверить значения можно командой:
 
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool resource --profile <PROFILE> --account <LOTTERY_ADDR> --resource-id lottery::treasury_v1::TreasuryState"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool resource --profile <PROFILE> --account <LOTTERY_ADDR> --resource-id lottery_core::treasury_v1::TreasuryState"
    ```
 
    Поля `*_events.guid.id.creation_num` в выводе подскажут, какие GUID передавать в `supra move tool event --start <seq>` при выгрузке логов. Адрес лотереи возьмите из `.move/config` или чек-листа деплоя. Благодаря начальному `event::emit_event` сразу после `move_to` (см. модули `LotteryRounds`, `TreasuryMulti`, `Autopurchase`) счётчик начинается с `0`, так что мониторинг не пропускает первые события.
 6. При необходимости можно временно заморозить primary store (например, на время расследования инцидента) и затем снять блокировку:
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::treasury_v1::set_store_frozen --args address:<ACCOUNT> bool:true"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery_core::treasury_v1::set_store_frozen --args address:<ACCOUNT> bool:true"
    ```
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::treasury_v1::set_store_frozen --args address:<ACCOUNT> bool:false"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery_core::treasury_v1::set_store_frozen --args address:<ACCOUNT> bool:false"
    ```
 
 7. Перед назначением получателей распределения убедитесь, что на каждом адресе создан primary store через `register_store_for` или `register_stores_for` и store не заморожен (проверьте `treasury_v1::account_extended_status`/`store_frozen`); затем выполните:
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::treasury_v1::set_recipients --args address:<TREASURY_ADDR> address:<MARKETING_ADDR> address:<COMMUNITY_ADDR> address:<TEAM_ADDR> address:<PARTNERS_ADDR>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery_core::treasury_v1::set_recipients --args address:<TREASURY_ADDR> address:<MARKETING_ADDR> address:<COMMUNITY_ADDR> address:<TEAM_ADDR> address:<PARTNERS_ADDR>"
    ```
    Если какой-то адрес не имеет зарегистрированного store, команда завершится ошибкой `E_RECIPIENT_STORE_NOT_REGISTERED`; при замороженном store вернётся стандартный `E_STORE_FROZEN` — оба требования соответствуют правилам Supra FA о переводах только между готовыми хранилищами.
 
 8. Обновить доли распределения (сумма basis points должна равняться 10 000):
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::treasury_v1::set_config --args u64:<BP_JACKPOT> u64:<BP_PRIZE> u64:<BP_TREASURY> u64:<BP_MARKETING> u64:<BP_COMMUNITY> u64:<BP_TEAM> u64:<BP_PARTNERS>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery_core::treasury_v1::set_config --args u64:<BP_JACKPOT> u64:<BP_PRIZE> u64:<BP_TREASURY> u64:<BP_MARKETING> u64:<BP_COMMUNITY> u64:<BP_TEAM> u64:<BP_PARTNERS>"
    ```
 
 ### 3.2 Настройка подписки Supra dVRF 3.0
@@ -142,13 +143,13 @@ Supra CLI начиная с релиза 2025.05 хранит ключи и па
 
 1. **Сконфигурируйте лимиты газа для VRF.** Параметры участвуют в расчёте депозита и проверках whitelisting.
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery::main_v2::configure_vrf_gas --args u128:<MAX_GAS_PRICE> u128:<MAX_GAS_LIMIT> u128:<CALLBACK_GAS_PRICE> u128:<CALLBACK_GAS_LIMIT> u128:<VERIFICATION_GAS_VALUE> --assume-yes"
+   docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery_core::main_v2::configure_vrf_gas --args u128:<MAX_GAS_PRICE> u128:<MAX_GAS_LIMIT> u128:<CALLBACK_GAS_PRICE> u128:<CALLBACK_GAS_LIMIT> u128:<VERIFICATION_GAS_VALUE> --assume-yes"
 
-   > Ограничения Supra VRF subscription: `callback_gas_price` и `callback_gas_limit` контракта должны быть ≤ `max_gas_price`/`max_gas_limit` подписки. Контракт и CLI проверяют эти неравенства перед выполнением команды.【F:SupraLottery/supra/move_workspace/lottery/sources/Lottery.move†L700-L711】【F:SupraLottery/supra/scripts/configure_vrf_gas.py†L52-L65】【F:SupraLottery/docs/dvrf_reference_snapshot.md†L53-L60】
+> Ограничения Supra VRF subscription: `callback_gas_price` и `callback_gas_limit` контракта должны быть ≤ `max_gas_price`/`max_gas_limit` подписки. Контракт и CLI проверяют эти неравенства перед выполнением команды.【F:SupraLottery/supra/move_workspace/lottery_core/sources/Lottery.move†L700-L711】【F:SupraLottery/supra/scripts/configure_vrf_gas.py†L52-L65】【F:SupraLottery/docs/dvrf_reference_snapshot.md†L53-L60】
    ```
    Дождитесь события `GasConfigUpdatedEvent`.
 
-2. **Рассчитайте минимальный депозит.** Формула из `lottery::main_v2::calculate_min_balance`:
+2. **Рассчитайте минимальный депозит.** Формула из `lottery_core::main_v2::calculate_min_balance`:
    ```bash
    python - <<'PY'
    max_gas_price = <MAX_GAS_PRICE>
@@ -187,7 +188,7 @@ Supra CLI начиная с релиза 2025.05 хранит ключи и па
 
 6. **Создайте подписку и пополните депозит.** Значение `<INITIAL_DEPOSIT>` должно быть ≥ рассчитанного минимума.
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery::main_v2::create_subscription --args u64:<INITIAL_DEPOSIT> --assume-yes"
+   docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery_core::main_v2::create_subscription --args u64:<INITIAL_DEPOSIT> --assume-yes"
    ```
    Функция вызывает `deposit::clientSettingMinimumBalance`, `deposit::depositFundClient` и `deposit::addContractToWhitelist`, а событие `SubscriptionConfiguredEvent` фиксирует параметры.
 
@@ -195,15 +196,15 @@ Supra CLI начиная с релиза 2025.05 хранит ключи и па
 
 7. **(Опционально) синхронизируйте минимальный баланс вручную.** Используйте при изменении лимитов газа на стороне Supra.
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery::main_v2::set_minimum_balance --assume-yes"
+   docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery_core::main_v2::set_minimum_balance --assume-yes"
    ```
 
 8. **Зафиксируйте снапшоты whitelisting для аудита.**
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery::main_v2::record_client_whitelist_snapshot --args u128:<MAX_GAS_PRICE> u128:<MAX_GAS_LIMIT> u128:<MIN_BALANCE_LIMIT>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery_core::main_v2::record_client_whitelist_snapshot --args u128:<MAX_GAS_PRICE> u128:<MAX_GAS_LIMIT> u128:<MIN_BALANCE_LIMIT>"
    ```
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery::main_v2::record_consumer_whitelist_snapshot --args u128:<CALLBACK_GAS_PRICE> u128:<CALLBACK_GAS_LIMIT>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery_core::main_v2::record_consumer_whitelist_snapshot --args u128:<CALLBACK_GAS_PRICE> u128:<CALLBACK_GAS_LIMIT>"
    ```
 
 9. **Управление депозитом напрямую (при необходимости).** Все функции принимают camelCase-имена при вызове через Supra CLI.
@@ -268,17 +269,17 @@ Supra CLI начиная с релиза 2025.05 хранит ключи и па
       --supra-cli-bin /supra/supra \
       --supra-config $SUPRA_CONFIG
     ```
-    Скрипт вызывает `lottery::main_v2::remove_subscription`, публикует событие `SubscriptionContractRemovedEvent` и проксирует `deposit::remove_contract_from_whitelist`. При необходимости можно выполнить команду напрямую через Supra CLI:
+    Скрипт вызывает `lottery_core::main_v2::remove_subscription`, публикует событие `SubscriptionContractRemovedEvent` и проксирует `deposit::remove_contract_from_whitelist`. При необходимости можно выполнить команду напрямую через Supra CLI:
     ```bash
-    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery::main_v2::remove_subscription --assume-yes"
+    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery_core::main_v2::remove_subscription --assume-yes"
     ```
     Используйте опцию `--allow-pending-request`, только если осознанно завершаете контракт с активными запросами (по умолчанию операция блокируется).
 12. **Проверка адресов и статуса пулов `treasury_multi`.** После инициализации казначейства выполните view-команды, чтобы убедиться, что используются ожидаемые адреса джекпота/операционного пула и что для них зарегистрированы primary store без freeze:
     ```bash
-    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::treasury_multi::get_recipients"
-    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::treasury_multi::get_recipient_statuses"
+    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_core::treasury_multi::get_recipients"
+    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_core::treasury_multi::get_recipient_statuses"
     ```
-    Поле `recipient` должно совпадать с ожидаемыми адресами, а флаги `registered=true` и `frozen=false` подтверждают готовность primary store. Значение `balance` отражает актуальные выплаты Supra FA для каждого пула. Дополнительно отслеживайте события `lottery::treasury_v1::RecipientsUpdatedEvent` и `lottery::treasury_multi::RecipientsUpdatedEvent` в Supra Explorer или логах CLI — оба события публикуют снапшоты `RecipientStatus` при инициализации и каждой смене получателей, причём `treasury_v1` теперь выводит пары «предыдущее → текущее» состояния направлений, чтобы можно было сравнить старый и новый конфиг по freeze-флагам и балансам.
+    Поле `recipient` должно совпадать с ожидаемыми адресами, а флаги `registered=true` и `frozen=false` подтверждают готовность primary store. Значение `balance` отражает актуальные выплаты Supra FA для каждого пула. Дополнительно отслеживайте события `lottery_core::treasury_v1::RecipientsUpdatedEvent` и `lottery_core::treasury_multi::RecipientsUpdatedEvent` в Supra Explorer или логах CLI — оба события публикуют снапшоты `RecipientStatus` при инициализации и каждой смене получателей, причём `treasury_v1` теперь выводит пары «предыдущее → текущее» состояния направлений, чтобы можно было сравнить старый и новый конфиг по freeze-флагам и балансам.
     Если `withdraw_operations`, `pay_operations_bonus_internal` или `distribute_jackpot` завершаются с кодами `14`, `15`, `16`, `17` или `18`, повторно зарегистрируйте store через `treasury_v1::register_store_for` и снимите freeze (`treasury_v1::set_store_frozen`), затем повторите выплату.
 
 **Снапшот фабрики лотерей.** Для аудита Supra выгрузите текущее состояние фабрики: снапшот `lottery_factory::registry::get_registry_snapshot` возвращает администратора и все зарегистрированные лотереи с ценой билета и долей джекпота, а `list_lottery_ids` показывает только идентификаторы.
@@ -291,17 +292,17 @@ docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_C
 **Снапшот экземпляров лотерей.** После создания или обновления экземпляров проверьте агрегированное событие и view, чтобы Supra видела актуальные параметры (адреса контрактов, владельцы, цены билетов, доли джекпота, продажи и статус активности):
 
 ```bash
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool events list --profile <PROFILE> --address @lottery --event-type lottery::instances::LotteryInstancesSnapshotUpdatedEvent --limit 5"
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::instances::get_instances_snapshot"
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::instances::get_instance_snapshot --args u64:<LOTTERY_ID>"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool events list --profile <PROFILE> --address @lottery --event-type lottery_core::instances::LotteryInstancesSnapshotUpdatedEvent --limit 5"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_core::instances::get_instances_snapshot"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_core::instances::get_instance_snapshot --args u64:<LOTTERY_ID>"
 ```
 
 Убедитесь, что в событии/JSON указаны `admin` (адрес управляющего @lottery), `hub` (текущий VRF-хаб), а также массив `instances`, где для каждого `lottery_id` отображаются `owner`, адрес контракта `lottery`, `ticket_price`, `jackpot_share_bps`, накопленные `tickets_sold`, `jackpot_accumulated` и флаг `active`. Если данные не обновились, повторите `create_instance`, `sync_blueprint` или синхронизацию статуса (`set_instance_active`), чтобы модуль опубликовал свежий `LotteryInstancesSnapshotUpdatedEvent`.
 
-**Снапшот витринных метаданных.** После загрузки описаний вызовите view `lottery::metadata::get_metadata_snapshot`, чтобы убедиться, что Supra CLI и панели мониторинга увидят актуального администратора и список `MetadataEntry`:
+**Снапшот витринных метаданных.** После загрузки описаний вызовите view `lottery_support::metadata::get_metadata_snapshot`, чтобы убедиться, что Supra CLI и панели мониторинга увидят актуального администратора и список `MetadataEntry`:
 
 ```bash
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::metadata::get_metadata_snapshot"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_support::metadata::get_metadata_snapshot"
 ```
 
 Команда вернёт JSON с полями `admin` и `entries`; каждый элемент `entries[i]` содержит `lottery_id` и все текстовые поля (`title`, `description`, `image_uri`, `website_uri`, `rules_uri`). При необходимости сравните результат с событием `MetadataSnapshotUpdatedEvent`, используя `move tool events list` для адреса лотереи.
@@ -309,19 +310,45 @@ docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_C
 **Снапшот истории розыгрышей.** Supra ожидает агрегированный журнал draw, поэтому после fulfill или очистки истории сравните событие и view:
 
 ```bash
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool events list --profile <PROFILE> --address @lottery --event-type lottery::history::HistorySnapshotUpdatedEvent --limit 5"
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::history::get_history_snapshot"
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::history::get_lottery_snapshot --args u64:<LOTTERY_ID>"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool events list --profile <PROFILE> --address @lottery --event-type lottery_support::history::HistorySnapshotUpdatedEvent --limit 5"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_support::history::get_history_snapshot"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_support::history::get_lottery_snapshot --args u64:<LOTTERY_ID>"
 ```
 
-Убедитесь, что в событии и JSON указаны `admin`, полный список `lottery_ids` и массив `histories`, где каждая запись содержит `lottery_id` и массив `records` с `request_id`, `winner`, `ticket_index`, `prize_amount`, `random_bytes` и `timestamp_seconds`. Если снапшот отсутствует, инициируйте `lottery::rounds::fulfill_draw` или вызовите `history::clear_history`, чтобы модуль опубликовал актуальное состояние.
+Убедитесь, что в событии и JSON указаны `admin`, полный список `lottery_ids` и массив `histories`, где каждая запись содержит `lottery_id` и массив `records` с `request_id`, `winner`, `ticket_index`, `prize_amount`, `random_bytes` и `timestamp_seconds`. Если снапшот отсутствует, инициируйте `lottery_core::rounds::fulfill_draw` или вызовите `lottery_support::history::clear_history`, чтобы модуль опубликовал актуальное состояние.
+
+После каждого `lottery_core::rounds::fulfill_draw_request` сбросьте очередь результатов, накопленную ядром, вызвав `lottery_support::history::sync_draws_from_rounds`. Функция автоматически извлечёт все доступные записи (если `limit = 0`) и добавит их в историю:
+
+```bash
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery_support::history::sync_draws_from_rounds --args u64:0"
+```
+Чтобы выполнять оба вызова одной командой, воспользуйтесь скриптом `supra/scripts/sync_lottery_queues.sh`. Он принимает профиль Supra CLI и опциональные лимиты для очередей истории и покупок (значение `0` обрабатывает все записи, а `skip` пропускает соответствующую очередь):
+
+```bash
+bash supra/scripts/sync_lottery_queues.sh <PROFILE> 0 0
+```
+
+
+Если требуется восстановить отдельную запись вручную (например, при повторном выполнении VRF), используйте резервный вызов `lottery_support::history::record_draw_from_rounds`, передав параметры розыгрыша явно.
+
+**Синхронизация VIP-бонусов и реферальных выплат.** После пользовательских или автоматических покупок билетов выполните `lottery_rewards::rounds_sync::sync_purchases_from_rounds`, чтобы выгрузить очередь покупок из ядра, начислить бесплатные билеты подписчикам VIP и передать объём покупки в реферальный модуль. При `limit = 0` обработаются все доступные записи:
+
+```bash
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery_rewards::rounds_sync::sync_purchases_from_rounds --args u64:0"
+> Smoke-проверка: `PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test --package-dir SupraLottery/supra/move_workspace/lottery_rewards -- --filter rounds_sync_tests`
+> Smoke-проверка: `PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test --package-dir SupraLottery/supra/move_workspace/lottery_rewards -- --filter autopurchase_tests`
+> Smoke-проверка: `PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test --package-dir SupraLottery/supra/move_workspace/lottery_rewards -- --filter jackpot_tests`
+> Smoke-проверка: `PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test --package-dir SupraLottery/supra/move_workspace/lottery_rewards -- --filter referrals_tests`
+> Smoke-проверка: `PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test --package-dir SupraLottery/supra/move_workspace/lottery_rewards -- --filter store_tests`
+> Smoke-проверка: `PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test --package-dir SupraLottery/supra/move_workspace/lottery_rewards -- --filter vip_tests`
+```
 
 **Снапшот автопокупки билетов.** Для контроля автоматических планов Supra требует агрегированного события и view:
 
 ```bash
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool events list --profile <PROFILE> --address @lottery --event-type lottery::autopurchase::AutopurchaseSnapshotUpdatedEvent --limit 5"
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::autopurchase::get_autopurchase_snapshot"
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::autopurchase::get_lottery_snapshot --args u64:<LOTTERY_ID>"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool events list --profile <PROFILE> --address @lottery --event-type lottery_rewards::autopurchase::AutopurchaseSnapshotUpdatedEvent --limit 5"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_rewards::autopurchase::get_autopurchase_snapshot"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_rewards::autopurchase::get_lottery_snapshot --args u64:<LOTTERY_ID>"
 ```
 
 В событии и ответе view проверьте поле `admin`, суммарный `total_balance`, количество игроков и массив `players`: каждый элемент содержит адрес, баланс, `tickets_per_draw` и флаг `active`. Если снапшот отсутствует, выполните `configure_plan`/`deposit` или тестовое `execute`, чтобы модуль опубликовал актуальные данные.
@@ -339,8 +366,8 @@ View `get_snapshot` возвращает администратора, `next_bad
 **Снапшот глобального джекпота.** После выдачи билетов, планирования розыгрыша или выполнения колбэка проверьте, что Supra фиксирует агрегированный снимок и view возвращает те же значения:
 
 ```bash
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool events list --profile <PROFILE> --address @lottery --event-type lottery::jackpot::JackpotSnapshotUpdatedEvent --limit 5"
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::jackpot::get_snapshot"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool events list --profile <PROFILE> --address @lottery --event-type lottery_rewards::jackpot::JackpotSnapshotUpdatedEvent --limit 5"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_rewards::jackpot::get_snapshot"
 ```
 
 Убедитесь, что в событии и JSON поля `admin` и `lottery_id` совпадают с ожиданиями, `ticket_count` отражает количество выданных билетов, `draw_scheduled` соответствует текущему статусу подготовки, а `pending_request_id` появляется только после `request_randomness` и обнуляется после `fulfill_draw`.
@@ -348,9 +375,9 @@ docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_C
 **Снапшот VIP-подписок.** После обновления конфигураций или операций убедитесь, что Supra CLI видит агрегированные данные:
 
 ```bash
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool events list --profile <PROFILE> --address @lottery --event-type lottery::vip::VipSnapshotUpdatedEvent --limit 5"
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::vip::get_vip_snapshot"
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::vip::get_lottery_snapshot --args u64:<LOTTERY_ID>"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool events list --profile <PROFILE> --address @lottery --event-type lottery_rewards::vip::VipSnapshotUpdatedEvent --limit 5"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_rewards::vip::get_vip_snapshot"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_rewards::vip::get_lottery_snapshot --args u64:<LOTTERY_ID>"
 ```
 
 Проверьте, что в событии/вью корректно указаны `admin`, список лотерей (`lotteries`) с полями `config`, `total_members`, `active_members`, `total_revenue` и `bonus_tickets_issued`. При необходимости вызовите `upsert_config`, выполните `subscribe`/`subscribe_for` и совершите покупку билета, чтобы `record_bonus_usage` обновил счётчики и опубликовал свежий `VipSnapshotUpdatedEvent`.
@@ -358,11 +385,11 @@ docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_C
 **Снапшот реферальных бонусов.** После настройки конфигураций и тестовых выплат убедитесь, что событие и view публикуют агрегированный снимок:
 
 ```bash
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool events list --profile <PROFILE> --address @lottery --event-type lottery::referrals::ReferralSnapshotUpdatedEvent --limit 5"
-docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery::referrals::get_referral_snapshot"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool events list --profile <PROFILE> --address @lottery --event-type lottery_rewards::referrals::ReferralSnapshotUpdatedEvent --limit 5"
+docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool view --profile <PROFILE> --function-id lottery_rewards::referrals::get_referral_snapshot"
 ```
 
-В ответе проверьте поле `admin`, значение `total_registered` и массив `lotteries`: каждый элемент содержит `lottery_id`, доли `referrer/referee_bps`, счётчик `rewarded_purchases` и суммы выплат. Если событие отсутствует, повторно вызовите `set_lottery_config` и выполните тестовую покупку билета, чтобы модуль `lottery::referrals` опубликовал актуальный снимок.
+В ответе проверьте поле `admin`, значение `total_registered` и массив `lotteries`: каждый элемент содержит `lottery_id`, доли `referrer/referee_bps`, счётчик `rewarded_purchases` и суммы выплат. Если событие отсутствует, повторно вызовите `set_lottery_config` и выполните тестовую покупку билета, чтобы модуль `lottery_rewards::referrals` опубликовал актуальный снимок.
 
 #### Быстрая последовательность (пример)
 Ниже приведён пример запуска всех ключевых команд. Сначала заполните значения переменных в первых строках (адреса, лимиты газа, профили), затем выполните блок целиком. Вместо ручного редактирования экспортов можно скопировать файл [`supra/scripts/testnet_env.example`](../supra/scripts/testnet_env.example) в `testnet_env.local`, подставить значения и выполнить `set -a; source supra/scripts/testnet_env.local; set +a`.
@@ -388,7 +415,7 @@ PLAYER_CONFIG=/supra/configs/player1.yaml   # профиль/YAML игрока, 
 
 docker compose run --rm --entrypoint bash supra_cli -lc "mkdir -p /supra/.aptos && cp $SUPRA_CONFIG /supra/.aptos/config.yaml"
 
-docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery::main_v2::configure_vrf_gas --args u128:$MAX_GAS_PRICE u128:$MAX_GAS_LIMIT u128:$CALLBACK_GAS_PRICE u128:$CALLBACK_GAS_LIMIT u128:$VERIFICATION_GAS_VALUE --assume-yes"
+docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery_core::main_v2::configure_vrf_gas --args u128:$MAX_GAS_PRICE u128:$MAX_GAS_LIMIT u128:$CALLBACK_GAS_PRICE u128:$CALLBACK_GAS_LIMIT u128:$VERIFICATION_GAS_VALUE --assume-yes"
 
 docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id $DEPOSIT_ADDR::deposit::migrateClient --args u128:$MAX_GAS_PRICE u128:$MAX_GAS_LIMIT --assume-yes"
 
@@ -404,30 +431,30 @@ PY
 )
 echo "Calculated MIN_BALANCE_LIMIT=$MIN_BALANCE_LIMIT"
 
-docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery::main_v2::create_subscription --args u64:$INITIAL_DEPOSIT --assume-yes"
+docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery_core::main_v2::create_subscription --args u64:$INITIAL_DEPOSIT --assume-yes"
 
 if [[ -n "$AGGREGATOR_ADDR" ]]; then
-  docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery::main_v2::whitelist_callback_sender --args address:$AGGREGATOR_ADDR --assume-yes"
+  docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery_core::main_v2::whitelist_callback_sender --args address:$AGGREGATOR_ADDR --assume-yes"
 fi
-docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery::main_v2::whitelist_consumer --args address:$LOTTERY_ADDR --assume-yes"
+docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery_core::main_v2::whitelist_consumer --args address:$LOTTERY_ADDR --assume-yes"
 
-docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery::main_v2::record_client_whitelist_snapshot --args u128:$MAX_GAS_PRICE u128:$MAX_GAS_LIMIT u128:$MIN_BALANCE_LIMIT --assume-yes"
-docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery::main_v2::record_consumer_whitelist_snapshot --args u128:$CALLBACK_GAS_PRICE u128:$CALLBACK_GAS_LIMIT --assume-yes"
+docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery_core::main_v2::record_client_whitelist_snapshot --args u128:$MAX_GAS_PRICE u128:$MAX_GAS_LIMIT u128:$MIN_BALANCE_LIMIT --assume-yes"
+docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery_core::main_v2::record_consumer_whitelist_snapshot --args u128:$CALLBACK_GAS_PRICE u128:$CALLBACK_GAS_LIMIT --assume-yes"
 
-docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery::main_v2::configure_vrf_request --args u8:$RNG_COUNT u64:$NUM_CONFIRMATIONS u64:$CLIENT_SEED --assume-yes"
+docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery_core::main_v2::configure_vrf_request --args u8:$RNG_COUNT u64:$NUM_CONFIRMATIONS u64:$CLIENT_SEED --assume-yes"
 
-docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$PLAYER_CONFIG /supra/supra move tool run --profile $PLAYER_PROFILE --function-id lottery::main_v2::buy_ticket"
+docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$PLAYER_CONFIG /supra/supra move tool run --profile $PLAYER_PROFILE --function-id lottery_core::main_v2::buy_ticket"
 # Повторите команду для остальных игроков, чтобы суммарно продать ≥5 билетов
 
-docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool view --profile $PROFILE --function-id lottery::main_v2::get_lottery_status"
+docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool view --profile $PROFILE --function-id lottery_core::main_v2::get_lottery_status"
 
 PROFILE=$PROFILE LOTTERY_ADDR=$LOTTERY_ADDR DEPOSIT_ADDR=$DEPOSIT_ADDR \
   MAX_GAS_PRICE=$MAX_GAS_PRICE MAX_GAS_LIMIT=$MAX_GAS_LIMIT VERIFICATION_GAS_VALUE=$VERIFICATION_GAS_VALUE \
   SUPRA_CONFIG=$SUPRA_CONFIG CLIENT_ADDR=$LOTTERY_ADDR \
   python supra/scripts/testnet_draw_readiness.py
 
-docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery::main_v2::manual_draw --assume-yes"
-docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool events tail --profile $PROFILE --address $LOTTERY_ADDR --event-type lottery::main_v2::DrawHandledEvent"
+docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool run --profile $PROFILE --function-id lottery_core::main_v2::manual_draw --assume-yes"
+docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=$SUPRA_CONFIG /supra/supra move tool events tail --profile $PROFILE --address $LOTTERY_ADDR --event-type lottery_core::main_v2::DrawHandledEvent"
 
 # Проверка депозита и минимального баланса (завершится exit=1 при срабатывании порога)
 MONITOR_MARGIN=0.2 PROFILE=$PROFILE LOTTERY_ADDR=$LOTTERY_ADDR DEPOSIT_ADDR=$DEPOSIT_ADDR \
@@ -457,33 +484,33 @@ PROFILE=$PROFILE LOTTERY_ADDR=$LOTTERY_ADDR DEPOSIT_ADDR=$DEPOSIT_ADDR \
 
 1. **Whitelisting агрегатора колбэков** — выполняется только администратором лотереи (`@lottery`) после успешного депозита и настройки газа. Команда запрещена, пока активен незавершённый VRF-запрос (`E_REQUEST_STILL_PENDING`).
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::main_v2::whitelist_callback_sender --args address:<AGGREGATOR_ADDR>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery_core::main_v2::whitelist_callback_sender --args address:<AGGREGATOR_ADDR>"
    ```
    - Зафиксируйте tx hash и событие `WhitelistSnapshotUpdatedEvent` (последняя запись покажет агрегатора и весь список потребителей). При необходимости сохраняйте также `AggregatorWhitelistedEvent` для истории доступа.
-   - При необходимости сменить агрегатор сначала убедитесь, что `pending_request` пуст (проверьте `lottery::main_v2::get_whitelist_status`).
-   - Для временного отключения агрегатора используйте `lottery::main_v2::revoke_callback_sender`, но только когда нет активного запроса.
+   - При необходимости сменить агрегатор сначала убедитесь, что `pending_request` пуст (проверьте `lottery_core::main_v2::get_whitelist_status`).
+   - Для временного отключения агрегатора используйте `lottery_core::main_v2::revoke_callback_sender`, но только когда нет активного запроса.
 
 2. **Whitelisting потребителей VRF** — Supra VRF Subscription FAQ требует явно разрешать каждому контракту отправку запросов.
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::main_v2::whitelist_consumer --args address:<CONSUMER_ADDR>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery_core::main_v2::whitelist_consumer --args address:<CONSUMER_ADDR>"
    ```
    - Повторите для всех вспомогательных контрактов (операторских или будущих интеграций).
-   - Проверяйте наличие адреса в списке через `lottery::main_v2::get_whitelist_status` или по событию `WhitelistSnapshotUpdatedEvent`.
+   - Проверяйте наличие адреса в списке через `lottery_core::main_v2::get_whitelist_status` или по событию `WhitelistSnapshotUpdatedEvent`.
 
 3. **Удаление потребителя** при отзыве доступа или компрометации ключа:
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::main_v2::remove_consumer --args address:<CONSUMER_ADDR>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery_core::main_v2::remove_consumer --args address:<CONSUMER_ADDR>"
    ```
    - Команда аварийно завершится `E_CONSUMER_NOT_WHITELISTED`, если адрес отсутствует в whitelist.
    - После ревока проверяйте событие `ConsumerRemovedEvent` и убедитесь, что свежий `WhitelistSnapshotUpdatedEvent` содержит только валидных потребителей.
 
 4. **Контроль whitelisting через события**. Для аудита используйте CLI:
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool events tail --profile <PROFILE> --address <LOTTERY_ADDR> --event-type lottery::main_v2::WhitelistSnapshotUpdatedEvent"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool events tail --profile <PROFILE> --address <LOTTERY_ADDR> --event-type lottery_core::main_v2::WhitelistSnapshotUpdatedEvent"
    ```
    ```bash
    # При необходимости дополнительно отслеживайте отдельные события grant/revoke
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool events tail --profile <PROFILE> --address <LOTTERY_ADDR> --event-type lottery::main_v2::AggregatorWhitelistedEvent"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool events tail --profile <PROFILE> --address <LOTTERY_ADDR> --event-type lottery_core::main_v2::AggregatorWhitelistedEvent"
    ```
    Сохраняйте timestamp, tx hash и payload событий в runbook журналах.
 
@@ -502,66 +529,99 @@ PROFILE=$PROFILE LOTTERY_ADDR=$LOTTERY_ADDR DEPOSIT_ADDR=$DEPOSIT_ADDR \
 > Основано на руководстве Supra *Migration to dVRF 3.0* и требованиях к наблюдаемости при переносе данных.
 
 1. **Подготовка** — убедитесь, что:
-   - для нужной лотереи нет активного VRF-запроса (`lottery::main_v2::get_pending_request_view` → `option::none`),
+   - для нужной лотереи нет активного VRF-запроса (`lottery_core::main_v2::get_pending_request_view` → `option::none`),
    - конфигурация долей (`prize_bps`, `jackpot_bps`, `operations_bps`) согласована с новым казначейством,
    - `treasury_multi::get_pool(<LOTTERY_ID>)` возвращает `option::none` (лотерея ещё не мигрирована).
+   - локально пройдены smoke-тесты `lottery_support::migration_tests`:
+     ```bash
+     PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test \
+       --package-dir SupraLottery/supra/move_workspace/lottery_support \
+       -- --filter migration_tests
+     ```
+     Команда проверяет выдачу/возврат capability `MigrationSession` и корректность `migrate_from_legacy` до выполнения on-chain операции.
 
 2. **Запуск миграции**
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::migration::migrate_from_legacy --args u64:<LOTTERY_ID> u64:<PRIZE_BPS> u64:<JACKPOT_BPS> u64:<OPERATIONS_BPS> --assume-yes"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery_support::migration::migrate_from_legacy --args u64:<LOTTERY_ID> u64:<PRIZE_BPS> u64:<JACKPOT_BPS> u64:<OPERATIONS_BPS> --assume-yes"
    ```
    - При наличии незавершённого запроса функция завершится `E_PENDING_REQUEST`.
    - Повторный запуск для уже перенесённой лотереи приведёт к `E_ALREADY_MIGRATED`.
 
 3. **Проверка события** — миграция публикует агрегированный снапшот с билетами, `next_ticket_id` и долями распределения:
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool events tail --profile <PROFILE> --address $LOTTERY_ADDR --event-type lottery::migration::MigrationSnapshotUpdatedEvent"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool events tail --profile <PROFILE> --address $LOTTERY_ADDR --event-type lottery_support::migration::MigrationSnapshotUpdatedEvent"
    ```
    Сохраните payload события в журнал аудита (включает `ticket_count`, `legacy_next_ticket_id`, `migrated_next_ticket_id`, `jackpot_amount_migrated`, `prize_bps`, `jackpot_bps`, `operations_bps`).
 
 4. **View-функции для отчётов**
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::migration::list_migrated_lottery_ids"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_support::migration::list_migrated_lottery_ids"
    ```
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::migration::get_migration_snapshot --args u64:<LOTTERY_ID>"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_support::migration::get_migration_snapshot --args u64:<LOTTERY_ID>"
    ```
    Результат `get_migration_snapshot` содержит структуру `MigrationSnapshot`; сохраните JSON для сверки с off-chain отчётами.
 
-5. **Кросс-проверка** — после миграции выполните `treasury_multi::get_pool(<LOTTERY_ID>)` и `lottery::rounds::get_round_snapshot(<LOTTERY_ID>)`, чтобы убедиться, что билеты и джекпот перенесены, `pending_request_id` отсутствует и `draw_scheduled` соответствует ожиданиям. Дополнительно просмотрите события `RoundSnapshotUpdatedEvent` (`events list ... --event-type $LOTTERY_ADDR::rounds::RoundSnapshotUpdatedEvent`), чтобы сверить, что последние снапшоты совпадают с данными view.
+5. **Кросс-проверка** — после миграции выполните `treasury_multi::get_pool(<LOTTERY_ID>)` и `lottery_core::rounds::get_round_snapshot(<LOTTERY_ID>)`, чтобы убедиться, что билеты и джекпот перенесены, `pending_request_id` отсутствует и `draw_scheduled` соответствует ожиданиям. Дополнительно просмотрите события `RoundSnapshotUpdatedEvent` (`events list ... --event-type $LOTTERY_ADDR::rounds::RoundSnapshotUpdatedEvent`), чтобы сверить, что последние снапшоты совпадают с данными view.
 
 
 ## 4. Настройка параметров VRF-запроса
 
 ```bash
-docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::main_v2::configure_vrf_request --args u8:<RNG_COUNT> u64:<NUM_CONFIRMATIONS> u64:<CLIENT_SEED>"
+docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery_core::main_v2::configure_vrf_request --args u8:<RNG_COUNT> u64:<NUM_CONFIRMATIONS> u64:<CLIENT_SEED>"
 ```
 Убедитесь, что `RNG_COUNT > 0`, а `NUM_CONFIRMATIONS` находится в диапазоне `1..20` (ограничение Supra dVRF). Событие `VrfRequestConfigUpdatedEvent` фиксирует значения.
 
-## 5. Публикация пакета и взаимодействие
-1. Публикуем контракт:
+## 5. Публикация пакетов и взаимодействие
+
+### 5.1 Публикация Move-пакетов
+Перед ручным запуском команд можно воспользоваться скриптом `supra/scripts/publish_lottery_packages.sh`. Он принимает профиль Supra CLI и публикует пакеты по порядку (по умолчанию `lottery_core`, `lottery_support`, `lottery_rewards`). Примеры:
+
+```bash
+bash supra/scripts/publish_lottery_packages.sh lottery_admin
+bash supra/scripts/publish_lottery_packages.sh lottery_admin lottery_core lottery_support
+```
+
+Скрипт автоматически подбирает доступный способ запуска (`supra`, Docker Compose, Podman) и прокидывает `SUPRA_CONFIG`, `SUPRA_PUBLISH_EXTRA_ARGS` (дополнительные флаги CLI), `SUPRA_PUBLISH_ASSUME_YES=0` (отключить `--assume-yes`) и `SUPRA_PUBLISH_PAUSE=<секунды>` для пауз между пакетами. При необходимости можно указать собственный порядок пакетов вторым и последующими аргументами.
+
+1. **Ядро (`lottery_core`)**
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool publish --profile <PROFILE> --package-dir /supra/move_workspace/lottery"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool publish --profile <PROFILE> --package-dir /supra/move_workspace/lottery_core --included-artifacts none --skip-fetch-latest-git-deps --assume-yes"
    ```
-2. Пополняем банк (при необходимости) и продаём билеты (для нескольких адресов, используйте faucet testnet и отдельный профайл для каждого игрока). **Розыгрыш планируется автоматически, только когда в пуле ≥ 5 билетов** — иначе `manual_draw`/`request_draw` завершатся ошибкой.
+   Публикация разворачивает состояние раундов, казначейства и capability-контроллеры (`CoreControl`). После deploy выполните `lottery_core::rounds::init`/`lottery_core::treasury_v1::init` (если не запускались ранее) тем же администратором.
+2. **Пакет поддержки (`lottery_support`)**
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/player1.yaml /supra/supra move tool run --profile <PLAYER_PROFILE> --function-id lottery::main_v2::buy_ticket"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool publish --profile <PROFILE> --package-dir /supra/move_workspace/lottery_support --included-artifacts none --skip-fetch-latest-git-deps --assume-yes"
+   ```
+   Сразу после публикации вызовите `lottery_support::history::ensure_caps_initialized` и `lottery_support::migration::ensure_caps_initialized`, чтобы кэшировать capability истории и миграции перед эксплуатацией.
+3. **Пакет наград (`lottery_rewards`)**
+   ```bash
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool publish --profile <PROFILE> --package-dir /supra/move_workspace/lottery_rewards --included-artifacts none --skip-fetch-latest-git-deps --assume-yes"
+   ```
+   После деплоя вызовите `ensure_caps_initialized` для каждого модуля (`autopurchase`, `jackpot`, `referrals`, `store`, `vip`), чтобы забронировать соответствующие `MultiTreasuryCap`. Проверить готовность можно функциями `caps_ready()`.
+
+> Для локальной автоматизации предусмотрен набор скриптов: `supra/scripts/build_lottery_packages.sh` собирает пакеты перед публикацией, `supra/scripts/publish_lottery_packages.sh` поочерёдно вызывает `move tool publish` для `lottery_core`/`lottery_support`/`lottery_rewards`, а `supra/scripts/sync_lottery_queues.sh` синхронизирует очереди истории и покупок после развёртывания наград.
+
+### 5.2 Продажа билетов и запрос VRF
+1. Пополняем казначейство (при необходимости) и продаём билеты. **Розыгрыш планируется автоматически, только когда в пуле ≥ 5 билетов** — иначе `manual_draw`/`request_draw` завершатся ошибкой.
+   ```bash
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/player1.yaml /supra/supra move tool run --profile <PLAYER_PROFILE> --function-id lottery_core::main_v2::buy_ticket"
    ```
    > Вызов требует подписи самого игрока, поэтому указывайте профиль с его приватным ключом (`--profile <PLAYER_PROFILE>` и соответствующий `SUPRA_CONFIG`, если используете YAML). Аналогично запускаем команду для других участников (player2, player3 и т.д.).
    После продажи пятого билета проверьте статус:
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::main_v2::get_lottery_status"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_core::main_v2::get_lottery_status"
    ```
    В ответе поле `draw_scheduled` должно быть `true`, а `pending_request` — `false`.
    Для автоматизированной проверки перед запуском VRF можно выполнить скрипт `python supra/scripts/testnet_draw_readiness.py` (см. раздел 6) — он проверит количество билетов, whitelisting агрегаторов и достижение минимального депозита.
-3. Делаем запрос VRF:
+2. Делаем запрос VRF:
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery::main_v2::manual_draw"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool run --profile <PROFILE> --function-id lottery_core::main_v2::manual_draw"
    ```
    Функция проверяет whitelisting агрегатора и потребителей, убеждается, что `draw_scheduled = true` и нет активного `pending_request`. При несоблюдении условий вернёт `Move abort … manual_draw at code offset 11` — значит, необходимо продать недостающие билеты или дождаться обработки предыдущего запроса.
-4. Ожидаем callback `on_random_received`. Проверяем события:
+3. Ожидаем callback `on_random_received`. Проверяем события:
    ```bash
-   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool events tail --profile <PROFILE> --address <LOTTERY_ADDR> --event-type lottery::main_v2::DrawHandledEvent"
+   docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool events tail --profile <PROFILE> --address <LOTTERY_ADDR> --event-type lottery_core::main_v2::DrawHandledEvent"
    ```
 
 ## 6. Верификация и мониторинг
@@ -571,17 +631,17 @@ docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/con
 - Для автоматизированного мониторинга минимального баланса используйте [`supra/scripts/testnet_monitor_check.sh`](../supra/scripts/testnet_monitor_check.sh). Скрипт рассчитывает `min_balance` по текущим лимитам газа, сравнивает с on-chain-остатком `deposit::checkClientFund` и завершает работу с кодом 1, если депозит опустился до порога (`isMinimumBalanceReached = true`) или ниже ожидаемого значения. Рекомендации по запуску скриптов по расписанию, в CI и Supra AutoFi собраны в [отдельном руководстве](./dvrf_monitoring_automation.md).
 - Для получения машиночитаемого статуса подписки (баланс, whitelisting, конфигурация VRF) воспользуйтесь [`supra/scripts/testnet_monitor_json.py`](../supra/scripts/testnet_monitor_json.py). Скрипт повторно использует расчёт `calc_min_balance.py`, обращается к `view`-функциям контракта и модуля `deposit` и при флаге `--fail-on-low` завершает работу с кодом 1, если баланс меньше `min_balance`.
 - Для отправки уведомлений в Slack/Teams или любой совместимый webhook используйте [`supra/scripts/testnet_monitor_slack.py`](../supra/scripts/testnet_monitor_slack.py). Он запускает `testnet_monitor_json.py`, формирует текстовое сообщение и возвращает тот же код возврата (поддерживает `--fail-on-low` и опцию `--include-json`).
-- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::main_v2::get_lottery_status"`
-- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::main_v2::get_whitelist_status"`
-- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::main_v2::get_vrf_request_config"`
-- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::main_v2::get_client_whitelist_snapshot"`
-- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::main_v2::get_min_balance_limit_snapshot"`
-- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::main_v2::get_consumer_whitelist_snapshot"`
-- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::store::get_store_snapshot"`
-- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery::store::get_lottery_snapshot --args u64:<LOTTERY_ID>"`
+- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_core::main_v2::get_lottery_status"`
+- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_core::main_v2::get_whitelist_status"`
+- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_core::main_v2::get_vrf_request_config"`
+- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_core::main_v2::get_client_whitelist_snapshot"`
+- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_core::main_v2::get_min_balance_limit_snapshot"`
+- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_core::main_v2::get_consumer_whitelist_snapshot"`
+- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_rewards::store::get_store_snapshot"`
+- `docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/configs/testnet.yaml /supra/supra move tool view --profile <PROFILE> --function-id lottery_rewards::store::get_lottery_snapshot --args u64:<LOTTERY_ID>"`
 - Контролируйте остаток депозита по событиям `SubscriptionConfiguredEvent`/`MinimumBalanceUpdatedEvent` и отчётам Supra dVRF (Supra CLI/Explorer отражает баланс клиента после `depositFundClient`).
 - Для подробного мониторинга событий см. отдельный документ [dVRF event monitoring](./dvrf_event_monitoring.md) с примерами `events list` и `events tail`.
-- Для контроля ассортимента и продаж магазина используйте поток `StoreSnapshotUpdatedEvent` (`events tail --event-type lottery::store::StoreSnapshotUpdatedEvent`) и агрегированные view выше.
+- Для контроля ассортимента и продаж магазина используйте поток `StoreSnapshotUpdatedEvent` (`events tail --event-type lottery_rewards::store::StoreSnapshotUpdatedEvent`) и агрегированные view выше.
 
 ## 7. Troubleshooting
 Сводная таблица расшифровок и решений доступна в отдельном документе [dVRF error reference](./dvrf_error_reference.md).
@@ -613,13 +673,13 @@ docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/con
    - Минт тестовых сумм через `treasury_v1::mint_to` → `treasury_v1::balance_of` для проверки.
    - При необходимости заморозить подозрительные аккаунты `treasury_v1::set_store_frozen`.
 5. **VRF-депозит и whitelisting**
-   - Настроить лимиты газа через `lottery::main_v2::configure_vrf_gas`.
-   - Рассчитать минимальный депозит (формула `30 * maxGasPrice * (maxGasLimit + verificationGasValue)`), вызвать `lottery::main_v2::create_subscription` с запасом и убедиться в событии `SubscriptionConfiguredEvent`.
-   - При необходимости обновить минимальный баланс (`lottery::main_v2::set_minimum_balance`).
+   - Настроить лимиты газа через `lottery_core::main_v2::configure_vrf_gas`.
+   - Рассчитать минимальный депозит (формула `30 * maxGasPrice * (maxGasLimit + verificationGasValue)`), вызвать `lottery_core::main_v2::create_subscription` с запасом и убедиться в событии `SubscriptionConfiguredEvent`.
+   - При необходимости обновить минимальный баланс (`lottery_core::main_v2::set_minimum_balance`).
 6. **Конфигурация лотереи**
-   - `lottery::main_v2::record_client_whitelist_snapshot`, `record_consumer_whitelist_snapshot`, `configure_vrf_request`.
+   - `lottery_core::main_v2::record_client_whitelist_snapshot`, `record_consumer_whitelist_snapshot`, `configure_vrf_request`.
    - Провести whitelisting агрегатора/потребителей (`whitelist_callback_sender`, `whitelist_consumer`).
-   - Проверить `lottery::main_v2::get_lottery_status`, `get_whitelist_status`, `get_vrf_request_config`, `get_client_whitelist_snapshot`, `get_min_balance_limit_snapshot`, `get_consumer_whitelist_snapshot`.
+   - Проверить `lottery_core::main_v2::get_lottery_status`, `get_whitelist_status`, `get_vrf_request_config`, `get_client_whitelist_snapshot`, `get_min_balance_limit_snapshot`, `get_consumer_whitelist_snapshot`.
 7. **Smoke-тест**
    - Минт токенов двум игрокам, купить билеты (`buy_ticket`), запросить розыгрыш (`manual_draw`).
    - Убедиться, что `WinnerSelected` и `DrawHandledEvent` появились в истории событий.
@@ -634,7 +694,7 @@ docker compose run --rm --entrypoint bash supra_cli -lc "SUPRA_CONFIG=/supra/con
 
 1. **Зафиксировать состояние**
    - Снять снапшоты `treasury_v1::treasury_balance`, `total_supply`, `get_config` и `account_extended_status` для ключевых адресов.
-   - Экспортировать список билетов и текущий `jackpot_amount` через view-функции `lottery::main_v2`.
+   - Экспортировать список билетов и текущий `jackpot_amount` через view-функции `lottery_core::main_v2`.
 
 ## 10. Автоматизация Supra Move тестов
 - Перед публикацией релиза вручную запустите `PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test --workspace SupraLottery/supra/move_workspace --all-packages --keep-going --report-json ci/move-test-report.json --report-junit ci/move-test-report.xml -- --skip-fetch-latest-git-deps` и зафиксируйте результат в отчёте. Команда последовательно проверит `lottery`, `lottery_factory`, `vrf_hub` и другие пакеты workspace, не прерываясь на первом провале; JSON (`ci/move-test-report.json`) и JUnit (`ci/move-test-report.xml`) можно приложить к релизному отчёту или загрузить в CI-артефакты. Автоматический GitHub Actions workflow отключён по договорённости — регрессионные проверки выполняются оператором вручную.
