@@ -33,10 +33,18 @@ print('Move dependencies installed at', target_base)"
 This downloads `aptos-core` (branch `dev`) and seeds the `~/.move` cache so further builds do not fetch git deps every time.
 
 ## 3. Build packages
-```bash
-bash supra/scripts/build_lottery_packages.sh lottery_core lottery_support lottery_rewards
+```powershell
+docker compose run --rm --entrypoint bash supra_cli `
+  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_core \
+        --skip-fetch-latest-git-deps"
+docker compose run --rm --entrypoint bash supra_cli `
+  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_support \
+        --skip-fetch-latest-git-deps"
+docker compose run --rm --entrypoint bash supra_cli `
+  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_rewards \
+        --skip-fetch-latest-git-deps"
 ```
-The script uses Docker/Podman or Aptos CLI (if `MOVE_CLI` is set) and writes artifacts to `supra/move_workspace/<pkg>/build`.
+These commands execute inside the `supra_cli` container, so no local bash/WSL is required. Podman users can adapt the command.
 
 ## 4. Run unit tests
 ```bash

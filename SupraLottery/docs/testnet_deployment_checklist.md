@@ -1,4 +1,4 @@
-# SupraLottery Testnet Deployment Checklist
+﻿# SupraLottery Testnet Deployment Checklist
 
 ## 0. Preparation
 - [ ] Sync repository (`git pull --rebase`).
@@ -7,7 +7,20 @@
 - [ ] Run `bash supra/scripts/bootstrap_move_deps.sh` (pins aptos-core commit `7d1e62c9a5394a279a73515a150e880200640f06`). On Windows without WSL execute the Python fallback from the runbook.
 
 ## 1. Build
-- [ ] `bash supra/scripts/build_lottery_packages.sh lottery_core lottery_support lottery_rewards`
+- [ ] ```powershell
+# lottery_core
+docker compose run --rm --entrypoint bash supra_cli `
+  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_core \
+        --skip-fetch-latest-git-deps"
+# lottery_support
+docker compose run --rm --entrypoint bash supra_cli `
+  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_support \
+        --skip-fetch-latest-git-deps"
+# lottery_rewards
+docker compose run --rm --entrypoint bash supra_cli `
+  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_rewards \
+        --skip-fetch-latest-git-deps"
+```
 - [ ] Verify `build/` directories are produced without errors.
 - [ ] Run unit tests for each package:
   ```bash
