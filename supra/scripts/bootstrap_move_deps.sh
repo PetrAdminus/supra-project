@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/Entropy-Foundation/aptos-core"
-REV="dev"
+REV="7d1e62c9a5394a279a73515a150e880200640f06"
 FRAMEWORK_PATH="aptos-move/framework"
 NEEDED_DIRS=("move-stdlib" "supra-framework" "aptos-stdlib" "supra-stdlib")
 
@@ -14,42 +14,46 @@ log() {
   echo "[bootstrap_move_deps] $*"
 }
 
-ensure_dependencies() {
-  local missing=0
+have_dependencies() {
   for dir in "${NEEDED_DIRS[@]}"; do
     if [ ! -d "${TARGET_BASE}/${dir}" ]; then
-      missing=1
-      break
+      return 1
     fi
   done
-  return ${missing}
+  return 0
 }
 
 main() {
-  if ensure_dependencies; then
-    log "Все зависимости уже установлены в ${TARGET_BASE}."
+  if have_dependencies; then
+    log "Found cached dependencies in ${TARGET_BASE}."
     exit 0
   fi
 
-  local tmpdir="$(mktemp -d)"
-  trap 'if [ -n "${tmpdir:-}" ]; then rm -rf "${tmpdir}"; fi' EXIT
+  local tmpdir
+  tmpdir="$(mktemp -d)"
+  trap 'rm -rf "${tmpdir}"' EXIT
 
   local archive="${tmpdir}/aptos-core.tar.gz"
-  log "Скачиваю ${REPO_URL} (${REV})…"
-  curl -sSL "${REPO_URL}/archive/refs/heads/${REV}.tar.gz" -o "${archive}"
+  log "Fetching ${REPO_URL} (${REV})"
+  curl -sSL "${REPO_URL}/archive/${REV}.tar.gz" -o "${archive}"
 
-  log "Распаковываю архив…"
+  log "Extracting archive"
   tar -xzf "${archive}" -C "${tmpdir}"
   local source_base="${tmpdir}/aptos-core-${REV}/${FRAMEWORK_PATH}"
 
+  if [ ! -d "${source_base}" ]; then
+    log "Expected framework path ${source_base} not found"
+    exit 1
+  fi
+
   mkdir -p "${TARGET_BASE}"
   for dir in "${NEEDED_DIRS[@]}"; do
-    log "Копирую ${dir} → ${TARGET_BASE}/${dir}"
+    log "Installing ${dir} -> ${TARGET_BASE}/${dir}"
     rm -rf "${TARGET_BASE}/${dir}"
     cp -R "${source_base}/${dir}" "${TARGET_BASE}/${dir}"
   done
 
-  log "Готово. Git-зависимости Move теперь доступны локально."
+  log "Move dependencies installed."
 }
 
 main "$@"
