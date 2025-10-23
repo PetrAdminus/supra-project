@@ -13,6 +13,23 @@ This runbook describes how to prepare the environment, build, publish and verify
 bash supra/scripts/bootstrap_move_deps.sh
 ```
 This pulls commit `7d1e62c9a5394a279a73515a150e880200640f06` of aptos-core and hydrates the local Move cache.
+If you are on Windows without WSL/bash, run the Python fallback:
+```powershell
+python -c "import os, tarfile, tempfile, shutil, urllib.request; from pathlib import Path; commit='7d1e62c9a5394a279a73515a150e880200640f06'; repo_url='https://github.com/Entropy-Foundation/aptos-core'; framework_subpath=Path('aptos-move/framework'); needed_dirs=['move-stdlib','supra-framework','aptos-stdlib','supra-stdlib']; move_home=Path(os.environ.get('MOVE_HOME', Path.home()/'.move')); cache_prefix=f'https___github_com_Entropy-Foundation_aptos-core_git_{commit}'; target_base=move_home/cache_prefix/framework_subpath;
+if all((target_base/d).exists() for d in needed_dirs):
+    print('Dependencies already cached at', target_base); raise SystemExit(0)
+move_home.mkdir(parents=True, exist_ok=True)
+with tempfile.TemporaryDirectory() as tmpdir:
+    tmpdir=Path(tmpdir); archive=tmpdir/'aptos-core.tar.gz'; url=f'{repo_url}/archive/{commit}.tar.gz'; print('Downloading', url);
+    with urllib.request.urlopen(url) as resp, open(archive,'wb') as f: shutil.copyfileobj(resp, f)
+    print('Extracting archive...');
+    with tarfile.open(archive, 'r:gz') as tf: tf.extractall(tmpdir); source_base=tmpdir/f'aptos-core-{commit}'/framework_subpath
+    if not source_base.exists(): raise SystemExit(f'Missing {source_base}')
+    for d in needed_dirs:
+        src=source_base/d; dst=target_base/d; dst.parent.mkdir(parents=True, exist_ok=True);
+        if dst.exists(): shutil.rmtree(dst); shutil.copytree(src, dst); print('Installed', dst)
+print('Move dependencies installed at', target_base)"
+```
 This downloads `aptos-core` (branch `dev`) and seeds the `~/.move` cache so further builds do not fetch git deps every time.
 
 ## 3. Build packages
