@@ -34,11 +34,11 @@ module lottery_core::rounds {
     const E_HISTORY_QUEUE_MISSING: u64 = 104;
     const E_PURCHASE_QUEUE_MISSING: u64 = 105;
 
-    /// Capability, подтверждающая право записи истории розыгрышей.
-    public struct HistoryWriterCap has store {}
+    /// Capability that authorizes writing the draw history.
+    struct HistoryWriterCap has store {}
 
-    /// Capability, выдаваемая модулю автопокупок для записи билетов раундов.
-    public struct AutopurchaseRoundCap has store {}
+    /// Capability issued to the autopurchase module for recording round tickets.
+    struct AutopurchaseRoundCap has store {}
 
     struct RoundState has store {
         tickets: vector<address>,
@@ -110,7 +110,7 @@ module lottery_core::rounds {
         snapshot: RoundSnapshot,
     }
 
-    public struct PendingHistoryRecord has drop, store {
+    struct PendingHistoryRecord has drop, store {
         lottery_id: u64,
         request_id: u64,
         winner: address,
@@ -124,7 +124,7 @@ module lottery_core::rounds {
         pending: vector<PendingHistoryRecord>,
     }
 
-    public struct PendingPurchaseRecord has drop, store {
+    struct PendingPurchaseRecord has drop, store {
         lottery_id: u64,
         buyer: address,
         ticket_count: u64,
@@ -141,7 +141,7 @@ module lottery_core::rounds {
         autopurchase_cap: option::Option<AutopurchaseRoundCap>,
     }
 
-    /// Разворачивает коллекцию раундов и capability-контроллер.
+    /// Deploys the round collection and the capability controller.
     public entry fun init(caller: &signer) acquires CoreControl, RoundCollection {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
@@ -183,10 +183,10 @@ module lottery_core::rounds {
             let control = borrow_global_mut<CoreControl>(@lottery);
             control.admin = addr;
             if (!option::is_some(&control.history_cap)) {
-                option::fill(&mut control.history_cap, HistoryWriterCap {});
+                control.history_cap = option::some(HistoryWriterCap {});
             };
             if (!option::is_some(&control.autopurchase_cap)) {
-                option::fill(&mut control.autopurchase_cap, AutopurchaseRoundCap {});
+                control.autopurchase_cap = option::some(AutopurchaseRoundCap {});
             };
         };
         if (!exists<HistoryQueue>(@lottery)) {
@@ -203,13 +203,13 @@ module lottery_core::rounds {
         };
     }
 
-    /// Проверяет, развёрнут ли модуль раундов.
+    // Checks whether the rounds module has been deployed.
     #[view]
     public fun is_initialized(): bool {
         exists<RoundCollection>(@lottery)
     }
 
-    /// Возвращает текущего администратора коллекции раундов.
+    // Returns the current administrator of the round collection.
     #[view]
     public fun admin(): address acquires RoundCollection {
         ensure_initialized();
@@ -217,7 +217,7 @@ module lottery_core::rounds {
         state.admin
     }
 
-    /// Обновляет администратора раундов (а также capability-контроллера, если он существует).
+    /// Updates the round administrator and the capability controller (if present).
     public entry fun set_admin(caller: &signer, new_admin: address)
     acquires CoreControl, RoundCollection {
         ensure_admin(caller);
@@ -229,7 +229,7 @@ module lottery_core::rounds {
         };
     }
 
-    /// Покупка билета пользователем.
+    /// Purchases a ticket on behalf of the caller.
     public entry fun buy_ticket(caller: &signer, lottery_id: u64)
     acquires RoundCollection {
         let buyer = signer::address_of(caller);
@@ -249,7 +249,7 @@ module lottery_core::rounds {
         );
     }
 
-    /// Регистрирует покупку билетов автопокупками через capability.
+    /// Records prepaid ticket purchases via the capability.
     public fun record_prepaid_purchase(
         _cap: &AutopurchaseRoundCap,
         lottery_id: u64,
@@ -266,7 +266,7 @@ module lottery_core::rounds {
         complete_purchase(state, lottery_id, buyer, ticket_price, jackpot_share_bps, ticket_count)
     }
 
-    /// Планирование розыгрыша администратором.
+    /// Schedules a draw by the administrator.
     public entry fun schedule_draw(caller: &signer, lottery_id: u64)
     acquires RoundCollection {
         ensure_admin(caller);
@@ -293,7 +293,7 @@ module lottery_core::rounds {
         emit_snapshot_event(state, lottery_id, snapshot);
     }
 
-    /// Сбрасывает состояние раунда.
+    /// Resets the round state.
     public entry fun reset_round(caller: &signer, lottery_id: u64)
     acquires RoundCollection {
         ensure_admin(caller);
@@ -317,7 +317,7 @@ module lottery_core::rounds {
         emit_snapshot_event(state, lottery_id, snapshot);
     }
 
-    /// Отправляет запрос случайности в VRF-хаб.
+    /// Sends a randomness request to the VRF hub.
     public entry fun request_randomness(
         caller: &signer,
         lottery_id: u64,
@@ -351,7 +351,7 @@ module lottery_core::rounds {
         emit_snapshot_event(state, lottery_id, snapshot);
     }
 
-    /// Обрабатывает ответ VRF и завершает розыгрыш.
+    /// Processes the VRF response and finalizes the draw.
     public entry fun fulfill_draw(
         caller: &signer,
         request_id: u64,
@@ -418,23 +418,23 @@ module lottery_core::rounds {
         );
     }
 
-    /// Возвращает список всех идентификаторов лотерей, для которых создан раунд.
+    // Returns the list of lottery identifiers that already have a round.
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires RoundCollection {
         if (!exists<RoundCollection>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         let state = borrow_global<RoundCollection>(@lottery);
         clone_u64_vector(&state.lottery_ids)
     }
 
-    /// Возвращает снимок состояния раунда, если он существует.
+    // Returns the round snapshot if it exists.
     #[view]
     public fun get_round_snapshot(
         lottery_id: u64,
     ): option::Option<RoundSnapshot> acquires RoundCollection {
         if (!exists<RoundCollection>(@lottery)) {
-            return option::none<RoundSnapshot>()
+            return option::none<RoundSnapshot>();
         };
         let state = borrow_global<RoundCollection>(@lottery);
         if (!table::contains(&state.rounds, lottery_id)) {
@@ -465,13 +465,13 @@ module lottery_core::rounds {
         (event.lottery_id, event.snapshot)
     }
 
-    /// Возвращает ID ожидающего VRF-запроса (если он есть) для указанной лотереи.
+    // Returns the pending VRF request ID for the given lottery, if any.
     #[view]
     public fun pending_request_id(
         lottery_id: u64,
     ): option::Option<u64> acquires RoundCollection {
         if (!exists<RoundCollection>(@lottery)) {
-            return option::none<u64>()
+            return option::none<u64>();
         };
         let state = borrow_global<RoundCollection>(@lottery);
         if (!table::contains(&state.rounds, lottery_id)) {
@@ -482,7 +482,7 @@ module lottery_core::rounds {
         }
     }
 
-    /// Импортирует состояние раунда из монолита во время миграции.
+    /// Imports round state from the monolith during migration.
     public fun migrate_import_round(
         caller: &signer,
         lottery_id: u64,
@@ -508,7 +508,7 @@ module lottery_core::rounds {
                 snapshot_from_round_mut(round)
             };
             emit_snapshot_event(state, lottery_id, snapshot);
-            return
+            return;
         };
 
         record_lottery_id(&mut state.lottery_ids, lottery_id);
@@ -529,7 +529,7 @@ module lottery_core::rounds {
         emit_snapshot_event(state, lottery_id, snapshot);
     }
 
-    /// Проверяет, создан ли `CoreControl`.
+    // Checks whether `CoreControl` has been created.
     #[view]
     public fun is_core_control_initialized(): bool {
         exists<CoreControl>(@lottery)
@@ -538,7 +538,7 @@ module lottery_core::rounds {
     #[view]
     public fun history_queue_length(): u64 acquires HistoryQueue {
         if (!exists<HistoryQueue>(@lottery)) {
-            return 0
+            return 0;
         };
         let queue = borrow_global<HistoryQueue>(@lottery);
         vector::length(&queue.pending)
@@ -547,7 +547,7 @@ module lottery_core::rounds {
     #[view]
     public fun purchase_queue_length(): u64 acquires PurchaseQueue {
         if (!exists<PurchaseQueue>(@lottery)) {
-            return 0
+            return 0;
         };
         let queue = borrow_global<PurchaseQueue>(@lottery);
         vector::length(&queue.pending)
@@ -584,42 +584,42 @@ module lottery_core::rounds {
     ) acquires RoundCollection {
         ensure_lottery_signer(admin);
         if (bonus_tickets == 0) {
-            return
+            return;
         };
         let state = borrow_global_mut<RoundCollection>(@lottery);
         let issued = 0;
         while (issued < bonus_tickets) {
-            issue_ticket_with_amount(&mut state, lottery_id, player, 0, 0);
+            issue_ticket_with_amount(state, lottery_id, player, 0, 0);
             issued = issued + 1;
         };
         let snapshot = {
-            let round = ensure_round(&mut state, lottery_id);
+            let round = ensure_round(state, lottery_id);
             snapshot_from_round_mut(round)
         };
-        emit_snapshot_event(&mut state, lottery_id, snapshot);
+        emit_snapshot_event(state, lottery_id, snapshot);
     }
 
-    /// Возвращает `true`, если capability истории свободна и может быть выдана.
+    // Returns `true` when the history capability is available for issuance.
     #[view]
     public fun history_cap_available(): bool acquires CoreControl {
         if (!exists<CoreControl>(@lottery)) {
-            return false
+            return false;
         };
         let control = borrow_global<CoreControl>(@lottery);
         option::is_some(&control.history_cap)
     }
 
-    /// Возвращает `true`, если capability автопокупок свободна.
+    // Returns `true` when the autopurchase capability is available.
     #[view]
     public fun autopurchase_cap_available(): bool acquires CoreControl {
         if (!exists<CoreControl>(@lottery)) {
-            return false
+            return false;
         };
         let control = borrow_global<CoreControl>(@lottery);
         option::is_some(&control.autopurchase_cap)
     }
 
-    /// Выдаёт capability истории для административной транзакции.
+    /// Issues the history capability for an administrative transaction.
     public fun borrow_history_writer_cap(
         caller: &signer,
     ): HistoryWriterCap acquires CoreControl {
@@ -632,23 +632,23 @@ module lottery_core::rounds {
         option::extract(&mut control.history_cap)
     }
 
-    /// Пытается получить capability истории, возвращая `none`, если она занята.
+    /// Attempts to borrow the history capability and returns `none` if it is already taken.
     public fun try_borrow_history_writer_cap(
         caller: &signer,
     ): option::Option<HistoryWriterCap> acquires CoreControl {
         if (!exists<CoreControl>(@lottery)) {
-            return option::none<HistoryWriterCap>()
+            return option::none<HistoryWriterCap>();
         };
         ensure_core_admin(caller);
         let control = borrow_global_mut<CoreControl>(@lottery);
         if (!option::is_some(&control.history_cap)) {
-            return option::none<HistoryWriterCap>()
+            return option::none<HistoryWriterCap>();
         };
         let cap = option::extract(&mut control.history_cap);
         option::some(cap)
     }
 
-    /// Возвращает capability истории обратно в `CoreControl`.
+    /// Returns the history capability back to `CoreControl`.
     public fun return_history_writer_cap(
         caller: &signer,
         cap: HistoryWriterCap,
@@ -659,10 +659,10 @@ module lottery_core::rounds {
         if (option::is_some(&control.history_cap)) {
             abort E_HISTORY_CAP_NOT_BORROWED
         };
-        option::fill(&mut control.history_cap, cap);
+        control.history_cap = option::some(cap);
     }
 
-    /// Выдаёт capability автопокупок. Возвращает ошибку, если она уже занята.
+    /// Issues the autopurchase capability and aborts if it is already taken.
     public fun borrow_autopurchase_round_cap(
         caller: &signer,
     ): AutopurchaseRoundCap acquires CoreControl {
@@ -675,23 +675,23 @@ module lottery_core::rounds {
         option::extract(&mut control.autopurchase_cap)
     }
 
-    /// Пытается получить capability автопокупок без ошибки, если ресурс занят.
+    /// Tries to borrow the autopurchase capability without aborting when it is in use.
     public fun try_borrow_autopurchase_round_cap(
         caller: &signer,
     ): option::Option<AutopurchaseRoundCap> acquires CoreControl {
         if (!exists<CoreControl>(@lottery)) {
-            return option::none<AutopurchaseRoundCap>()
+            return option::none<AutopurchaseRoundCap>();
         };
         ensure_core_admin(caller);
         let control = borrow_global_mut<CoreControl>(@lottery);
         if (!option::is_some(&control.autopurchase_cap)) {
-            return option::none<AutopurchaseRoundCap>()
+            return option::none<AutopurchaseRoundCap>();
         };
         let cap = option::extract(&mut control.autopurchase_cap);
         option::some(cap)
     }
 
-    /// Возвращает capability автопокупок обратно в `CoreControl`.
+    /// Returns the autopurchase capability back to `CoreControl`.
     public fun return_autopurchase_round_cap(
         caller: &signer,
         cap: AutopurchaseRoundCap,
@@ -702,7 +702,7 @@ module lottery_core::rounds {
         if (option::is_some(&control.autopurchase_cap)) {
             abort E_AUTOPURCHASE_CAP_NOT_BORROWED
         };
-        option::fill(&mut control.autopurchase_cap, cap);
+        control.autopurchase_cap = option::some(cap);
     }
 
     fun ensure_initialized() {
@@ -881,7 +881,7 @@ module lottery_core::rounds {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
-                return
+                return;
             };
             idx = idx + 1;
         };
@@ -988,14 +988,14 @@ module lottery_core::rounds {
         } else {
             limit
         };
-        let mut temp = vector::empty<PendingHistoryRecord>();
-        let mut taken = 0;
+        let temp = vector::empty<PendingHistoryRecord>();
+        let taken = 0;
         while (taken < to_take) {
             let record = vector::pop_back(records);
             vector::push_back(&mut temp, record);
             taken = taken + 1;
         };
-        let mut result = vector::empty<PendingHistoryRecord>();
+        let result = vector::empty<PendingHistoryRecord>();
         while (!vector::is_empty(&temp)) {
             let record = vector::pop_back(&mut temp);
             vector::push_back(&mut result, record);
@@ -1013,14 +1013,14 @@ module lottery_core::rounds {
         } else {
             limit
         };
-        let mut temp = vector::empty<PendingPurchaseRecord>();
-        let mut taken = 0;
+        let temp = vector::empty<PendingPurchaseRecord>();
+        let taken = 0;
         while (taken < to_take) {
             let record = vector::pop_back(records);
             vector::push_back(&mut temp, record);
             taken = taken + 1;
         };
-        let mut result = vector::empty<PendingPurchaseRecord>();
+        let result = vector::empty<PendingPurchaseRecord>();
         while (!vector::is_empty(&temp)) {
             let record = vector::pop_back(&mut temp);
             vector::push_back(&mut result, record);

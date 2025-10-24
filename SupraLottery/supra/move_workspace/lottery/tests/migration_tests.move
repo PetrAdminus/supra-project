@@ -39,7 +39,7 @@ module lottery::migration_tests {
         main_v2::set_draw_state_for_test(true, tickets);
         main_v2::set_jackpot_amount_for_test(500);
         main_v2::set_next_ticket_id_for_test(3);
-        main_v2::set_pending_request_for_test(option::none());
+        main_v2::set_pending_request_for_test(option::none<u64>());
 
         migration::migrate_from_legacy(lottery, lottery_id, 9_000, 1_000, 0);
 

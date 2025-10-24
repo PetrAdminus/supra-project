@@ -121,7 +121,7 @@ module lottery::autopurchase {
             AutopurchaseState {
                 admin: addr,
                 lotteries: table::new(),
-                lottery_ids: vector::empty(),
+                lottery_ids: vector::empty<u64>(),
                 deposit_events: account::new_event_handle<AutopurchaseDepositEvent>(caller),
                 config_events: account::new_event_handle<AutopurchaseConfigUpdatedEvent>(caller),
                 executed_events: account::new_event_handle<AutopurchaseExecutedEvent>(caller),
@@ -317,12 +317,12 @@ module lottery::autopurchase {
     public fun get_plan(lottery_id: u64, player: address): option::Option<AutopurchasePlan>
     acquires AutopurchaseState {
         if (!exists<AutopurchaseState>(@lottery)) {
-            return option::none<AutopurchasePlan>()
+            return option::none<AutopurchasePlan>();
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<AutopurchasePlan>()
+            return option::none<AutopurchasePlan>();
         };
         let plans = table::borrow(&state.lotteries, lottery_id);
         if (!table::contains(&plans.plans, player)) {
@@ -336,12 +336,12 @@ module lottery::autopurchase {
     public fun get_lottery_summary(lottery_id: u64): option::Option<AutopurchaseLotterySummary>
     acquires AutopurchaseState {
         if (!exists<AutopurchaseState>(@lottery)) {
-            return option::none<AutopurchaseLotterySummary>()
+            return option::none<AutopurchaseLotterySummary>();
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<AutopurchaseLotterySummary>()
+            return option::none<AutopurchaseLotterySummary>();
         };
         let plans = table::borrow(&state.lotteries, lottery_id);
         let total_players = vector::length(&plans.players);
@@ -369,7 +369,7 @@ module lottery::autopurchase {
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires AutopurchaseState {
         if (!exists<AutopurchaseState>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
@@ -380,12 +380,12 @@ module lottery::autopurchase {
     public fun list_players(lottery_id: u64): option::Option<vector<address>>
     acquires AutopurchaseState {
         if (!exists<AutopurchaseState>(@lottery)) {
-            return option::none<vector<address>>()
+            return option::none<vector<address>>();
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<vector<address>>()
+            return option::none<vector<address>>();
         };
         let plans = table::borrow(&state.lotteries, lottery_id);
         option::some(copy_address_vector(&plans.players))
@@ -395,12 +395,12 @@ module lottery::autopurchase {
     public fun get_lottery_snapshot(lottery_id: u64): option::Option<AutopurchaseLotterySnapshot>
     acquires AutopurchaseState {
         if (!exists<AutopurchaseState>(@lottery)) {
-            return option::none<AutopurchaseLotterySnapshot>()
+            return option::none<AutopurchaseLotterySnapshot>();
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<AutopurchaseLotterySnapshot>()
+            return option::none<AutopurchaseLotterySnapshot>();
         };
         option::some(build_lottery_snapshot(state, lottery_id))
     }
@@ -409,7 +409,7 @@ module lottery::autopurchase {
     public fun get_autopurchase_snapshot(): option::Option<AutopurchaseSnapshot>
     acquires AutopurchaseState {
         if (!exists<AutopurchaseState>(@lottery)) {
-            return option::none<AutopurchaseSnapshot>()
+            return option::none<AutopurchaseSnapshot>();
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
@@ -425,7 +425,7 @@ module lottery::autopurchase {
     fun ensure_executor(caller: &signer, player: address) acquires AutopurchaseState {
         let caller_addr = signer::address_of(caller);
         if (caller_addr == player) {
-            return
+            return;
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
@@ -439,7 +439,7 @@ module lottery::autopurchase {
             table::add(
                 &mut state.lotteries,
                 lottery_id,
-                LotteryPlans { plans: table::new(), players: vector::empty(), total_balance: 0 },
+                LotteryPlans { plans: table::new(), players: vector::empty<address>(), total_balance: 0 },
             );
             vector::push_back(&mut state.lottery_ids, lottery_id);
         };
@@ -451,7 +451,7 @@ module lottery::autopurchase {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(&plans.players, idx) == player) {
-                return
+                return;
             };
             idx = idx + 1;
         };
@@ -653,7 +653,7 @@ module lottery::autopurchase {
 
     fun emit_autopurchase_snapshot(state: &mut AutopurchaseState, lottery_id: u64) {
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return
+            return;
         };
         let snapshot = build_lottery_snapshot_from_mut(state, lottery_id);
         event::emit_event(

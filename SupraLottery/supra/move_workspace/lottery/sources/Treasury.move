@@ -207,7 +207,7 @@ module lottery::treasury_v1 {
         amount: u64,
     ) {
         if (amount == 0 || target == @lottery) {
-            return
+            return;
         };
 
         let target_store = ensure_store_exists(state, target, E_RECIPIENT_STORE_NOT_REGISTERED);
@@ -222,7 +222,7 @@ module lottery::treasury_v1 {
 
     fun calculate_share(total: u64, basis_points: u64): u64 {
         if (basis_points == 0) {
-            return 0
+            return 0;
         };
 
         total * basis_points / BASIS_POINT_DENOMINATOR
@@ -230,7 +230,7 @@ module lottery::treasury_v1 {
 
     fun share_for_recipient(total: u64, basis_points: u64, recipient: address): u64 {
         if (recipient == @lottery) {
-            return 0
+            return 0;
         };
 
         calculate_share(total, basis_points)
@@ -253,7 +253,7 @@ module lottery::treasury_v1 {
         let constructor_ref = object::create_named_object(admin, seed);
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             &constructor_ref,
-            option::none(),
+            option::none<vector<u8>>(),
             string::utf8(name),
             string::utf8(symbol),
             decimals,
@@ -279,7 +279,7 @@ module lottery::treasury_v1 {
         );
         move_to(admin, Vaults { config: default_config(), recipients: default_recipients() });
         emit_config();
-        emit_recipients_event(option::none());
+        emit_recipients_event(option::none<VaultRecipientsSnapshot>());
     }
 
     public entry fun register_store(account: &signer) acquires TokenState {
@@ -428,7 +428,7 @@ module lottery::treasury_v1 {
     #[view]
     public fun store_registered(account: address): bool acquires TokenState {
         if (!exists<TokenState>(@lottery)) {
-            return false
+            return false;
         };
         let state = borrow_global<TokenState>(@lottery);
         primary_fungible_store::primary_store_exists(account, state.metadata)
@@ -437,7 +437,7 @@ module lottery::treasury_v1 {
     #[view]
     public fun store_frozen(account: address): bool acquires TokenState {
         if (!exists<TokenState>(@lottery)) {
-            return false
+            return false;
         };
         let state = borrow_global<TokenState>(@lottery);
         if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
@@ -491,12 +491,12 @@ module lottery::treasury_v1 {
     #[view]
     public fun account_status(account: address): (bool, option::Option<address>, u64) acquires TokenState {
         if (!exists<TokenState>(@lottery)) {
-            return (false, option::none(), 0)
+            return (false, option::none<address>(), 0);
         };
 
         let state = borrow_global<TokenState>(@lottery);
         if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
-            return (false, option::none(), 0)
+            return (false, option::none<address>(), 0);
         };
 
         let store_address = primary_fungible_store::primary_store_address(account, state.metadata);
@@ -507,12 +507,12 @@ module lottery::treasury_v1 {
     #[view]
     public fun account_extended_status(account: address): (bool, bool, option::Option<address>, u64) acquires TokenState {
         if (!exists<TokenState>(@lottery)) {
-            return (false, false, option::none(), 0)
+            return (false, false, option::none<address>(), 0);
         };
 
         let state = borrow_global<TokenState>(@lottery);
         if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
-            return (false, false, option::none(), 0)
+            return (false, false, option::none<address>(), 0);
         };
 
         let store_address = primary_fungible_store::primary_store_address(account, state.metadata);
@@ -537,7 +537,7 @@ module lottery::treasury_v1 {
                 DEFAULT_BP_COMMUNITY,
                 DEFAULT_BP_TEAM,
                 DEFAULT_BP_PARTNERS,
-            )
+            );
         };
 
         let vaults = borrow_global<Vaults>(@lottery);
@@ -556,7 +556,7 @@ module lottery::treasury_v1 {
     #[view]
     public fun get_recipients(): (address, address, address, address, address) acquires Vaults {
         if (!exists<Vaults>(@lottery)) {
-            return (@lottery, @lottery, @lottery, @lottery, @lottery)
+            return (@lottery, @lottery, @lottery, @lottery, @lottery);
         };
 
         let vaults = borrow_global<Vaults>(@lottery);
@@ -597,7 +597,7 @@ module lottery::treasury_v1 {
     public(friend) fun distribute_payout(winner: address, total_amount: u64): u64 acquires TokenState, Vaults {
         ensure_token_initialized();
         if (total_amount == 0) {
-            return 0
+            return 0;
         };
 
         let state = borrow_global<TokenState>(@lottery);

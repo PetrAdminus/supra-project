@@ -256,7 +256,7 @@ module lottery::store {
                 };
                 option::some(remaining - quantity)
             } else {
-                option::none()
+                option::none<u64>()
             };
             total_price = record.item.price * quantity;
             treasury_v1::deposit_from_user(buyer, total_price);
@@ -275,15 +275,15 @@ module lottery::store {
     #[view]
     public fun get_item(lottery_id: u64, item_id: u64): option::Option<StoreItem> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return option::none()
+            return option::none<StoreItem>();
         };
         let state = borrow_global<StoreState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none()
+            return option::none<StoreItem>();
         };
         let store = table::borrow(&state.lotteries, lottery_id);
         if (!table::contains(&store.items, item_id)) {
-            option::none()
+            option::none<StoreItem>()
         } else {
             option::some(table::borrow(&store.items, item_id).item)
         }
@@ -294,15 +294,15 @@ module lottery::store {
     public fun get_item_with_stats(lottery_id: u64, item_id: u64): option::Option<ItemWithStats>
     acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return option::none()
+            return option::none<ItemWithStats>();
         };
         let state = borrow_global<StoreState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none()
+            return option::none<ItemWithStats>();
         };
         let store = table::borrow(&state.lotteries, lottery_id);
         if (!table::contains(&store.items, item_id)) {
-            option::none()
+            option::none<ItemWithStats>()
         } else {
             let record = table::borrow(&store.items, item_id);
             option::some(ItemWithStats { item: record.item, sold: record.sold })
@@ -313,7 +313,7 @@ module lottery::store {
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         let state_ref = borrow_global<StoreState>(@lottery);
         copy_vec_u64(&state_ref.lottery_ids)
@@ -323,7 +323,7 @@ module lottery::store {
     #[view]
     public fun list_item_ids(lottery_id: u64): vector<u64> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         let state_ref = borrow_global<StoreState>(@lottery);
         if (!table::contains(&state_ref.lotteries, lottery_id)) {
@@ -338,11 +338,11 @@ module lottery::store {
     public fun get_lottery_summary(lottery_id: u64): option::Option<vector<ItemWithStats>>
     acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return option::none()
+            return option::none<vector<ItemWithStats>>();
         };
         let state_ref = borrow_global<StoreState>(@lottery);
         if (!table::contains(&state_ref.lotteries, lottery_id)) {
-            return option::none()
+            return option::none<vector<ItemWithStats>>();
         };
         let store = table::borrow(&state_ref.lotteries, lottery_id);
         let result = vector::empty<ItemWithStats>();
@@ -364,11 +364,11 @@ module lottery::store {
     public fun get_lottery_snapshot(lottery_id: u64): option::Option<StoreLotterySnapshot>
     acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return option::none<StoreLotterySnapshot>()
+            return option::none<StoreLotterySnapshot>();
         };
         let state = borrow_global<StoreState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<StoreLotterySnapshot>()
+            return option::none<StoreLotterySnapshot>();
         };
         option::some(build_lottery_snapshot(state, lottery_id))
     }
@@ -377,7 +377,7 @@ module lottery::store {
     #[view]
     public fun get_store_snapshot(): option::Option<StoreSnapshot> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return option::none<StoreSnapshot>()
+            return option::none<StoreSnapshot>();
         };
         let state = borrow_global<StoreState>(@lottery);
         option::some(build_store_snapshot(state))
@@ -530,7 +530,7 @@ module lottery::store {
 
     fun emit_store_snapshot(state: &mut StoreState, lottery_id: u64) {
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return
+            return;
         };
         let snapshot = build_lottery_snapshot_from_mut(state, lottery_id);
         event::emit_event(

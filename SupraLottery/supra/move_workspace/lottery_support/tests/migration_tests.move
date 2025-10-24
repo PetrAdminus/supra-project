@@ -29,7 +29,7 @@ module lottery_support::migration_tests {
         migration::ensure_caps_initialized(lottery_admin);
         assert!(migration::caps_ready(), 1);
 
-        // Повторная инициализация должна быть идемпотентной.
+        // Reinitializing should be idempotent.
         migration::ensure_caps_initialized(lottery_admin);
         assert!(migration::caps_ready(), 2);
 
@@ -58,7 +58,7 @@ module lottery_support::migration_tests {
     ) {
         setup_environment(lottery_admin, factory_admin, vrf_admin);
         migration::ensure_caps_initialized(lottery_admin);
-        // Вторая попытка выдачи capability должна завершиться ошибкой ядра.
+        // Borrowing the capability a second time must abort in the core module.
         instances::borrow_instances_export_cap(lottery_admin);
     }
 
@@ -90,13 +90,13 @@ module lottery_support::migration_tests {
         );
         instances::create_instance(lottery_admin, lottery_id);
 
-        let mut tickets = vector::empty<address>();
+        let tickets = vector::empty<address>();
         vector::push_back(&mut tickets, signer::address_of(lottery_owner));
         vector::push_back(&mut tickets, signer::address_of(lottery_contract));
         main_v2::set_draw_state_for_test(true, tickets);
         main_v2::set_jackpot_amount_for_test(500);
         main_v2::set_next_ticket_id_for_test(3);
-        main_v2::set_pending_request_for_test(option::none());
+        main_v2::set_pending_request_for_test(option::none<u64>());
 
         migration::migrate_from_legacy(lottery_admin, lottery_id, 9_000, 1_000, 0);
 

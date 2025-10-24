@@ -22,9 +22,9 @@ module lottery_core::instances {
     const E_EXPORT_CAP_ALREADY_BORROWED: u64 = 10;
     const E_EXPORT_CAP_NOT_BORROWED: u64 = 11;
 
-    /// Capability, выдаваемая административным модулем миграции для изменения статистики.
-    /// Храним единственный экземпляр в `CoreControl` и возвращаем после завершения операции.
-    public struct InstancesExportCap has store {}
+    /// Capability issued to the migration module for updating instance statistics.
+    /// A single copy lives in `CoreControl` and must be returned after use.
+    struct InstancesExportCap has store {}
 
     struct CoreControl has key {
         export_cap: option::Option<InstancesExportCap>,
@@ -294,7 +294,7 @@ module lottery_core::instances {
         ensure_initialized();
         let state = borrow_global<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
-            option::none()
+            option::none<registry::LotteryInfo>()
         } else {
             let instance = table::borrow(&state.instances, lottery_id);
             option::some(instance.info)
@@ -306,7 +306,7 @@ module lottery_core::instances {
         ensure_initialized();
         let state = borrow_global<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
-            option::none()
+            option::none<InstanceStats>()
         } else {
             let instance = table::borrow(&state.instances, lottery_id);
             option::some(InstanceStats {
@@ -367,11 +367,11 @@ module lottery_core::instances {
     public fun get_instance_snapshot(lottery_id: u64): option::Option<LotteryInstanceSnapshot>
     acquires LotteryCollection {
         if (!exists<LotteryCollection>(@lottery)) {
-            return option::none<LotteryInstanceSnapshot>()
+            return option::none<LotteryInstanceSnapshot>();
         };
         let state = borrow_global<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
-            return option::none<LotteryInstanceSnapshot>()
+            return option::none<LotteryInstanceSnapshot>();
         };
         option::some(build_instance_snapshot(state, lottery_id))
     }
@@ -380,7 +380,7 @@ module lottery_core::instances {
     public fun get_instances_snapshot(): option::Option<LotteryInstancesSnapshot>
     acquires LotteryCollection {
         if (!exists<LotteryCollection>(@lottery)) {
-            return option::none<LotteryInstancesSnapshot>()
+            return option::none<LotteryInstancesSnapshot>();
         };
         let state = borrow_global<LotteryCollection>(@lottery);
         option::some(build_instances_snapshot(state))
@@ -417,7 +417,7 @@ module lottery_core::instances {
         if (option::is_some(&control.export_cap)) {
             abort E_EXPORT_CAP_NOT_BORROWED
         };
-        option::fill(&mut control.export_cap, cap);
+        control.export_cap = option::some(cap);
     }
 
     public fun migrate_override_stats(
@@ -456,7 +456,7 @@ module lottery_core::instances {
 
     fun emit_instance_snapshot(state: &mut LotteryCollection, lottery_id: u64) {
         if (!table::contains(&state.instances, lottery_id)) {
-            return
+            return;
         };
         let snapshot = build_instance_snapshot_from_mut(state, lottery_id);
         event::emit_event(

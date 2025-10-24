@@ -7,13 +7,13 @@ module lottery::metadata_tests {
 
     fun vector_equals(lhs: &vector<u8>, rhs: &vector<u8>): bool {
         if (vector::length(lhs) != vector::length(rhs)) {
-            return false
+            return false;
         };
         let len = vector::length(lhs);
         let i = 0;
         while (i < len) {
             if (*vector::borrow(lhs, i) != *vector::borrow(rhs, i)) {
-                return false
+                return false;
             };
             i = i + 1;
         };

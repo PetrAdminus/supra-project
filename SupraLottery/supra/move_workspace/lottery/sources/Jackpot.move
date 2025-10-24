@@ -274,7 +274,7 @@ module lottery::jackpot {
     #[view]
     public fun get_snapshot(): option::Option<JackpotSnapshot> acquires JackpotState {
         if (!exists<JackpotState>(@lottery)) {
-            return option::none<JackpotSnapshot>()
+            return option::none<JackpotSnapshot>();
         };
         let state = borrow_global<JackpotState>(@lottery);
         option::some(build_snapshot(state))
@@ -283,7 +283,7 @@ module lottery::jackpot {
     #[view]
     public fun pending_request(): option::Option<u64> acquires JackpotState {
         if (!exists<JackpotState>(@lottery)) {
-            return option::none<u64>()
+            return option::none<u64>();
         };
         let state = borrow_global<JackpotState>(@lottery);
         copy_option_u64(&state.pending_request)

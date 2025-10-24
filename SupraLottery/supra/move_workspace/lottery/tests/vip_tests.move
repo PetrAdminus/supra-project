@@ -299,7 +299,9 @@ module lottery::vip_tests {
 
         let snapshot_events =
             test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
-        if (vector::is_empty(&snapshot_events)) return;
+        if (vector::is_empty(&snapshot_events)) {
+            return;
+        };
         let last_event = test_utils::last_event_ref(&snapshot_events);
         let (_event_admin, event_snapshots) =
             vip::vip_snapshot_event_fields_for_test(last_event);

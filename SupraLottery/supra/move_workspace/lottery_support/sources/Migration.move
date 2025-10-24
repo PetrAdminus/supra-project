@@ -85,19 +85,21 @@ module lottery_support::migration {
             legacy_cap,
         } = move_from<MigrationSession>(@lottery);
 
-        let mut instances_cap_opt = instances_cap;
+        let instances_cap_opt = instances_cap;
         if (option::is_some(&instances_cap_opt)) {
-            let cap = option::extract(&mut instances_cap_opt);
+            let cap = option::destroy_some(instances_cap_opt);
             instances::return_instances_export_cap(admin, cap);
+        } else {
+            option::destroy_none(instances_cap_opt);
         };
-        option::destroy_none(instances_cap_opt);
 
-        let mut legacy_cap_opt = legacy_cap;
+        let legacy_cap_opt = legacy_cap;
         if (option::is_some(&legacy_cap_opt)) {
-            let cap = option::extract(&mut legacy_cap_opt);
+            let cap = option::destroy_some(legacy_cap_opt);
             treasury_v1::return_legacy_treasury_cap(admin, cap);
+        } else {
+            option::destroy_none(legacy_cap_opt);
         };
-        option::destroy_none(legacy_cap_opt);
     }
 
     public entry fun migrate_from_legacy(
@@ -177,7 +179,7 @@ module lottery_support::migration {
     #[view]
     public fun list_migrated_lottery_ids(): vector<u64> acquires MigrationLedger {
         if (!exists<MigrationLedger>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         let state = borrow_global<MigrationLedger>(@lottery);
         copy_u64_vector(&state.lottery_ids)
@@ -188,7 +190,7 @@ module lottery_support::migration {
         lottery_id: u64
     ): option::Option<MigrationSnapshot> acquires MigrationLedger {
         if (!exists<MigrationLedger>(@lottery)) {
-            return option::none<MigrationSnapshot>()
+            return option::none<MigrationSnapshot>();
         };
         let state = borrow_global<MigrationLedger>(@lottery);
         if (!table::contains(&state.snapshots, lottery_id)) {
@@ -260,7 +262,7 @@ module lottery_support::migration {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
-                return
+                return;
             };
             idx = idx + 1;
         };

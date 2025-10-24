@@ -35,12 +35,11 @@ module lottery_core::treasury_v1 {
     const DEFAULT_BP_TEAM: u64 = 200;
     const DEFAULT_BP_PARTNERS: u64 = 100;
 
-    /// Capability для автопокупок: позволяет модулю наград выполнять
-    /// выплаты из казначейства.
-    public struct AutopurchaseTreasuryCap has store {}
+    /// Capability granted to the rewards module for automated payouts from the treasury.
+    struct AutopurchaseTreasuryCap has store {}
 
-    /// Capability миграции legacy-данных в новое казначейство.
-    public struct LegacyTreasuryCap has store {}
+    /// Capability used to migrate legacy treasury data into the new storage.
+    struct LegacyTreasuryCap has store {}
 
     struct VaultConfig has copy, drop, store {
         bp_jackpot: u64,
@@ -225,7 +224,7 @@ module lottery_core::treasury_v1 {
         amount: u64,
     ) {
         if (amount == 0 || target == @lottery) {
-            return
+            return;
         };
 
         let target_store = ensure_store_exists(state, target, E_RECIPIENT_STORE_NOT_REGISTERED);
@@ -240,7 +239,7 @@ module lottery_core::treasury_v1 {
 
     fun calculate_share(total: u64, basis_points: u64): u64 {
         if (basis_points == 0) {
-            return 0
+            return 0;
         };
 
         total * basis_points / BASIS_POINT_DENOMINATOR
@@ -248,7 +247,7 @@ module lottery_core::treasury_v1 {
 
     fun share_for_recipient(total: u64, basis_points: u64, recipient: address): u64 {
         if (recipient == @lottery) {
-            return 0
+            return 0;
         };
 
         calculate_share(total, basis_points)
@@ -271,7 +270,7 @@ module lottery_core::treasury_v1 {
         let constructor_ref = object::create_named_object(admin, seed);
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             &constructor_ref,
-            option::none(),
+            option::none<vector<u8>>(),
             string::utf8(name),
             string::utf8(symbol),
             decimals,
@@ -297,7 +296,7 @@ module lottery_core::treasury_v1 {
         );
         move_to(admin, Vaults { config: default_config(), recipients: default_recipients() });
         emit_config();
-        emit_recipients_event(option::none());
+        emit_recipients_event(option::none<VaultRecipientsSnapshot>());
     }
 
     public entry fun register_store(account: &signer) acquires TokenState {
@@ -453,7 +452,7 @@ module lottery_core::treasury_v1 {
     #[view]
     public fun store_registered(account: address): bool acquires TokenState {
         if (!exists<TokenState>(@lottery)) {
-            return false
+            return false;
         };
         let state = borrow_global<TokenState>(@lottery);
         primary_fungible_store::primary_store_exists(account, state.metadata)
@@ -462,7 +461,7 @@ module lottery_core::treasury_v1 {
     #[view]
     public fun store_frozen(account: address): bool acquires TokenState {
         if (!exists<TokenState>(@lottery)) {
-            return false
+            return false;
         };
         let state = borrow_global<TokenState>(@lottery);
         if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
@@ -516,12 +515,12 @@ module lottery_core::treasury_v1 {
     #[view]
     public fun account_status(account: address): (bool, option::Option<address>, u64) acquires TokenState {
         if (!exists<TokenState>(@lottery)) {
-            return (false, option::none(), 0)
+            return (false, option::none<address>(), 0);
         };
 
         let state = borrow_global<TokenState>(@lottery);
         if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
-            return (false, option::none(), 0)
+            return (false, option::none<address>(), 0);
         };
 
         let store_address = primary_fungible_store::primary_store_address(account, state.metadata);
@@ -532,12 +531,12 @@ module lottery_core::treasury_v1 {
     #[view]
     public fun account_extended_status(account: address): (bool, bool, option::Option<address>, u64) acquires TokenState {
         if (!exists<TokenState>(@lottery)) {
-            return (false, false, option::none(), 0)
+            return (false, false, option::none<address>(), 0);
         };
 
         let state = borrow_global<TokenState>(@lottery);
         if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
-            return (false, false, option::none(), 0)
+            return (false, false, option::none<address>(), 0);
         };
 
         let store_address = primary_fungible_store::primary_store_address(account, state.metadata);
@@ -562,7 +561,7 @@ module lottery_core::treasury_v1 {
                 DEFAULT_BP_COMMUNITY,
                 DEFAULT_BP_TEAM,
                 DEFAULT_BP_PARTNERS,
-            )
+            );
         };
 
         let vaults = borrow_global<Vaults>(@lottery);
@@ -581,7 +580,7 @@ module lottery_core::treasury_v1 {
     #[view]
     public fun get_recipients(): (address, address, address, address, address) acquires Vaults {
         if (!exists<Vaults>(@lottery)) {
-            return (@lottery, @lottery, @lottery, @lottery, @lottery)
+            return (@lottery, @lottery, @lottery, @lottery, @lottery);
         };
 
         let vaults = borrow_global<Vaults>(@lottery);
@@ -622,7 +621,7 @@ module lottery_core::treasury_v1 {
     public(friend) fun distribute_payout(winner: address, total_amount: u64): u64 acquires TokenState, Vaults {
         ensure_token_initialized();
         if (total_amount == 0) {
-            return 0
+            return 0;
         };
 
         let state = borrow_global<TokenState>(@lottery);
@@ -811,9 +810,9 @@ module lottery_core::treasury_v1 {
         }
     }
 
-    /// --- Управление capability ---
+    // --- Capability management ---
 
-    /// Разворачивает `CoreControl` и подготавливает capability.
+    /// Deploys `CoreControl` and prepares the capabilities.
     public entry fun init(caller: &signer) {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
@@ -832,63 +831,63 @@ module lottery_core::treasury_v1 {
         );
     }
 
-    // Проверяет, инициализирован ли `CoreControl`.
+    // Checks whether `CoreControl` has been initialized.
     #[view]
     public fun is_core_control_initialized(): bool {
         exists<CoreControl>(@lottery)
     }
 
-    // Возвращает `true`, если capability автопокупок свободна.
+    // Returns `true` when the autopurchase capability is available.
     #[view]
     public fun autopurchase_cap_available(): bool acquires CoreControl {
         if (!exists<CoreControl>(@lottery)) {
-            return false
+            return false;
         };
         let control = borrow_global<CoreControl>(@lottery);
         option::is_some(&control.autopurchase_cap)
     }
 
-    // Возвращает `true`, если capability миграции свободна.
+    // Returns `true` when the legacy migration capability is available.
     #[view]
     public fun legacy_cap_available(): bool acquires CoreControl {
         if (!exists<CoreControl>(@lottery)) {
-            return false
+            return false;
         };
         let control = borrow_global<CoreControl>(@lottery);
         option::is_some(&control.legacy_cap)
     }
 
-    /// Выдаёт capability автопокупок. Возвращает ошибку, если она уже занята.
+    /// Issues the autopurchase capability and aborts if it is already borrowed.
     public fun borrow_autopurchase_treasury_cap(
         caller: &signer,
     ): AutopurchaseTreasuryCap acquires CoreControl {
         let cap_opt = try_borrow_autopurchase_treasury_cap(caller);
         if (!option::is_some(&cap_opt)) {
+            option::destroy_none(cap_opt);
             abort E_AUTOPURCHASE_CAP_BORROWED
         };
-        let cap = option::extract(&mut cap_opt);
-        option::destroy_none(cap_opt);
+        let cap = option::destroy_some(cap_opt);
         cap
     }
 
-    /// Пытается получить capability автопокупок без ошибки, если она уже выдана.
+    /// Attempts to borrow the autopurchase capability without aborting when it is taken.
     public fun try_borrow_autopurchase_treasury_cap(
         caller: &signer,
     ): option::Option<AutopurchaseTreasuryCap> acquires CoreControl {
         if (!exists<CoreControl>(@lottery)) {
-            return option::none<AutopurchaseTreasuryCap>()
+            return option::none<AutopurchaseTreasuryCap>();
         };
 
         ensure_core_admin(caller);
         let control = borrow_global_mut<CoreControl>(@lottery);
         if (!option::is_some(&control.autopurchase_cap)) {
-            return option::none<AutopurchaseTreasuryCap>()
+            return option::none<AutopurchaseTreasuryCap>();
         };
         let cap = option::extract(&mut control.autopurchase_cap);
         option::some(cap)
     }
 
-    /// Возвращает capability автопокупок обратно в `CoreControl`.
+    /// Returns the autopurchase capability to `CoreControl`.
     public fun return_autopurchase_treasury_cap(
         caller: &signer,
         cap: AutopurchaseTreasuryCap,
@@ -899,40 +898,40 @@ module lottery_core::treasury_v1 {
         if (option::is_some(&control.autopurchase_cap)) {
             abort E_AUTOPURCHASE_CAP_NOT_BORROWED
         };
-        option::fill(&mut control.autopurchase_cap, cap);
+        control.autopurchase_cap = option::some(cap);
     }
 
-    /// Выдаёт capability миграции legacy-данных.
+    /// Issues the legacy migration capability.
     public fun borrow_legacy_treasury_cap(
         caller: &signer,
     ): LegacyTreasuryCap acquires CoreControl {
         let cap_opt = try_borrow_legacy_treasury_cap(caller);
         if (!option::is_some(&cap_opt)) {
+            option::destroy_none(cap_opt);
             abort E_LEGACY_CAP_BORROWED
         };
-        let cap = option::extract(&mut cap_opt);
-        option::destroy_none(cap_opt);
+        let cap = option::destroy_some(cap_opt);
         cap
     }
 
-    /// Пытается получить capability миграции, не выбрасывая ошибку, если она занята.
+    /// Attempts to borrow the legacy capability without aborting if it is in use.
     public fun try_borrow_legacy_treasury_cap(
         caller: &signer,
     ): option::Option<LegacyTreasuryCap> acquires CoreControl {
         if (!exists<CoreControl>(@lottery)) {
-            return option::none<LegacyTreasuryCap>()
+            return option::none<LegacyTreasuryCap>();
         };
 
         ensure_core_admin(caller);
         let control = borrow_global_mut<CoreControl>(@lottery);
         if (!option::is_some(&control.legacy_cap)) {
-            return option::none<LegacyTreasuryCap>()
+            return option::none<LegacyTreasuryCap>();
         };
         let cap = option::extract(&mut control.legacy_cap);
         option::some(cap)
     }
 
-    /// Возвращает capability миграции обратно в `CoreControl`.
+    /// Returns the legacy capability to `CoreControl`.
     public fun return_legacy_treasury_cap(
         caller: &signer,
         cap: LegacyTreasuryCap,
@@ -943,10 +942,10 @@ module lottery_core::treasury_v1 {
         if (option::is_some(&control.legacy_cap)) {
             abort E_LEGACY_CAP_NOT_BORROWED
         };
-        option::fill(&mut control.legacy_cap, cap);
+        control.legacy_cap = option::some(cap);
     }
 
-    /// Выплата с использованием capability автопокупок.
+    /// Performs a payout using the autopurchase capability.
     public fun payout_with_autopurchase_cap(
         _cap: &AutopurchaseTreasuryCap,
         recipient: address,
@@ -955,7 +954,7 @@ module lottery_core::treasury_v1 {
         payout_from_treasury_internal(recipient, amount);
     }
 
-    /// Выплата с использованием capability миграции.
+    /// Performs a payout using the legacy capability.
     public fun payout_with_legacy_cap(
         _cap: &LegacyTreasuryCap,
         recipient: address,

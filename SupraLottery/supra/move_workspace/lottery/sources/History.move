@@ -125,7 +125,7 @@ module lottery::history {
         payload: vector<u8>,
     ) acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return
+            return;
         };
         let state = borrow_global_mut<HistoryCollection>(@lottery);
         let previous = option::some(build_snapshot_from_mut(state));
@@ -159,7 +159,7 @@ module lottery::history {
     #[view]
     public fun has_history(lottery_id: u64): bool acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return false
+            return false;
         };
         let state = borrow_global<HistoryCollection>(@lottery);
         table::contains(&state.histories, lottery_id)
@@ -168,7 +168,7 @@ module lottery::history {
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         let state = borrow_global<HistoryCollection>(@lottery);
         clone_u64_vector(&state.lottery_ids)
@@ -177,7 +177,7 @@ module lottery::history {
     #[view]
     public fun get_history(lottery_id: u64): option::Option<vector<DrawRecord>> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return option::none<vector<DrawRecord>>()
+            return option::none<vector<DrawRecord>>();
         };
         let state = borrow_global<HistoryCollection>(@lottery);
         if (!table::contains(&state.histories, lottery_id)) {
@@ -191,7 +191,7 @@ module lottery::history {
     #[view]
     public fun latest_record(lottery_id: u64): option::Option<DrawRecord> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return option::none<DrawRecord>()
+            return option::none<DrawRecord>();
         };
         let state = borrow_global<HistoryCollection>(@lottery);
         if (!table::contains(&state.histories, lottery_id)) {
@@ -212,7 +212,7 @@ module lottery::history {
         lottery_id: u64
     ): option::Option<LotteryHistorySnapshot> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return option::none<LotteryHistorySnapshot>()
+            return option::none<LotteryHistorySnapshot>();
         };
         let state = borrow_global<HistoryCollection>(@lottery);
         if (!table::contains(&state.histories, lottery_id)) {
@@ -225,7 +225,7 @@ module lottery::history {
     #[view]
     public fun get_history_snapshot(): option::Option<HistorySnapshot> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return option::none<HistorySnapshot>()
+            return option::none<HistorySnapshot>();
         };
         let state = borrow_global<HistoryCollection>(@lottery);
         option::some(build_snapshot(state))
@@ -267,7 +267,7 @@ module lottery::history {
         let index = 0;
         while (index < len) {
             if (*vector::borrow(list, index) == lottery_id) {
-                return
+                return;
             } else {
                 index = index + 1;
             }

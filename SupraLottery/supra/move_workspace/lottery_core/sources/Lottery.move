@@ -281,7 +281,7 @@ module lottery_core::main_v2 {
         lottery.jackpot_amount = 0;
         lottery.draw_scheduled = false;
         lottery.next_ticket_id = 1;
-        lottery.pending_request = option::none();
+        lottery.pending_request = option::none<u64>();
     }
 
     public fun is_initialized(): bool {
@@ -333,7 +333,7 @@ module lottery_core::main_v2 {
         if (option::is_some(opt)) {
             option::some(*option::borrow(opt))
         } else {
-            option::none()
+            option::none<address>()
         }
     }
 
@@ -350,7 +350,7 @@ module lottery_core::main_v2 {
         if (option::is_some(opt)) {
             option::some(*option::borrow(opt))
         } else {
-            option::none()
+            option::none<u64>()
         }
     }
 
@@ -432,11 +432,11 @@ module lottery_core::main_v2 {
         // Store lottery data at the lottery contract address
         let default_consumers = vector[@lottery];
         move_to(sender, LotteryData {
-            tickets: vector::empty(),
+            tickets: vector::empty<address>(),
             jackpot_amount: 0,
             draw_scheduled: false,
             next_ticket_id: 1,
-            pending_request: option::none(),
+            pending_request: option::none<u64>(),
             max_gas_fee: 0,
             max_gas_price: 0,
             max_gas_limit: 0,
@@ -445,14 +445,14 @@ module lottery_core::main_v2 {
             verification_gas_value: 0,
             rng_request_count: 0,
             rng_response_count: 0,
-            last_request_payload_hash: option::none(),
-            last_requester: option::none(),
+            last_request_payload_hash: option::none<vector<u8>>(),
+            last_requester: option::none<address>(),
             next_client_seed: 0,
             whitelisted_consumers: default_consumers,
-            whitelisted_callback_sender: option::none(),
-            client_whitelist_snapshot: option::none(),
-            consumer_whitelist_snapshot: option::none(),
-            vrf_request_config: option::none(),
+            whitelisted_callback_sender: option::none<address>(),
+            client_whitelist_snapshot: option::none<ClientWhitelistSnapshot>(),
+            consumer_whitelist_snapshot: option::none<ConsumerWhitelistSnapshot>(),
+            vrf_request_config: option::none<VrfRequestConfig>(),
         });
 
         event::emit(ConsumerWhitelistedEvent { consumer: @lottery });
@@ -931,7 +931,7 @@ module lottery_core::main_v2 {
         event::emit(WinnerSelected { winner, prize: prize_amount });
 
         // Reset lottery
-        lottery.tickets = vector::empty();
+        lottery.tickets = vector::empty<address>();
         lottery.jackpot_amount = 0;
         lottery.draw_scheduled = false;
         lottery.next_ticket_id = 1;
@@ -1033,7 +1033,11 @@ module lottery_core::main_v2 {
 
     #[test_only]
     public fun set_pending_request_for_test(nonce: option::Option<u64>) acquires LotteryData {
-        set_pending_request_and_hash_for_test(nonce, option::none(), option::none());
+        set_pending_request_and_hash_for_test(
+            nonce,
+            option::none<vector<u8>>(),
+            option::none<address>(),
+        );
     }
 
     #[test_only]
@@ -1311,7 +1315,7 @@ module lottery_core::main_v2 {
                 min_balance_limit: snapshot.min_balance_limit,
             })
         } else {
-            option::none()
+            option::none<ClientWhitelistSnapshotView>()
         }
     }
 
@@ -1326,7 +1330,7 @@ module lottery_core::main_v2 {
                 callback_gas_limit: snapshot.callback_gas_limit,
             })
         } else {
-            option::none()
+            option::none<ConsumerWhitelistSnapshotView>()
         }
     }
 
@@ -1342,7 +1346,7 @@ module lottery_core::main_v2 {
                 client_seed: config.client_seed,
             })
         } else {
-            option::none()
+            option::none<VrfRequestConfigView>()
         }
     }
 
@@ -1617,7 +1621,7 @@ module lottery_core::main_v2 {
             randomness: randomness_for_event,
         });
 
-        lottery.tickets = vector::empty();
+        lottery.tickets = vector::empty<address>();
         lottery.jackpot_amount = 0;
         lottery.draw_scheduled = false;
         lottery.next_ticket_id = 1;
@@ -1734,11 +1738,11 @@ module lottery_core::main_v2 {
     #[view]
     public fun get_pending_request_view(): option::Option<PendingRequestView> acquires LotteryData {
         if (!exists<LotteryData>(@lottery)) {
-            option::none()
+            option::none<PendingRequestView>()
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             if (!option::is_some(&lottery.pending_request)) {
-                option::none()
+                option::none<PendingRequestView>()
             } else {
                 assert!(option::is_some(&lottery.last_request_payload_hash), E_INVALID_CALLBACK_PAYLOAD);
                 assert!(option::is_some(&lottery.last_requester), E_INVALID_CALLBACK_PAYLOAD);
@@ -1812,7 +1816,7 @@ module lottery_core::main_v2 {
     public fun get_whitelist_status(): WhitelistStatus acquires LotteryData {
         if (!exists<LotteryData>(@lottery)) {
             WhitelistStatus {
-                aggregator: option::none(),
+                aggregator: option::none<address>(),
                 consumers: vector::empty<address>(),
             }
         } else {
@@ -1829,7 +1833,7 @@ module lottery_core::main_v2 {
             let aggregator = if (option::is_some(&lottery.whitelisted_callback_sender)) {
                 option::some(*option::borrow(&lottery.whitelisted_callback_sender))
             } else {
-                option::none()
+                option::none<address>()
             };
 
             WhitelistStatus { aggregator, consumers }
@@ -1839,14 +1843,14 @@ module lottery_core::main_v2 {
     #[view]
     public fun get_client_whitelist_snapshot(): option::Option<ClientWhitelistSnapshot> acquires LotteryData {
         if (!exists<LotteryData>(@lottery)) {
-            option::none()
+            option::none<ClientWhitelistSnapshot>()
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             if (option::is_some(&lottery.client_whitelist_snapshot)) {
                 let snapshot = *option::borrow(&lottery.client_whitelist_snapshot);
                 option::some(snapshot)
             } else {
-                option::none()
+                option::none<ClientWhitelistSnapshot>()
             }
         }
     }
@@ -1854,14 +1858,14 @@ module lottery_core::main_v2 {
     #[view]
     public fun get_min_balance_limit_snapshot(): option::Option<u128> acquires LotteryData {
         if (!exists<LotteryData>(@lottery)) {
-            option::none()
+            option::none<u128>()
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             if (option::is_some(&lottery.client_whitelist_snapshot)) {
                 let snapshot = option::borrow(&lottery.client_whitelist_snapshot);
                 option::some(snapshot.min_balance_limit)
             } else {
-                option::none()
+                option::none<u128>()
             }
         }
     }
@@ -1869,14 +1873,14 @@ module lottery_core::main_v2 {
     #[view]
     public fun get_consumer_whitelist_snapshot(): option::Option<ConsumerWhitelistSnapshot> acquires LotteryData {
         if (!exists<LotteryData>(@lottery)) {
-            option::none()
+            option::none<ConsumerWhitelistSnapshot>()
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             if (option::is_some(&lottery.consumer_whitelist_snapshot)) {
                 let snapshot = *option::borrow(&lottery.consumer_whitelist_snapshot);
                 option::some(snapshot)
             } else {
-                option::none()
+                option::none<ConsumerWhitelistSnapshot>()
             }
         }
     }
@@ -1884,14 +1888,14 @@ module lottery_core::main_v2 {
     #[view]
     public fun get_vrf_request_config(): option::Option<VrfRequestConfig> acquires LotteryData {
         if (!exists<LotteryData>(@lottery)) {
-            option::none()
+            option::none<VrfRequestConfig>()
         } else {
             let lottery = borrow_global<LotteryData>(@lottery);
             if (option::is_some(&lottery.vrf_request_config)) {
                 let config = *option::borrow(&lottery.vrf_request_config);
                 option::some(config)
             } else {
-                option::none()
+                option::none<VrfRequestConfig>()
             }
         }
     }
@@ -1976,10 +1980,10 @@ module lottery_core::main_v2 {
     }
 
     fun clear_pending_request_state(lottery: &mut LotteryData) {
-        lottery.pending_request = option::none();
-        lottery.last_request_payload_hash = option::none();
-        lottery.last_requester = option::none();
-        lottery.vrf_request_config = option::none();
+        lottery.pending_request = option::none<u64>();
+        lottery.last_request_payload_hash = option::none<vector<u8>>();
+        lottery.last_requester = option::none<address>();
+        lottery.vrf_request_config = option::none<VrfRequestConfig>();
     }
 
     fun calculate_per_request_gas_fee(

@@ -119,7 +119,7 @@ module vrf_hub::hub {
             requests: table::new(),
             lottery_ids: vector::empty<u64>(),
             pending_request_ids: vector::empty<u64>(),
-            callback_sender: option::none(),
+            callback_sender: option::none<address>(),
             register_events: account::new_event_handle<LotteryRegisteredEvent>(caller),
             status_events: account::new_event_handle<LotteryStatusChangedEvent>(caller),
             metadata_events: account::new_event_handle<LotteryMetadataUpdatedEvent>(caller),
@@ -252,7 +252,7 @@ module vrf_hub::hub {
         ensure_initialized();
         let state = borrow_global<HubState>(@vrf_hub);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return false
+            return false;
         };
         table::borrow(&state.lotteries, lottery_id).active
     }
@@ -263,7 +263,7 @@ module vrf_hub::hub {
         ensure_initialized();
         let state = borrow_global<HubState>(@vrf_hub);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            option::none()
+            option::none<LotteryRegistration>()
         } else {
             option::some(*table::borrow(&state.lotteries, lottery_id))
         }
@@ -384,7 +384,7 @@ module vrf_hub::hub {
         ensure_initialized();
         let state = borrow_global<HubState>(@vrf_hub);
         if (!table::contains(&state.requests, request_id)) {
-            option::none()
+            option::none<RequestRecord>()
         } else {
             option::some(*table::borrow(&state.requests, request_id))
         }
@@ -477,7 +477,7 @@ module vrf_hub::hub {
         if (option::is_some(value)) {
             option::some(*option::borrow(value))
         } else {
-            option::none()
+            option::none<address>()
         }
     }
 
@@ -548,7 +548,7 @@ module vrf_hub::hub {
                     let slot = vector::borrow_mut(ids, i);
                     *slot = last;
                 };
-                return
+                return;
             };
             i = i + 1;
         };

@@ -141,7 +141,7 @@ module lottery::vip {
             VipState {
                 admin: addr,
                 lotteries: table::new(),
-                lottery_ids: vector::empty(),
+                lottery_ids: vector::empty<u64>(),
                 config_events: account::new_event_handle<VipConfigUpdatedEvent>(caller),
                 subscribed_events: account::new_event_handle<VipSubscribedEvent>(caller),
                 cancelled_events: account::new_event_handle<VipCancelledEvent>(caller),
@@ -198,7 +198,7 @@ module lottery::vip {
                 VipLottery {
                     config,
                     subscriptions: table::new(),
-                    members: vector::empty(),
+                    members: vector::empty<address>(),
                     total_revenue: 0,
                     bonus_tickets_issued: 0,
                 },
@@ -244,7 +244,7 @@ module lottery::vip {
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         let state = borrow_global<VipState>(@lottery);
         copy_u64_vector(&state.lottery_ids)
@@ -254,11 +254,11 @@ module lottery::vip {
     public fun get_lottery_summary(lottery_id: u64): option::Option<VipLotterySummary>
     acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return option::none<VipLotterySummary>()
+            return option::none<VipLotterySummary>();
         };
         let state = borrow_global<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<VipLotterySummary>()
+            return option::none<VipLotterySummary>();
         };
         let snapshot = build_lottery_snapshot_for_view(state, lottery_id);
         let VipLotterySnapshot {
@@ -281,11 +281,11 @@ module lottery::vip {
     #[view]
     public fun list_players(lottery_id: u64): option::Option<vector<address>> acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return option::none<vector<address>>()
+            return option::none<vector<address>>();
         };
         let state = borrow_global<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<vector<address>>()
+            return option::none<vector<address>>();
         };
         let lottery = table::borrow(&state.lotteries, lottery_id);
         option::some(copy_address_vector(&lottery.members))
@@ -297,15 +297,15 @@ module lottery::vip {
         player: address,
     ): option::Option<VipSubscriptionView> acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return option::none<VipSubscriptionView>()
+            return option::none<VipSubscriptionView>();
         };
         let state = borrow_global<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<VipSubscriptionView>()
+            return option::none<VipSubscriptionView>();
         };
         let lottery = table::borrow(&state.lotteries, lottery_id);
         if (!table::contains(&lottery.subscriptions, player)) {
-            return option::none<VipSubscriptionView>()
+            return option::none<VipSubscriptionView>();
         };
         let subscription = table::borrow(&lottery.subscriptions, player);
         let now = timestamp::now_seconds();
@@ -322,11 +322,11 @@ module lottery::vip {
         lottery_id: u64,
     ): option::Option<VipLotterySnapshot> acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return option::none<VipLotterySnapshot>()
+            return option::none<VipLotterySnapshot>();
         };
         let state = borrow_global<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<VipLotterySnapshot>()
+            return option::none<VipLotterySnapshot>();
         };
         option::some(build_lottery_snapshot_for_view(state, lottery_id))
     }
@@ -334,7 +334,7 @@ module lottery::vip {
     #[view]
     public fun get_vip_snapshot(): option::Option<VipSnapshot> acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return option::none<VipSnapshot>()
+            return option::none<VipSnapshot>();
         };
         let state = borrow_global<VipState>(@lottery);
         option::some(build_vip_snapshot(state))
@@ -342,15 +342,15 @@ module lottery::vip {
 
     public(friend) fun bonus_tickets_for(lottery_id: u64, player: address): u64 acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return 0
+            return 0;
         };
         let state = borrow_global<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return 0
+            return 0;
         };
         let lottery = table::borrow(&state.lotteries, lottery_id);
         if (!table::contains(&lottery.subscriptions, player)) {
-            return 0
+            return 0;
         };
         let subscription = table::borrow(&lottery.subscriptions, player);
         let now = timestamp::now_seconds();
@@ -367,11 +367,11 @@ module lottery::vip {
         bonus_tickets: u64,
     ) acquires VipState {
         if (bonus_tickets == 0 || !exists<VipState>(@lottery)) {
-            return
+            return;
         };
         let state = borrow_global_mut<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return
+            return;
         };
         let lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
         lottery.bonus_tickets_issued = lottery.bonus_tickets_issued + bonus_tickets;
@@ -642,7 +642,7 @@ module lottery::vip {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
-                return
+                return;
             };
             idx = idx + 1;
         };
@@ -654,7 +654,7 @@ module lottery::vip {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(members, idx) == member) {
-                return
+                return;
             };
             idx = idx + 1;
         };

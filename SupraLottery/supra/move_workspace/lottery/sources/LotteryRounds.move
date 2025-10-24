@@ -325,7 +325,7 @@ module lottery::rounds {
     #[view]
     public fun get_round_snapshot(lottery_id: u64): option::Option<RoundSnapshot> acquires RoundCollection {
         if (!exists<RoundCollection>(@lottery)) {
-            return option::none<RoundSnapshot>()
+            return option::none<RoundSnapshot>();
         };
         let state = borrow_global<RoundCollection>(@lottery);
         if (!table::contains(&state.rounds, lottery_id)) {
@@ -339,7 +339,7 @@ module lottery::rounds {
     #[view]
     public fun pending_request_id(lottery_id: u64): option::Option<u64> acquires RoundCollection {
         if (!exists<RoundCollection>(@lottery)) {
-            return option::none<u64>()
+            return option::none<u64>();
         };
         let state = borrow_global<RoundCollection>(@lottery);
         if (!table::contains(&state.rounds, lottery_id)) {
@@ -496,7 +496,7 @@ module lottery::rounds {
                 snapshot_from_round_mut(round)
             };
             emit_snapshot_event(state, lottery_id, snapshot);
-            return
+            return;
         };
         record_lottery_id(&mut state.lottery_ids, lottery_id);
         table::add(
@@ -644,7 +644,7 @@ module lottery::rounds {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
-                return
+                return;
             };
             idx = idx + 1;
         };

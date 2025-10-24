@@ -99,7 +99,7 @@ module lottery::metadata {
     public fun get_metadata(lottery_id: u64): option::Option<LotteryMetadata> acquires MetadataRegistry {
         let state = borrow_global<MetadataRegistry>(@lottery);
         if (!table::contains(&state.entries, lottery_id)) {
-            option::none()
+            option::none<LotteryMetadata>()
         } else {
             option::some(*table::borrow(&state.entries, lottery_id))
         }
@@ -321,7 +321,7 @@ module lottery::metadata {
         while (i < len) {
             if (*vector::borrow(ids, i) == lottery_id) {
                 vector::swap_remove(ids, i);
-                return
+                return;
             };
             i = i + 1;
         };

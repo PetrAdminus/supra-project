@@ -2457,13 +2457,13 @@ module lottery::lottery_tests {
 
     fun vector_equals(lhs: &vector<u8>, rhs: &vector<u8>): bool {
         if (vector::length(lhs) != vector::length(rhs)) {
-            return false
+            return false;
         };
         let i = 0;
         let len = vector::length(lhs);
         while (i < len) {
             if (*vector::borrow(lhs, i) != *vector::borrow(rhs, i)) {
-                return false
+                return false;
             };
             i = i + 1;
         };
@@ -2522,7 +2522,7 @@ module lottery::lottery_tests {
         let (_, _, pending_after_flag, _, _, _) = main_v2::lottery_status_fields(&status_after_pending);
         assert!(pending_after_flag, 12);
 
-        main_v2::set_pending_request_for_test(option::none());
+        main_v2::set_pending_request_for_test(option::none<u64>());
     }
 
     #[test]
@@ -2874,7 +2874,7 @@ module lottery::lottery_tests {
         main_v2::set_pending_request_for_test(option::some(777));
         assert!(main_v2::is_vrf_request_pending(), 1);
 
-        main_v2::set_pending_request_for_test(option::none());
+        main_v2::set_pending_request_for_test(option::none<u64>());
         assert!(!main_v2::is_vrf_request_pending(), 2);
     }
 }

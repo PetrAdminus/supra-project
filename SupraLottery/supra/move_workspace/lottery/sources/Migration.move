@@ -115,7 +115,7 @@ module lottery::migration {
     #[view]
     public fun list_migrated_lottery_ids(): vector<u64> acquires MigrationLedger {
         if (!exists<MigrationLedger>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         let state = borrow_global<MigrationLedger>(@lottery);
         copy_u64_vector(&state.lottery_ids)
@@ -127,7 +127,7 @@ module lottery::migration {
         lottery_id: u64
     ): option::Option<MigrationSnapshot> acquires MigrationLedger {
         if (!exists<MigrationLedger>(@lottery)) {
-            return option::none<MigrationSnapshot>()
+            return option::none<MigrationSnapshot>();
         };
         let state = borrow_global<MigrationLedger>(@lottery);
         if (!table::contains(&state.snapshots, lottery_id)) {
@@ -204,7 +204,7 @@ module lottery::migration {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
-                return
+                return;
             };
             idx = idx + 1;
         };

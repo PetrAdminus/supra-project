@@ -185,11 +185,11 @@ module lottery_rewards::nft_rewards {
     #[view]
     public fun has_badge(owner: address, badge_id: u64): bool acquires BadgeAuthority {
         if (!exists<BadgeAuthority>(@lottery)) {
-            return false
+            return false;
         };
         let state = borrow_global<BadgeAuthority>(@lottery);
         if (!table::contains(&state.users, owner)) {
-            return false
+            return false;
         };
         let collection = table::borrow(&state.users, owner);
         table::contains(&collection.badges, badge_id)
@@ -199,11 +199,11 @@ module lottery_rewards::nft_rewards {
     #[view]
     public fun list_badges(owner: address): vector<u64> acquires BadgeAuthority {
         if (!exists<BadgeAuthority>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         let state = borrow_global<BadgeAuthority>(@lottery);
         if (!table::contains(&state.users, owner)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         let collection = table::borrow(&state.users, owner);
         clone_u64_vector(&collection.badge_ids)
@@ -213,11 +213,11 @@ module lottery_rewards::nft_rewards {
     #[view]
     public fun get_badge(owner: address, badge_id: u64): option::Option<WinnerBadgeData> acquires BadgeAuthority {
         if (!exists<BadgeAuthority>(@lottery)) {
-            return option::none<WinnerBadgeData>()
+            return option::none<WinnerBadgeData>();
         };
         let state = borrow_global<BadgeAuthority>(@lottery);
         if (!table::contains(&state.users, owner)) {
-            return option::none<WinnerBadgeData>()
+            return option::none<WinnerBadgeData>();
         };
         let collection = table::borrow(&state.users, owner);
         if (!table::contains(&collection.badges, badge_id)) {
@@ -231,7 +231,7 @@ module lottery_rewards::nft_rewards {
     #[view]
     public fun list_owner_addresses(): vector<address> acquires BadgeAuthority {
         if (!exists<BadgeAuthority>(@lottery)) {
-            return vector::empty<address>()
+            return vector::empty<address>();
         };
         let state = borrow_global<BadgeAuthority>(@lottery);
         clone_address_vector(&state.owners)
@@ -242,11 +242,11 @@ module lottery_rewards::nft_rewards {
     public fun get_owner_snapshot(owner: address): option::Option<BadgeOwnerSnapshot>
     acquires BadgeAuthority {
         if (!exists<BadgeAuthority>(@lottery)) {
-            return option::none<BadgeOwnerSnapshot>()
+            return option::none<BadgeOwnerSnapshot>();
         };
         let state = borrow_global<BadgeAuthority>(@lottery);
         if (!table::contains(&state.users, owner)) {
-            return option::none<BadgeOwnerSnapshot>()
+            return option::none<BadgeOwnerSnapshot>();
         };
         option::some(build_owner_snapshot(state, owner))
     }
@@ -255,7 +255,7 @@ module lottery_rewards::nft_rewards {
     #[view]
     public fun get_snapshot(): option::Option<NftRewardsSnapshot> acquires BadgeAuthority {
         if (!exists<BadgeAuthority>(@lottery)) {
-            return option::none<NftRewardsSnapshot>()
+            return option::none<NftRewardsSnapshot>();
         };
         let state = borrow_global<BadgeAuthority>(@lottery);
         option::some(build_snapshot(state))
@@ -322,11 +322,11 @@ module lottery_rewards::nft_rewards {
         badge_id: u64,
     ): option::Option<WinnerBadgeData> {
         if (!table::contains(users, owner)) {
-            return option::none<WinnerBadgeData>()
+            return option::none<WinnerBadgeData>();
         };
         let collection = table::borrow_mut(users, owner);
         if (!table::contains(&collection.badges, badge_id)) {
-            return option::none<WinnerBadgeData>()
+            return option::none<WinnerBadgeData>();
         };
         let data = table::remove(&mut collection.badges, badge_id);
         remove_badge_id(&mut collection.badge_ids, badge_id);
@@ -353,7 +353,7 @@ module lottery_rewards::nft_rewards {
         while (i < len) {
             if (*vector::borrow(ids, i) == badge_id) {
                 vector::remove(ids, i);
-                return
+                return;
             } else {
                 i = i + 1;
             }
@@ -419,7 +419,7 @@ module lottery_rewards::nft_rewards {
         owner: address,
     ): BadgeOwnerSnapshot {
         if (!table::contains(users, owner)) {
-            return BadgeOwnerSnapshot { owner, badges: vector::empty<BadgeSnapshot>() }
+            return BadgeOwnerSnapshot { owner, badges: vector::empty<BadgeSnapshot>() };
         };
         let collection = table::borrow(users, owner);
         let len = vector::length(&collection.badge_ids);

@@ -120,7 +120,7 @@ module lottery_core::test_utils {
     }
 
     public fun sample_randomness(): vector<u8> {
-        let mut randomness = vector::empty<u8>();
+        let randomness = vector::empty<u8>();
         vector::push_back(&mut randomness, 1);
         vector::push_back(&mut randomness, 2);
         vector::push_back(&mut randomness, 3);
@@ -200,7 +200,7 @@ module lottery_core::test_utils {
 
         rounds::schedule_draw(lottery_admin, lottery_id);
         rounds::request_randomness(lottery_admin, lottery_id, vector::empty<u8>());
-        let mut pending = rounds::pending_request_id(lottery_id);
+        let pending = rounds::pending_request_id(lottery_id);
         let request_id = unwrap(&mut pending);
         (lottery_id, request_id, total_paid)
     }

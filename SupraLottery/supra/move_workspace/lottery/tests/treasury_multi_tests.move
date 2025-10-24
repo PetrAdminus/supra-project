@@ -115,7 +115,9 @@ module lottery::treasury_multi_tests {
 
         let init_events =
             test_utils::drain_events<treasury_multi::RecipientsUpdatedEvent>();
-        if (vector::is_empty(&init_events)) return;
+        if (vector::is_empty(&init_events)) {
+            return;
+        };
         let init_event = vector::borrow(&init_events, 0);
         let (
             previous_jackpot_opt,
