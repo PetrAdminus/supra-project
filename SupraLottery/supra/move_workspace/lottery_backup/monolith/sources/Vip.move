@@ -1,15 +1,16 @@
-module lottery_rewards::vip {
-    use lottery_core::instances;
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_multi::MultiTreasuryCap;
-    use lottery_core::treasury_v1;
+module lottery::vip {
+    friend lottery::rounds;
+
     use std::option;
     use std::signer;
-    use std::timestamp;
     use std::vector;
+    use vrf_hub::table;
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use std::timestamp;
+    use lottery_core::instances;
+    use lottery::treasury_multi;
+    use lottery::treasury_v1;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
     const E_NOT_INITIALIZED: u64 = 2;
@@ -62,8 +63,6 @@ module lottery_rewards::vip {
         bonus_events: event::EventHandle<VipBonusIssuedEvent>,
         snapshot_events: event::EventHandle<VipSnapshotUpdatedEvent>,
     }
-
-    struct VipAccess has key { cap: MultiTreasuryCap }
 
     #[event]
     struct VipConfigUpdatedEvent has drop, store, copy {
@@ -152,9 +151,6 @@ module lottery_rewards::vip {
         );
         let state = borrow_global_mut<VipState>(@lottery);
         emit_vip_snapshot(state);
-        if (!exists<VipAccess>(@lottery)) {
-            ensure_caps_initialized(caller);
-        };
     }
 
     #[view]
@@ -217,7 +213,7 @@ module lottery_rewards::vip {
     }
 
     public entry fun subscribe(caller: &signer, lottery_id: u64)
-    acquires VipState, VipAccess {
+    acquires VipState {
         let player = signer::address_of(caller);
         subscribe_internal(caller, lottery_id, player);
     }
@@ -226,7 +222,7 @@ module lottery_rewards::vip {
         caller: &signer,
         lottery_id: u64,
         player: address,
-    ) acquires VipState, VipAccess {
+    ) acquires VipState {
         ensure_admin(caller);
         subscribe_internal(caller, lottery_id, player);
     }
@@ -248,7 +244,7 @@ module lottery_rewards::vip {
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         let state = borrow_global<VipState>(@lottery);
         copy_u64_vector(&state.lottery_ids)
@@ -258,11 +254,11 @@ module lottery_rewards::vip {
     public fun get_lottery_summary(lottery_id: u64): option::Option<VipLotterySummary>
     acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return option::none<VipLotterySummary>()
+            return option::none<VipLotterySummary>();
         };
         let state = borrow_global<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<VipLotterySummary>()
+            return option::none<VipLotterySummary>();
         };
         let snapshot = build_lottery_snapshot_for_view(state, lottery_id);
         let VipLotterySnapshot {
@@ -285,11 +281,11 @@ module lottery_rewards::vip {
     #[view]
     public fun list_players(lottery_id: u64): option::Option<vector<address>> acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return option::none<vector<address>>()
+            return option::none<vector<address>>();
         };
         let state = borrow_global<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<vector<address>>()
+            return option::none<vector<address>>();
         };
         let lottery = table::borrow(&state.lotteries, lottery_id);
         option::some(copy_address_vector(&lottery.members))
@@ -301,15 +297,15 @@ module lottery_rewards::vip {
         player: address,
     ): option::Option<VipSubscriptionView> acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return option::none<VipSubscriptionView>()
+            return option::none<VipSubscriptionView>();
         };
         let state = borrow_global<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<VipSubscriptionView>()
+            return option::none<VipSubscriptionView>();
         };
         let lottery = table::borrow(&state.lotteries, lottery_id);
         if (!table::contains(&lottery.subscriptions, player)) {
-            return option::none<VipSubscriptionView>()
+            return option::none<VipSubscriptionView>();
         };
         let subscription = table::borrow(&lottery.subscriptions, player);
         let now = timestamp::now_seconds();
@@ -326,11 +322,11 @@ module lottery_rewards::vip {
         lottery_id: u64,
     ): option::Option<VipLotterySnapshot> acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return option::none<VipLotterySnapshot>()
+            return option::none<VipLotterySnapshot>();
         };
         let state = borrow_global<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<VipLotterySnapshot>()
+            return option::none<VipLotterySnapshot>();
         };
         option::some(build_lottery_snapshot_for_view(state, lottery_id))
     }
@@ -338,23 +334,23 @@ module lottery_rewards::vip {
     #[view]
     public fun get_vip_snapshot(): option::Option<VipSnapshot> acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return option::none<VipSnapshot>()
+            return option::none<VipSnapshot>();
         };
         let state = borrow_global<VipState>(@lottery);
         option::some(build_vip_snapshot(state))
     }
 
-    public fun bonus_tickets_for(lottery_id: u64, player: address): u64 acquires VipState {
+    public(friend) fun bonus_tickets_for(lottery_id: u64, player: address): u64 acquires VipState {
         if (!exists<VipState>(@lottery)) {
-            return 0
+            return 0;
         };
         let state = borrow_global<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return 0
+            return 0;
         };
         let lottery = table::borrow(&state.lotteries, lottery_id);
         if (!table::contains(&lottery.subscriptions, player)) {
-            return 0
+            return 0;
         };
         let subscription = table::borrow(&lottery.subscriptions, player);
         let now = timestamp::now_seconds();
@@ -365,14 +361,17 @@ module lottery_rewards::vip {
         }
     }
 
-    public fun record_bonus_usage(lottery_id: u64, player: address, bonus_tickets: u64)
-    acquires VipState {
+    public(friend) fun record_bonus_usage(
+        lottery_id: u64,
+        player: address,
+        bonus_tickets: u64,
+    ) acquires VipState {
         if (bonus_tickets == 0 || !exists<VipState>(@lottery)) {
-            return
+            return;
         };
         let state = borrow_global_mut<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return
+            return;
         };
         let lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
         lottery.bonus_tickets_issued = lottery.bonus_tickets_issued + bonus_tickets;
@@ -425,53 +424,14 @@ module lottery_rewards::vip {
         vip_snapshot_fields_for_test(&event.snapshot)
     }
 
-    public fun ensure_caps_initialized(admin: &signer) {
-        ensure_caps_admin(admin);
-        if (exists<VipAccess>(@lottery)) {
-            return
-        };
-        ensure_initialized();
-        let cap = treasury_multi::borrow_multi_treasury_cap(
-            admin,
-            treasury_multi::scope_vip(),
-        );
-        move_to(admin, VipAccess { cap });
-    }
-
-    public fun release_caps(admin: &signer) acquires VipAccess {
-        ensure_caps_admin(admin);
-        if (!exists<VipAccess>(@lottery)) {
-            abort E_NOT_INITIALIZED
-        };
-        let VipAccess { cap } = move_from<VipAccess>(@lottery);
-        treasury_multi::return_multi_treasury_cap(admin, cap);
-    }
-
-    #[view]
-    public fun caps_ready(): bool {
-        exists<VipAccess>(@lottery)
-    }
-
-    #[view]
-    public fun scope_id(): u64 {
-        treasury_multi::scope_vip()
-    }
-
     fun subscribe_internal(
         payer: &signer,
         lottery_id: u64,
         player: address,
-    ) acquires VipAccess, VipState {
+    ) acquires VipState {
         ensure_lottery_known(lottery_id);
         if (!exists<VipState>(@lottery)) {
             abort E_NOT_INITIALIZED
-        };
-        let cap = {
-            if (!exists<VipAccess>(@lottery)) {
-                abort E_NOT_INITIALIZED
-            };
-            let access = borrow_global<VipAccess>(@lottery);
-            &access.cap
         };
         let state = borrow_global_mut<VipState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
@@ -480,15 +440,14 @@ module lottery_rewards::vip {
         let lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
         let config_snapshot = lottery.config;
         let price = config_snapshot.price;
+        let duration_secs = config_snapshot.duration_secs;
+        let bonus_tickets = config_snapshot.bonus_tickets;
         treasury_v1::deposit_from_user(payer, price);
-        treasury_multi::record_operations_income_with_cap(
-            cap,
+        treasury_multi::record_operations_income_internal(
             lottery_id,
             price,
             SOURCE_VIP_SUBSCRIPTION,
         );
-        let duration_secs = config_snapshot.duration_secs;
-        let bonus_tickets = config_snapshot.bonus_tickets;
         lottery.total_revenue = lottery.total_revenue + price;
         let now = timestamp::now_seconds();
         let expiry = now + duration_secs;
@@ -564,35 +523,49 @@ module lottery_rewards::vip {
     }
 
     fun build_vip_snapshot_from_mut(state: &mut VipState): VipSnapshot {
-        build_vip_snapshot_internal(state.admin, &state.lotteries, &state.lottery_ids)
+        build_vip_snapshot_internal(state.admin, &state.lottery_ids, &state.lotteries)
     }
 
     fun build_vip_snapshot(state: &VipState): VipSnapshot {
-        build_vip_snapshot_internal(state.admin, &state.lotteries, &state.lottery_ids)
+        build_vip_snapshot_internal(state.admin, &state.lottery_ids, &state.lotteries)
     }
 
     fun build_vip_snapshot_internal(
         admin: address,
-        lotteries: &table::Table<u64, VipLottery>,
         lottery_ids: &vector<u64>,
+        lotteries: &table::Table<u64, VipLottery>,
     ): VipSnapshot {
         let now = timestamp::now_seconds();
+        VipSnapshot {
+            admin,
+            lotteries: build_all_lottery_snapshots_from_table(lottery_ids, lotteries, now),
+        }
+    }
+
+    fun build_all_lottery_snapshots(
+        state: &VipState,
+        now: u64,
+    ): vector<VipLotterySnapshot> {
+        build_all_lottery_snapshots_from_table(&state.lottery_ids, &state.lotteries, now)
+    }
+
+    fun build_all_lottery_snapshots_from_table(
+        lottery_ids: &vector<u64>,
+        lotteries: &table::Table<u64, VipLottery>,
+        now: u64,
+    ): vector<VipLotterySnapshot> {
         let snapshots = vector::empty<VipLotterySnapshot>();
         let len = vector::length(lottery_ids);
         let idx = 0;
         while (idx < len) {
             let lottery_id = *vector::borrow(lottery_ids, idx);
             if (table::contains(lotteries, lottery_id)) {
-                let snapshot = build_lottery_snapshot_internal(
-                    lottery_id,
-                    table::borrow(lotteries, lottery_id),
-                    now,
-                );
+                let snapshot = build_lottery_snapshot_with_now_from_table(lotteries, lottery_id, now);
                 vector::push_back(&mut snapshots, snapshot);
             };
             idx = idx + 1;
         };
-        VipSnapshot { admin, lotteries: snapshots }
+        snapshots
     }
 
     fun build_lottery_snapshot_for_view(
@@ -600,7 +573,23 @@ module lottery_rewards::vip {
         lottery_id: u64,
     ): VipLotterySnapshot {
         let now = timestamp::now_seconds();
-        let lottery = table::borrow(&state.lotteries, lottery_id);
+        build_lottery_snapshot_with_now(state, lottery_id, now)
+    }
+
+    fun build_lottery_snapshot_with_now(
+        state: &VipState,
+        lottery_id: u64,
+        now: u64,
+    ): VipLotterySnapshot {
+        build_lottery_snapshot_with_now_from_table(&state.lotteries, lottery_id, now)
+    }
+
+    fun build_lottery_snapshot_with_now_from_table(
+        lotteries: &table::Table<u64, VipLottery>,
+        lottery_id: u64,
+        now: u64,
+    ): VipLotterySnapshot {
+        let lottery = table::borrow(lotteries, lottery_id);
         build_lottery_snapshot_internal(lottery_id, lottery, now)
     }
 
@@ -653,7 +642,7 @@ module lottery_rewards::vip {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
-                return
+                return;
             };
             idx = idx + 1;
         };
@@ -665,7 +654,7 @@ module lottery_rewards::vip {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(members, idx) == member) {
-                return
+                return;
             };
             idx = idx + 1;
         };
@@ -716,16 +705,9 @@ module lottery_rewards::vip {
         };
     }
 
-    fun ensure_caps_admin(admin: &signer) {
-        if (signer::address_of(admin) != @lottery) {
-            abort E_NOT_AUTHORIZED
-        };
-    }
-
     fun ensure_initialized() {
         if (!exists<VipState>(@lottery)) {
             abort E_NOT_INITIALIZED
         };
     }
-
 }

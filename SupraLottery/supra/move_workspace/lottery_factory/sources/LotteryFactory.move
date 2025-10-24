@@ -232,7 +232,7 @@ module lottery_factory::registry {
         ensure_initialized();
         let state = borrow_global<FactoryState>(@lottery_factory);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            option::none()
+            option::none<LotteryInfo>()
         } else {
             option::some(*table::borrow(&state.lotteries, lottery_id))
         }

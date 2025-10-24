@@ -1,16 +1,14 @@
-module lottery_rewards::autopurchase {
-    use lottery_core::instances;
-    use lottery_core::rounds;
-    use lottery_core::rounds::AutopurchaseRoundCap;
-    use lottery_core::treasury_v1;
-    use lottery_core::treasury_v1::AutopurchaseTreasuryCap;
-    use lottery_factory::registry;
+module lottery::autopurchase {
     use std::option;
     use std::signer;
     use std::vector;
+    use vrf_hub::table;
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_core::instances;
+    use lottery::rounds;
+    use lottery::treasury_v1;
+    use lottery_factory::registry;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
     const E_NOT_INITIALIZED: u64 = 2;
@@ -43,11 +41,6 @@ module lottery_rewards::autopurchase {
         executed_events: event::EventHandle<AutopurchaseExecutedEvent>,
         refund_events: event::EventHandle<AutopurchaseRefundedEvent>,
         snapshot_events: event::EventHandle<AutopurchaseSnapshotUpdatedEvent>,
-    }
-
-    struct AutopurchaseAccess has key {
-        rounds: AutopurchaseRoundCap,
-        treasury: AutopurchaseTreasuryCap,
     }
 
     struct AutopurchaseLotterySummary has copy, drop, store {
@@ -138,9 +131,6 @@ module lottery_rewards::autopurchase {
         );
         let state = borrow_global_mut<AutopurchaseState>(@lottery);
         emit_all_snapshots(state);
-        if (!exists<AutopurchaseAccess>(@lottery)) {
-            ensure_caps_initialized(caller);
-        };
     }
 
     #[view]
@@ -237,11 +227,10 @@ module lottery_rewards::autopurchase {
     }
 
     public entry fun execute(caller: &signer, lottery_id: u64, player: address)
-    acquires AutopurchaseAccess, AutopurchaseState {
+    acquires AutopurchaseState {
         ensure_executor(caller, player);
         ensure_lottery_known(lottery_id);
         ensure_autopurchase_initialized();
-        ensure_caps_ready();
         let state = borrow_global_mut<AutopurchaseState>(@lottery);
         let info_opt = instances::get_lottery_info(lottery_id);
         if (!option::is_some(&info_opt)) {
@@ -273,15 +262,7 @@ module lottery_rewards::autopurchase {
             if (tickets_to_buy_local == 0) {
                 abort E_INSUFFICIENT_BALANCE
             };
-            ensure_caps_ready();
-            let access_ref = borrow_global<AutopurchaseAccess>(@lottery);
-            let rounds_cap_ref = &access_ref.rounds;
-            let spent_local = rounds::record_prepaid_purchase(
-                rounds_cap_ref,
-                lottery_id,
-                player,
-                tickets_to_buy_local,
-            );
+            let spent_local = rounds::record_prepaid_purchase(lottery_id, player, tickets_to_buy_local);
             plan_ref.balance = plan_ref.balance - spent_local;
             plans.total_balance = plans.total_balance - spent_local;
             (tickets_to_buy_local, spent_local, plan_ref.balance)
@@ -303,11 +284,10 @@ module lottery_rewards::autopurchase {
         caller: &signer,
         lottery_id: u64,
         amount: u64,
-    ) acquires AutopurchaseAccess, AutopurchaseState {
+    ) acquires AutopurchaseState {
         if (amount == 0) {
             abort E_INVALID_AMOUNT
         };
-        ensure_caps_ready();
         ensure_lottery_known(lottery_id);
         ensure_autopurchase_initialized();
         let state = borrow_global_mut<AutopurchaseState>(@lottery);
@@ -325,10 +305,7 @@ module lottery_rewards::autopurchase {
             plans.total_balance = plans.total_balance - amount;
             plan_ref.balance
         };
-        ensure_caps_ready();
-        let access_ref = borrow_global<AutopurchaseAccess>(@lottery);
-        let treasury_cap_ref = &access_ref.treasury;
-        treasury_v1::payout_with_autopurchase_cap(treasury_cap_ref, player, amount);
+        treasury_v1::payout_from_treasury(player, amount);
         event::emit_event(
             &mut state.refund_events,
             AutopurchaseRefundedEvent { lottery_id, player, amount, remaining_balance },
@@ -340,12 +317,12 @@ module lottery_rewards::autopurchase {
     public fun get_plan(lottery_id: u64, player: address): option::Option<AutopurchasePlan>
     acquires AutopurchaseState {
         if (!exists<AutopurchaseState>(@lottery)) {
-            return option::none<AutopurchasePlan>()
+            return option::none<AutopurchasePlan>();
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<AutopurchasePlan>()
+            return option::none<AutopurchasePlan>();
         };
         let plans = table::borrow(&state.lotteries, lottery_id);
         if (!table::contains(&plans.plans, player)) {
@@ -359,12 +336,12 @@ module lottery_rewards::autopurchase {
     public fun get_lottery_summary(lottery_id: u64): option::Option<AutopurchaseLotterySummary>
     acquires AutopurchaseState {
         if (!exists<AutopurchaseState>(@lottery)) {
-            return option::none<AutopurchaseLotterySummary>()
+            return option::none<AutopurchaseLotterySummary>();
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<AutopurchaseLotterySummary>()
+            return option::none<AutopurchaseLotterySummary>();
         };
         let plans = table::borrow(&state.lotteries, lottery_id);
         let total_players = vector::length(&plans.players);
@@ -392,7 +369,7 @@ module lottery_rewards::autopurchase {
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires AutopurchaseState {
         if (!exists<AutopurchaseState>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
@@ -403,12 +380,12 @@ module lottery_rewards::autopurchase {
     public fun list_players(lottery_id: u64): option::Option<vector<address>>
     acquires AutopurchaseState {
         if (!exists<AutopurchaseState>(@lottery)) {
-            return option::none<vector<address>>()
+            return option::none<vector<address>>();
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<vector<address>>()
+            return option::none<vector<address>>();
         };
         let plans = table::borrow(&state.lotteries, lottery_id);
         option::some(copy_address_vector(&plans.players))
@@ -418,12 +395,12 @@ module lottery_rewards::autopurchase {
     public fun get_lottery_snapshot(lottery_id: u64): option::Option<AutopurchaseLotterySnapshot>
     acquires AutopurchaseState {
         if (!exists<AutopurchaseState>(@lottery)) {
-            return option::none<AutopurchaseLotterySnapshot>()
+            return option::none<AutopurchaseLotterySnapshot>();
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<AutopurchaseLotterySnapshot>()
+            return option::none<AutopurchaseLotterySnapshot>();
         };
         option::some(build_lottery_snapshot(state, lottery_id))
     }
@@ -432,45 +409,11 @@ module lottery_rewards::autopurchase {
     public fun get_autopurchase_snapshot(): option::Option<AutopurchaseSnapshot>
     acquires AutopurchaseState {
         if (!exists<AutopurchaseState>(@lottery)) {
-            return option::none<AutopurchaseSnapshot>()
+            return option::none<AutopurchaseSnapshot>();
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
         option::some(build_autopurchase_snapshot(state))
-    }
-
-    public fun ensure_caps_initialized(admin: &signer) {
-        let addr = signer::address_of(admin);
-        if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED
-        };
-        if (exists<AutopurchaseAccess>(@lottery)) {
-            return
-        };
-        let rounds_cap = rounds::borrow_autopurchase_round_cap(admin);
-        let treasury_cap = treasury_v1::borrow_autopurchase_treasury_cap(admin);
-        move_to(
-            admin,
-            AutopurchaseAccess { rounds: rounds_cap, treasury: treasury_cap },
-        );
-    }
-
-    public fun release_caps(admin: &signer) acquires AutopurchaseAccess {
-        let addr = signer::address_of(admin);
-        if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED
-        };
-        if (!exists<AutopurchaseAccess>(@lottery)) {
-            abort E_NOT_INITIALIZED
-        };
-        let AutopurchaseAccess { rounds, treasury } = move_from<AutopurchaseAccess>(@lottery);
-        rounds::return_autopurchase_round_cap(admin, rounds);
-        treasury_v1::return_autopurchase_treasury_cap(admin, treasury);
-    }
-
-    #[view]
-    public fun caps_ready(): bool {
-        exists<AutopurchaseAccess>(@lottery)
     }
 
     fun ensure_lottery_known(lottery_id: u64) {
@@ -482,7 +425,7 @@ module lottery_rewards::autopurchase {
     fun ensure_executor(caller: &signer, player: address) acquires AutopurchaseState {
         let caller_addr = signer::address_of(caller);
         if (caller_addr == player) {
-            return
+            return;
         };
         ensure_autopurchase_initialized();
         let state = borrow_global<AutopurchaseState>(@lottery);
@@ -508,7 +451,7 @@ module lottery_rewards::autopurchase {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(&plans.players, idx) == player) {
-                return
+                return;
             };
             idx = idx + 1;
         };
@@ -526,12 +469,6 @@ module lottery_rewards::autopurchase {
 
     fun ensure_autopurchase_initialized() {
         if (!exists<AutopurchaseState>(@lottery)) {
-            abort E_NOT_INITIALIZED
-        };
-    }
-
-    fun ensure_caps_ready() {
-        if (!exists<AutopurchaseAccess>(@lottery)) {
             abort E_NOT_INITIALIZED
         };
     }
@@ -716,7 +653,7 @@ module lottery_rewards::autopurchase {
 
     fun emit_autopurchase_snapshot(state: &mut AutopurchaseState, lottery_id: u64) {
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return
+            return;
         };
         let snapshot = build_lottery_snapshot_from_mut(state, lottery_id);
         event::emit_event(

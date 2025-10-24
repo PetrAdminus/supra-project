@@ -1,94 +1,37 @@
 #[test_only]
-module lottery_support::migration_tests {
+module lottery::migration_tests {
     use std::option;
     use std::signer;
     use std::vector;
     use lottery_core::instances;
-    use lottery_core::main_v2;
-    use lottery_core::rounds;
-    use lottery_core::test_utils;
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_v1;
+    use lottery::main_v2;
+    use lottery::migration;
+    use lottery::rounds;
+    use lottery::treasury_multi;
+    use lottery::test_utils;
+    use lottery::treasury_v1;
     use lottery_factory::registry;
-    use lottery_support::migration;
     use vrf_hub::hub;
 
-    #[test(
-        lottery_admin = @lottery,
-        factory_admin = @lottery_factory,
-        vrf_admin = @vrf_hub
-    )]
-    fun migration_cap_lifecycle(
-        lottery_admin: &signer,
-        factory_admin: &signer,
-        vrf_admin: &signer,
-    ) {
-        setup_environment(lottery_admin, factory_admin, vrf_admin);
-        assert!(!migration::caps_ready(), 0);
-
-        migration::ensure_caps_initialized(lottery_admin);
-        assert!(migration::caps_ready(), 1);
-
-        // Reinitializing should be idempotent.
-        migration::ensure_caps_initialized(lottery_admin);
-        assert!(migration::caps_ready(), 2);
-
-        migration::release_caps(lottery_admin);
-        assert!(!migration::caps_ready(), 3);
-
-        migration::ensure_caps_initialized(lottery_admin);
-        assert!(migration::caps_ready(), 4);
-        migration::release_caps(lottery_admin);
-        assert!(!migration::caps_ready(), 5);
-    }
-
-    #[test(
-        lottery_admin = @lottery,
-        factory_admin = @lottery_factory,
-        vrf_admin = @vrf_hub
-    )]
-    #[expected_failure(
-        location = lottery_core::instances,
-        abort_code = instances::E_EXPORT_CAP_ALREADY_BORROWED
-    )]
-    fun migration_session_locks_instances_cap(
-        lottery_admin: &signer,
-        factory_admin: &signer,
-        vrf_admin: &signer,
-    ) {
-        setup_environment(lottery_admin, factory_admin, vrf_admin);
-        migration::ensure_caps_initialized(lottery_admin);
-        // Borrowing the capability a second time must abort in the core module.
-        instances::borrow_instances_export_cap(lottery_admin);
-    }
-
-    #[test(
-        lottery_admin = @lottery,
-        factory_admin = @lottery_factory,
-        vrf_admin = @vrf_hub,
-        lottery_owner = @player1,
-        lottery_contract = @player2
-    )]
+    #[test(lottery = @lottery, lottery_owner = @player1, lottery_contract = @player2)]
     fun migrate_legacy_state(
-        lottery_admin: &signer,
-        factory_admin: &signer,
-        vrf_admin: &signer,
+        lottery: &signer,
         lottery_owner: &signer,
         lottery_contract: &signer,
     ) {
         let _ = test_utils::drain_events<migration::MigrationSnapshotUpdatedEvent>();
-        setup_environment(lottery_admin, factory_admin, vrf_admin);
+        setup_environment(lottery);
 
         let metadata = vector::empty<u8>();
         let blueprint = registry::new_blueprint(100, 1_000);
         let lottery_id = registry::create_lottery(
-            factory_admin,
-            signer::address_of(lottery_owner),
-            signer::address_of(lottery_contract),
+            lottery,
+            signer::address_of(lottery),
+            signer::address_of(lottery),
             blueprint,
             metadata,
         );
-        instances::create_instance(lottery_admin, lottery_id);
+        instances::create_instance(lottery, lottery_id);
 
         let tickets = vector::empty<address>();
         vector::push_back(&mut tickets, signer::address_of(lottery_owner));
@@ -98,14 +41,16 @@ module lottery_support::migration_tests {
         main_v2::set_next_ticket_id_for_test(3);
         main_v2::set_pending_request_for_test(option::none<u64>());
 
-        migration::migrate_from_legacy(lottery_admin, lottery_id, 9_000, 1_000, 0);
+        migration::migrate_from_legacy(lottery, lottery_id, 9_000, 1_000, 0);
 
         let stats_opt = instances::get_instance_stats(lottery_id);
         assert!(option::is_some(&stats_opt), 0);
         let stats = test_utils::unwrap(&mut stats_opt);
-        assert!(stats.tickets_sold == 2, stats.tickets_sold);
-        assert!(stats.jackpot_accumulated == 0, stats.jackpot_accumulated);
-        assert!(stats.active, 6);
+        let (tickets_sold, jackpot_accumulated, active) =
+            instances::instance_stats_for_test(&stats);
+        assert!(tickets_sold == 2, tickets_sold);
+        assert!(jackpot_accumulated == 0, jackpot_accumulated);
+        assert!(active, 6);
 
         let snapshot_opt = rounds::get_round_snapshot(lottery_id);
         assert!(option::is_some(&snapshot_opt), 1);
@@ -115,7 +60,7 @@ module lottery_support::migration_tests {
             draw_scheduled,
             has_pending_request,
             next_ticket_id,
-            _pending_request_id,
+            _,
         ) = rounds::round_snapshot_fields_for_test(&snapshot);
         assert!(ticket_count == 2, ticket_count);
         assert!(draw_scheduled, 2);
@@ -132,13 +77,6 @@ module lottery_support::migration_tests {
 
         let config_opt = treasury_multi::get_config(lottery_id);
         assert!(option::is_some(&config_opt), 5);
-        let config = test_utils::unwrap(&mut config_opt);
-        let (prize_bps, jackpot_bps, operations_bps) =
-            treasury_multi::share_config_bps_for_test(&config);
-        assert!(prize_bps == 9_000, prize_bps);
-        assert!(jackpot_bps == 1_000, jackpot_bps);
-        assert!(operations_bps == 0, operations_bps);
-
         assert!(main_v2::get_jackpot_amount() == 0, main_v2::get_jackpot_amount());
 
         let migrated_ids = migration::list_migrated_lottery_ids();
@@ -207,53 +145,36 @@ module lottery_support::migration_tests {
         assert!(event_prize_bps == 9_000, 28);
         assert!(event_jackpot_bps == 1_000, 29);
         assert!(event_operations_bps == 0, 30);
-
-        migration::release_caps(lottery_admin);
     }
 
-    #[test(
-        lottery_admin = @lottery,
-        factory_admin = @lottery_factory,
-        vrf_admin = @vrf_hub
-    )]
-    #[expected_failure(
-        location = lottery_support::migration,
-        abort_code = migration::E_PENDING_REQUEST
-    )]
-    fun migration_rejects_pending_request(
-        lottery_admin: &signer,
-        factory_admin: &signer,
-        vrf_admin: &signer,
-    ) {
-        setup_environment(lottery_admin, factory_admin, vrf_admin);
+    #[test(lottery = @lottery)]
+    #[expected_failure(location = lottery::migration, abort_code = migration::E_PENDING_REQUEST)]
+    fun migration_rejects_pending_request(lottery: &signer) {
+        setup_environment(lottery);
 
         let blueprint = registry::new_blueprint(100, 1_000);
         let metadata = vector::empty<u8>();
         let lottery_id = registry::create_lottery(
-            factory_admin,
-            signer::address_of(lottery_admin),
-            signer::address_of(lottery_admin),
+            lottery,
+            signer::address_of(lottery),
+            signer::address_of(lottery),
             blueprint,
             metadata,
         );
-        instances::create_instance(lottery_admin, lottery_id);
+        instances::create_instance(lottery, lottery_id);
 
         main_v2::set_draw_state_for_test(false, vector::empty<address>());
         main_v2::set_jackpot_amount_for_test(0);
         main_v2::set_pending_request_for_test(option::some(7));
 
-        migration::migrate_from_legacy(lottery_admin, lottery_id, 10_000, 0, 0);
+        migration::migrate_from_legacy(lottery, lottery_id, 10_000, 0, 0);
     }
 
-    fun setup_environment(
-        lottery_admin: &signer,
-        factory_admin: &signer,
-        vrf_admin: &signer,
-    ) {
+    fun setup_environment(lottery: &signer) {
         test_utils::ensure_core_accounts();
         if (!treasury_v1::is_initialized()) {
             treasury_v1::init_token(
-                lottery_admin,
+                lottery,
                 b"seed",
                 b"Legacy Token",
                 b"LEG",
@@ -262,30 +183,27 @@ module lottery_support::migration_tests {
                 b"",
             );
         };
-        if (!treasury_v1::is_core_control_initialized()) {
-            treasury_v1::init(lottery_admin);
-        };
-        treasury_v1::register_store(lottery_admin);
-        treasury_v1::register_store_for(lottery_admin, @jackpot_pool);
-        treasury_v1::register_store_for(lottery_admin, @operations_pool);
-
-        if (!hub::is_initialized()) {
-            hub::init(vrf_admin);
-        };
-        if (!registry::is_initialized()) {
-            registry::init(factory_admin);
-        };
-        if (!instances::is_initialized()) {
-            instances::init(lottery_admin, @vrf_hub);
+        if (!main_v2::is_initialized()) {
+            main_v2::init(lottery);
         };
         if (!treasury_multi::is_initialized()) {
-            treasury_multi::init(lottery_admin, @jackpot_pool, @operations_pool);
+            treasury_multi::init(
+                lottery,
+                signer::address_of(lottery),
+                signer::address_of(lottery),
+            );
+        };
+        if (!hub::is_initialized()) {
+            hub::init(lottery);
+        };
+        if (!registry::is_initialized()) {
+            registry::init(lottery);
+        };
+        if (!instances::is_initialized()) {
+            instances::init(lottery, signer::address_of(lottery));
         };
         if (!rounds::is_initialized()) {
-            rounds::init(lottery_admin);
-        };
-        if (!main_v2::is_initialized()) {
-            main_v2::init(lottery_admin);
+            rounds::init(lottery);
         };
     }
 }

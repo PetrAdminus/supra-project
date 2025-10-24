@@ -1,6 +1,7 @@
-module lottery_core::treasury_v1 {
-    friend lottery_core::main_v2;
-    friend lottery_core::treasury_multi;
+module lottery::treasury_v1 {
+    friend lottery::autopurchase;
+    friend lottery::main_v2;
+    friend lottery::treasury_multi;
 
     use std::option;
     use std::signer;
@@ -20,12 +21,6 @@ module lottery_core::treasury_v1 {
     const E_RECIPIENT_STORE_NOT_REGISTERED: u64 = 7;
     const E_STORE_FROZEN: u64 = 0x50003;
 
-    const E_CORE_NOT_AUTHORIZED: u64 = 100;
-    const E_AUTOPURCHASE_CAP_BORROWED: u64 = 101;
-    const E_AUTOPURCHASE_CAP_NOT_BORROWED: u64 = 102;
-    const E_LEGACY_CAP_BORROWED: u64 = 103;
-    const E_LEGACY_CAP_NOT_BORROWED: u64 = 104;
-
     const BASIS_POINT_DENOMINATOR: u64 = 10_000;
     const DEFAULT_BP_JACKPOT: u64 = 5_000;
     const DEFAULT_BP_PRIZE: u64 = 2_000;
@@ -34,12 +29,6 @@ module lottery_core::treasury_v1 {
     const DEFAULT_BP_COMMUNITY: u64 = 400;
     const DEFAULT_BP_TEAM: u64 = 200;
     const DEFAULT_BP_PARTNERS: u64 = 100;
-
-    /// Capability granted to the rewards module for automated payouts from the treasury.
-    struct AutopurchaseTreasuryCap has store {}
-
-    /// Capability used to migrate legacy treasury data into the new storage.
-    struct LegacyTreasuryCap has store {}
 
     struct VaultConfig has copy, drop, store {
         bp_jackpot: u64,
@@ -116,12 +105,6 @@ module lottery_core::treasury_v1 {
         mint_ref: fungible_asset::MintRef,
         burn_ref: fungible_asset::BurnRef,
         transfer_ref: fungible_asset::TransferRef,
-    }
-
-    struct CoreControl has key {
-        admin: address,
-        autopurchase_cap: option::Option<AutopurchaseTreasuryCap>,
-        legacy_cap: option::Option<LegacyTreasuryCap>,
     }
 
     fun default_config(): VaultConfig {
@@ -224,7 +207,7 @@ module lottery_core::treasury_v1 {
         amount: u64,
     ) {
         if (amount == 0 || target == @lottery) {
-            return
+            return;
         };
 
         let target_store = ensure_store_exists(state, target, E_RECIPIENT_STORE_NOT_REGISTERED);
@@ -239,7 +222,7 @@ module lottery_core::treasury_v1 {
 
     fun calculate_share(total: u64, basis_points: u64): u64 {
         if (basis_points == 0) {
-            return 0
+            return 0;
         };
 
         total * basis_points / BASIS_POINT_DENOMINATOR
@@ -247,7 +230,7 @@ module lottery_core::treasury_v1 {
 
     fun share_for_recipient(total: u64, basis_points: u64, recipient: address): u64 {
         if (recipient == @lottery) {
-            return 0
+            return 0;
         };
 
         calculate_share(total, basis_points)
@@ -270,7 +253,7 @@ module lottery_core::treasury_v1 {
         let constructor_ref = object::create_named_object(admin, seed);
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             &constructor_ref,
-            option::none<u128>(),
+            option::none<vector<u8>>(),
             string::utf8(name),
             string::utf8(symbol),
             decimals,
@@ -383,14 +366,7 @@ module lottery_core::treasury_v1 {
         fungible_asset::transfer_with_ref(&state.transfer_ref, user_store, treasury_store, amount);
     }
 
-    public(friend) fun payout_from_treasury(
-        recipient: address,
-        amount: u64
-    ) acquires TokenState {
-        payout_from_treasury_internal(recipient, amount);
-    }
-
-    fun payout_from_treasury_internal(recipient: address, amount: u64) acquires TokenState {
+    public(friend) fun payout_from_treasury(recipient: address, amount: u64) acquires TokenState {
         ensure_token_initialized();
         let state = borrow_global<TokenState>(@lottery);
         let treasury_store = ensure_store_exists(state, @lottery, E_TREASURY_STORE_NOT_REGISTERED);
@@ -452,7 +428,7 @@ module lottery_core::treasury_v1 {
     #[view]
     public fun store_registered(account: address): bool acquires TokenState {
         if (!exists<TokenState>(@lottery)) {
-            return false
+            return false;
         };
         let state = borrow_global<TokenState>(@lottery);
         primary_fungible_store::primary_store_exists(account, state.metadata)
@@ -461,7 +437,7 @@ module lottery_core::treasury_v1 {
     #[view]
     public fun store_frozen(account: address): bool acquires TokenState {
         if (!exists<TokenState>(@lottery)) {
-            return false
+            return false;
         };
         let state = borrow_global<TokenState>(@lottery);
         if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
@@ -515,12 +491,12 @@ module lottery_core::treasury_v1 {
     #[view]
     public fun account_status(account: address): (bool, option::Option<address>, u64) acquires TokenState {
         if (!exists<TokenState>(@lottery)) {
-            return (false, option::none<address>(), 0)
+            return (false, option::none<address>(), 0);
         };
 
         let state = borrow_global<TokenState>(@lottery);
         if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
-            return (false, option::none<address>(), 0)
+            return (false, option::none<address>(), 0);
         };
 
         let store_address = primary_fungible_store::primary_store_address(account, state.metadata);
@@ -531,12 +507,12 @@ module lottery_core::treasury_v1 {
     #[view]
     public fun account_extended_status(account: address): (bool, bool, option::Option<address>, u64) acquires TokenState {
         if (!exists<TokenState>(@lottery)) {
-            return (false, false, option::none<address>(), 0)
+            return (false, false, option::none<address>(), 0);
         };
 
         let state = borrow_global<TokenState>(@lottery);
         if (!primary_fungible_store::primary_store_exists(account, state.metadata)) {
-            return (false, false, option::none<address>(), 0)
+            return (false, false, option::none<address>(), 0);
         };
 
         let store_address = primary_fungible_store::primary_store_address(account, state.metadata);
@@ -561,7 +537,7 @@ module lottery_core::treasury_v1 {
                 DEFAULT_BP_COMMUNITY,
                 DEFAULT_BP_TEAM,
                 DEFAULT_BP_PARTNERS,
-            )
+            );
         };
 
         let vaults = borrow_global<Vaults>(@lottery);
@@ -580,7 +556,7 @@ module lottery_core::treasury_v1 {
     #[view]
     public fun get_recipients(): (address, address, address, address, address) acquires Vaults {
         if (!exists<Vaults>(@lottery)) {
-            return (@lottery, @lottery, @lottery, @lottery, @lottery)
+            return (@lottery, @lottery, @lottery, @lottery, @lottery);
         };
 
         let vaults = borrow_global<Vaults>(@lottery);
@@ -621,7 +597,7 @@ module lottery_core::treasury_v1 {
     public(friend) fun distribute_payout(winner: address, total_amount: u64): u64 acquires TokenState, Vaults {
         ensure_token_initialized();
         if (total_amount == 0) {
-            return 0
+            return 0;
         };
 
         let state = borrow_global<TokenState>(@lottery);
@@ -808,175 +784,5 @@ module lottery_core::treasury_v1 {
             team: build_recipient_status(recipients.team),
             partners: build_recipient_status(recipients.partners),
         }
-    }
-
-    // --- Capability management ---
-
-    /// Deploys `CoreControl` and prepares the capabilities.
-    public entry fun init(caller: &signer) {
-        let addr = signer::address_of(caller);
-        if (addr != @lottery) {
-            abort E_CORE_NOT_AUTHORIZED
-        };
-        if (exists<CoreControl>(@lottery)) {
-            abort E_ALREADY_INITIALIZED
-        };
-        move_to(
-            caller,
-            CoreControl {
-                admin: addr,
-                autopurchase_cap: option::some(AutopurchaseTreasuryCap {}),
-                legacy_cap: option::some(LegacyTreasuryCap {}),
-            },
-        );
-    }
-
-    // Checks whether `CoreControl` has been initialized.
-    #[view]
-    public fun is_core_control_initialized(): bool {
-        exists<CoreControl>(@lottery)
-    }
-
-    // Returns `true` when the autopurchase capability is available.
-    #[view]
-    public fun autopurchase_cap_available(): bool acquires CoreControl {
-        if (!exists<CoreControl>(@lottery)) {
-            return false
-        };
-        let control = borrow_global<CoreControl>(@lottery);
-        option::is_some(&control.autopurchase_cap)
-    }
-
-    // Returns `true` when the legacy migration capability is available.
-    #[view]
-    public fun legacy_cap_available(): bool acquires CoreControl {
-        if (!exists<CoreControl>(@lottery)) {
-            return false
-        };
-        let control = borrow_global<CoreControl>(@lottery);
-        option::is_some(&control.legacy_cap)
-    }
-
-    /// Issues the autopurchase capability and aborts if it is already borrowed.
-    public fun borrow_autopurchase_treasury_cap(
-        caller: &signer,
-    ): AutopurchaseTreasuryCap acquires CoreControl {
-        let cap_opt = try_borrow_autopurchase_treasury_cap(caller);
-        if (!option::is_some(&cap_opt)) {
-            option::destroy_none(cap_opt);
-            abort E_AUTOPURCHASE_CAP_BORROWED
-        };
-        let cap = option::destroy_some(cap_opt);
-        cap
-    }
-
-    /// Attempts to borrow the autopurchase capability without aborting when it is taken.
-    public fun try_borrow_autopurchase_treasury_cap(
-        caller: &signer,
-    ): option::Option<AutopurchaseTreasuryCap> acquires CoreControl {
-        if (!exists<CoreControl>(@lottery)) {
-            return option::none<AutopurchaseTreasuryCap>()
-        };
-
-        ensure_core_admin(caller);
-        let control = borrow_global_mut<CoreControl>(@lottery);
-        if (!option::is_some(&control.autopurchase_cap)) {
-            return option::none<AutopurchaseTreasuryCap>()
-        };
-        let cap = option::extract(&mut control.autopurchase_cap);
-        option::some(cap)
-    }
-
-    /// Returns the autopurchase capability to `CoreControl`.
-    public fun return_autopurchase_treasury_cap(
-        caller: &signer,
-        cap: AutopurchaseTreasuryCap,
-    ) acquires CoreControl {
-        ensure_core_control_initialized();
-        ensure_core_admin(caller);
-        let control = borrow_global_mut<CoreControl>(@lottery);
-        if (option::is_some(&control.autopurchase_cap)) {
-            abort E_AUTOPURCHASE_CAP_NOT_BORROWED
-        };
-        option::fill(&mut control.autopurchase_cap, cap);
-    }
-
-    /// Issues the legacy migration capability.
-    public fun borrow_legacy_treasury_cap(
-        caller: &signer,
-    ): LegacyTreasuryCap acquires CoreControl {
-        let cap_opt = try_borrow_legacy_treasury_cap(caller);
-        if (!option::is_some(&cap_opt)) {
-            option::destroy_none(cap_opt);
-            abort E_LEGACY_CAP_BORROWED
-        };
-        let cap = option::destroy_some(cap_opt);
-        cap
-    }
-
-    /// Attempts to borrow the legacy capability without aborting if it is in use.
-    public fun try_borrow_legacy_treasury_cap(
-        caller: &signer,
-    ): option::Option<LegacyTreasuryCap> acquires CoreControl {
-        if (!exists<CoreControl>(@lottery)) {
-            return option::none<LegacyTreasuryCap>()
-        };
-
-        ensure_core_admin(caller);
-        let control = borrow_global_mut<CoreControl>(@lottery);
-        if (!option::is_some(&control.legacy_cap)) {
-            return option::none<LegacyTreasuryCap>()
-        };
-        let cap = option::extract(&mut control.legacy_cap);
-        option::some(cap)
-    }
-
-    /// Returns the legacy capability to `CoreControl`.
-    public fun return_legacy_treasury_cap(
-        caller: &signer,
-        cap: LegacyTreasuryCap,
-    ) acquires CoreControl {
-        ensure_core_control_initialized();
-        ensure_core_admin(caller);
-        let control = borrow_global_mut<CoreControl>(@lottery);
-        if (option::is_some(&control.legacy_cap)) {
-            abort E_LEGACY_CAP_NOT_BORROWED
-        };
-        option::fill(&mut control.legacy_cap, cap);
-    }
-
-    /// Performs a payout using the autopurchase capability.
-    public fun payout_with_autopurchase_cap(
-        _cap: &AutopurchaseTreasuryCap,
-        recipient: address,
-        amount: u64,
-    ) acquires TokenState {
-        payout_from_treasury_internal(recipient, amount);
-    }
-
-    /// Performs a payout using the legacy capability.
-    public fun payout_with_legacy_cap(
-        _cap: &LegacyTreasuryCap,
-        recipient: address,
-        amount: u64,
-    ) acquires TokenState {
-        payout_from_treasury_internal(recipient, amount);
-    }
-
-    fun ensure_core_control_initialized() {
-        if (!exists<CoreControl>(@lottery)) {
-            abort E_NOT_INITIALIZED
-        };
-    }
-
-    fun ensure_core_admin(caller: &signer) acquires CoreControl {
-        let addr = signer::address_of(caller);
-        if (!exists<CoreControl>(@lottery)) {
-            abort E_NOT_INITIALIZED
-        };
-        let control = borrow_global<CoreControl>(@lottery);
-        if (addr != control.admin) {
-            abort E_CORE_NOT_AUTHORIZED
-        };
     }
 }

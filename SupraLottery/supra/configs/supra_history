@@ -2017,3 +2017,601 @@ Output:
 }
 
 
+Local: (2025-10-24 12:16:45.134471755 +00:00)	 Utc: (2025-10-24 12:16:45.134534848 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 12:44:39.119569927 +00:00)	 Utc: (2025-10-24 12:44:39.119634552 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 13:05:13.008513057 +00:00)	 Utc: (2025-10-24 13:05:13.008570549 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 13:26:51.729218126 +00:00)	 Utc: (2025-10-24 13:26:51.729287621 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 13:47:36.896043482 +00:00)	 Utc: (2025-10-24 13:47:36.896107256 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::instances",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_v1",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::main_v2",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::operators",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_multi",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds"
+  ]
+}
+
+
+Local: (2025-10-24 13:49:18.452198241 +00:00)	 Utc: (2025-10-24 13:49:18.452258167 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::instances",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_v1",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::main_v2",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::operators",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_multi",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds"
+  ]
+}
+
+
+Local: (2025-10-24 14:11:16.589710250 +00:00)	 Utc: (2025-10-24 14:11:16.590953683 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: No such file or directory '/supra/move_workspace/sources'"
+}
+Local: (2025-10-24 14:22:52.547262903 +00:00)	 Utc: (2025-10-24 14:22:52.547376364 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: No such file or directory '/supra/move_workspace/sources'"
+}
+Local: (2025-10-24 14:28:41.728629483 +00:00)	 Utc: (2025-10-24 14:28:41.728679330 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Unable to resolve packages for package 'lottery': While resolving dependency 'MoveStdlib' in package 'lottery': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-24 14:29:56.150831070 +00:00)	 Utc: (2025-10-24 14:29:56.150885407 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 14:54:13.738029202 +00:00)	 Utc: (2025-10-24 14:54:13.738089718 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::instances",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_v1",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::main_v2",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::operators",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_multi",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds"
+  ]
+}
+
+
+Local: (2025-10-24 14:54:14.536151959 +00:00)	 Utc: (2025-10-24 14:54:14.536204931 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 14:59:03.534795488 +00:00)	 Utc: (2025-10-24 14:59:03.534852950 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::instances",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_v1",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::main_v2",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::operators",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_multi",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds"
+  ]
+}
+
+
+Local: (2025-10-24 14:59:04.598455047 +00:00)	 Utc: (2025-10-24 14:59:04.598506217 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 15:10:52.175174943 +00:00)	 Utc: (2025-10-24 15:10:52.175213648 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Unable to resolve packages for package 'lottery_core': While resolving dependency 'MoveStdlib' in package 'lottery_core': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-24 15:12:45.605447813 +00:00)	 Utc: (2025-10-24 15:12:45.605503962 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::instances",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_v1",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::main_v2",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::operators",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_multi",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds"
+  ]
+}
+
+
+Local: (2025-10-24 15:12:46.648427016 +00:00)	 Utc: (2025-10-24 15:12:46.648477725 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 15:17:54.708690989 +00:00)	 Utc: (2025-10-24 15:17:54.708746817 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::instances",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_v1",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::main_v2",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::operators",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_multi",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds"
+  ]
+}
+
+
+Local: (2025-10-24 15:17:55.799226106 +00:00)	 Utc: (2025-10-24 15:17:55.799279741 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 15:21:28.948020551 +00:00)	 Utc: (2025-10-24 15:21:28.948079917 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::instances",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_v1",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::main_v2",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::operators",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_multi",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds"
+  ]
+}
+
+
+Local: (2025-10-24 15:21:30.037386569 +00:00)	 Utc: (2025-10-24 15:21:30.037438250 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 15:34:15.783391072 +00:00)	 Utc: (2025-10-24 15:34:15.783447582 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::instances",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_v1",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::main_v2",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::operators",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_multi",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds"
+  ]
+}
+
+
+Local: (2025-10-24 15:34:16.825851841 +00:00)	 Utc: (2025-10-24 15:34:16.825902589 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 15:39:33.595484333 +00:00)	 Utc: (2025-10-24 15:39:33.595541304 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::instances",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_v1",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::main_v2",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::operators",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_multi",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds"
+  ]
+}
+
+
+Local: (2025-10-24 15:39:34.641139894 +00:00)	 Utc: (2025-10-24 15:39:34.641191575 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 15:47:47.914378283 +00:00)	 Utc: (2025-10-24 15:47:47.915524419 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: No such file or directory '/supra/move_workspace/sources'"
+}
+Local: (2025-10-24 15:51:42.556600003 +00:00)	 Utc: (2025-10-24 15:51:42.556659440 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::instances",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_v1",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::main_v2",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::operators",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_multi",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds"
+  ]
+}
+
+
+Local: (2025-10-24 15:51:43.599349009 +00:00)	 Utc: (2025-10-24 15:51:43.599400951 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 15:56:47.793353147 +00:00)	 Utc: (2025-10-24 15:56:47.793412003 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::instances",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_v1",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::main_v2",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::operators",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_multi",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds"
+  ]
+}
+
+
+Local: (2025-10-24 15:56:53.777248440 +00:00)	 Utc: (2025-10-24 15:56:53.777306804 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::history",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::metadata",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::migration"
+  ]
+}
+
+
+Local: (2025-10-24 15:56:54.902974988 +00:00)	 Utc: (2025-10-24 15:56:54.903029445 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 16:14:35.792292184 +00:00)	 Utc: (2025-10-24 16:14:35.792349656 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::instances",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_v1",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::main_v2",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::operators",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_multi",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds"
+  ]
+}
+
+
+Local: (2025-10-24 16:25:54.211273230 +00:00)	 Utc: (2025-10-24 16:25:54.211386721 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::history",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::metadata",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::migration"
+  ]
+}
+
+
+Local: (2025-10-24 16:34:04.263044122 +00:00)	 Utc: (2025-10-24 16:34:04.263118356 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Unable to resolve packages for package 'lottery_core': While resolving dependency 'MoveStdlib' in package 'lottery_core': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-24 16:34:04.305958025 +00:00)	 Utc: (2025-10-24 16:34:04.306048731 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Unable to resolve packages for package 'lottery_rewards': While resolving dependency 'MoveStdlib' in package 'lottery_rewards': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-24 16:35:09.601075226 +00:00)	 Utc: (2025-10-24 16:35:09.601133208 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::instances",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_v1",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::main_v2",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::operators",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_multi",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds"
+  ]
+}
+
+
+Local: (2025-10-24 16:35:16.304788937 +00:00)	 Utc: (2025-10-24 16:35:16.304847520 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::history",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::metadata",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::migration"
+  ]
+}
+
+
+Local: (2025-10-24 16:35:16.844091766 +00:00)	 Utc: (2025-10-24 16:35:16.844136653 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 16:56:55.931219655 +00:00)	 Utc: (2025-10-24 16:56:55.931290753 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Compilation error"
+}
+Local: (2025-10-24 17:01:25.734464361 +00:00)	 Utc: (2025-10-24 17:01:25.734516041 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Unable to resolve packages for package 'lottery_core': While resolving dependency 'MoveStdlib' in package 'lottery_core': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-24 17:01:25.760643866 +00:00)	 Utc: (2025-10-24 17:01:25.760683092 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Unable to resolve packages for package 'lottery_rewards': While resolving dependency 'MoveStdlib' in package 'lottery_rewards': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-24 17:02:39.786372257 +00:00)	 Utc: (2025-10-24 17:02:39.786430901 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::instances",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_v1",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::main_v2",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::operators",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::treasury_multi",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds"
+  ]
+}
+
+
+Local: (2025-10-24 17:02:46.559681838 +00:00)	 Utc: (2025-10-24 17:02:46.559742082 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::history",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::metadata",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::migration"
+  ]
+}
+
+
+Local: (2025-10-24 17:02:52.874925652 +00:00)	 Utc: (2025-10-24 17:02:52.874994245 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::autopurchase",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::jackpot",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::nft_rewards",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::referrals",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::vip",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::rounds_sync",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::store"
+  ]
+}
+
+
+Local: (2025-10-24 17:02:58.497543919 +00:00)	 Utc: (2025-10-24 17:02:58.497599727 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::registry"
+  ]
+}
+
+
+Local: (2025-10-24 17:03:03.767219275 +00:00)	 Utc: (2025-10-24 17:03:03.767274663 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::table",
+    "bc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::hub"
+  ]
+}
+
+
+Local: (2025-10-24 17:03:08.043504090 +00:00)	 Utc: (2025-10-24 17:03:08.043548225 UTC)
+
+CMD:
+Compile
+Output:
+{
+  "Result": [
+    "186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::deposit",
+    "186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::supra_vrf"
+  ]
+}
+
+
+Local: (2025-10-24 17:55:57.924562440 +00:00)	 Utc: (2025-10-24 17:55:57.924614571 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery_core': While resolving dependency 'MoveStdlib' in package 'lottery_core': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-24 17:55:57.953917414 +00:00)	 Utc: (2025-10-24 17:55:57.953955978 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery_core': While resolving dependency 'MoveStdlib' in package 'lottery_core': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-24 18:22:26.000256685 +00:00)	 Utc: (2025-10-24 18:22:26.000319697 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}
+Local: (2025-10-24 18:55:41.865089138 +00:00)	 Utc: (2025-10-24 18:55:41.865145377 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery_core': While resolving dependency 'MoveStdlib' in package 'lottery_core': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-24 18:55:41.954411412 +00:00)	 Utc: (2025-10-24 18:55:41.954446039 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery_core': While resolving dependency 'MoveStdlib' in package 'lottery_core': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-24 19:00:10.841228423 +00:00)	 Utc: (2025-10-24 19:00:10.841289441 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}

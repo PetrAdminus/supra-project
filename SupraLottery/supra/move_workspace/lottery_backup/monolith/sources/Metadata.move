@@ -1,9 +1,9 @@
-module lottery_support::metadata {
+module lottery::metadata {
     use std::option;
     use std::signer;
+    use vrf_hub::table;
     use std::vector;
     use supra_framework::event;
-    use vrf_hub::table;
 
     const E_ALREADY_INIT: u64 = 1;
     const E_NOT_INITIALIZED: u64 = 2;
@@ -321,7 +321,7 @@ module lottery_support::metadata {
         while (i < len) {
             if (*vector::borrow(ids, i) == lottery_id) {
                 vector::swap_remove(ids, i);
-                return
+                return;
             };
             i = i + 1;
         };

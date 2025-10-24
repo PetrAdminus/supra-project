@@ -1,12 +1,11 @@
-module lottery_rewards::jackpot {
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_multi::MultiTreasuryCap;
-    use lottery_core::treasury_v1;
+module lottery::jackpot {
     use std::option;
     use std::signer;
     use std::vector;
     use supra_framework::account;
     use supra_framework::event;
+    use lottery::treasury_multi;
+    use lottery::treasury_v1;
     use vrf_hub::hub;
 
     const E_NOT_AUTHORIZED: u64 = 1;
@@ -35,8 +34,6 @@ module lottery_rewards::jackpot {
         fulfill_events: event::EventHandle<JackpotFulfilledEvent>,
         snapshot_events: event::EventHandle<JackpotSnapshotUpdatedEvent>,
     }
-
-    struct JackpotAccess has key { cap: MultiTreasuryCap }
 
     #[event]
     struct JackpotTicketGrantedEvent has drop, store, copy {
@@ -83,8 +80,7 @@ module lottery_rewards::jackpot {
         current: JackpotSnapshot,
     }
 
-    public entry fun init(caller: &signer, lottery_id: u64)
-    acquires JackpotState {
+    public entry fun init(caller: &signer, lottery_id: u64) acquires JackpotState {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED
@@ -109,9 +105,6 @@ module lottery_rewards::jackpot {
         );
         let state = borrow_global_mut<JackpotState>(@lottery);
         emit_snapshot_event(state, option::none<JackpotSnapshot>());
-        if (!exists<JackpotAccess>(@lottery)) {
-            ensure_caps_initialized(caller);
-        };
     }
 
     #[view]
@@ -121,20 +114,17 @@ module lottery_rewards::jackpot {
 
     #[view]
     public fun admin(): address acquires JackpotState {
-        ensure_jackpot_initialized();
         let state = borrow_global<JackpotState>(@lottery);
         state.admin
     }
 
     #[view]
     public fun lottery_id(): u64 acquires JackpotState {
-        ensure_jackpot_initialized();
         let state = borrow_global<JackpotState>(@lottery);
         state.lottery_id
     }
 
-    public entry fun set_admin(caller: &signer, new_admin: address)
-    acquires JackpotState {
+    public entry fun set_admin(caller: &signer, new_admin: address) acquires JackpotState {
         ensure_admin(caller);
         let state = borrow_global_mut<JackpotState>(@lottery);
         let previous = option::some(build_snapshot_from_mut(state));
@@ -142,15 +132,13 @@ module lottery_rewards::jackpot {
         emit_snapshot_event(state, previous);
     }
 
-    public entry fun grant_ticket(caller: &signer, player: address)
-    acquires JackpotState {
+    public entry fun grant_ticket(caller: &signer, player: address) acquires JackpotState {
         ensure_admin(caller);
         let state = borrow_global_mut<JackpotState>(@lottery);
         grant_ticket_internal(state, player);
     }
 
-    public entry fun grant_tickets_batch(caller: &signer, players: vector<address>)
-    acquires JackpotState {
+    public entry fun grant_tickets_batch(caller: &signer, players: vector<address>) acquires JackpotState {
         ensure_admin(caller);
         let len = vector::length(&players);
         let i = 0;
@@ -223,7 +211,7 @@ module lottery_rewards::jackpot {
         caller: &signer,
         request_id: u64,
         randomness: vector<u8>,
-    ) acquires JackpotAccess, JackpotState {
+    ) acquires JackpotState {
         hub::ensure_callback_sender(caller);
         let record = hub::consume_request(request_id);
         let recorded_lottery = hub::request_record_lottery_id(&record);
@@ -259,12 +247,7 @@ module lottery_rewards::jackpot {
             abort E_WINNER_STORE_NOT_REGISTERED
         };
 
-        let cap = {
-            ensure_caps_ready();
-            let access = borrow_global<JackpotAccess>(@lottery);
-            &access.cap
-        };
-        treasury_multi::distribute_jackpot_with_cap(cap, winner, jackpot_amount);
+        treasury_multi::distribute_jackpot_internal(winner, jackpot_amount);
 
         state.draw_scheduled = false;
         state.pending_request = option::none<u64>();
@@ -289,10 +272,9 @@ module lottery_rewards::jackpot {
     }
 
     #[view]
-    public fun get_snapshot(): option::Option<JackpotSnapshot>
-    acquires JackpotState {
+    public fun get_snapshot(): option::Option<JackpotSnapshot> acquires JackpotState {
         if (!exists<JackpotState>(@lottery)) {
-            return option::none<JackpotSnapshot>()
+            return option::none<JackpotSnapshot>();
         };
         let state = borrow_global<JackpotState>(@lottery);
         option::some(build_snapshot(state))
@@ -301,60 +283,19 @@ module lottery_rewards::jackpot {
     #[view]
     public fun pending_request(): option::Option<u64> acquires JackpotState {
         if (!exists<JackpotState>(@lottery)) {
-            return option::none<u64>()
+            return option::none<u64>();
         };
         let state = borrow_global<JackpotState>(@lottery);
         copy_option_u64(&state.pending_request)
     }
 
-    public fun ensure_caps_initialized(admin: &signer) {
-        let addr = signer::address_of(admin);
-        if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED
-        };
-        if (exists<JackpotAccess>(@lottery)) {
-            return
-        };
-        let cap = treasury_multi::borrow_multi_treasury_cap(
-            admin,
-            treasury_multi::scope_jackpot(),
-        );
-        move_to(admin, JackpotAccess { cap });
-    }
-
-    public fun release_caps(admin: &signer) acquires JackpotAccess {
-        let addr = signer::address_of(admin);
-        if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED
-        };
-        if (!exists<JackpotAccess>(@lottery)) {
+    fun ensure_admin(caller: &signer) acquires JackpotState {
+        if (!exists<JackpotState>(@lottery)) {
             abort E_NOT_INITIALIZED
         };
-        let JackpotAccess { cap } = move_from<JackpotAccess>(@lottery);
-        treasury_multi::return_multi_treasury_cap(admin, cap);
-    }
-
-    #[view]
-    public fun caps_ready(): bool {
-        exists<JackpotAccess>(@lottery)
-    }
-
-    #[view]
-    public fun scope_id(): u64 {
-        treasury_multi::scope_jackpot()
-    }
-
-    fun ensure_admin(caller: &signer) acquires JackpotState {
-        ensure_jackpot_initialized();
         let state = borrow_global<JackpotState>(@lottery);
         if (signer::address_of(caller) != state.admin) {
             abort E_NOT_AUTHORIZED
-        };
-    }
-
-    fun ensure_jackpot_initialized() {
-        if (!exists<JackpotState>(@lottery)) {
-            abort E_NOT_INITIALIZED
         };
     }
 
@@ -418,12 +359,6 @@ module lottery_rewards::jackpot {
             remaining = remaining - 1;
         };
         result
-    }
-
-    fun ensure_caps_ready() {
-        if (!exists<JackpotAccess>(@lottery)) {
-            abort E_NOT_INITIALIZED
-        };
     }
 
     #[test_only]

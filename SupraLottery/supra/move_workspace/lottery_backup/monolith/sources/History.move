@@ -1,13 +1,13 @@
-module lottery_support::history {
-    use lottery_core::rounds;
-    use lottery_core::rounds::HistoryWriterCap;
+module lottery::history {
+    friend lottery::rounds;
+
     use std::option;
     use std::signer;
-    use std::timestamp;
     use std::vector;
+    use vrf_hub::table;
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use std::timestamp;
 
     const MAX_HISTORY_LENGTH: u64 = 128;
 
@@ -25,10 +25,6 @@ module lottery_support::history {
         lottery_ids: vector<u64>,
         record_events: event::EventHandle<DrawRecordedEvent>,
         snapshot_events: event::EventHandle<HistorySnapshotUpdatedEvent>,
-    }
-
-    struct HistoryWarden has key {
-        writer: HistoryWriterCap,
     }
 
     struct DrawRecord has copy, drop, store {
@@ -68,46 +64,6 @@ module lottery_support::history {
         current: HistorySnapshot,
     }
 
-    /// Ensures the support module holds the history capability.
-    ///
-    /// On the first call it requests `HistoryWriterCap` from the core and caches it
-    /// in the `HistoryWarden` resource. Subsequent calls are no-ops.
-    /// Used in smoke scenarios before recording history and during reinitialization
-    /// after upgrading the package.
-    public fun ensure_caps_initialized(admin: &signer) {
-        if (signer::address_of(admin) != @lottery) {
-            abort E_NOT_AUTHORIZED
-        };
-        if (exists<HistoryWarden>(@lottery)) {
-            return
-        };
-        let cap_opt = rounds::try_borrow_history_writer_cap(admin);
-        if (!option::is_some(&cap_opt)) {
-            option::destroy_none(cap_opt);
-            return
-        };
-        let cap = option::destroy_some(cap_opt);
-        move_to(admin, HistoryWarden { writer: cap });
-    }
-
-    // Checks whether the support module currently holds the history capability.
-    #[view]
-    public fun caps_ready(): bool {
-        exists<HistoryWarden>(@lottery)
-    }
-
-    /// Returns the history capability to the core (for example, before redeploying the package).
-    public fun release_caps(admin: &signer) acquires HistoryWarden {
-        if (signer::address_of(admin) != @lottery) {
-            abort E_NOT_AUTHORIZED
-        };
-        if (!exists<HistoryWarden>(@lottery)) {
-            abort E_NOT_INITIALIZED
-        };
-        let HistoryWarden { writer } = move_from<HistoryWarden>(@lottery);
-        rounds::return_history_writer_cap(admin, writer);
-    }
-
     public entry fun init(caller: &signer) acquires HistoryCollection {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
@@ -129,9 +85,6 @@ module lottery_support::history {
         let previous = option::none<HistorySnapshot>();
         let state = borrow_global_mut<HistoryCollection>(@lottery);
         emit_history_snapshot(state, previous);
-        if (!exists<HistoryWarden>(@lottery)) {
-            ensure_caps_initialized(caller);
-        };
     }
 
     public fun is_initialized(): bool {
@@ -162,8 +115,7 @@ module lottery_support::history {
         };
     }
 
-    public fun record_draw(
-        _cap: &HistoryWriterCap,
+    public(friend) fun record_draw(
         lottery_id: u64,
         request_id: u64,
         winner: address,
@@ -172,11 +124,8 @@ module lottery_support::history {
         random_bytes: vector<u8>,
         payload: vector<u8>,
     ) acquires HistoryCollection {
-        if (!exists<HistoryWarden>(@lottery)) {
-            abort E_NOT_INITIALIZED
-        };
         if (!exists<HistoryCollection>(@lottery)) {
-            return
+            return;
         };
         let state = borrow_global_mut<HistoryCollection>(@lottery);
         let previous = option::some(build_snapshot_from_mut(state));
@@ -207,80 +156,10 @@ module lottery_support::history {
         emit_history_snapshot(state, previous);
     }
 
-    /// Records a draw result on behalf of the core using the cached capability.
-    ///
-    /// Invoked by the lottery administrator right after `lottery_core::rounds::fulfill_draw_request`
-    /// (for example, by the VRF aggregator). The function checks that the capability
-    /// is issued to `HistoryWarden` and reuses the shared `record_draw` hook.
-    public entry fun record_draw_from_rounds(
-        caller: &signer,
-        lottery_id: u64,
-        request_id: u64,
-        winner: address,
-        ticket_index: u64,
-        prize_amount: u64,
-        random_bytes: vector<u8>,
-        payload: vector<u8>,
-    ) acquires HistoryCollection, HistoryWarden {
-        if (signer::address_of(caller) != @lottery) {
-            abort E_NOT_AUTHORIZED
-        };
-        if (!exists<HistoryWarden>(@lottery)) {
-            abort E_NOT_INITIALIZED
-        };
-        let warden = borrow_global<HistoryWarden>(@lottery);
-        let cap_ref = &warden.writer;
-        record_draw(
-            cap_ref,
-            lottery_id,
-            request_id,
-            winner,
-            ticket_index,
-            prize_amount,
-            random_bytes,
-            payload,
-        );
-    }
-
-    /// Synchronizes accumulated draw results from the core module.
-    ///
-    /// `lottery_core::rounds` pushes every fulfilled draw into a queue guarded by
-    /// the `HistoryWriterCap` capability. This function drains up to `limit` records
-    /// (all records when `limit = 0`) and replays them via `record_draw`, updating
-    /// history events and snapshots.
-    public entry fun sync_draws_from_rounds(caller: &signer, limit: u64)
-    acquires HistoryCollection, HistoryWarden {
-        if (signer::address_of(caller) != @lottery) {
-            abort E_NOT_AUTHORIZED
-        };
-        if (!exists<HistoryWarden>(@lottery)) {
-            abort E_NOT_INITIALIZED
-        };
-        let warden = borrow_global<HistoryWarden>(@lottery);
-        let cap_ref = &warden.writer;
-        let pending = rounds::drain_history_queue(cap_ref, limit);
-        while (!vector::is_empty(&pending)) {
-            let record = vector::remove(&mut pending, 0);
-            let (lottery_id, request_id, winner, ticket_index, prize_amount) =
-                rounds::history_record_fields(&record);
-            let (random_bytes, payload) = rounds::history_record_payloads(&record);
-            record_draw(
-                cap_ref,
-                lottery_id,
-                request_id,
-                winner,
-                ticket_index,
-                prize_amount,
-                random_bytes,
-                payload,
-            );
-        };
-    }
-
     #[view]
     public fun has_history(lottery_id: u64): bool acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return false
+            return false;
         };
         let state = borrow_global<HistoryCollection>(@lottery);
         table::contains(&state.histories, lottery_id)
@@ -289,7 +168,7 @@ module lottery_support::history {
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         let state = borrow_global<HistoryCollection>(@lottery);
         clone_u64_vector(&state.lottery_ids)
@@ -298,7 +177,7 @@ module lottery_support::history {
     #[view]
     public fun get_history(lottery_id: u64): option::Option<vector<DrawRecord>> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return option::none<vector<DrawRecord>>()
+            return option::none<vector<DrawRecord>>();
         };
         let state = borrow_global<HistoryCollection>(@lottery);
         if (!table::contains(&state.histories, lottery_id)) {
@@ -312,7 +191,7 @@ module lottery_support::history {
     #[view]
     public fun latest_record(lottery_id: u64): option::Option<DrawRecord> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return option::none<DrawRecord>()
+            return option::none<DrawRecord>();
         };
         let state = borrow_global<HistoryCollection>(@lottery);
         if (!table::contains(&state.histories, lottery_id)) {
@@ -333,7 +212,7 @@ module lottery_support::history {
         lottery_id: u64
     ): option::Option<LotteryHistorySnapshot> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return option::none<LotteryHistorySnapshot>()
+            return option::none<LotteryHistorySnapshot>();
         };
         let state = borrow_global<HistoryCollection>(@lottery);
         if (!table::contains(&state.histories, lottery_id)) {
@@ -346,7 +225,7 @@ module lottery_support::history {
     #[view]
     public fun get_history_snapshot(): option::Option<HistorySnapshot> acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
-            return option::none<HistorySnapshot>()
+            return option::none<HistorySnapshot>();
         };
         let state = borrow_global<HistoryCollection>(@lottery);
         option::some(build_snapshot(state))
@@ -388,7 +267,7 @@ module lottery_support::history {
         let index = 0;
         while (index < len) {
             if (*vector::borrow(list, index) == lottery_id) {
-                return
+                return;
             } else {
                 index = index + 1;
             }
@@ -520,8 +399,7 @@ module lottery_support::history {
         (event.previous, event.current)
     }
 
-    #[test_only]
-    public fun clone_lottery_snapshots(
+    fun clone_lottery_snapshots(
         snapshots: &vector<LotteryHistorySnapshot>
     ): vector<LotteryHistorySnapshot> {
         let result = vector::empty<LotteryHistorySnapshot>();

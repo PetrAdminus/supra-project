@@ -1,14 +1,13 @@
-module lottery_rewards::store {
+module lottery::store {
     use std::option;
     use std::vector;
-    use std::signer;
     use supra_framework::account;
     use supra_framework::event;
+    use std::signer;
     use vrf_hub::table;
     use lottery_core::instances;
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_multi::MultiTreasuryCap;
-    use lottery_core::treasury_v1;
+    use lottery::treasury_multi;
+    use lottery::treasury_v1;
 
     const E_NOT_AUTHORIZED: u64 = 1;
     const E_ALREADY_INITIALIZED: u64 = 2;
@@ -21,12 +20,14 @@ module lottery_rewards::store {
 
     const SOURCE_STORE: vector<u8> = b"store";
 
+
     struct StoreItem has copy, drop, store {
         price: u64,
         metadata: vector<u8>,
         available: bool,
         stock: option::Option<u64>,
     }
+
 
     struct StoreRecord has store {
         item: StoreItem,
@@ -47,8 +48,6 @@ module lottery_rewards::store {
         purchase_events: event::EventHandle<ItemPurchasedEvent>,
         snapshot_events: event::EventHandle<StoreSnapshotUpdatedEvent>,
     }
-
-    struct StoreAccess has key { cap: MultiTreasuryCap }
 
     #[event]
     struct AdminUpdatedEvent has drop, store, copy {
@@ -105,6 +104,7 @@ module lottery_rewards::store {
         sold: u64,
     }
 
+
     public entry fun init(caller: &signer) acquires StoreState {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
@@ -127,21 +127,21 @@ module lottery_rewards::store {
         );
         let state = borrow_global_mut<StoreState>(@lottery);
         emit_all_snapshots(state);
-        if (!exists<StoreAccess>(@lottery)) {
-            ensure_caps_initialized(caller);
-        };
     }
+
 
     #[view]
     public fun is_initialized(): bool {
         exists<StoreState>(@lottery)
     }
 
+
     #[view]
-    public fun admin(): address acquires StoreState {
+    public fun admin() : address acquires StoreState {
         let state = borrow_global<StoreState>(@lottery);
         state.admin
     }
+
 
     public entry fun set_admin(caller: &signer, new_admin: address) acquires StoreState {
         ensure_admin(caller);
@@ -151,6 +151,7 @@ module lottery_rewards::store {
         event::emit_event(&mut state.admin_events, AdminUpdatedEvent { previous, next: new_admin });
         emit_all_snapshots(state);
     }
+
 
     public entry fun upsert_item(
         caller: &signer,
@@ -193,6 +194,7 @@ module lottery_rewards::store {
         emit_store_snapshot(state_ref, lottery_id);
     }
 
+
     public entry fun set_availability(
         caller: &signer,
         lottery_id: u64,
@@ -227,12 +229,13 @@ module lottery_rewards::store {
         emit_store_snapshot(state_ref, lottery_id);
     }
 
+
     public entry fun purchase(
         buyer: &signer,
         lottery_id: u64,
         item_id: u64,
         quantity: u64,
-    ) acquires StoreAccess, StoreState {
+    ) acquires StoreState {
         assert!(quantity > 0, E_INVALID_QUANTITY);
         ensure_lottery_exists(lottery_id);
         let state_ref = borrow_global_mut<StoreState>(@lottery);
@@ -260,13 +263,7 @@ module lottery_rewards::store {
             record.item.stock = stock_left;
             record.sold = record.sold + quantity;
         };
-        let access = borrow_global<StoreAccess>(@lottery);
-        treasury_multi::record_operations_income_with_cap(
-            &access.cap,
-            lottery_id,
-            total_price,
-            source_tag(),
-        );
+        treasury_multi::record_operations_income_internal(lottery_id, total_price, source_tag());
         event::emit_event(
             &mut state_ref.purchase_events,
             ItemPurchasedEvent { lottery_id, item_id, buyer: signer::address_of(buyer), quantity, total_price },
@@ -274,14 +271,15 @@ module lottery_rewards::store {
         emit_store_snapshot(state_ref, lottery_id);
     }
 
+
     #[view]
     public fun get_item(lottery_id: u64, item_id: u64): option::Option<StoreItem> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return option::none<StoreItem>()
+            return option::none<StoreItem>();
         };
         let state = borrow_global<StoreState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<StoreItem>()
+            return option::none<StoreItem>();
         };
         let store = table::borrow(&state.lotteries, lottery_id);
         if (!table::contains(&store.items, item_id)) {
@@ -291,15 +289,16 @@ module lottery_rewards::store {
         }
     }
 
+
     #[view]
     public fun get_item_with_stats(lottery_id: u64, item_id: u64): option::Option<ItemWithStats>
     acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return option::none<ItemWithStats>()
+            return option::none<ItemWithStats>();
         };
         let state = borrow_global<StoreState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<ItemWithStats>()
+            return option::none<ItemWithStats>();
         };
         let store = table::borrow(&state.lotteries, lottery_id);
         if (!table::contains(&store.items, item_id)) {
@@ -310,19 +309,21 @@ module lottery_rewards::store {
         }
     }
 
+
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         let state_ref = borrow_global<StoreState>(@lottery);
         copy_vec_u64(&state_ref.lottery_ids)
     }
 
+
     #[view]
     public fun list_item_ids(lottery_id: u64): vector<u64> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         let state_ref = borrow_global<StoreState>(@lottery);
         if (!table::contains(&state_ref.lotteries, lottery_id)) {
@@ -332,15 +333,16 @@ module lottery_rewards::store {
         }
     }
 
+
     #[view]
     public fun get_lottery_summary(lottery_id: u64): option::Option<vector<ItemWithStats>>
     acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return option::none<vector<ItemWithStats>>()
+            return option::none<vector<ItemWithStats>>();
         };
         let state_ref = borrow_global<StoreState>(@lottery);
         if (!table::contains(&state_ref.lotteries, lottery_id)) {
-            return option::none<vector<ItemWithStats>>()
+            return option::none<vector<ItemWithStats>>();
         };
         let store = table::borrow(&state_ref.lotteries, lottery_id);
         let result = vector::empty<ItemWithStats>();
@@ -357,63 +359,28 @@ module lottery_rewards::store {
         option::some(result)
     }
 
+
     #[view]
     public fun get_lottery_snapshot(lottery_id: u64): option::Option<StoreLotterySnapshot>
     acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return option::none<StoreLotterySnapshot>()
+            return option::none<StoreLotterySnapshot>();
         };
         let state = borrow_global<StoreState>(@lottery);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return option::none<StoreLotterySnapshot>()
+            return option::none<StoreLotterySnapshot>();
         };
         option::some(build_lottery_snapshot(state, lottery_id))
     }
 
+
     #[view]
     public fun get_store_snapshot(): option::Option<StoreSnapshot> acquires StoreState {
         if (!exists<StoreState>(@lottery)) {
-            return option::none<StoreSnapshot>()
+            return option::none<StoreSnapshot>();
         };
         let state = borrow_global<StoreState>(@lottery);
         option::some(build_store_snapshot(state))
-    }
-
-    public fun ensure_caps_initialized(admin: &signer) {
-        let addr = signer::address_of(admin);
-        if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED
-        };
-        if (exists<StoreAccess>(@lottery)) {
-            return
-        };
-        let cap = treasury_multi::borrow_multi_treasury_cap(
-            admin,
-            treasury_multi::scope_store(),
-        );
-        move_to(admin, StoreAccess { cap });
-    }
-
-    public fun release_caps(admin: &signer) acquires StoreAccess {
-        let addr = signer::address_of(admin);
-        if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED
-        };
-        if (!exists<StoreAccess>(@lottery)) {
-            abort E_NOT_INITIALIZED
-        };
-        let StoreAccess { cap } = move_from<StoreAccess>(@lottery);
-        treasury_multi::return_multi_treasury_cap(admin, cap);
-    }
-
-    #[view]
-    public fun caps_ready(): bool {
-        exists<StoreAccess>(@lottery)
-    }
-
-    #[view]
-    public fun scope_id(): u64 {
-        treasury_multi::scope_store()
     }
 
     fun ensure_admin(caller: &signer) acquires StoreState {
@@ -563,7 +530,7 @@ module lottery_rewards::store {
 
     fun emit_store_snapshot(state: &mut StoreState, lottery_id: u64) {
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return
+            return;
         };
         let snapshot = build_lottery_snapshot_from_mut(state, lottery_id);
         event::emit_event(

@@ -1,5 +1,6 @@
 // sources/Lottery.move
-module lottery_core::main_v2 {
+module lottery::main_v2 {
+    friend lottery::migration;
 
     use std::string;
     use std::bcs;
@@ -11,7 +12,7 @@ module lottery_core::main_v2 {
     use supra_framework::event;
     use supra_addr::supra_vrf;
     use supra_addr::deposit;
-    use lottery_core::treasury_v1;
+    use lottery::treasury_v1;
 
     const E_NOT_OWNER: u64 = 1;
     const E_ALREADY_INITIALIZED: u64 = 2;
@@ -258,10 +259,8 @@ module lottery_core::main_v2 {
         verification_gas_value: u128,
     }
 
-    public fun export_state_for_migration(
-        caller: &signer,
-    ): (vector<address>, bool, u64, option::Option<u64>, u64) acquires LotteryData {
-        assert!(signer::address_of(caller) == @lottery, E_NOT_OWNER);
+    public(friend) fun export_state_for_migration():
+        (vector<address>, bool, u64, option::Option<u64>, u64) acquires LotteryData {
         let lottery = borrow_global<LotteryData>(@lottery);
         let tickets = clone_addresses(&lottery.tickets);
         let pending = copy_option_u64(&lottery.pending_request);
@@ -274,8 +273,7 @@ module lottery_core::main_v2 {
         )
     }
 
-    public fun clear_state_after_migration(caller: &signer) acquires LotteryData {
-        assert!(signer::address_of(caller) == @lottery, E_NOT_OWNER);
+    public(friend) fun clear_state_after_migration() acquires LotteryData {
         let lottery = borrow_global_mut<LotteryData>(@lottery);
         clear_addresses(&mut lottery.tickets);
         lottery.jackpot_amount = 0;

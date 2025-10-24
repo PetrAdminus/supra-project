@@ -22,9 +22,9 @@ module lottery_core::instances {
     const E_EXPORT_CAP_ALREADY_BORROWED: u64 = 10;
     const E_EXPORT_CAP_NOT_BORROWED: u64 = 11;
 
-    /// Capability, выдаваемая административным модулем миграции для изменения статистики.
-    /// Храним единственный экземпляр в `CoreControl` и возвращаем после завершения операции.
-    public struct InstancesExportCap has store {}
+    /// Capability issued to the migration module for updating instance statistics.
+    /// A single copy lives in `CoreControl` and must be returned after use.
+    struct InstancesExportCap has store {}
 
     struct CoreControl has key {
         export_cap: option::Option<InstancesExportCap>,
@@ -294,7 +294,7 @@ module lottery_core::instances {
         ensure_initialized();
         let state = borrow_global<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
-            option::none()
+            option::none<registry::LotteryInfo>()
         } else {
             let instance = table::borrow(&state.instances, lottery_id);
             option::some(instance.info)
@@ -306,7 +306,7 @@ module lottery_core::instances {
         ensure_initialized();
         let state = borrow_global<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
-            option::none()
+            option::none<InstanceStats>()
         } else {
             let instance = table::borrow(&state.instances, lottery_id);
             option::some(InstanceStats {
@@ -574,5 +574,10 @@ module lottery_core::instances {
         event: &LotteryInstancesSnapshotUpdatedEvent,
     ): (address, address, LotteryInstanceSnapshot) {
         (event.admin, event.hub, event.snapshot)
+    }
+
+    #[test_only]
+    public fun instance_stats_fields_for_test(stats: &InstanceStats): (u64, u64, bool) {
+        (stats.tickets_sold, stats.jackpot_accumulated, stats.active)
     }
 }

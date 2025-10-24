@@ -34,7 +34,7 @@ module lottery_support::history_sync_tests {
         assert!(rounds::history_queue_length() == 0, 1);
 
         let history_opt = history::get_history(lottery_id);
-        let mut records = test_utils::unwrap(&mut history_opt);
+        let records = test_utils::unwrap(&mut history_opt);
         assert!(vector::length(&records) == 1, 2);
         let record_ref = vector::borrow(&records, 0);
         let (

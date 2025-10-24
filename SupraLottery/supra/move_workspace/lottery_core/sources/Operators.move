@@ -274,10 +274,11 @@ module lottery_core::operators {
     #[view]
     public fun get_operator_snapshot(lottery_id: u64): OperatorSnapshot acquires LotteryOperators {
         if (!exists<LotteryOperators>(@lottery)) {
-            return OperatorSnapshot {
-                owner: option::none(),
+            let empty_snapshot = OperatorSnapshot {
+                owner: option::none<address>(),
                 operators: vector::empty<address>(),
-            }
+            };
+            return empty_snapshot
         };
         let state = borrow_global<LotteryOperators>(@lottery);
         build_operator_snapshot(state, lottery_id)
@@ -435,10 +436,11 @@ module lottery_core::operators {
         lottery_id: u64,
     ): OperatorSnapshot {
         if (!table::contains(entries, lottery_id)) {
-            return OperatorSnapshot {
-                owner: option::none(),
+            let empty_snapshot = OperatorSnapshot {
+                owner: option::none<address>(),
                 operators: vector::empty<address>(),
-            }
+            };
+            return empty_snapshot
         };
         let entry = table::borrow(entries, lottery_id);
         OperatorSnapshot {

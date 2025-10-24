@@ -1,15 +1,14 @@
 #[test_only]
-module lottery_rewards::vip_tests {
-    use lottery_core::instances;
-    use lottery_core::rounds;
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_v1;
-    use lottery_factory::registry;
-    use lottery_rewards::rounds_sync;
-    use lottery_rewards::test_utils;
-    use lottery_rewards::vip;
+module lottery::vip_tests {
     use std::signer;
     use std::vector;
+    use lottery_core::instances;
+    use lottery::rounds;
+    use lottery::treasury_multi;
+    use lottery::treasury_v1;
+    use lottery::test_utils;
+    use lottery::vip;
+    use lottery_factory::registry;
     use vrf_hub::hub;
 
     const VIP_PRICE: u64 = 250;
@@ -75,7 +74,6 @@ module lottery_rewards::vip_tests {
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
-        vip::ensure_caps_initialized(lottery_admin);
         vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, VIP_BONUS_TICKETS);
         let baseline = {
             let events = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
@@ -125,9 +123,6 @@ module lottery_rewards::vip_tests {
         assert!(operations_balance == VIP_PRICE, 6);
 
         rounds::buy_ticket(player, lottery_id);
-        assert!(rounds::purchase_queue_length() == 1, 60);
-        rounds_sync::sync_purchases_from_rounds(lottery_admin, 0);
-        assert!(rounds::purchase_queue_length() == 0, 61);
         let round_snapshot_opt = rounds::get_round_snapshot(lottery_id);
         let round_snapshot = test_utils::unwrap(&mut round_snapshot_opt);
         let (ticket_count, _, _, _, _) = rounds::round_snapshot_fields_for_test(&round_snapshot);
@@ -228,7 +223,6 @@ module lottery_rewards::vip_tests {
         treasury_v1::register_store(recipient);
         treasury_v1::mint_to(lottery_admin, signer::address_of(recipient), 10_000);
 
-        vip::ensure_caps_initialized(lottery_admin);
         vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, 1);
         let _ = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
 

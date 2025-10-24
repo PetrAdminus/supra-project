@@ -1,12 +1,11 @@
-module lottery_support::migration {
+module lottery::migration {
     use std::option;
     use std::signer;
     use std::vector;
     use lottery_core::instances;
-    use lottery_core::main_v2;
-    use lottery_core::rounds;
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_v1;
+    use lottery::main_v2;
+    use lottery::rounds;
+    use lottery::treasury_multi;
     use lottery_factory::registry;
     use supra_framework::account;
     use supra_framework::event;
@@ -16,8 +15,7 @@ module lottery_support::migration {
     const E_INSTANCE_MISSING: u64 = 2;
     const E_PENDING_REQUEST: u64 = 3;
     const E_ALREADY_MIGRATED: u64 = 4;
-    const E_CAPS_NOT_READY: u64 = 5;
-    const E_SESSION_NOT_ADMIN: u64 = 6;
+
 
     struct MigrationLedger has key {
         snapshots: table::Table<u64, MigrationSnapshot>,
@@ -45,62 +43,6 @@ module lottery_support::migration {
         snapshot: MigrationSnapshot,
     }
 
-    struct MigrationSession has key {
-        instances_cap: option::Option<instances::InstancesExportCap>,
-        legacy_cap: option::Option<treasury_v1::LegacyTreasuryCap>,
-    }
-
-    public fun ensure_caps_initialized(admin: &signer) {
-        ensure_admin(admin);
-        if (exists<MigrationSession>(@lottery)) {
-            return
-        };
-        let instances_cap = instances::borrow_instances_export_cap(admin);
-        let legacy_cap = treasury_v1::borrow_legacy_treasury_cap(admin);
-        move_to(
-            admin,
-            MigrationSession {
-                instances_cap: option::some(instances_cap),
-                legacy_cap: option::some(legacy_cap),
-            },
-        );
-    }
-
-    #[view]
-    public fun caps_ready(): bool acquires MigrationSession {
-        if (!exists<MigrationSession>(@lottery)) {
-            return false
-        };
-        let session = borrow_global<MigrationSession>(@lottery);
-        option::is_some(&session.instances_cap) && option::is_some(&session.legacy_cap)
-    }
-
-    public fun release_caps(admin: &signer) acquires MigrationSession {
-        ensure_admin(admin);
-        if (!exists<MigrationSession>(@lottery)) {
-            return
-        };
-        let MigrationSession {
-            instances_cap,
-            legacy_cap,
-        } = move_from<MigrationSession>(@lottery);
-
-        let instances_cap_opt = instances_cap;
-        if (option::is_some(&instances_cap_opt)) {
-            let cap = option::destroy_some(instances_cap_opt);
-            instances::return_instances_export_cap(admin, cap);
-        } else {
-            option::destroy_none(instances_cap_opt);
-        };
-
-        let legacy_cap_opt = legacy_cap;
-        if (option::is_some(&legacy_cap_opt)) {
-            let cap = option::destroy_some(legacy_cap_opt);
-            treasury_v1::return_legacy_treasury_cap(admin, cap);
-        } else {
-            option::destroy_none(legacy_cap_opt);
-        };
-    }
 
     public entry fun migrate_from_legacy(
         caller: &signer,
@@ -108,11 +50,10 @@ module lottery_support::migration {
         prize_bps: u64,
         jackpot_bps: u64,
         operations_bps: u64,
-    ) acquires MigrationLedger, MigrationSession {
+    ) acquires MigrationLedger {
         if (signer::address_of(caller) != @lottery) {
             abort E_NOT_AUTHORIZED
         };
-        ensure_caps_initialized(caller);
         if (!instances::contains_instance(lottery_id)) {
             abort E_INSTANCE_MISSING
         };
@@ -127,7 +68,8 @@ module lottery_support::migration {
             next_ticket_id_legacy,
             pending_request,
             jackpot_amount,
-        ) = main_v2::export_state_for_migration(caller);
+        ) =
+            main_v2::export_state_for_migration();
 
         let pending_request_present = option::is_some(&pending_request);
         if (pending_request_present) {
@@ -145,30 +87,10 @@ module lottery_support::migration {
         let next_ticket_id = ticket_count;
         let effective_draw = draw_scheduled && ticket_count > 0;
 
-        treasury_multi::migrate_seed_pool(caller, lottery_id, jackpot_amount, 0, 0);
-        {
-            if (!exists<MigrationSession>(@lottery)) {
-                abort E_CAPS_NOT_READY
-            };
-            let session = borrow_global<MigrationSession>(@lottery);
-            if (!option::is_some(&session.instances_cap)) {
-                abort E_CAPS_NOT_READY
-            };
-            let instances_cap_ref = option::borrow(&session.instances_cap);
-            if (!option::is_some(&session.legacy_cap)) {
-                abort E_CAPS_NOT_READY
-            };
-            let _legacy_cap_ref = option::borrow(&session.legacy_cap);
-            instances::migrate_override_stats(instances_cap_ref, lottery_id, ticket_count, 0);
-        };
-        rounds::migrate_import_round(
-            caller,
-            lottery_id,
-            tickets,
-            effective_draw,
-            next_ticket_id,
-            pending_request,
-        );
+        treasury_multi::migrate_seed_pool(lottery_id, jackpot_amount, 0, 0);
+        let instances_cap = instances::borrow_instances_export_cap(caller);
+        instances::migrate_override_stats(&instances_cap, lottery_id, ticket_count, 0);
+        rounds::migrate_import_round(lottery_id, tickets, effective_draw, next_ticket_id, pending_request);
 
         let snapshot = MigrationSnapshot {
             lottery_id,
@@ -185,24 +107,27 @@ module lottery_support::migration {
         };
         record_snapshot(caller, snapshot);
 
-        main_v2::clear_state_after_migration(caller);
+        main_v2::clear_state_after_migration();
+        instances::return_instances_export_cap(caller, instances_cap);
     }
+
 
     #[view]
     public fun list_migrated_lottery_ids(): vector<u64> acquires MigrationLedger {
         if (!exists<MigrationLedger>(@lottery)) {
-            return vector::empty<u64>()
+            return vector::empty<u64>();
         };
         let state = borrow_global<MigrationLedger>(@lottery);
         copy_u64_vector(&state.lottery_ids)
     }
+
 
     #[view]
     public fun get_migration_snapshot(
         lottery_id: u64
     ): option::Option<MigrationSnapshot> acquires MigrationLedger {
         if (!exists<MigrationLedger>(@lottery)) {
-            return option::none<MigrationSnapshot>()
+            return option::none<MigrationSnapshot>();
         };
         let state = borrow_global<MigrationLedger>(@lottery);
         if (!table::contains(&state.snapshots, lottery_id)) {
@@ -211,6 +136,7 @@ module lottery_support::migration {
             option::some(*table::borrow(&state.snapshots, lottery_id))
         }
     }
+
 
     #[test_only]
     public fun migration_snapshot_fields_for_test(
@@ -231,12 +157,14 @@ module lottery_support::migration {
         )
     }
 
+
     #[test_only]
     public fun migration_snapshot_event_fields_for_test(
         event: &MigrationSnapshotUpdatedEvent
     ): (u64, MigrationSnapshot) {
         (event.lottery_id, event.snapshot)
     }
+
 
     fun record_snapshot(caller: &signer, snapshot: MigrationSnapshot) acquires MigrationLedger {
         ensure_ledger(caller);
@@ -256,6 +184,7 @@ module lottery_support::migration {
         };
     }
 
+
     fun ensure_ledger(caller: &signer) {
         if (!exists<MigrationLedger>(@lottery)) {
             move_to(
@@ -269,25 +198,18 @@ module lottery_support::migration {
         };
     }
 
+
     fun record_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
         let len = vector::length(ids);
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
-                return
+                return;
             };
             idx = idx + 1;
         };
         vector::push_back(ids, lottery_id);
     }
-
-    fun ensure_admin(admin: &signer) {
-        if (signer::address_of(admin) != @lottery) {
-            abort E_SESSION_NOT_ADMIN
-        };
-    }
-
-
 
 
     fun copy_u64_vector(values: &vector<u64>): vector<u64> {
