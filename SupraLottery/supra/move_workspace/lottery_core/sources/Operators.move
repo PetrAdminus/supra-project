@@ -206,11 +206,11 @@ module lottery_core::operators {
     #[view]
     public fun get_owner(lottery_id: u64): option::Option<address> acquires LotteryOperators {
         if (!exists<LotteryOperators>(@lottery)) {
-            return option::none<address>();
+            return option::none<address>()
         };
         let state = borrow_global<LotteryOperators>(@lottery);
         if (!table::contains(&state.entries, lottery_id)) {
-            return option::none<address>();
+            return option::none<address>()
         };
         let entry = table::borrow(&state.entries, lottery_id);
         option::some(entry.owner)
@@ -219,11 +219,11 @@ module lottery_core::operators {
     #[view]
     public fun is_operator(lottery_id: u64, operator: address): bool acquires LotteryOperators {
         if (!exists<LotteryOperators>(@lottery)) {
-            return false;
+            return false
         };
         let state = borrow_global<LotteryOperators>(@lottery);
         if (!table::contains(&state.entries, lottery_id)) {
-            return false;
+            return false
         };
         let entry = table::borrow(&state.entries, lottery_id);
         table::contains(&entry.operators, operator)
@@ -232,18 +232,18 @@ module lottery_core::operators {
     #[view]
     public fun can_manage(lottery_id: u64, actor: address): bool acquires LotteryOperators {
         if (!exists<LotteryOperators>(@lottery)) {
-            return false;
+            return false
         };
         let state = borrow_global<LotteryOperators>(@lottery);
         if (state.admin == actor) {
-            return true;
+            return true
         };
         if (!table::contains(&state.entries, lottery_id)) {
-            return false;
+            return false
         };
         let entry = table::borrow(&state.entries, lottery_id);
         if (entry.owner == actor) {
-            return true;
+            return true
         };
         table::contains(&entry.operators, actor)
     }
@@ -251,7 +251,7 @@ module lottery_core::operators {
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires LotteryOperators {
         if (!exists<LotteryOperators>(@lottery)) {
-            return vector::empty<u64>();
+            return vector::empty<u64>()
         };
         let state = borrow_global<LotteryOperators>(@lottery);
         copy_u64_vector(&state.lottery_ids)
@@ -261,11 +261,11 @@ module lottery_core::operators {
     public fun list_operators(lottery_id: u64): option::Option<vector<address>>
     acquires LotteryOperators {
         if (!exists<LotteryOperators>(@lottery)) {
-            return option::none<vector<address>>();
+            return option::none<vector<address>>()
         };
         let state = borrow_global<LotteryOperators>(@lottery);
         if (!table::contains(&state.entries, lottery_id)) {
-            return option::none<vector<address>>();
+            return option::none<vector<address>>()
         };
         let entry = table::borrow(&state.entries, lottery_id);
         option::some(copy_address_vector(&entry.operator_list))
@@ -278,7 +278,7 @@ module lottery_core::operators {
                 owner: option::none<address>(),
                 operators: vector::empty<address>(),
             };
-            return empty_snapshot;
+            return empty_snapshot
         };
         let state = borrow_global<LotteryOperators>(@lottery);
         build_operator_snapshot(state, lottery_id)
@@ -329,7 +329,7 @@ module lottery_core::operators {
         let addr = signer::address_of(caller);
         let state = borrow_global<LotteryOperators>(@lottery);
         if (state.admin == addr) {
-            return;
+            return
         };
         if (!table::contains(&state.entries, lottery_id)) {
             abort E_UNKNOWN_LOTTERY
@@ -345,7 +345,7 @@ module lottery_core::operators {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
-                return;
+                return
             };
             idx = idx + 1;
         };
@@ -357,7 +357,7 @@ module lottery_core::operators {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(operators, idx) == operator) {
-                return;
+                return
             };
             idx = idx + 1;
         };
@@ -373,7 +373,7 @@ module lottery_core::operators {
                     vector::swap(operators, idx, len - 1);
                 };
                 vector::pop_back(operators);
-                return;
+                return
             };
             idx = idx + 1;
         };
@@ -440,7 +440,7 @@ module lottery_core::operators {
                 owner: option::none<address>(),
                 operators: vector::empty<address>(),
             };
-            return empty_snapshot;
+            return empty_snapshot
         };
         let entry = table::borrow(entries, lottery_id);
         OperatorSnapshot {

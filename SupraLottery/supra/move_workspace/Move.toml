@@ -1,7 +1,6 @@
 [workspace]
 resolver = "v2"
 members = [
-  "lottery",
   "lottery_core",
   "lottery_support",
   "lottery_rewards",

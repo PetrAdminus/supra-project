@@ -19,6 +19,9 @@ services:
       - type: bind
         source: ./supra/move_workspace
         target: /supra/move_workspace
+      - type: bind
+        source: .
+        target: /supra/SupraLottery
     #ALLOCATES A PSEUDO-TTY
     tty: true
     #SHARE THE HOST NETWORK

@@ -367,11 +367,11 @@ module lottery_core::instances {
     public fun get_instance_snapshot(lottery_id: u64): option::Option<LotteryInstanceSnapshot>
     acquires LotteryCollection {
         if (!exists<LotteryCollection>(@lottery)) {
-            return option::none<LotteryInstanceSnapshot>();
+            return option::none<LotteryInstanceSnapshot>()
         };
         let state = borrow_global<LotteryCollection>(@lottery);
         if (!table::contains(&state.instances, lottery_id)) {
-            return option::none<LotteryInstanceSnapshot>();
+            return option::none<LotteryInstanceSnapshot>()
         };
         option::some(build_instance_snapshot(state, lottery_id))
     }
@@ -380,7 +380,7 @@ module lottery_core::instances {
     public fun get_instances_snapshot(): option::Option<LotteryInstancesSnapshot>
     acquires LotteryCollection {
         if (!exists<LotteryCollection>(@lottery)) {
-            return option::none<LotteryInstancesSnapshot>();
+            return option::none<LotteryInstancesSnapshot>()
         };
         let state = borrow_global<LotteryCollection>(@lottery);
         option::some(build_instances_snapshot(state))
@@ -417,7 +417,7 @@ module lottery_core::instances {
         if (option::is_some(&control.export_cap)) {
             abort E_EXPORT_CAP_NOT_BORROWED
         };
-        control.export_cap = option::some(cap);
+        option::fill(&mut control.export_cap, cap);
     }
 
     public fun migrate_override_stats(
@@ -456,7 +456,7 @@ module lottery_core::instances {
 
     fun emit_instance_snapshot(state: &mut LotteryCollection, lottery_id: u64) {
         if (!table::contains(&state.instances, lottery_id)) {
-            return;
+            return
         };
         let snapshot = build_instance_snapshot_from_mut(state, lottery_id);
         event::emit_event(
@@ -574,5 +574,10 @@ module lottery_core::instances {
         event: &LotteryInstancesSnapshotUpdatedEvent,
     ): (address, address, LotteryInstanceSnapshot) {
         (event.admin, event.hub, event.snapshot)
+    }
+
+    #[test_only]
+    public fun instance_stats_fields_for_test(stats: &InstanceStats): (u64, u64, bool) {
+        (stats.tickets_sold, stats.jackpot_accumulated, stats.active)
     }
 }

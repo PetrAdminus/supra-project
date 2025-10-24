@@ -252,7 +252,7 @@ module vrf_hub::hub {
         ensure_initialized();
         let state = borrow_global<HubState>(@vrf_hub);
         if (!table::contains(&state.lotteries, lottery_id)) {
-            return false;
+            return false
         };
         table::borrow(&state.lotteries, lottery_id).active
     }
@@ -548,7 +548,7 @@ module vrf_hub::hub {
                     let slot = vector::borrow_mut(ids, i);
                     *slot = last;
                 };
-                return;
+                return
             };
             i = i + 1;
         };

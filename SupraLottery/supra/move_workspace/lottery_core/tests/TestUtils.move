@@ -1,6 +1,7 @@
 #[test_only]
 module lottery_core::test_utils {
     use lottery_core::instances;
+    use lottery_core::main_v2;
     use lottery_core::rounds;
     use lottery_core::treasury_multi;
     use lottery_core::treasury_v1;
@@ -171,6 +172,12 @@ module lottery_core::test_utils {
         if (!treasury_multi::is_initialized()) {
             treasury_multi::init(lottery_admin, @jackpot_pool, @operations_pool);
         };
+        if (!main_v2::is_initialized()) {
+            main_v2::init(lottery_admin);
+        };
+        let aggregator = signer::address_of(vrf_admin);
+        hub::set_callback_sender(vrf_admin, aggregator);
+        main_v2::set_callback_aggregator_for_test(option::some(aggregator));
         if (!instances::is_initialized()) {
             instances::init(lottery_admin, @vrf_hub);
         };

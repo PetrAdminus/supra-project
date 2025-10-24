@@ -321,7 +321,7 @@ module lottery_support::metadata {
         while (i < len) {
             if (*vector::borrow(ids, i) == lottery_id) {
                 vector::swap_remove(ids, i);
-                return;
+                return
             };
             i = i + 1;
         };

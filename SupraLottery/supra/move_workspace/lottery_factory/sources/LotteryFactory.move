@@ -248,7 +248,7 @@ module lottery_factory::registry {
     #[view]
     public fun list_lottery_ids(): vector<u64> acquires FactoryState {
         if (!exists<FactoryState>(@lottery_factory)) {
-            return vector::empty<u64>();
+            return vector::empty<u64>()
         };
         let state = borrow_global<FactoryState>(@lottery_factory);
         copy_u64_vector(&state.lottery_ids)
@@ -260,7 +260,7 @@ module lottery_factory::registry {
             return LotteryRegistrySnapshot {
                 admin: @lottery_factory,
                 lotteries: vector::empty<LotteryRegistryEntry>(),
-            };
+            }
         };
         let state = borrow_global<FactoryState>(@lottery_factory);
         build_registry_snapshot(state)
@@ -371,7 +371,7 @@ module lottery_factory::registry {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
-                return;
+                return
             };
             idx = idx + 1;
         };

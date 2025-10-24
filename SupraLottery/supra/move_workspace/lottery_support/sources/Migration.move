@@ -50,10 +50,10 @@ module lottery_support::migration {
         legacy_cap: option::Option<treasury_v1::LegacyTreasuryCap>,
     }
 
-    public fun ensure_caps_initialized(admin: &signer) acquires MigrationSession {
+    public fun ensure_caps_initialized(admin: &signer) {
         ensure_admin(admin);
         if (exists<MigrationSession>(@lottery)) {
-            return;
+            return
         };
         let instances_cap = instances::borrow_instances_export_cap(admin);
         let legacy_cap = treasury_v1::borrow_legacy_treasury_cap(admin);
@@ -69,7 +69,7 @@ module lottery_support::migration {
     #[view]
     public fun caps_ready(): bool acquires MigrationSession {
         if (!exists<MigrationSession>(@lottery)) {
-            return false;
+            return false
         };
         let session = borrow_global<MigrationSession>(@lottery);
         option::is_some(&session.instances_cap) && option::is_some(&session.legacy_cap)
@@ -78,7 +78,7 @@ module lottery_support::migration {
     public fun release_caps(admin: &signer) acquires MigrationSession {
         ensure_admin(admin);
         if (!exists<MigrationSession>(@lottery)) {
-            return;
+            return
         };
         let MigrationSession {
             instances_cap,
@@ -108,7 +108,7 @@ module lottery_support::migration {
         prize_bps: u64,
         jackpot_bps: u64,
         operations_bps: u64,
-    ) acquires MigrationLedger {
+    ) acquires MigrationLedger, MigrationSession {
         if (signer::address_of(caller) != @lottery) {
             abort E_NOT_AUTHORIZED
         };
@@ -146,9 +146,21 @@ module lottery_support::migration {
         let effective_draw = draw_scheduled && ticket_count > 0;
 
         treasury_multi::migrate_seed_pool(caller, lottery_id, jackpot_amount, 0, 0);
-        let instances_cap = borrow_instances_cap();
-        let _legacy_cap = borrow_legacy_cap();
-        instances::migrate_override_stats(instances_cap, lottery_id, ticket_count, 0);
+        {
+            if (!exists<MigrationSession>(@lottery)) {
+                abort E_CAPS_NOT_READY
+            };
+            let session = borrow_global<MigrationSession>(@lottery);
+            if (!option::is_some(&session.instances_cap)) {
+                abort E_CAPS_NOT_READY
+            };
+            let instances_cap_ref = option::borrow(&session.instances_cap);
+            if (!option::is_some(&session.legacy_cap)) {
+                abort E_CAPS_NOT_READY
+            };
+            let _legacy_cap_ref = option::borrow(&session.legacy_cap);
+            instances::migrate_override_stats(instances_cap_ref, lottery_id, ticket_count, 0);
+        };
         rounds::migrate_import_round(
             caller,
             lottery_id,
@@ -179,7 +191,7 @@ module lottery_support::migration {
     #[view]
     public fun list_migrated_lottery_ids(): vector<u64> acquires MigrationLedger {
         if (!exists<MigrationLedger>(@lottery)) {
-            return vector::empty<u64>();
+            return vector::empty<u64>()
         };
         let state = borrow_global<MigrationLedger>(@lottery);
         copy_u64_vector(&state.lottery_ids)
@@ -190,7 +202,7 @@ module lottery_support::migration {
         lottery_id: u64
     ): option::Option<MigrationSnapshot> acquires MigrationLedger {
         if (!exists<MigrationLedger>(@lottery)) {
-            return option::none<MigrationSnapshot>();
+            return option::none<MigrationSnapshot>()
         };
         let state = borrow_global<MigrationLedger>(@lottery);
         if (!table::contains(&state.snapshots, lottery_id)) {
@@ -262,7 +274,7 @@ module lottery_support::migration {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(ids, idx) == lottery_id) {
-                return;
+                return
             };
             idx = idx + 1;
         };
@@ -275,28 +287,8 @@ module lottery_support::migration {
         };
     }
 
-    fun borrow_session(): &MigrationSession acquires MigrationSession {
-        if (!exists<MigrationSession>(@lottery)) {
-            abort E_CAPS_NOT_READY
-        };
-        borrow_global<MigrationSession>(@lottery)
-    }
 
-    fun borrow_instances_cap(): &instances::InstancesExportCap acquires MigrationSession {
-        let session = borrow_session();
-        if (!option::is_some(&session.instances_cap)) {
-            abort E_CAPS_NOT_READY
-        };
-        option::borrow(&session.instances_cap)
-    }
 
-    fun borrow_legacy_cap(): &treasury_v1::LegacyTreasuryCap acquires MigrationSession {
-        let session = borrow_session();
-        if (!option::is_some(&session.legacy_cap)) {
-            abort E_CAPS_NOT_READY
-        };
-        option::borrow(&session.legacy_cap)
-    }
 
     fun copy_u64_vector(values: &vector<u64>): vector<u64> {
         let out = vector::empty<u64>();

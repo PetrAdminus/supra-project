@@ -159,21 +159,20 @@ module lottery_core::instances_tests {
 
         let stats_opt = instances::get_instance_stats(lottery_id);
         let stats = test_utils::unwrap(&mut stats_opt);
-        let (tickets_sold, jackpot_accumulated, active) = (
-            stats.tickets_sold,
-            stats.jackpot_accumulated,
-            stats.active,
-        );
+        let (tickets_sold, jackpot_accumulated, active) =
+            instances::instance_stats_fields_for_test(&stats);
         assert!(tickets_sold == 0, 40);
         assert!(jackpot_accumulated == 0, 41);
         assert!(active, 42);
 
+        hub::set_lottery_active(vrf_admin, lottery_id, false);
         instances::set_instance_active(lottery_admin, lottery_id, false);
         assert!(!instances::is_instance_active(lottery_id), 43);
 
         let inactive_list = instances::list_active_lottery_ids();
         assert!(vector::length(&inactive_list) == 0, 44);
 
+        hub::set_lottery_active(vrf_admin, lottery_id, true);
         instances::set_instance_active(lottery_admin, lottery_id, true);
         let active_list = instances::list_active_lottery_ids();
         assert!(vector::length(&active_list) == 1, 45);

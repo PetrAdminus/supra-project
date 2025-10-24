@@ -169,7 +169,7 @@ module lottery_core::treasury_multi {
         caller: &signer,
         jackpot_recipient: address,
         operations_recipient: address,
-    ) {
+    ) acquires CoreControl {
         ensure_treasury_ready();
         ensure_recipient_ready_for_payout(
             jackpot_recipient,
@@ -418,7 +418,7 @@ module lottery_core::treasury_multi {
         source: vector<u8>,
     ) acquires TreasuryState {
         if (amount == 0) {
-            return;
+            return
         };
         ensure_initialized();
         let state = borrow_global_mut<TreasuryState>(@lottery);
@@ -531,7 +531,7 @@ module lottery_core::treasury_multi {
     acquires TreasuryState {
         let state = borrow_global<TreasuryState>(@lottery);
         if (!table::contains(&state.configs, lottery_id)) {
-            return option::none<LotterySummary>();
+            return option::none<LotterySummary>()
         };
         let config = *table::borrow(&state.configs, lottery_id);
         let pool = if (table::contains(&state.pools, lottery_id)) {
@@ -616,7 +616,7 @@ module lottery_core::treasury_multi {
     #[view]
     public fun cap_available(scope: u64): bool acquires CoreControl {
         if (!exists<CoreControl>(@lottery)) {
-            return false;
+            return false
         };
         let control = borrow_global<CoreControl>(@lottery);
         option::is_some(cap_slot(control, scope))
@@ -640,13 +640,13 @@ module lottery_core::treasury_multi {
         scope: u64,
     ): option::Option<MultiTreasuryCap> acquires CoreControl {
         if (!exists<CoreControl>(@lottery)) {
-            return option::none<MultiTreasuryCap>();
+            return option::none<MultiTreasuryCap>()
         };
         ensure_core_admin(caller);
         let control = borrow_global_mut<CoreControl>(@lottery);
         let slot = borrow_cap_slot_mut(control, scope);
         if (!option::is_some(slot)) {
-            return option::none<MultiTreasuryCap>();
+            return option::none<MultiTreasuryCap>()
         };
         let cap = option::extract(slot);
         option::some(cap)
@@ -663,7 +663,7 @@ module lottery_core::treasury_multi {
         if (option::is_some(slot)) {
             abort E_CORE_CAP_NOT_BORROWED
         };
-        *slot = option::some(cap);
+        option::fill(slot, cap);
     }
 
     fun borrow_cap_slot_mut(
@@ -718,7 +718,7 @@ module lottery_core::treasury_multi {
         if (exists<CoreControl>(@lottery)) {
             let control = borrow_global_mut<CoreControl>(@lottery);
             control.admin = addr;
-            return;
+            return
         };
         move_to(
             caller,
@@ -734,7 +734,7 @@ module lottery_core::treasury_multi {
 
     fun update_core_control_admin(new_admin: address) acquires CoreControl {
         if (!exists<CoreControl>(@lottery)) {
-            return;
+            return
         };
         let control = borrow_global_mut<CoreControl>(@lottery);
         control.admin = new_admin;
@@ -845,7 +845,7 @@ module lottery_core::treasury_multi {
         let pool = table::borrow_mut(&mut state.pools, lottery_id);
         let amount = pool.prize_balance;
         if (amount == 0) {
-            return 0;
+            return 0
         };
         pool.prize_balance = 0;
         treasury_v1::payout_from_treasury(winner, amount);
@@ -863,7 +863,7 @@ module lottery_core::treasury_multi {
         let pool = table::borrow_mut(&mut state.pools, lottery_id);
         let amount = pool.operations_balance;
         if (amount == 0) {
-            return 0;
+            return 0
         };
         let recipient = state.operations_recipient;
         ensure_recipient_ready_for_payout(
@@ -887,7 +887,7 @@ module lottery_core::treasury_multi {
         amount: u64,
     ) {
         if (amount == 0) {
-            return;
+            return
         };
         if (!table::contains(&state.pools, lottery_id)) {
             abort E_POOL_MISSING
@@ -911,7 +911,7 @@ module lottery_core::treasury_multi {
 
     fun distribute_jackpot_impl(state: &mut TreasuryState, recipient: address, amount: u64) {
         if (amount == 0) {
-            return;
+            return
         };
         if (amount > state.jackpot_balance) {
             abort E_INSUFFICIENT_JACKPOT
@@ -934,7 +934,7 @@ module lottery_core::treasury_multi {
         let idx = 0;
         while (idx < len) {
             if (*vector::borrow(&state.lottery_ids, idx) == lottery_id) {
-                return;
+                return
             };
             idx = idx + 1;
         };

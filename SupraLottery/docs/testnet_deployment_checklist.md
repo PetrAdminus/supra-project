@@ -7,7 +7,7 @@
 - [ ] Run `bash supra/scripts/bootstrap_move_deps.sh` (pins aptos-core commit `7d1e62c9a5394a279a73515a150e880200640f06`). On Windows without WSL execute the Python fallback from the runbook.
 
 ## 1. Build
-- [ ] ```powershell
+ - [x] ```powershell
 # lottery_core
 docker compose run --rm --entrypoint bash supra_cli `
   -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_core \
@@ -21,7 +21,8 @@ docker compose run --rm --entrypoint bash supra_cli `
   -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_rewards \
         --skip-fetch-latest-git-deps"
 ```
-- [ ] Verify `build/` directories are produced without errors.
+- [x] Supplementary loop run to compile `lottery_factory`, `vrf_hub`, and `SupraVrf` with the same toolchain.
+- [x] Verify `build/` directories are produced without errors.
 - [ ] Run unit tests for each package:
   ```bash
   python -m supra.scripts.cli move-test --workspace supra/move_workspace --package lottery_core
