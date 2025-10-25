@@ -27,29 +27,25 @@ module lottery_core::operators_tests {
         assert!(snapshot_owner == signer::address_of(owner), 6);
         assert!(vector::length(&snapshot_operators) == 0, 7);
 
-        // Baseline before granting operator (snapshot)
-        let baseline = {
-            let ev = test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
-            test_utils::events_len(&ev)
-        };
-
-        // Strict baseline for OperatorGrantedEvent (core)
-        let granted_baseline = {
-            let ev = test_utils::drain_events<operators::OperatorGrantedEvent>();
-            test_utils::events_len(&ev)
-        };
+        // Очистить события перед проверкой сценария выдачи оператора
+        let _ = test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<operators::OperatorGrantedEvent>();
 
         operators::grant_operator(lottery_admin, 0, signer::address_of(operator));
         assert!(operators::is_operator(0, signer::address_of(operator)), 1);
 
         // Strict: exactly one OperatorGrantedEvent emitted
         let granted_events = test_utils::drain_events<operators::OperatorGrantedEvent>();
-        test_utils::assert_grew_by<operators::OperatorGrantedEvent>(
-            granted_baseline,
-            &granted_events,
-            0,
-            100,
-        );
+        test_utils::assert_len_eq<operators::OperatorGrantedEvent>(&granted_events, 1, 100);
+        let grant_event = *test_utils::last_event_ref(&granted_events);
+        let operators::OperatorGrantedEvent {
+            lottery_id: grant_lottery,
+            operator: grant_operator,
+            granted_by,
+        } = grant_event;
+        assert!(grant_lottery == 0, 102);
+        assert!(grant_operator == signer::address_of(operator), 103);
+        assert!(granted_by == signer::address_of(lottery_admin), 104);
 
         let operators_list_opt = operators::list_operators(0);
         let operators_list = test_utils::unwrap(&mut operators_list_opt);
@@ -71,10 +67,9 @@ module lottery_core::operators_tests {
         let snapshot_events =
             test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
         let snapshot_events_len = vector::length(&snapshot_events);
-        test_utils::assert_grew_by<operators::OperatorSnapshotUpdatedEvent>(
-            baseline,
+        test_utils::assert_len_eq<operators::OperatorSnapshotUpdatedEvent>(
             &snapshot_events,
-            0,
+            1,
             11,
         );
         if (snapshot_events_len > 1) {
@@ -123,29 +118,25 @@ module lottery_core::operators_tests {
         assert!(owner_after_grant == signer::address_of(owner), 19);
         assert!(vector::length(&operators_after_grant) == 1, 20);
 
-        // Baseline before revoke (snapshot)
-        let baseline = {
-            let ev = test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
-            test_utils::events_len(&ev)
-        };
-
-        // Strict baseline for OperatorRevokedEvent (core)
-        let revoked_baseline = {
-            let ev = test_utils::drain_events<operators::OperatorRevokedEvent>();
-            test_utils::events_len(&ev)
-        };
+        // Очистить события перед сценарием отзыва оператора
+        let _ = test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<operators::OperatorRevokedEvent>();
 
         operators::revoke_operator(owner, 7, signer::address_of(operator));
         assert!(!operators::is_operator(7, signer::address_of(operator)), 11);
 
         // Strict: exactly one OperatorRevokedEvent emitted
         let revoked_events = test_utils::drain_events<operators::OperatorRevokedEvent>();
-        test_utils::assert_grew_by<operators::OperatorRevokedEvent>(
-            revoked_baseline,
-            &revoked_events,
-            0,
-            101,
-        );
+        test_utils::assert_len_eq<operators::OperatorRevokedEvent>(&revoked_events, 1, 101);
+        let revoke_event = *test_utils::last_event_ref(&revoked_events);
+        let operators::OperatorRevokedEvent {
+            lottery_id: revoke_lottery,
+            operator: revoke_operator,
+            revoked_by,
+        } = revoke_event;
+        assert!(revoke_lottery == 7, 105);
+        assert!(revoke_operator == signer::address_of(operator), 106);
+        assert!(revoked_by == signer::address_of(owner), 107);
 
         let operators_after_opt = operators::list_operators(7);
         let operators_after = test_utils::unwrap(&mut operators_after_opt);
@@ -161,10 +152,9 @@ module lottery_core::operators_tests {
         let snapshot_events =
             test_utils::drain_events<operators::OperatorSnapshotUpdatedEvent>();
         let snapshot_events_len = vector::length(&snapshot_events);
-        test_utils::assert_grew_by<operators::OperatorSnapshotUpdatedEvent>(
-            baseline,
+        test_utils::assert_len_eq<operators::OperatorSnapshotUpdatedEvent>(
             &snapshot_events,
-            0,
+            1,
             23,
         );
         if (vector::length(&snapshot_events) > 0) {

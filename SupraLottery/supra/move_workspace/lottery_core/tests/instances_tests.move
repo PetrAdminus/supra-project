@@ -1,5 +1,6 @@
 #[test_only]
 module lottery_core::instances_tests {
+    use std::account;
     use std::vector;
     use lottery_core::instances;
     use lottery_core::test_utils;
@@ -74,6 +75,8 @@ module lottery_core::instances_tests {
 
         let updated_blueprint = registry::new_blueprint(25, 800);
         registry::update_blueprint(factory_admin, lottery_id, updated_blueprint);
+        let _ =
+            test_utils::drain_events<instances::LotteryInstanceBlueprintSyncedEvent>();
 
         let baseline = {
             let ev = test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
@@ -81,6 +84,23 @@ module lottery_core::instances_tests {
         };
 
         instances::sync_blueprint(lottery_admin, lottery_id);
+
+        let blueprint_events =
+            test_utils::drain_events<instances::LotteryInstanceBlueprintSyncedEvent>();
+        test_utils::assert_len_eq<instances::LotteryInstanceBlueprintSyncedEvent>(
+            &blueprint_events,
+            1,
+            49,
+        );
+        let synced_blueprint_event = *test_utils::last_event_ref(&blueprint_events);
+        let instances::LotteryInstanceBlueprintSyncedEvent {
+            lottery_id: blueprint_lottery,
+            ticket_price: blueprint_price,
+            jackpot_share_bps: blueprint_share,
+        } = synced_blueprint_event;
+        assert!(blueprint_lottery == lottery_id, 50);
+        assert!(blueprint_price == 25, 51);
+        assert!(blueprint_share == 800, 52);
 
         let synced_info_opt = instances::get_lottery_info(lottery_id);
         let synced_info = test_utils::unwrap(&mut synced_info_opt);
@@ -108,10 +128,10 @@ module lottery_core::instances_tests {
         let snapshot_events =
             test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
         let snapshot_events_len = vector::length(&snapshot_events);
-        test_utils::assert_grew_by<instances::LotteryInstancesSnapshotUpdatedEvent>(
+        test_utils::assert_delta_eq<instances::LotteryInstancesSnapshotUpdatedEvent>(
             baseline,
             &snapshot_events,
-            0,
+            1,
             28,
         );
         if (snapshot_events_len > 1) {
@@ -166,22 +186,176 @@ module lottery_core::instances_tests {
         assert!(active, 42);
 
         hub::set_lottery_active(vrf_admin, lottery_id, false);
+        let _ = test_utils::drain_events<instances::LotteryInstanceStatusUpdatedEvent>();
+        let _ = test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
         instances::set_instance_active(lottery_admin, lottery_id, false);
         assert!(!instances::is_instance_active(lottery_id), 43);
+
+        let status_events =
+            test_utils::drain_events<instances::LotteryInstanceStatusUpdatedEvent>();
+        test_utils::assert_len_eq<instances::LotteryInstanceStatusUpdatedEvent>(&status_events, 1, 53);
+        let inactive_status_event = *test_utils::last_event_ref(&status_events);
+        let instances::LotteryInstanceStatusUpdatedEvent {
+            lottery_id: inactive_status_lottery,
+            active: inactive_status_active,
+        } = inactive_status_event;
+        assert!(inactive_status_lottery == lottery_id, 54);
+        assert!(!inactive_status_active, 55);
+
+        let inactive_snapshot_events =
+            test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<instances::LotteryInstancesSnapshotUpdatedEvent>(
+            &inactive_snapshot_events,
+            1,
+            71,
+        );
+        let inactive_snapshot_event = test_utils::last_event_ref(&inactive_snapshot_events);
+        let (inactive_admin, inactive_hub, inactive_snapshot) =
+            instances::snapshot_event_fields_for_test(inactive_snapshot_event);
+        assert!(inactive_admin == @lottery, 72);
+        assert!(inactive_hub == @vrf_hub, 73);
+        let (
+            inactive_snapshot_lottery,
+            _inactive_owner,
+            _inactive_lottery,
+            _inactive_price,
+            _inactive_share,
+            _inactive_tickets,
+            _inactive_jackpot,
+            inactive_active,
+        ) = instances::instance_snapshot_fields_for_test(&inactive_snapshot);
+        assert!(inactive_snapshot_lottery == lottery_id, 74);
+        assert!(!inactive_active, 75);
 
         let inactive_list = instances::list_active_lottery_ids();
         assert!(vector::length(&inactive_list) == 0, 44);
 
         hub::set_lottery_active(vrf_admin, lottery_id, true);
+        let _ = test_utils::drain_events<instances::LotteryInstanceStatusUpdatedEvent>();
+        let _ = test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
         instances::set_instance_active(lottery_admin, lottery_id, true);
         let active_list = instances::list_active_lottery_ids();
         assert!(vector::length(&active_list) == 1, 45);
 
+        let reactivated_status_events =
+            test_utils::drain_events<instances::LotteryInstanceStatusUpdatedEvent>();
+        test_utils::assert_len_eq<instances::LotteryInstanceStatusUpdatedEvent>(
+            &reactivated_status_events,
+            1,
+            56,
+        );
+        let active_status_event = *test_utils::last_event_ref(&reactivated_status_events);
+        let instances::LotteryInstanceStatusUpdatedEvent {
+            lottery_id: active_status_lottery,
+            active: active_status_active,
+        } = active_status_event;
+        assert!(active_status_lottery == lottery_id, 57);
+        assert!(active_status_active, 58);
+
+        let active_snapshot_events =
+            test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<instances::LotteryInstancesSnapshotUpdatedEvent>(
+            &active_snapshot_events,
+            1,
+            76,
+        );
+        let active_snapshot_event = test_utils::last_event_ref(&active_snapshot_events);
+        let (active_admin, active_hub, active_snapshot) =
+            instances::snapshot_event_fields_for_test(active_snapshot_event);
+        assert!(active_admin == @lottery, 77);
+        assert!(active_hub == @vrf_hub, 78);
+        let (
+            active_snapshot_lottery,
+            _active_owner,
+            _active_lottery,
+            _active_price,
+            _active_share,
+            _active_tickets,
+            _active_jackpot,
+            active_snapshot_active,
+        ) = instances::instance_snapshot_fields_for_test(&active_snapshot);
+        assert!(active_snapshot_lottery == lottery_id, 79);
+        assert!(active_snapshot_active, 80);
+
         let ids = instances::list_lottery_ids();
         assert!(vector::length(&ids) == 1, 46);
 
+        let _ = test_utils::drain_events<instances::AdminUpdatedEvent>();
+        let _ = test_utils::drain_events<instances::HubAddressUpdatedEvent>();
+        let _ = test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
+
         instances::set_admin(lottery_admin, @0x123);
-        instances::set_hub(lottery_admin, @0x456);
+        let admin_events = test_utils::drain_events<instances::AdminUpdatedEvent>();
+        test_utils::assert_len_eq<instances::AdminUpdatedEvent>(&admin_events, 1, 59);
+        let admin_event = *test_utils::last_event_ref(&admin_events);
+        let instances::AdminUpdatedEvent {
+            previous: admin_previous,
+            next: admin_next,
+        } = admin_event;
+        assert!(admin_previous == @lottery, 60);
+        assert!(admin_next == @0x123, 61);
+
+        let admin_snapshot_events =
+            test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<instances::LotteryInstancesSnapshotUpdatedEvent>(
+            &admin_snapshot_events,
+            1,
+            62,
+        );
+        let admin_snapshot_event = test_utils::last_event_ref(&admin_snapshot_events);
+        let (admin_event_admin, admin_event_hub, admin_snapshot) =
+            instances::snapshot_event_fields_for_test(admin_snapshot_event);
+        assert!(admin_event_admin == @0x123, 63);
+        assert!(admin_event_hub == @vrf_hub, 64);
+        let (
+            admin_snapshot_lottery,
+            _admin_owner,
+            _admin_lottery,
+            _admin_price,
+            _admin_share,
+            _admin_tickets,
+            _admin_jackpot,
+            admin_snapshot_active,
+        ) = instances::instance_snapshot_fields_for_test(&admin_snapshot);
+        assert!(admin_snapshot_lottery == lottery_id, 81);
+        assert!(admin_snapshot_active, 82);
+
+        let new_admin = account::create_signer_for_test(@0x123);
+        instances::set_hub(&new_admin, @0x456);
+        let hub_events = test_utils::drain_events<instances::HubAddressUpdatedEvent>();
+        test_utils::assert_len_eq<instances::HubAddressUpdatedEvent>(&hub_events, 1, 65);
+        let hub_event = *test_utils::last_event_ref(&hub_events);
+        let instances::HubAddressUpdatedEvent {
+            previous: hub_previous,
+            next: hub_next,
+        } = hub_event;
+        assert!(hub_previous == @vrf_hub, 66);
+        assert!(hub_next == @0x456, 67);
+
+        let hub_snapshot_events =
+            test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<instances::LotteryInstancesSnapshotUpdatedEvent>(
+            &hub_snapshot_events,
+            1,
+            68,
+        );
+        let hub_snapshot_event = test_utils::last_event_ref(&hub_snapshot_events);
+        let (hub_event_admin, hub_event_hub, hub_snapshot) =
+            instances::snapshot_event_fields_for_test(hub_snapshot_event);
+        assert!(hub_event_admin == @0x123, 69);
+        assert!(hub_event_hub == @0x456, 70);
+        let (
+            hub_snapshot_lottery,
+            _hub_owner,
+            _hub_lottery,
+            _hub_price,
+            _hub_share,
+            _hub_tickets,
+            _hub_jackpot,
+            hub_snapshot_active,
+        ) = instances::instance_snapshot_fields_for_test(&hub_snapshot);
+        assert!(hub_snapshot_lottery == lottery_id, 83);
+        assert!(hub_snapshot_active, 84);
         let snapshot_opt = instances::get_instances_snapshot();
         let snapshot = test_utils::unwrap(&mut snapshot_opt);
         let (admin_after, hub_after, _) = instances::instances_snapshot_fields_for_test(&snapshot);

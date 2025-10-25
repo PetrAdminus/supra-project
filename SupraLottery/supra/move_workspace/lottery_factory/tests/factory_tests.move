@@ -28,10 +28,39 @@ module lottery_factory::factory_tests {
         assert!(initial_admin == FACTORY_ADDR, 0);
         assert!(vector::length(&initial_entries) == 0, 1);
 
+        let snapshot_events_after_init =
+            event::emitted_events<registry::LotteryRegistrySnapshotUpdatedEvent>();
+        assert!(vector::length(&snapshot_events_after_init) == 1, 100);
+        let init_event = vector::borrow(&snapshot_events_after_init, 0);
+        let (init_event_admin, init_event_entries) =
+            registry::registry_snapshot_event_fields_for_test(init_event);
+        assert!(init_event_admin == FACTORY_ADDR, 101);
+        assert!(vector::length(&init_event_entries) == 0, 102);
+
         let blueprint = registry::new_blueprint(10, 100);
         let lottery_id = registry::create_lottery(&factory_signer, OWNER, LOTTERY_ADDR, blueprint, b"meta");
         assert!(lottery_id == 1, 0);
         assert!(hub::is_lottery_active(lottery_id), 0);
+
+        let planned_events = event::emitted_events<registry::LotteryPlannedEvent>();
+        assert!(vector::length(&planned_events) == 1, 103);
+        let planned_event = vector::borrow(&planned_events, 0);
+        let registry::LotteryPlannedEvent {
+            lottery_id: planned_id,
+            owner: planned_owner,
+        } = *planned_event;
+        assert!(planned_id == lottery_id, 104);
+        assert!(planned_owner == OWNER, 105);
+
+        let activated_events = event::emitted_events<registry::LotteryActivatedEvent>();
+        assert!(vector::length(&activated_events) == 1, 106);
+        let activated_event = vector::borrow(&activated_events, 0);
+        let registry::LotteryActivatedEvent {
+            lottery_id: activated_id,
+            lottery: activated_lottery,
+        } = *activated_event;
+        assert!(activated_id == lottery_id, 107);
+        assert!(activated_lottery == LOTTERY_ADDR, 108);
 
         let ids = registry::list_lottery_ids();
         assert!(vector::length(&ids) == 1, 2);
@@ -55,6 +84,28 @@ module lottery_factory::factory_tests {
         assert!(create_lottery == LOTTERY_ADDR, 8);
         assert!(create_price == 10, 9);
         assert!(create_share == 100, 10);
+
+        let snapshot_events_after_create =
+            event::emitted_events<registry::LotteryRegistrySnapshotUpdatedEvent>();
+        assert!(vector::length(&snapshot_events_after_create) == 2, 109);
+        let create_snapshot_event = vector::borrow(&snapshot_events_after_create, 1);
+        let (create_event_admin, create_event_entries) =
+            registry::registry_snapshot_event_fields_for_test(create_snapshot_event);
+        assert!(create_event_admin == FACTORY_ADDR, 110);
+        assert!(vector::length(&create_event_entries) == 1, 111);
+        let create_event_entry = vector::borrow(&create_event_entries, 0);
+        let (
+            create_event_id,
+            create_event_owner,
+            create_event_lottery,
+            create_event_price,
+            create_event_share,
+        ) = registry::registry_entry_fields_for_test(create_event_entry);
+        assert!(create_event_id == lottery_id, 112);
+        assert!(create_event_owner == OWNER, 113);
+        assert!(create_event_lottery == LOTTERY_ADDR, 114);
+        assert!(create_event_price == 10, 115);
+        assert!(create_event_share == 100, 116);
 
         let info_opt = registry::get_lottery(lottery_id);
         let info = option::destroy_some(info_opt);
@@ -85,6 +136,28 @@ module lottery_factory::factory_tests {
         assert!(updated_price == 25, 19);
         assert!(updated_share == 150, 20);
 
+        let snapshot_events_after_update =
+            event::emitted_events<registry::LotteryRegistrySnapshotUpdatedEvent>();
+        assert!(vector::length(&snapshot_events_after_update) == 3, 117);
+        let update_snapshot_event = vector::borrow(&snapshot_events_after_update, 2);
+        let (update_event_admin, update_event_entries) =
+            registry::registry_snapshot_event_fields_for_test(update_snapshot_event);
+        assert!(update_event_admin == FACTORY_ADDR, 118);
+        assert!(vector::length(&update_event_entries) == 1, 119);
+        let update_event_entry = vector::borrow(&update_event_entries, 0);
+        let (
+            update_event_id,
+            update_event_owner,
+            update_event_lottery,
+            update_event_price,
+            update_event_share,
+        ) = registry::registry_entry_fields_for_test(update_event_entry);
+        assert!(update_event_id == lottery_id, 120);
+        assert!(update_event_owner == OWNER, 121);
+        assert!(update_event_lottery == LOTTERY_ADDR, 122);
+        assert!(update_event_price == 25, 123);
+        assert!(update_event_share == 150, 124);
+
         let updated_opt = registry::get_lottery(lottery_id);
         let updated = option::destroy_some(updated_opt);
         let (_owner2, _lottery2, updated_price, updated_share) =
@@ -100,72 +173,27 @@ module lottery_factory::factory_tests {
         assert!(admin_after_change == OWNER, 23);
         assert!(vector::length(&entries_after_change) == 1, 24);
 
-        let snapshot_events = event::emitted_events<registry::LotteryRegistrySnapshotUpdatedEvent>();
-        let snapshot_events_len = vector::length(&snapshot_events);
-        if (snapshot_events_len >= 4) {
-            let init_event = vector::borrow(&snapshot_events, 0);
-            let (init_admin, init_entries) =
-                registry::registry_snapshot_event_fields_for_test(init_event);
-            assert!(init_admin == FACTORY_ADDR, 26);
-            assert!(vector::length(&init_entries) == 0, 27);
-
-            let create_event = vector::borrow(&snapshot_events, 1);
-            let (create_event_admin, create_event_entries) =
-                registry::registry_snapshot_event_fields_for_test(create_event);
-            assert!(create_event_admin == FACTORY_ADDR, 28);
-            assert!(vector::length(&create_event_entries) == 1, 29);
-            let create_event_entry = vector::borrow(&create_event_entries, 0);
-            let (
-                create_event_id,
-                create_event_owner,
-                create_event_lottery,
-                create_event_price,
-                create_event_share,
-            ) = registry::registry_entry_fields_for_test(create_event_entry);
-            assert!(create_event_id == lottery_id, 30);
-            assert!(create_event_owner == OWNER, 31);
-            assert!(create_event_lottery == LOTTERY_ADDR, 32);
-            assert!(create_event_price == 10, 33);
-            assert!(create_event_share == 100, 34);
-
-            let update_event = vector::borrow(&snapshot_events, 2);
-            let (update_event_admin, update_event_entries) =
-                registry::registry_snapshot_event_fields_for_test(update_event);
-            assert!(update_event_admin == FACTORY_ADDR, 35);
-            assert!(vector::length(&update_event_entries) == 1, 36);
-            let update_event_entry = vector::borrow(&update_event_entries, 0);
-            let (
-                update_event_id,
-                update_event_owner,
-                update_event_lottery,
-                update_event_price,
-                update_event_share,
-            ) = registry::registry_entry_fields_for_test(update_event_entry);
-            assert!(update_event_id == lottery_id, 37);
-            assert!(update_event_owner == OWNER, 38);
-            assert!(update_event_lottery == LOTTERY_ADDR, 39);
-            assert!(update_event_price == 25, 40);
-            assert!(update_event_share == 150, 41);
-
-            let admin_event = vector::borrow(&snapshot_events, 3);
-            let (admin_event_admin, admin_event_entries) =
-                registry::registry_snapshot_event_fields_for_test(admin_event);
-            assert!(admin_event_admin == OWNER, 42);
-            assert!(vector::length(&admin_event_entries) == 1, 43);
-            let admin_event_entry = vector::borrow(&admin_event_entries, 0);
-            let (
-                admin_event_id,
-                admin_event_owner,
-                admin_event_lottery,
-                admin_event_price,
-                admin_event_share,
-            ) = registry::registry_entry_fields_for_test(admin_event_entry);
-            assert!(admin_event_id == lottery_id, 44);
-            assert!(admin_event_owner == OWNER, 45);
-            assert!(admin_event_lottery == LOTTERY_ADDR, 46);
-            assert!(admin_event_price == 25, 47);
-            assert!(admin_event_share == 150, 48);
-        };
+        let snapshot_events_after_admin_change =
+            event::emitted_events<registry::LotteryRegistrySnapshotUpdatedEvent>();
+        assert!(vector::length(&snapshot_events_after_admin_change) == 4, 125);
+        let admin_snapshot_event = vector::borrow(&snapshot_events_after_admin_change, 3);
+        let (admin_event_admin, admin_event_entries) =
+            registry::registry_snapshot_event_fields_for_test(admin_snapshot_event);
+        assert!(admin_event_admin == OWNER, 126);
+        assert!(vector::length(&admin_event_entries) == 1, 127);
+        let admin_event_entry = vector::borrow(&admin_event_entries, 0);
+        let (
+            admin_event_id,
+            admin_event_owner,
+            admin_event_lottery,
+            admin_event_price,
+            admin_event_share,
+        ) = registry::registry_entry_fields_for_test(admin_event_entry);
+        assert!(admin_event_id == lottery_id, 128);
+        assert!(admin_event_owner == OWNER, 129);
+        assert!(admin_event_lottery == LOTTERY_ADDR, 130);
+        assert!(admin_event_price == 25, 131);
+        assert!(admin_event_share == 150, 132);
     }
 
     fun setup_accounts() {

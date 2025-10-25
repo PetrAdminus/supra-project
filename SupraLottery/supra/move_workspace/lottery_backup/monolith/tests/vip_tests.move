@@ -74,11 +74,52 @@ module lottery::vip_tests {
         instances::create_instance(lottery_admin, lottery_id);
         treasury_multi::upsert_lottery_config(lottery_admin, lottery_id, 7000, 2000, 1000);
 
+        let _ = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<vip::VipConfigUpdatedEvent>();
+        let _ = test_utils::drain_events<vip::VipSubscribedEvent>();
+        let _ = test_utils::drain_events<vip::VipCancelledEvent>();
+        let _ = test_utils::drain_events<vip::VipBonusIssuedEvent>();
+
         vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, VIP_BONUS_TICKETS);
-        let baseline = {
-            let events = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
-            test_utils::events_len(&events)
-        };
+        let config_events = test_utils::drain_events<vip::VipConfigUpdatedEvent>();
+        test_utils::assert_len_eq<vip::VipConfigUpdatedEvent>(&config_events, 1, 1500);
+        let config_event = *test_utils::last_event_ref(&config_events);
+        let vip::VipConfigUpdatedEvent {
+            lottery_id: config_lottery,
+            price: config_price,
+            duration_secs: config_duration,
+            bonus_tickets: config_bonus,
+        } = config_event;
+        assert!(config_lottery == lottery_id, 1501);
+        assert!(config_price == VIP_PRICE, 1502);
+        assert!(config_duration == VIP_DURATION, 1503);
+        assert!(config_bonus == VIP_BONUS_TICKETS, 1504);
+
+        let config_snapshot_events = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<vip::VipSnapshotUpdatedEvent>(&config_snapshot_events, 1, 1505);
+        let config_snapshot_event = test_utils::last_event_ref(&config_snapshot_events);
+        let (config_admin, config_snapshots) =
+            vip::vip_snapshot_event_fields_for_test(config_snapshot_event);
+        assert!(config_admin == signer::address_of(lottery_admin), 1506);
+        assert!(vector::length(&config_snapshots) == 1, 1507);
+        let config_snapshot_ref = vector::borrow(&config_snapshots, 0);
+        let (
+            config_snapshot_lottery,
+            config_snapshot_config,
+            config_members,
+            config_active,
+            config_revenue,
+            config_issued,
+        ) = vip::vip_lottery_snapshot_fields_for_test(config_snapshot_ref);
+        assert!(config_snapshot_lottery == lottery_id, 1508);
+        assert!(vip::vip_config_price(&config_snapshot_config) == VIP_PRICE, 1509);
+        assert!(vip::vip_config_duration_secs(&config_snapshot_config) == VIP_DURATION, 1510);
+        assert!(vip::vip_config_bonus_tickets(&config_snapshot_config) == VIP_BONUS_TICKETS, 1511);
+        assert!(config_members == 0, 1512);
+        assert!(config_active == 0, 1513);
+        assert!(config_revenue == 0, 1514);
+        assert!(config_issued == 0, 1515);
+
         let summary_before_opt = vip::get_lottery_summary(lottery_id);
         let summary_before = test_utils::unwrap(&mut summary_before_opt);
         let (_config_before, total_members, active_members, total_revenue, _) =
@@ -86,6 +127,7 @@ module lottery::vip_tests {
         assert!(total_members == 0, 0);
         assert!(active_members == 0, 1);
         assert!(total_revenue == 0, 2);
+
         let vip_snapshot_initial_opt = vip::get_vip_snapshot();
         let vip_snapshot_initial = test_utils::unwrap(&mut vip_snapshot_initial_opt);
         let (snapshot_admin_initial, lottery_snapshots_initial) =
@@ -108,6 +150,47 @@ module lottery::vip_tests {
 
         vip::subscribe(player, lottery_id);
         let player_addr = signer::address_of(player);
+        let subscribe_events = test_utils::drain_events<vip::VipSubscribedEvent>();
+        test_utils::assert_len_eq<vip::VipSubscribedEvent>(&subscribe_events, 1, 1516);
+        let subscribe_event = *test_utils::last_event_ref(&subscribe_events);
+        let vip::VipSubscribedEvent {
+            lottery_id: subscribed_lottery,
+            player: subscribed_player,
+            expiry_ts: subscribed_expiry,
+            bonus_tickets: subscribed_bonus,
+            amount_paid: subscribed_amount,
+            renewed: subscribed_renewed,
+        } = subscribe_event;
+        assert!(subscribed_lottery == lottery_id, 1517);
+        assert!(subscribed_player == player_addr, 1518);
+        assert!(subscribed_bonus == VIP_BONUS_TICKETS, 1519);
+        assert!(subscribed_amount == VIP_PRICE, 1520);
+        assert!(!subscribed_renewed, 1521);
+        assert!(subscribed_expiry > 0, 1522);
+
+        let subscribe_snapshot_events = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<vip::VipSnapshotUpdatedEvent>(&subscribe_snapshot_events, 1, 1523);
+        let subscribe_snapshot_event = test_utils::last_event_ref(&subscribe_snapshot_events);
+        let (subscribe_admin, subscribe_snapshots) =
+            vip::vip_snapshot_event_fields_for_test(subscribe_snapshot_event);
+        assert!(subscribe_admin == signer::address_of(lottery_admin), 1524);
+        assert!(vector::length(&subscribe_snapshots) == 1, 1525);
+        let subscribe_snapshot_ref = vector::borrow(&subscribe_snapshots, 0);
+        let (
+            subscribe_lottery_id,
+            subscribe_config,
+            subscribe_members,
+            subscribe_active,
+            subscribe_revenue,
+            subscribe_issued,
+        ) = vip::vip_lottery_snapshot_fields_for_test(subscribe_snapshot_ref);
+        assert!(subscribe_lottery_id == lottery_id, 1526);
+        assert!(vip::vip_config_price(&subscribe_config) == VIP_PRICE, 1527);
+        assert!(subscribe_members == 1, 1528);
+        assert!(subscribe_active == 1, 1529);
+        assert!(subscribe_revenue == VIP_PRICE, 1530);
+        assert!(subscribe_issued == 0, 1531);
+
         let subscription_opt = vip::get_subscription(lottery_id, player_addr);
         let subscription = test_utils::unwrap(&mut subscription_opt);
         let (_expiry, is_active, bonus_tickets) =
@@ -123,6 +206,40 @@ module lottery::vip_tests {
         assert!(operations_balance == VIP_PRICE, 6);
 
         rounds::buy_ticket(player, lottery_id);
+        let bonus_events = test_utils::drain_events<vip::VipBonusIssuedEvent>();
+        test_utils::assert_len_eq<vip::VipBonusIssuedEvent>(&bonus_events, 1, 1532);
+        let bonus_event = *test_utils::last_event_ref(&bonus_events);
+        let vip::VipBonusIssuedEvent {
+            lottery_id: bonus_lottery,
+            player: bonus_player,
+            bonus_tickets: bonus_amount,
+        } = bonus_event;
+        assert!(bonus_lottery == lottery_id, 1533);
+        assert!(bonus_player == player_addr, 1534);
+        assert!(bonus_amount == VIP_BONUS_TICKETS, 1535);
+
+        let bonus_snapshot_events = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<vip::VipSnapshotUpdatedEvent>(&bonus_snapshot_events, 1, 1536);
+        let bonus_snapshot_event = test_utils::last_event_ref(&bonus_snapshot_events);
+        let (bonus_admin, bonus_snapshots) =
+            vip::vip_snapshot_event_fields_for_test(bonus_snapshot_event);
+        assert!(bonus_admin == signer::address_of(lottery_admin), 1537);
+        assert!(vector::length(&bonus_snapshots) == 1, 1538);
+        let bonus_snapshot_ref = vector::borrow(&bonus_snapshots, 0);
+        let (
+            bonus_snapshot_lottery,
+            _bonus_config,
+            bonus_members,
+            bonus_active,
+            bonus_revenue,
+            bonus_issued,
+        ) = vip::vip_lottery_snapshot_fields_for_test(bonus_snapshot_ref);
+        assert!(bonus_snapshot_lottery == lottery_id, 1539);
+        assert!(bonus_members == 1, 1540);
+        assert!(bonus_active == 1, 1541);
+        assert!(bonus_revenue == VIP_PRICE, 1542);
+        assert!(bonus_issued == VIP_BONUS_TICKETS, 1543);
+
         let round_snapshot_opt = rounds::get_round_snapshot(lottery_id);
         let round_snapshot = test_utils::unwrap(&mut round_snapshot_opt);
         let (ticket_count, _, _, _, _) = rounds::round_snapshot_fields_for_test(&round_snapshot);
@@ -172,34 +289,8 @@ module lottery::vip_tests {
         assert!(revenue_latest == VIP_PRICE, 37);
         assert!(issued_latest == VIP_BONUS_TICKETS, 38);
 
-        let snapshot_events =
-            test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
-        test_utils::assert_grew_by<vip::VipSnapshotUpdatedEvent>(
-            baseline,
-            &snapshot_events,
-            0,
-            39,
-        );
-        if (vector::length(&snapshot_events) > 0) {
-            let last_event = test_utils::last_event_ref(&snapshot_events);
-            let (event_admin, event_snapshots) =
-                vip::vip_snapshot_event_fields_for_test(last_event);
-            assert!(event_admin == signer::address_of(lottery_admin), 40);
-            assert!(vector::length(&event_snapshots) == 1, 41);
-            let event_snapshot = vector::borrow(&event_snapshots, 0);
-            let (
-                _event_lottery_id,
-                _event_config,
-                members_event,
-                active_event,
-                revenue_event,
-                issued_event,
-            ) = vip::vip_lottery_snapshot_fields_for_test(event_snapshot);
-            assert!(members_event == 1, 42);
-            assert!(active_event == 1, 43);
-            assert!(revenue_event == VIP_PRICE, 44);
-            assert!(issued_event == VIP_BONUS_TICKETS, 45);
-        };
+        let snapshot_events = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<vip::VipSnapshotUpdatedEvent>(&snapshot_events, 0, 1544);
     }
 
     #[test(
@@ -223,17 +314,69 @@ module lottery::vip_tests {
         treasury_v1::register_store(recipient);
         treasury_v1::mint_to(lottery_admin, signer::address_of(recipient), 10_000);
 
-        vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, 1);
         let _ = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<vip::VipConfigUpdatedEvent>();
+        let _ = test_utils::drain_events<vip::VipSubscribedEvent>();
+        let _ = test_utils::drain_events<vip::VipCancelledEvent>();
+
+        vip::upsert_config(lottery_admin, lottery_id, VIP_PRICE, VIP_DURATION, 1);
+        let config_events = test_utils::drain_events<vip::VipConfigUpdatedEvent>();
+        test_utils::assert_len_eq<vip::VipConfigUpdatedEvent>(&config_events, 1, 1545);
+        let config_event = *test_utils::last_event_ref(&config_events);
+        let vip::VipConfigUpdatedEvent {
+            lottery_id: config_lottery,
+            price: config_price,
+            duration_secs: config_duration,
+            bonus_tickets: config_bonus,
+        } = config_event;
+        assert!(config_lottery == lottery_id, 1546);
+        assert!(config_price == VIP_PRICE, 1547);
+        assert!(config_duration == VIP_DURATION, 1548);
+        assert!(config_bonus == 1, 1549);
+
+        let config_snapshot_events = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<vip::VipSnapshotUpdatedEvent>(&config_snapshot_events, 1, 1550);
+        let config_snapshot_event = test_utils::last_event_ref(&config_snapshot_events);
+        let (config_admin, config_snapshots) =
+            vip::vip_snapshot_event_fields_for_test(config_snapshot_event);
+        assert!(config_admin == signer::address_of(lottery_admin), 1551);
+        assert!(vector::length(&config_snapshots) == 1, 1552);
 
         treasury_v1::mint_to(lottery_admin, signer::address_of(lottery_admin), VIP_PRICE * 10);
         vip::subscribe_for(lottery_admin, lottery_id, signer::address_of(recipient));
+        let subscribe_events = test_utils::drain_events<vip::VipSubscribedEvent>();
+        test_utils::assert_len_eq<vip::VipSubscribedEvent>(&subscribe_events, 1, 1553);
+        let subscribe_event = *test_utils::last_event_ref(&subscribe_events);
+        let vip::VipSubscribedEvent {
+            lottery_id: subscribed_lottery,
+            player: subscribed_player,
+            expiry_ts: subscribed_expiry,
+            bonus_tickets: subscribed_bonus,
+            amount_paid: subscribed_amount,
+            renewed: subscribed_renewed,
+        } = subscribe_event;
+        assert!(subscribed_lottery == lottery_id, 1554);
+        assert!(subscribed_player == signer::address_of(recipient), 1555);
+        assert!(subscribed_bonus == 1, 1556);
+        assert!(subscribed_amount == VIP_PRICE, 1557);
+        assert!(!subscribed_renewed, 1558);
+        assert!(subscribed_expiry > 0, 1559);
+
+        let subscribe_snapshot_events = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<vip::VipSnapshotUpdatedEvent>(&subscribe_snapshot_events, 1, 1560);
+        let subscribe_snapshot_event = test_utils::last_event_ref(&subscribe_snapshot_events);
+        let (subscribe_admin, subscribe_snapshots) =
+            vip::vip_snapshot_event_fields_for_test(subscribe_snapshot_event);
+        assert!(subscribe_admin == signer::address_of(lottery_admin), 1561);
+        assert!(vector::length(&subscribe_snapshots) == 1, 1562);
+
         let subscription_opt =
             vip::get_subscription(lottery_id, signer::address_of(recipient));
         let subscription = test_utils::unwrap(&mut subscription_opt);
         let (_expiry_before_cancel, is_active_before, _bonus_before) =
             vip::subscription_fields_for_test(&subscription);
         assert!(is_active_before, 12);
+
         let lottery_snapshot_before_cancel_opt =
             vip::get_lottery_snapshot(lottery_id);
         let lottery_snapshot_before_cancel =
@@ -252,15 +395,39 @@ module lottery::vip_tests {
         assert!(issued_before_cancel == 0, 17);
 
         vip::set_admin(lottery_admin, signer::address_of(gift_admin));
-        let _ = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
+        let admin_snapshot_events = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<vip::VipSnapshotUpdatedEvent>(&admin_snapshot_events, 1, 1563);
+        let admin_snapshot_event = test_utils::last_event_ref(&admin_snapshot_events);
+        let (admin_event_admin, _) =
+            vip::vip_snapshot_event_fields_for_test(admin_snapshot_event);
+        assert!(admin_event_admin == signer::address_of(gift_admin), 1564);
 
         vip::cancel_for(gift_admin, lottery_id, signer::address_of(recipient));
+        let cancelled_events = test_utils::drain_events<vip::VipCancelledEvent>();
+        test_utils::assert_len_eq<vip::VipCancelledEvent>(&cancelled_events, 1, 1565);
+        let cancelled_event = *test_utils::last_event_ref(&cancelled_events);
+        let vip::VipCancelledEvent {
+            lottery_id: cancelled_lottery,
+            player: cancelled_player,
+        } = cancelled_event;
+        assert!(cancelled_lottery == lottery_id, 1566);
+        assert!(cancelled_player == signer::address_of(recipient), 1567);
+
+        let cancel_snapshot_events = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<vip::VipSnapshotUpdatedEvent>(&cancel_snapshot_events, 1, 1568);
+        let cancel_snapshot_event = test_utils::last_event_ref(&cancel_snapshot_events);
+        let (cancel_admin, cancel_snapshots) =
+            vip::vip_snapshot_event_fields_for_test(cancel_snapshot_event);
+        assert!(cancel_admin == signer::address_of(gift_admin), 1569);
+        assert!(vector::length(&cancel_snapshots) == 1, 1570);
+
         let after_cancel_opt =
             vip::get_subscription(lottery_id, signer::address_of(recipient));
         let after_cancel = test_utils::unwrap(&mut after_cancel_opt);
         let (_expiry_after_cancel, is_active_after, _bonus_after) =
             vip::subscription_fields_for_test(&after_cancel);
         assert!(!is_active_after, 13);
+
         let lottery_snapshot_after_cancel_opt =
             vip::get_lottery_snapshot(lottery_id);
         let lottery_snapshot_after_cancel =
@@ -297,26 +464,7 @@ module lottery::vip_tests {
         assert!(vip_revenue_after_cancel == VIP_PRICE, 24);
         assert!(vip_issued_after_cancel == 0, 25);
 
-        let snapshot_events =
-            test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
-        if (vector::is_empty(&snapshot_events)) {
-            return;
-        };
-        let last_event = test_utils::last_event_ref(&snapshot_events);
-        let (_event_admin, event_snapshots) =
-            vip::vip_snapshot_event_fields_for_test(last_event);
-        assert!(vector::length(&event_snapshots) == 1, 27);
-        let event_entry = vector::borrow(&event_snapshots, 0);
-        let (
-            _event_lottery_id,
-            _event_config,
-            _event_members,
-            event_active_after_cancel,
-            event_revenue_after_cancel,
-            event_issued_after_cancel,
-        ) = vip::vip_lottery_snapshot_fields_for_test(event_entry);
-        assert!(event_active_after_cancel == 0, 28);
-        assert!(event_revenue_after_cancel == VIP_PRICE, 29);
-        assert!(event_issued_after_cancel == 0, 30);
+        let snapshot_events = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<vip::VipSnapshotUpdatedEvent>(&snapshot_events, 0, 1571);
     }
 }
