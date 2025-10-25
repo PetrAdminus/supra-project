@@ -60,6 +60,7 @@ module lottery_rewards::referrals_tests {
     ) {
         let _ = test_utils::drain_events<referrals::ReferralSnapshotUpdatedEvent>();
         setup_environment(vrf_admin, factory_admin, lottery_admin, buyer, referrer);
+        let _ = test_utils::drain_events<referrals::ReferralSnapshotUpdatedEvent>();
 
         let blueprint = registry::new_blueprint(100, 1500);
         let lottery_id = registry::create_lottery(
@@ -125,19 +126,70 @@ module lottery_rewards::referrals_tests {
 
         let snapshot_events =
             test_utils::drain_events<referrals::ReferralSnapshotUpdatedEvent>();
-        if (vector::is_empty(&snapshot_events)) {
-            return;
-        };
-        let latest_snapshot = test_utils::last_event_ref(&snapshot_events);
-        let latest_previous_opt =
-            referrals::referral_snapshot_event_previous_for_test(latest_snapshot);
-        assert!(option::is_some(&latest_previous_opt), 18);
-        let latest_snapshot_state =
-            referrals::referral_snapshot_event_current_for_test(latest_snapshot);
-        let latest_total_registered = referrals::referral_snapshot_total_registered(&latest_snapshot_state);
-        assert!(latest_total_registered == 1, 19);
-        let latest_count = referrals::referral_snapshot_lottery_count(&latest_snapshot_state);
-        assert!(latest_count == 1, 20);
+        test_utils::assert_len_eq<referrals::ReferralSnapshotUpdatedEvent>(
+            &snapshot_events,
+            3,
+            17,
+        );
+
+        let config_event = vector::borrow(&snapshot_events, 0);
+        let mut config_previous_opt =
+            referrals::referral_snapshot_event_previous_for_test(config_event);
+        let config_previous = test_utils::unwrap(&mut config_previous_opt);
+        assert!(referrals::referral_snapshot_total_registered(&config_previous) == 0, 18);
+        assert!(referrals::referral_snapshot_lottery_count(&config_previous) == 0, 19);
+        let config_current = referrals::referral_snapshot_event_current_for_test(config_event);
+        assert!(referrals::referral_snapshot_total_registered(&config_current) == 0, 20);
+        assert!(referrals::referral_snapshot_lottery_count(&config_current) == 1, 21);
+        let config_entry = referrals::referral_snapshot_lottery_at(&config_current, 0);
+        let (
+            config_lottery,
+            config_referrer_bps,
+            config_referee_bps,
+            config_rewarded,
+            config_total_referrer,
+            config_total_referee,
+        ) = referrals::lottery_referral_snapshot_fields_for_test(&config_entry);
+        assert!(config_lottery == lottery_id, 22);
+        assert!(config_referrer_bps == 800, 23);
+        assert!(config_referee_bps == 600, 24);
+        assert!(config_rewarded == 0, 25);
+        assert!(config_total_referrer == 0, 26);
+        assert!(config_total_referee == 0, 27);
+
+        let register_event = vector::borrow(&snapshot_events, 1);
+        let mut register_previous_opt =
+            referrals::referral_snapshot_event_previous_for_test(register_event);
+        let register_previous = test_utils::unwrap(&mut register_previous_opt);
+        assert!(referrals::referral_snapshot_total_registered(&register_previous) == 0, 28);
+        let register_current = referrals::referral_snapshot_event_current_for_test(register_event);
+        assert!(referrals::referral_snapshot_total_registered(&register_current) == 1, 29);
+        assert!(referrals::referral_snapshot_lottery_count(&register_current) == 1, 30);
+
+        let reward_event = vector::borrow(&snapshot_events, 2);
+        let mut reward_previous_opt =
+            referrals::referral_snapshot_event_previous_for_test(reward_event);
+        let reward_previous = test_utils::unwrap(&mut reward_previous_opt);
+        assert!(referrals::referral_snapshot_total_registered(&reward_previous) == 1, 31);
+        let reward_current = referrals::referral_snapshot_event_current_for_test(reward_event);
+        assert!(referrals::referral_snapshot_total_registered(&reward_current) == 1, 32);
+        let reward_count = referrals::referral_snapshot_lottery_count(&reward_current);
+        assert!(reward_count == 1, 33);
+        let reward_entry = referrals::referral_snapshot_lottery_at(&reward_current, 0);
+        let (
+            reward_lottery,
+            reward_referrer_bps,
+            reward_referee_bps,
+            reward_rewarded,
+            reward_total_referrer,
+            reward_total_referee,
+        ) = referrals::lottery_referral_snapshot_fields_for_test(&reward_entry);
+        assert!(reward_lottery == lottery_id, 34);
+        assert!(reward_referrer_bps == 800, 35);
+        assert!(reward_referee_bps == 600, 36);
+        assert!(reward_rewarded == 1, 37);
+        assert!(reward_total_referrer == 8, 38);
+        assert!(reward_total_referee == 6, 39);
     }
 
     #[test(

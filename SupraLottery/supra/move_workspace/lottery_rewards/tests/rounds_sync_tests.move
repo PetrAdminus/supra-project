@@ -98,11 +98,145 @@ module lottery_rewards::rounds_sync_tests {
         vip::subscribe(buyer, lottery_id);
         assert!(rounds::purchase_queue_length() == 0, 0);
 
+        // Очистка событий перед основной проверкой синхронизации.
+        let _ = test_utils::drain_events<vip::VipSubscribedEvent>();
+        let _ = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<vip::VipBonusIssuedEvent>();
+        let _ = test_utils::drain_events<referrals::ReferralSnapshotUpdatedEvent>();
+        let _ = test_utils::drain_events<referrals::ReferralRewardPaidEvent>();
+
         rounds::buy_ticket(buyer, lottery_id);
         assert!(rounds::purchase_queue_length() == 1, 1);
 
         rounds_sync::sync_purchases_from_rounds(lottery_admin, 0);
         assert!(rounds::purchase_queue_length() == 0, 2);
+
+        let bonus_events = test_utils::drain_events<vip::VipBonusIssuedEvent>();
+        test_utils::assert_len_eq<vip::VipBonusIssuedEvent>(&bonus_events, 1, 200);
+        let vip::VipBonusIssuedEvent {
+            lottery_id: bonus_lottery,
+            player: bonus_player,
+            bonus_tickets,
+        } = *test_utils::last_event_ref(&bonus_events);
+        assert!(bonus_lottery == lottery_id, 201);
+        assert!(bonus_player == buyer_addr, 202);
+        assert!(bonus_tickets == VIP_BONUS_TICKETS, 203);
+
+        let vip_snapshot_events = test_utils::drain_events<vip::VipSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<vip::VipSnapshotUpdatedEvent>(&vip_snapshot_events, 1, 204);
+        let vip_snapshot_event = test_utils::last_event_ref(&vip_snapshot_events);
+        let (vip_admin, vip_lottery_snapshots) =
+            vip::vip_snapshot_event_fields_for_test(vip_snapshot_event);
+        assert!(vip_admin == signer::address_of(lottery_admin), 205);
+        assert!(vector::length(&vip_lottery_snapshots) == 1, 206);
+        let vip_lottery_snapshot = vector::borrow(&vip_lottery_snapshots, 0);
+        let (
+            vip_snapshot_lottery,
+            vip_snapshot_config,
+            vip_snapshot_members,
+            vip_snapshot_active,
+            vip_snapshot_revenue,
+            vip_snapshot_bonus_issued,
+        ) = vip::vip_lottery_snapshot_fields_for_test(vip_lottery_snapshot);
+        assert!(vip_snapshot_lottery == lottery_id, 207);
+        let vip_snapshot_price = vip::vip_config_price(&vip_snapshot_config);
+        let vip_snapshot_duration = vip::vip_config_duration_secs(&vip_snapshot_config);
+        let vip_snapshot_bonus = vip::vip_config_bonus_tickets(&vip_snapshot_config);
+        assert!(vip_snapshot_price == VIP_PRICE, 208);
+        assert!(vip_snapshot_duration == VIP_DURATION, 209);
+        assert!(vip_snapshot_bonus == VIP_BONUS_TICKETS, 210);
+        assert!(vip_snapshot_members == 1, 211);
+        assert!(vip_snapshot_active == 1, 212);
+        assert!(vip_snapshot_revenue == VIP_PRICE, 213);
+        assert!(vip_snapshot_bonus_issued == VIP_BONUS_TICKETS, 214);
+
+        let referral_reward_events =
+            test_utils::drain_events<referrals::ReferralRewardPaidEvent>();
+        test_utils::assert_len_eq<referrals::ReferralRewardPaidEvent>(
+            &referral_reward_events,
+            1,
+            220,
+        );
+        let referrals::ReferralRewardPaidEvent {
+            lottery_id: reward_lottery,
+            buyer: reward_buyer,
+            referrer: reward_referrer,
+            referrer_amount,
+            referee_amount,
+            total_amount,
+        } = *test_utils::last_event_ref(&referral_reward_events);
+        let expected_referrer_reward =
+            TICKET_PRICE * REFERRER_BPS / BASIS_POINT_DENOMINATOR;
+        let expected_referee_reward =
+            TICKET_PRICE * REFEREE_BPS / BASIS_POINT_DENOMINATOR;
+        assert!(reward_lottery == lottery_id, 221);
+        assert!(reward_buyer == buyer_addr, 222);
+        assert!(reward_referrer == referrer_addr, 223);
+        assert!(referrer_amount == expected_referrer_reward, 224);
+        assert!(referee_amount == expected_referee_reward, 225);
+        assert!(total_amount == TICKET_PRICE, 226);
+
+        let referral_snapshot_events =
+            test_utils::drain_events<referrals::ReferralSnapshotUpdatedEvent>();
+        test_utils::assert_len_eq<referrals::ReferralSnapshotUpdatedEvent>(
+            &referral_snapshot_events,
+            1,
+            227,
+        );
+        let referral_snapshot_event = test_utils::last_event_ref(&referral_snapshot_events);
+        let mut previous_opt =
+            referrals::referral_snapshot_event_previous_for_test(referral_snapshot_event);
+        assert!(option::is_some(&previous_opt), 228);
+        let previous_snapshot = test_utils::unwrap(&mut previous_opt);
+        assert!(
+            referrals::referral_snapshot_total_registered(&previous_snapshot) == 1,
+            229,
+        );
+        let previous_lottery_snapshot =
+            referrals::referral_snapshot_lottery_at(&previous_snapshot, 0);
+        let (
+            _prev_lottery_id,
+            _prev_referrer_bps,
+            _prev_referee_bps,
+            prev_rewarded_purchases,
+            prev_referrer_rewards,
+            prev_referee_rewards,
+        ) = referrals::lottery_referral_snapshot_fields_for_test(&previous_lottery_snapshot);
+        assert!(prev_rewarded_purchases == 0, 230);
+        assert!(prev_referrer_rewards == 0, 231);
+        assert!(prev_referee_rewards == 0, 232);
+
+        let referral_snapshot_current =
+            referrals::referral_snapshot_event_current_for_test(referral_snapshot_event);
+        assert!(
+            referrals::referral_snapshot_admin(&referral_snapshot_current)
+                == signer::address_of(lottery_admin),
+            233,
+        );
+        assert!(
+            referrals::referral_snapshot_total_registered(&referral_snapshot_current) == 1,
+            234,
+        );
+        assert!(
+            referrals::referral_snapshot_lottery_count(&referral_snapshot_current) == 1,
+            235,
+        );
+        let referral_lottery_snapshot =
+            referrals::referral_snapshot_lottery_at(&referral_snapshot_current, 0);
+        let (
+            snapshot_lottery_id,
+            snapshot_referrer_bps,
+            snapshot_referee_bps,
+            snapshot_rewarded_purchases,
+            snapshot_total_referrer,
+            snapshot_total_referee,
+        ) = referrals::lottery_referral_snapshot_fields_for_test(&referral_lottery_snapshot);
+        assert!(snapshot_lottery_id == lottery_id, 236);
+        assert!(snapshot_referrer_bps == REFERRER_BPS, 237);
+        assert!(snapshot_referee_bps == REFEREE_BPS, 238);
+        assert!(snapshot_rewarded_purchases == 1, 239);
+        assert!(snapshot_total_referrer == expected_referrer_reward, 240);
+        assert!(snapshot_total_referee == expected_referee_reward, 241);
 
         let vip_snapshot_opt = vip::get_lottery_snapshot(lottery_id);
         assert!(option::is_some(&vip_snapshot_opt), 3);
@@ -122,10 +256,6 @@ module lottery_rewards::rounds_sync_tests {
         let stats_ref = option::borrow(&stats_opt);
         let (rewarded, total_referrer_rewards, total_referee_rewards) =
             referrals::referral_stats_for_test(stats_ref);
-        let expected_referrer_reward =
-            TICKET_PRICE * REFERRER_BPS / BASIS_POINT_DENOMINATOR;
-        let expected_referee_reward =
-            TICKET_PRICE * REFEREE_BPS / BASIS_POINT_DENOMINATOR;
         assert!(rewarded == 1, 6);
         assert!(total_referrer_rewards == expected_referrer_reward, 7);
         assert!(total_referee_rewards == expected_referee_reward, 8);
