@@ -23,11 +23,14 @@ docker compose run --rm --entrypoint bash supra_cli `
 ```
 - [x] Supplementary loop run to compile `lottery_factory`, `vrf_hub`, and `SupraVrf` with the same toolchain.
 - [x] Verify `build/` directories are produced without errors.
-- [ ] Run unit tests for each package:
+- [x] Run unit tests for each package:
   ```bash
-  python -m supra.scripts.cli move-test --workspace supra/move_workspace --package lottery_core
-  python -m supra.scripts.cli move-test --workspace supra/move_workspace --package lottery_support
-  python -m supra.scripts.cli move-test --workspace supra/move_workspace --package lottery_rewards
+  docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+    -lc "cd /supra/SupraLottery && PYTHONPATH=/supra/SupraLottery python3 -m supra.scripts.cli move-test --workspace /supra/move_workspace --package lottery_core --cli /supra/supra"
+  docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+    -lc "cd /supra/SupraLottery && PYTHONPATH=/supra/SupraLottery python3 -m supra.scripts.cli move-test --workspace /supra/move_workspace --package lottery_support --cli /supra/supra"
+  docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+    -lc "cd /supra/SupraLottery && PYTHONPATH=/supra/SupraLottery python3 -m supra.scripts.cli move-test --workspace /supra/move_workspace --package lottery_rewards --cli /supra/supra"
   ```
 
 ## 2. Publish
