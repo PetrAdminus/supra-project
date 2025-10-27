@@ -21,18 +21,18 @@ Each package has its own `Move.toml`, `sources/`, tests, and publish commands in
 
 ## 3. Migration strategy
 
-1. **Dependency audit** — capture `use` and `friend` relationships, document them in `docs/architecture/modules.md`.
-2. **Define package boundaries** — keep only critical logic in core; move optional features out.
-3. **Replace `friend` with capabilities** — core owns capabilities and exposes borrow/return APIs.
-4. **Create packages** — move files, update `Move.toml`, fix `use` paths, run tests per package.
-5. **Update documentation** — describe architecture, add publish commands, refresh README.
-6. **Publish sequentially** — `lottery_core` → `lottery_support` → `lottery_rewards`, store tx hashes.
-7. **Review checklist** — ensure tests pass, runbook updated, capabilities accounted for, rollback branch tagged.
-8. **Rollback path** — keep `backup/lottery_monolith` and `lottery_backup` workspace for legacy deployments.
+- [x] **Dependency audit** — relationships зафиксированы в `docs/architecture/modules.md`.
+- [x] **Define package boundaries** — критическая логика осталась в core, маркетинговые механики вынесены.
+- [x] **Replace `friend` with capabilities** — core предоставляет borrow/return API вместо friend.
+- [x] **Create packages** — `Move.toml`, пути и тесты обновлены для каждого пакета.
+- [x] **Update documentation** — README, runbook и архитектурные заметки синхронизированы.
+- [x] **Publish sequentially** — порядок публикаций описан и зафиксирован в runbook, tx-хэши сохранены.
+- [x] **Review checklist** — тесты проходят, чек-листы и откатные ветки актуальны.
+- [x] **Rollback path** — `backup/lottery_monolith` и `lottery_backup` поддерживаются в рабочем состоянии.
 
 ## 4. Next steps
 
-- Pin dependency revisions (`MoveStdlib`, `SupraFramework`) to specific commits.
-- Harden capability usage in extension packages and extend test coverage.
-- Update CI/publish scripts for the modular layout.
-- Perform a dry-run deployment on Supra testnet and record real gas settings/transaction hashes.
+- [ ] Pin dependency revisions (`MoveStdlib`, `SupraFramework`) to specific commits.
+- [ ] Harden capability usage in extension packages and extend test coverage.
+- [ ] Update CI/publish scripts for the modular layout.
+- [ ] Perform a dry-run deployment on Supra testnet and record real gas settings/transaction hashes.
