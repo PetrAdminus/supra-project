@@ -1,5 +1,5 @@
 #[test_only]
-module lottery_rewards::test_utils {
+module lottery_rewards::rewards_test_utils {
     use lottery_core::instances;
     use lottery_core::rounds;
     use lottery_core::treasury_multi;

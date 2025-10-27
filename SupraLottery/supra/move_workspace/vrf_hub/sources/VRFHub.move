@@ -459,6 +459,46 @@ module vrf_hub::hub {
         )
     }
 
+    #[test_only]
+    public fun lottery_registered_event_fields_for_test(
+        event: &LotteryRegisteredEvent
+    ): (u64, address, address) {
+        (event.lottery_id, event.owner, event.lottery)
+    }
+
+    #[test_only]
+    public fun lottery_metadata_event_fields_for_test(
+        event: &LotteryMetadataUpdatedEvent
+    ): (u64, vector<u8>) {
+        (event.lottery_id, clone_bytes(&event.metadata))
+    }
+
+    #[test_only]
+    public fun lottery_status_event_fields_for_test(
+        event: &LotteryStatusChangedEvent
+    ): (u64, bool) {
+        (event.lottery_id, event.active)
+    }
+
+    #[test_only]
+    public fun randomness_requested_event_fields_for_test(
+        event: &RandomnessRequestedEvent
+    ): (u64, u64, vector<u8>, vector<u8>) {
+        (
+            event.request_id,
+            event.lottery_id,
+            clone_bytes(&event.payload),
+            clone_bytes(&event.payload_hash),
+        )
+    }
+
+    #[test_only]
+    public fun randomness_fulfilled_event_fields_for_test(
+        event: &RandomnessFulfilledEvent
+    ): (u64, u64, vector<u8>) {
+        (event.request_id, event.lottery_id, clone_bytes(&event.randomness))
+    }
+
 
     public fun ensure_callback_sender(caller: &signer) acquires HubState {
         ensure_initialized();

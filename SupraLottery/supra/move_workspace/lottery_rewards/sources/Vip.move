@@ -425,6 +425,46 @@ module lottery_rewards::vip {
         vip_snapshot_fields_for_test(&event.snapshot)
     }
 
+    #[test_only]
+    public fun vip_config_event_fields_for_test(
+        event: &VipConfigUpdatedEvent
+    ): (u64, u64, u64, u64) {
+        (
+            event.lottery_id,
+            event.price,
+            event.duration_secs,
+            event.bonus_tickets,
+        )
+    }
+
+    #[test_only]
+    public fun vip_subscribed_event_fields_for_test(
+        event: &VipSubscribedEvent
+    ): (u64, address, u64, u64, u64, bool) {
+        (
+            event.lottery_id,
+            event.player,
+            event.expiry_ts,
+            event.bonus_tickets,
+            event.amount_paid,
+            event.renewed,
+        )
+    }
+
+    #[test_only]
+    public fun vip_bonus_event_fields_for_test(
+        event: &VipBonusIssuedEvent
+    ): (u64, address, u64) {
+        (event.lottery_id, event.player, event.bonus_tickets)
+    }
+
+    #[test_only]
+    public fun vip_cancelled_event_fields_for_test(
+        event: &VipCancelledEvent
+    ): (u64, address) {
+        (event.lottery_id, event.player)
+    }
+
     public fun ensure_caps_initialized(admin: &signer) {
         ensure_caps_admin(admin);
         if (exists<VipAccess>(@lottery)) {

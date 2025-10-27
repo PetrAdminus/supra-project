@@ -4,12 +4,30 @@ module lottery_rewards::multi_treasury_scope_tests {
     use lottery_rewards::jackpot;
     use lottery_rewards::referrals;
     use lottery_rewards::store;
-    use lottery_rewards::test_utils;
+    use lottery_rewards::rewards_test_utils as test_utils;
     use lottery_rewards::vip;
 
     #[test(admin = @lottery, factory = @lottery_factory, vrf = @vrf_hub)]
     fun scopes_are_isolated(admin: &signer, factory: &signer, vrf: &signer) {
         test_utils::bootstrap_multi_treasury(admin, factory, vrf);
+        if (!store::is_initialized()) {
+            store::init(admin);
+        };
+        if (store::caps_ready()) {
+            store::release_caps(admin);
+        };
+        if (!referrals::is_initialized()) {
+            referrals::init(admin);
+        };
+        if (referrals::caps_ready()) {
+            referrals::release_caps(admin);
+        };
+        if (!vip::is_initialized()) {
+            vip::init(admin);
+        };
+        if (vip::caps_ready()) {
+            vip::release_caps(admin);
+        };
 
         assert!(jackpot::scope_id() == treasury_multi::scope_jackpot(), 0);
         assert!(referrals::scope_id() == treasury_multi::scope_referrals(), 1);
@@ -70,7 +88,8 @@ module lottery_rewards::multi_treasury_scope_tests {
     fun cannot_double_borrow_same_scope(admin: &signer, factory: &signer, vrf: &signer) {
         test_utils::bootstrap_multi_treasury(admin, factory, vrf);
         jackpot::ensure_caps_initialized(admin);
-        let _ = treasury_multi::borrow_multi_treasury_cap(admin, jackpot::scope_id());
+        let cap = treasury_multi::borrow_multi_treasury_cap(admin, jackpot::scope_id());
+        treasury_multi::return_multi_treasury_cap(admin, cap);
         let _ = vrf;
     }
 }

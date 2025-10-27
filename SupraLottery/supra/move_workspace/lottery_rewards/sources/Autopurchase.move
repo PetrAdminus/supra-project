@@ -579,6 +579,55 @@ module lottery_rewards::autopurchase {
         (event.admin, copy_lottery_snapshot(&event.snapshot))
     }
 
+    #[test_only]
+    public fun config_event_fields_for_test(
+        event: &AutopurchaseConfigUpdatedEvent,
+    ): (u64, address, u64, bool) {
+        (
+            event.lottery_id,
+            event.player,
+            event.tickets_per_draw,
+            event.active,
+        )
+    }
+
+    #[test_only]
+    public fun deposit_event_fields_for_test(
+        event: &AutopurchaseDepositEvent,
+    ): (u64, address, u64, u64) {
+        (
+            event.lottery_id,
+            event.player,
+            event.amount,
+            event.new_balance,
+        )
+    }
+
+    #[test_only]
+    public fun executed_event_fields_for_test(
+        event: &AutopurchaseExecutedEvent,
+    ): (u64, address, u64, u64, u64) {
+        (
+            event.lottery_id,
+            event.player,
+            event.tickets_bought,
+            event.spent_amount,
+            event.remaining_balance,
+        )
+    }
+
+    #[test_only]
+    public fun refunded_event_fields_for_test(
+        event: &AutopurchaseRefundedEvent,
+    ): (u64, address, u64, u64) {
+        (
+            event.lottery_id,
+            event.player,
+            event.amount,
+            event.remaining_balance,
+        )
+    }
+
     fun copy_u64_vector(values: &vector<u64>): vector<u64> {
         let out = vector::empty<u64>();
         let len = vector::length(values);

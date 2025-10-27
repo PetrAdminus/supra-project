@@ -23,11 +23,8 @@ module vrf_hub::hub_tests {
         let registered_events = event::emitted_events<hub::LotteryRegisteredEvent>();
         assert!(vector::length(&registered_events) == 1, 1);
         let register_event = vector::borrow(&registered_events, 0);
-        let hub::LotteryRegisteredEvent {
-            lottery_id: register_id,
-            owner: register_owner,
-            lottery: register_lottery,
-        } = *register_event;
+        let (register_id, register_owner, register_lottery) =
+            hub::lottery_registered_event_fields_for_test(register_event);
         assert!(register_id == id, 2);
         assert!(register_owner == OWNER, 3);
         assert!(register_lottery == LOTTERY_ADDR, 4);
@@ -35,10 +32,8 @@ module vrf_hub::hub_tests {
         let metadata_events = event::emitted_events<hub::LotteryMetadataUpdatedEvent>();
         assert!(vector::length(&metadata_events) == 1, 5);
         let metadata_event = vector::borrow(&metadata_events, 0);
-        let hub::LotteryMetadataUpdatedEvent {
-            lottery_id: metadata_event_id,
-            metadata: metadata_bytes,
-        } = *metadata_event;
+        let (metadata_event_id, metadata_bytes) =
+            hub::lottery_metadata_event_fields_for_test(metadata_event);
         assert!(metadata_event_id == id, 6);
         assert!(vector::length(&metadata_bytes) == 4, 7);
 
@@ -74,10 +69,8 @@ module vrf_hub::hub_tests {
         let status_events = event::emitted_events<hub::LotteryStatusChangedEvent>();
         assert!(vector::length(&status_events) == 1, 8);
         let status_event = vector::borrow(&status_events, 0);
-        let hub::LotteryStatusChangedEvent {
-            lottery_id: status_lottery,
-            active: status_active,
-        } = *status_event;
+        let (status_lottery, status_active) =
+            hub::lottery_status_event_fields_for_test(status_event);
         assert!(status_lottery == id, 9);
         assert!(!status_active, 10);
 
@@ -93,10 +86,8 @@ module vrf_hub::hub_tests {
             event::emitted_events<hub::LotteryMetadataUpdatedEvent>();
         assert!(vector::length(&metadata_events_after_update) == 2, 11);
         let metadata_update_event = vector::borrow(&metadata_events_after_update, 1);
-        let hub::LotteryMetadataUpdatedEvent {
-            lottery_id: update_event_id,
-            metadata: update_bytes,
-        } = *metadata_update_event;
+        let (update_event_id, update_bytes) =
+            hub::lottery_metadata_event_fields_for_test(metadata_update_event);
         assert!(update_event_id == id, 12);
         assert!(vector::length(&update_bytes) == 4, 13);
         assert!(*vector::borrow(&update_bytes, 0) == 100, 14);
@@ -115,12 +106,8 @@ module vrf_hub::hub_tests {
         let requested_events = event::emitted_events<hub::RandomnessRequestedEvent>();
         assert!(vector::length(&requested_events) == 1, 15);
         let requested_event = vector::borrow(&requested_events, 0);
-        let hub::RandomnessRequestedEvent {
-            request_id: event_request_id,
-            lottery_id: event_lottery_id,
-            payload: event_payload,
-            payload_hash: event_hash,
-        } = *requested_event;
+        let (event_request_id, event_lottery_id, event_payload, event_hash) =
+            hub::randomness_requested_event_fields_for_test(requested_event);
         assert!(event_request_id == request_id, 16);
         assert!(event_lottery_id == lottery_id, 17);
         assert!(vector::length(&event_payload) == 7, 18);
@@ -153,11 +140,8 @@ module vrf_hub::hub_tests {
         let fulfilled_events = event::emitted_events<hub::RandomnessFulfilledEvent>();
         assert!(vector::length(&fulfilled_events) == 1, 20);
         let fulfilled_event = vector::borrow(&fulfilled_events, 0);
-        let hub::RandomnessFulfilledEvent {
-            request_id: fulfilled_request_id,
-            lottery_id: fulfilled_lottery_id,
-            randomness: fulfilled_randomness,
-        } = *fulfilled_event;
+        let (fulfilled_request_id, fulfilled_lottery_id, fulfilled_randomness) =
+            hub::randomness_fulfilled_event_fields_for_test(fulfilled_event);
         assert!(fulfilled_request_id == request_id, 21);
         assert!(fulfilled_lottery_id == lottery_id, 22);
         assert!(vector::length(&fulfilled_randomness) == 6, 23);

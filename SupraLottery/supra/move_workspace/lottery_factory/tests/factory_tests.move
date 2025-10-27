@@ -45,20 +45,16 @@ module lottery_factory::factory_tests {
         let planned_events = event::emitted_events<registry::LotteryPlannedEvent>();
         assert!(vector::length(&planned_events) == 1, 103);
         let planned_event = vector::borrow(&planned_events, 0);
-        let registry::LotteryPlannedEvent {
-            lottery_id: planned_id,
-            owner: planned_owner,
-        } = *planned_event;
+        let (planned_id, planned_owner) =
+            registry::lottery_planned_event_fields_for_test(planned_event);
         assert!(planned_id == lottery_id, 104);
         assert!(planned_owner == OWNER, 105);
 
         let activated_events = event::emitted_events<registry::LotteryActivatedEvent>();
         assert!(vector::length(&activated_events) == 1, 106);
         let activated_event = vector::borrow(&activated_events, 0);
-        let registry::LotteryActivatedEvent {
-            lottery_id: activated_id,
-            lottery: activated_lottery,
-        } = *activated_event;
+        let (activated_id, activated_lottery) =
+            registry::lottery_activated_event_fields_for_test(activated_event);
         assert!(activated_id == lottery_id, 107);
         assert!(activated_lottery == LOTTERY_ADDR, 108);
 

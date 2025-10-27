@@ -628,6 +628,20 @@ module lottery_rewards::referrals {
     }
 
     #[test_only]
+    public fun referral_reward_event_fields_for_test(
+        event: &ReferralRewardPaidEvent,
+    ): (u64, address, address, u64, u64, u64) {
+        (
+            event.lottery_id,
+            event.buyer,
+            event.referrer,
+            event.referrer_amount,
+            event.referee_amount,
+            event.total_amount,
+        )
+    }
+
+    #[test_only]
     public fun referral_snapshot_admin(snapshot: &ReferralSnapshot): address {
         snapshot.admin
     }

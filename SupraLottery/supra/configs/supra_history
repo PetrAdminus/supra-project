@@ -2615,3 +2615,195 @@ Output:
 General: {
   "Error": "Move unit tests failed"
 }
+Local: (2025-10-25 10:09:51.067403041 +00:00)	 Utc: (2025-10-25 10:09:51.067761089 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery_core': While resolving dependency 'MoveStdlib' in package 'lottery_core': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-25 10:30:08.515843075 +00:00)	 Utc: (2025-10-25 10:30:08.515900466 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}
+Local: (2025-10-25 10:36:18.216767533 +00:00)	 Utc: (2025-10-25 10:36:18.216831598 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}
+Local: (2025-10-25 10:47:58.777695549 +00:00)	 Utc: (2025-10-25 10:47:58.777758822 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}
+Local: (2025-10-25 10:59:50.030607865 +00:00)	 Utc: (2025-10-25 10:59:50.030671279 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}
+Local: (2025-10-25 11:05:38.966582246 +00:00)	 Utc: (2025-10-25 11:05:38.966642523 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}
+Local: (2025-10-25 11:17:44.419259006 +00:00)	 Utc: (2025-10-25 11:17:44.419339823 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}
+Local: (2025-10-25 11:23:41.917400108 +00:00)	 Utc: (2025-10-25 11:23:41.917459103 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}
+Local: (2025-10-25 11:55:42.491608036 +00:00)	 Utc: (2025-10-25 11:55:42.491672141 UTC)
+
+CMD:
+Test
+Output:
+{
+  "Result": "Success"
+}
+
+
+Local: (2025-10-25 12:36:16.038900981 +00:00)	 Utc: (2025-10-25 12:36:16.038961890 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}
+Local: (2025-10-27 08:48:14.153255716 +00:00)	 Utc: (2025-10-27 08:48:14.153316136 UTC)
+
+CMD:
+Test
+Output:
+{
+  "Result": "Success"
+}
+
+
+Local: (2025-10-27 08:57:02.715141640 +00:00)	 Utc: (2025-10-27 08:57:02.715204102 UTC)
+
+CMD:
+Test
+Output:
+{
+  "Result": "Success"
+}
+
+
+Local: (2025-10-27 10:02:28.233707014 +00:00)	 Utc: (2025-10-27 10:02:28.233750699 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery_support': While resolving dependency 'MoveStdlib' in package 'lottery_support': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-27 10:08:43.042624728 +00:00)	 Utc: (2025-10-27 10:08:43.042654857 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery_support': While resolving dependency 'MoveStdlib' in package 'lottery_support': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-27 10:23:43.580449856 +00:00)	 Utc: (2025-10-27 10:23:43.580498491 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery_rewards': While resolving dependency 'MoveStdlib' in package 'lottery_rewards': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-27 10:34:01.195816603 +00:00)	 Utc: (2025-10-27 10:34:01.195887030 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}
+Local: (2025-10-27 10:36:30.205317076 +00:00)	 Utc: (2025-10-27 10:36:30.205373856 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}
+Local: (2025-10-27 10:57:48.396489517 +00:00)	 Utc: (2025-10-27 10:57:48.396530817 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery_rewards': While resolving dependency 'MoveStdlib' in package 'lottery_rewards': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-27 10:58:43.305243772 +00:00)	 Utc: (2025-10-27 10:58:43.305308167 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}
+Local: (Local: (22002255--1100--2277  1212:3:32:2:5577.0.73650564 0+073656561 +000:0:00)	 Utc: (020)	 Utc: (2250-215-01-027- 2172 1:32:23:527:.570.74058986 0UTC74068049)
+ UTC
+)
+CMD:
+
+TestCMD:
+
+Output:
+TestGeneral: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery_rewards': While resolving dependency 'MoveStdlib' in package 'lottery_rewards': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Output:
+
+General: {
+  "Error": "Unexpected error: Failed to run tests: Unable to resolve packages for package 'lottery_rewards': While resolving dependency 'MoveStdlib' in package 'lottery_rewards': While processing dependency 'MoveStdlib': Unable to find package manifest for 'MoveStdlib' at \"/root/.move/https___github_com_Entropy-Foundation_aptos-core_git_7d1e62c9a5394a279a73515a150e880200640f06/aptos-move/framework/move-stdlib\""
+}
+Local: (2025-10-27 12:33:52.389795199 +00:00)	 Utc: (2025-10-27 12:33:52.389855266 UTC)
+
+CMD:
+Test
+Output:
+General: {
+  "Error": "Move unit tests failed"
+}
+Local: (2025-10-27 13:08:55.629841803 +00:00)	 Utc: (2025-10-27 13:08:55.629905427 UTC)
+
+CMD:
+Test
+Output:
+{
+  "Result": "Success"
+}
+
+

@@ -577,6 +577,30 @@ module lottery_core::instances {
     }
 
     #[test_only]
+    public fun blueprint_event_fields_for_test(
+        event: &LotteryInstanceBlueprintSyncedEvent,
+    ): (u64, u64, u16) {
+        (event.lottery_id, event.ticket_price, event.jackpot_share_bps)
+    }
+
+    #[test_only]
+    public fun status_event_fields_for_test(
+        event: &LotteryInstanceStatusUpdatedEvent,
+    ): (u64, bool) {
+        (event.lottery_id, event.active)
+    }
+
+    #[test_only]
+    public fun admin_event_fields_for_test(event: &AdminUpdatedEvent): (address, address) {
+        (event.previous, event.next)
+    }
+
+    #[test_only]
+    public fun hub_event_fields_for_test(event: &HubAddressUpdatedEvent): (address, address) {
+        (event.previous, event.next)
+    }
+
+    #[test_only]
     public fun instance_stats_fields_for_test(stats: &InstanceStats): (u64, u64, bool) {
         (stats.tickets_sold, stats.jackpot_accumulated, stats.active)
     }

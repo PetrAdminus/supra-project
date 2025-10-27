@@ -299,6 +299,20 @@ module lottery_factory::registry {
         )
     }
 
+    #[test_only]
+    public fun lottery_planned_event_fields_for_test(
+        event: &LotteryPlannedEvent
+    ): (u64, address) {
+        (event.lottery_id, event.owner)
+    }
+
+    #[test_only]
+    public fun lottery_activated_event_fields_for_test(
+        event: &LotteryActivatedEvent
+    ): (u64, address) {
+        (event.lottery_id, event.lottery)
+    }
+
     fun ensure_admin(caller: &signer) acquires FactoryState {
         ensure_initialized();
         let addr = signer::address_of(caller);

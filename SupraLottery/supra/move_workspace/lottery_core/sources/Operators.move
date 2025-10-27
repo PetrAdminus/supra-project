@@ -305,6 +305,20 @@ module lottery_core::operators {
         )
     }
 
+    #[test_only]
+    public fun operator_granted_event_fields_for_test(
+        event: &OperatorGrantedEvent
+    ): (u64, address, address) {
+        (event.lottery_id, event.operator, event.granted_by)
+    }
+
+    #[test_only]
+    public fun operator_revoked_event_fields_for_test(
+        event: &OperatorRevokedEvent
+    ): (u64, address, address) {
+        (event.lottery_id, event.operator, event.revoked_by)
+    }
+
     public fun ensure_authorized(caller: &signer, lottery_id: u64) acquires LotteryOperators {
         if (!can_manage(lottery_id, signer::address_of(caller))) {
             abort E_NOT_AUTHORIZED

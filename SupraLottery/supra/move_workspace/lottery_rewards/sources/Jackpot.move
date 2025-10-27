@@ -454,6 +454,42 @@ module lottery_rewards::jackpot {
         (event.previous, event.current)
     }
 
+    #[test_only]
+    public fun jackpot_ticket_event_fields_for_test(
+        event: &JackpotTicketGrantedEvent
+    ): (u64, address, u64) {
+        (event.lottery_id, event.player, event.ticket_index)
+    }
+
+    #[test_only]
+    public fun jackpot_schedule_event_fields_for_test(
+        event: &JackpotScheduleUpdatedEvent
+    ): (u64, bool) {
+        (event.lottery_id, event.draw_scheduled)
+    }
+
+    #[test_only]
+    public fun jackpot_request_event_fields_for_test(
+        event: &JackpotRequestIssuedEvent
+    ): (u64, u64) {
+        (event.lottery_id, event.request_id)
+    }
+
+    #[test_only]
+    public fun jackpot_fulfilled_event_fields_for_test(
+        event: &JackpotFulfilledEvent
+    ): (u64, u64, address, u64, vector<u8>, u64, vector<u8>) {
+        (
+            event.request_id,
+            event.lottery_id,
+            event.winner,
+            event.ticket_index,
+            clone_bytes(&event.random_bytes),
+            event.prize_amount,
+            clone_bytes(&event.payload),
+        )
+    }
+
     fun emit_snapshot_event(
         state: &mut JackpotState,
         previous: option::Option<JackpotSnapshot>,
