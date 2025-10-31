@@ -1,8 +1,8 @@
 #[test_only]
-module lottery_core::rounds_queue_tests {
-    use lottery_core::rounds;
+module lottery_core::core_rounds_queue_tests {
+    use lottery_core::core_rounds as rounds;
     use lottery_core::test_utils;
-    use lottery_core::treasury_v1;
+    use lottery_core::core_treasury_v1 as treasury_v1;
     use std::option;
     use std::signer;
     use std::vector;
@@ -71,3 +71,4 @@ module lottery_core::rounds_queue_tests {
         );
     }
 }
+

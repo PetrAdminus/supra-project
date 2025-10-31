@@ -1,9 +1,9 @@
 #[test_only]
-module lottery_core::instances_tests {
+module lottery_core::core_instances_tests {
     use std::account;
     use std::option;
     use std::vector;
-    use lottery_core::instances;
+    use lottery_core::core_instances as instances;
     use lottery_core::test_utils;
     use lottery_factory::registry;
     use vrf_hub::hub;
@@ -337,3 +337,4 @@ module lottery_core::instances_tests {
         };
     }
 }
+

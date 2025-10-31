@@ -1,6 +1,6 @@
-module lottery_core::treasury_v1 {
-    friend lottery_core::main_v2;
-    friend lottery_core::treasury_multi;
+module lottery_core::core_treasury_v1 {
+    friend lottery_core::core_main_v2;
+    friend lottery_core::core_treasury_multi;
 
     use std::option;
     use std::signer;
@@ -980,3 +980,5 @@ module lottery_core::treasury_v1 {
         };
     }
 }
+
+

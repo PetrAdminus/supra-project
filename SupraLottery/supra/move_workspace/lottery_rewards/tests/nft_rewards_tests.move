@@ -1,9 +1,9 @@
 #[test_only]
-module lottery_rewards::nft_rewards_tests {
+module lottery_rewards::rewards_nft_tests {
     use std::option;
     use std::vector;
     use std::signer;
-    use lottery_rewards::nft_rewards;
+    use lottery_rewards::rewards_nft as nft_rewards;
     use lottery_rewards::rewards_test_utils as test_utils;
 
     #[test(admin = @lottery, owner = @0x123)]
@@ -29,7 +29,7 @@ module lottery_rewards::nft_rewards_tests {
 
     #[test(admin = @lottery, owner = @0x456)]
     #[expected_failure(
-        location = lottery_rewards::nft_rewards,
+        location = lottery_rewards::rewards_nft,
         abort_code = nft_rewards::E_NOT_AUTHORIZED,
     )]
     fun non_admin_cannot_mint(admin: &signer, owner: &signer) {
@@ -201,3 +201,5 @@ module lottery_rewards::nft_rewards_tests {
         assert!(vector::length(&owner1_badges_after) == 0, 37);
     }
 }
+
+

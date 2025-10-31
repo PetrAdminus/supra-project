@@ -1,6 +1,6 @@
-module lottery_support::history {
-    use lottery_core::rounds;
-    use lottery_core::rounds::HistoryWriterCap;
+module lottery_support::support_history {
+    use lottery_core::core_rounds as rounds;
+    use lottery_core::core_rounds::HistoryWriterCap;
     use std::option;
     use std::signer;
     use std::timestamp;
@@ -209,7 +209,7 @@ module lottery_support::history {
 
     /// Records a draw result on behalf of the core using the cached capability.
     ///
-    /// Invoked by the lottery administrator right after `lottery_core::rounds::fulfill_draw_request`
+    /// Invoked by the lottery administrator right after `lottery_core::core_rounds::fulfill_draw_request`
     /// (for example, by the VRF aggregator). The function checks that the capability
     /// is issued to `HistoryWarden` and reuses the shared `record_draw` hook.
     public entry fun record_draw_from_rounds(
@@ -244,7 +244,7 @@ module lottery_support::history {
 
     /// Synchronizes accumulated draw results from the core module.
     ///
-    /// `lottery_core::rounds` pushes every fulfilled draw into a queue guarded by
+    /// `lottery_core::core_rounds` pushes every fulfilled draw into a queue guarded by
     /// the `HistoryWriterCap` capability. This function drains up to `limit` records
     /// (all records when `limit = 0`) and replays them via `record_draw`, updating
     /// history events and snapshots.
@@ -534,3 +534,6 @@ module lottery_support::history {
         result
     }
 }
+
+
+

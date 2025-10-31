@@ -1,12 +1,12 @@
-module lottery_support::migration {
+module lottery_support::support_migration {
     use std::option;
     use std::signer;
     use std::vector;
-    use lottery_core::instances;
-    use lottery_core::main_v2;
-    use lottery_core::rounds;
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_v1;
+    use lottery_core::core_instances as instances;
+    use lottery_core::core_main_v2 as main_v2;
+    use lottery_core::core_rounds as rounds;
+    use lottery_core::core_treasury_multi as treasury_multi;
+    use lottery_core::core_treasury_v1 as treasury_v1;
     use lottery_factory::registry;
     use supra_framework::account;
     use supra_framework::event;
@@ -302,3 +302,6 @@ module lottery_support::migration {
         out
     }
 }
+
+
+

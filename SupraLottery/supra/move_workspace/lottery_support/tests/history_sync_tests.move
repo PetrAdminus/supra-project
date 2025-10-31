@@ -1,8 +1,8 @@
 #[test_only]
-module lottery_support::history_sync_tests {
-    use lottery_core::rounds;
+module lottery_support::support_history_sync_tests {
+    use lottery_core::core_rounds as rounds;
     use lottery_core::test_utils;
-    use lottery_support::history;
+    use lottery_support::support_history as history;
     use std::signer;
     use std::vector;
 
@@ -54,3 +54,5 @@ module lottery_support::history_sync_tests {
         assert!(history::caps_ready(), 7);
     }
 }
+
+

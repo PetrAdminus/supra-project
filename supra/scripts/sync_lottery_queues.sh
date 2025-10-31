@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Usage: ./sync_lottery_queues.sh <PROFILE> [history_limit] [purchase_limit]
 # Synchronizes draw history and purchase queues between lottery_core and the
 # support/rewards packages. Limits default to 0 (process all pending records).
@@ -53,9 +53,9 @@ elif command -v podman >/dev/null 2>&1; then
   RUNNER="podman"
 else
   cat >&2 <<'MSG'
-[sync_lottery_queues] Не удалось найти Supra CLI. Установите `supra` в PATH,
-задайте SUPRA_BIN или включите один из контейнерных способов запуска
-(Docker Compose или Podman).
+[sync_lottery_queues] РќРµ СѓРґР°Р»РѕСЃСЊ РЅР°Р№С‚Рё Supra CLI. РЈСЃС‚Р°РЅРѕРІРёС‚Рµ `supra` РІ PATH,
+Р·Р°РґР°Р№С‚Рµ SUPRA_BIN РёР»Рё РІРєР»СЋС‡РёС‚Рµ РѕРґРёРЅ РёР· РєРѕРЅС‚РµР№РЅРµСЂРЅС‹С… СЃРїРѕСЃРѕР±РѕРІ Р·Р°РїСѓСЃРєР°
+(Docker Compose РёР»Рё Podman).
 MSG
   exit 1
 fi
@@ -141,15 +141,16 @@ execute() {
 }
 
 if [ "${HISTORY_LIMIT,,}" != "skip" ]; then
-  echo "[info] Синхронизация очереди розыгрышей (limit=${HISTORY_LIMIT})"
-  execute "lottery_support::history::sync_draws_from_rounds" "$HISTORY_LIMIT"
+  echo "[info] РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ РѕС‡РµСЂРµРґРё СЂРѕР·С‹РіСЂС‹С€РµР№ (limit=${HISTORY_LIMIT})"
+  execute "lottery_support::support_history::sync_draws_from_rounds" "$HISTORY_LIMIT"
 else
-  echo "[info] Пропуск синхронизации истории (skip)"
+  echo "[info] РџСЂРѕРїСѓСЃРє СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё РёСЃС‚РѕСЂРёРё (skip)"
 fi
 
 if [ "${PURCHASE_LIMIT,,}" != "skip" ]; then
-  echo "[info] Синхронизация очереди покупок (limit=${PURCHASE_LIMIT})"
+  echo "[info] РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ РѕС‡РµСЂРµРґРё РїРѕРєСѓРїРѕРє (limit=${PURCHASE_LIMIT})"
   execute "lottery_rewards::rounds_sync::sync_purchases_from_rounds" "$PURCHASE_LIMIT"
 else
-  echo "[info] Пропуск синхронизации покупок (skip)"
+  echo "[info] РџСЂРѕРїСѓСЃРє СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё РїРѕРєСѓРїРѕРє (skip)"
 fi
+

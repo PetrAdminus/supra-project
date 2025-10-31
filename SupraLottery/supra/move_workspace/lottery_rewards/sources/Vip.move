@@ -1,8 +1,8 @@
-module lottery_rewards::vip {
-    use lottery_core::instances;
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_multi::MultiTreasuryCap;
-    use lottery_core::treasury_v1;
+module lottery_rewards::rewards_vip {
+    use lottery_core::core_instances as instances;
+    use lottery_core::core_treasury_multi as treasury_multi;
+    use lottery_core::core_treasury_multi::MultiTreasuryCap;
+    use lottery_core::core_treasury_v1 as treasury_v1;
     use std::option;
     use std::signer;
     use std::timestamp;
@@ -769,3 +769,6 @@ module lottery_rewards::vip {
     }
 
 }
+
+
+

@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Usage: ./testnet_migration.sh /supra/configs/testnet.yaml 0xDEPOSIT_ADDR 0xLOTTERY_ADDR
 set -euo pipefail
 CONFIG=${1:?"Path to Supra CLI config is required"}
@@ -79,14 +79,15 @@ echo "[info] Whitelisting contract"
 run "supra move run --config $CONFIG --function $DEPOSIT_ADDR::deposit::addContractToWhitelist --args address:$LOTTERY_ADDR u128:$CALLBACK_GAS_PRICE u128:$CALLBACK_GAS_LIMIT"
 
 echo "[info] Recording snapshots"
-run "supra move run --config $CONFIG --function lottery::main_v2::record_client_whitelist_snapshot --args u128:$MAX_GAS_PRICE u128:$MAX_GAS_LIMIT u128:$MIN_BALANCE_LIMIT"
-run "supra move run --config $CONFIG --function lottery::main_v2::record_consumer_whitelist_snapshot --args u128:$CALLBACK_GAS_PRICE u128:$CALLBACK_GAS_LIMIT"
+run "supra move run --config $CONFIG --function lottery::core_main_v2::record_client_whitelist_snapshot --args u128:$MAX_GAS_PRICE u128:$MAX_GAS_LIMIT u128:$MIN_BALANCE_LIMIT"
+run "supra move run --config $CONFIG --function lottery::core_main_v2::record_consumer_whitelist_snapshot --args u128:$CALLBACK_GAS_PRICE u128:$CALLBACK_GAS_LIMIT"
 
 echo "[info] Configuring VRF request"
-run "supra move run --config $CONFIG --function lottery::main_v2::configure_vrf_request --args u8:$RNG_COUNT u64:$CLIENT_SEED"
+run "supra move run --config $CONFIG --function lottery::core_main_v2::configure_vrf_request --args u8:$RNG_COUNT u64:$CLIENT_SEED"
 
 echo "[info] Publish package (optional)"
 run "supra move publish --config $CONFIG --package-dir /supra/move_workspace/lottery"
 
 echo "[info] Requesting draw"
-run "supra move run --config $CONFIG --function lottery::main_v2::request_draw"
+run "supra move run --config $CONFIG --function lottery::core_main_v2::request_draw"
+

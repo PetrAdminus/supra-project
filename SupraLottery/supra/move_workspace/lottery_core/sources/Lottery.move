@@ -1,5 +1,5 @@
 // sources/Lottery.move
-module lottery_core::main_v2 {
+module lottery_core::core_main_v2 {
 
     use std::string;
     use std::bcs;
@@ -11,7 +11,7 @@ module lottery_core::main_v2 {
     use supra_framework::event;
     use supra_addr::supra_vrf;
     use supra_addr::deposit;
-    use lottery_core::treasury_v1;
+    use lottery_core::core_treasury_v1 as treasury_v1;
 
     const E_NOT_OWNER: u64 = 1;
     const E_ALREADY_INITIALIZED: u64 = 2;
@@ -355,7 +355,7 @@ module lottery_core::main_v2 {
     }
 
     fun callback_module_bytes(): vector<u8> {
-        b"main_v2"
+        b"core_main_v2"
     }
 
     fun callback_function_bytes(): vector<u8> {
@@ -2161,3 +2161,5 @@ module lottery_core::main_v2 {
         first_u64_from_bytes(&bytes)
     }
 }
+
+

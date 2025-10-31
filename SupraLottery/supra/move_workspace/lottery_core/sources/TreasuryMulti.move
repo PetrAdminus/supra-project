@@ -1,7 +1,7 @@
-module lottery_core::treasury_multi {
-    friend lottery_core::rounds;
+module lottery_core::core_treasury_multi {
+    friend lottery_core::core_rounds;
 
-    use lottery_core::treasury_v1;
+    use lottery_core::core_treasury_v1 as treasury_v1;
     use std::option;
     use std::signer;
     use std::vector;
@@ -1017,3 +1017,5 @@ module lottery_core::treasury_multi {
     }
 
 }
+
+

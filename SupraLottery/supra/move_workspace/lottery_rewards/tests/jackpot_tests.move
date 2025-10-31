@@ -1,8 +1,8 @@
 #[test_only]
-module lottery_rewards::jackpot_tests {
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_v1;
-    use lottery_rewards::jackpot;
+module lottery_rewards::rewards_jackpot_tests {
+    use lottery_core::core_treasury_multi as treasury_multi;
+    use lottery_core::core_treasury_v1 as treasury_v1;
+    use lottery_rewards::rewards_jackpot as jackpot;
     use lottery_rewards::rewards_test_utils as test_utils;
     use std::option;
     use std::signer;
@@ -411,7 +411,7 @@ module lottery_rewards::jackpot_tests {
         aggregator = @0x46,
     )]
     #[expected_failure(
-        location = lottery_rewards::jackpot,
+        location = lottery_rewards::rewards_jackpot,
         abort_code = jackpot::E_EMPTY_JACKPOT,
     )]
     fun jackpot_requires_balance(
@@ -446,3 +446,7 @@ module lottery_rewards::jackpot_tests {
         jackpot::fulfill_draw(aggregator, request_id, randomness);
     }
 }
+
+
+
+

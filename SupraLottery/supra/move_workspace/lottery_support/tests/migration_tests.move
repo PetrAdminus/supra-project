@@ -1,16 +1,16 @@
 #[test_only]
-module lottery_support::migration_tests {
+module lottery_support::support_migration_tests {
     use std::option;
     use std::signer;
     use std::vector;
-    use lottery_core::instances;
-    use lottery_core::main_v2;
-    use lottery_core::rounds;
+    use lottery_core::core_instances as instances;
+    use lottery_core::core_main_v2 as main_v2;
+    use lottery_core::core_rounds as rounds;
     use lottery_core::test_utils;
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_v1;
+    use lottery_core::core_treasury_multi as treasury_multi;
+    use lottery_core::core_treasury_v1 as treasury_v1;
     use lottery_factory::registry;
-    use lottery_support::migration;
+    use lottery_support::support_migration as migration;
     use vrf_hub::hub;
 
     #[test(
@@ -48,7 +48,7 @@ module lottery_support::migration_tests {
         vrf_admin = @vrf_hub
     )]
     #[expected_failure(
-        location = lottery_core::instances,
+        location = lottery_core::core_instances,
         abort_code = instances::E_EXPORT_CAP_ALREADY_BORROWED
     )]
     fun migration_session_locks_instances_cap(
@@ -246,7 +246,7 @@ module lottery_support::migration_tests {
         vrf_admin = @vrf_hub
     )]
     #[expected_failure(
-        location = lottery_support::migration,
+        location = lottery_support::support_migration,
         abort_code = migration::E_PENDING_REQUEST
     )]
     fun migration_rejects_pending_request(
@@ -318,3 +318,5 @@ module lottery_support::migration_tests {
         };
     }
 }
+
+

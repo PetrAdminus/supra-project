@@ -1,28 +1,28 @@
-# SupraLottery Contracts
+﻿# SupraLottery Contracts
 
 Move packages that implement the SupraLottery protocol.
 
 ## Layout
 ```
 SupraLottery/
-├─ supra/
-│  ├─ move_workspace/
-│  │  ├─ lottery_core/
-│  │  ├─ lottery_support/
-│  │  ├─ lottery_rewards/
-│  │  ├─ lottery_factory/
-│  │  ├─ vrf_hub/
-│  │  ├─ SupraVrf/
-│  │  └─ lottery_backup/
-│  ├─ configs/
-│  └─ scripts/
-├─ docs/
-└─ frontend/
+в”њв”Ђ supra/
+в”‚  в”њв”Ђ move_workspace/
+в”‚  в”‚  в”њв”Ђ lottery_core/
+в”‚  в”‚  в”њв”Ђ lottery_support/
+в”‚  в”‚  в”њв”Ђ lottery_rewards/
+в”‚  в”‚  в”њв”Ђ lottery_factory/
+в”‚  в”‚  в”њв”Ђ vrf_hub/
+в”‚  в”‚  в”њв”Ђ SupraVrf/
+в”‚  в”‚  в””в”Ђ lottery_backup/
+в”‚  в”њв”Ђ configs/
+в”‚  в””в”Ђ scripts/
+в”њв”Ђ docs/
+в””в”Ђ frontend/
 ```
 
 ## Capabilities
-- `lottery_core::rounds` – issues `HistoryWriterCap` and `AutopurchaseRoundCap`.
-- `lottery_core::treasury_v1` – issues treasury capabilities for autopurchase and migration flows.
+- `lottery_core::core_rounds` вЂ“ issues `HistoryWriterCap` and `AutopurchaseRoundCap`.
+- `lottery_core::core_treasury_v1` вЂ“ issues treasury capabilities for autopurchase and migration flows.
 - Support and rewards packages obtain capabilities only through public APIs.
 
 ## Useful scripts
@@ -44,4 +44,5 @@ See `SupraLottery/docs/testnet_deployment_checklist.md` and the runbook in `docs
 
 ## Rollback
 - Use `backup/lottery_monolith` or `lottery_backup` for the legacy contract.
-- Legacy publish commands remain in the runbook (section “Legacy”).
+- Legacy publish commands remain in the runbook (section вЂњLegacyвЂќ).
+

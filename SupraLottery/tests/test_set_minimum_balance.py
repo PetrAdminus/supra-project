@@ -1,4 +1,4 @@
-import unittest
+﻿import unittest
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest import TestCase
@@ -57,7 +57,7 @@ class SetMinimumBalanceTests(TestCase):
         exec_mock.assert_called_once_with(
             supra_cli_bin="/supra/supra",
             profile="testnet",
-            function_id="0xlottery::main_v2::set_minimum_balance",
+            function_id="0xlottery::core_main_v2::set_minimum_balance",
             args=[],
             supra_config=None,
             assume_yes=True,
@@ -94,3 +94,4 @@ class SetMinimumBalanceTests(TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+

@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Calculate Supra dVRF gas economics for Lottery contract.
 
 Given gas price, gas limits and verification gas value the script
-reproduces formulas from lottery::main_v2::{calculate_per_request_gas_fee,
+reproduces formulas from lottery::core_main_v2::{calculate_per_request_gas_fee,
 calculate_min_balance} and outputs suggested deposit with optional margin.
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ def parse_u128(value: str) -> int:
     try:
         return int(value.replace("_", ""), 10)
     except ValueError as exc:
-        raise argparse.ArgumentTypeError(f"Неверное целое число: {value}") from exc
+        raise argparse.ArgumentTypeError(f"РќРµРІРµСЂРЅРѕРµ С†РµР»РѕРµ С‡РёСЃР»Рѕ: {value}") from exc
 
 
 def format_amount(amount: int) -> str:
@@ -69,19 +69,19 @@ def calculate(max_gas_price: int, max_gas_limit: int, verification_gas_value: in
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Вычислить минимальный депозит Supra dVRF по формуле контракта Lottery")
+    parser = argparse.ArgumentParser(description="Р’С‹С‡РёСЃР»РёС‚СЊ РјРёРЅРёРјР°Р»СЊРЅС‹Р№ РґРµРїРѕР·РёС‚ Supra dVRF РїРѕ С„РѕСЂРјСѓР»Рµ РєРѕРЅС‚СЂР°РєС‚Р° Lottery")
     parser.add_argument("--max-gas-price", required=True, type=parse_u128, help="max_gas_price (u128)" )
     parser.add_argument("--max-gas-limit", required=True, type=parse_u128, help="max_gas_limit (u128)")
     parser.add_argument("--verification-gas", required=True, type=parse_u128, help="verification_gas_value (u128)")
-    parser.add_argument("--margin", type=float, default=0.15, help="запас к минимальному депозиту (доля, по умолчанию 0.15 = 15%)")
-    parser.add_argument("--window", type=int, default=30, help="окно запросов (MIN_REQUEST_WINDOW_U128, по умолчанию 30)")
-    parser.add_argument("--json", action="store_true", help="вывести JSON")
+    parser.add_argument("--margin", type=float, default=0.15, help="Р·Р°РїР°СЃ Рє РјРёРЅРёРјР°Р»СЊРЅРѕРјСѓ РґРµРїРѕР·РёС‚Сѓ (РґРѕР»СЏ, РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 0.15 = 15%)")
+    parser.add_argument("--window", type=int, default=30, help="РѕРєРЅРѕ Р·Р°РїСЂРѕСЃРѕРІ (MIN_REQUEST_WINDOW_U128, РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 30)")
+    parser.add_argument("--json", action="store_true", help="РІС‹РІРµСЃС‚Рё JSON")
 
     args = parser.parse_args()
     if args.margin < 0:
-        parser.error("margin не может быть отрицательным")
+        parser.error("margin РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РѕС‚СЂРёС†Р°С‚РµР»СЊРЅС‹Рј")
     if args.window <= 0:
-        parser.error("window должно быть положительным")
+        parser.error("window РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹Рј")
 
     result = calculate(args.max_gas_price, args.max_gas_limit, args.verification_gas, args.margin, args.window)
 
@@ -89,19 +89,20 @@ def main() -> None:
         print(json.dumps(result.to_json(), indent=2, ensure_ascii=False))
         return
 
-    print("Параметры Supra dVRF:")
+    print("РџР°СЂР°РјРµС‚СЂС‹ Supra dVRF:")
     print(f"  max_gas_price: {result.max_gas_price:,}".replace(",", " "))
     print(f"  max_gas_limit: {result.max_gas_limit:,}".replace(",", " "))
     print(f"  verification_gas_value: {result.verification_gas_value:,}".replace(",", " "))
     print()
-    print("Расчёт по формуле lottery::main_v2::calculate_min_balance:")
+    print("Р Р°СЃС‡С‘С‚ РїРѕ С„РѕСЂРјСѓР»Рµ lottery::core_main_v2::calculate_min_balance:")
     print(f"  per_request_fee = max_gas_price * (max_gas_limit + verification_gas_value) = {format_amount(result.per_request_fee)}")
     print(f"  min_balance = window({result.request_window}) * per_request_fee = {format_amount(result.min_balance)}")
     if args.margin:
-        print(f"  рекомендованный депозит (запас {args.margin * 100:.1f}%): {format_amount(result.recommended_deposit)}")
+        print(f"  СЂРµРєРѕРјРµРЅРґРѕРІР°РЅРЅС‹Р№ РґРµРїРѕР·РёС‚ (Р·Р°РїР°СЃ {args.margin * 100:.1f}%): {format_amount(result.recommended_deposit)}")
     else:
-        print("  рекомендованный депозит совпадает с min_balance (margin = 0)")
+        print("  СЂРµРєРѕРјРµРЅРґРѕРІР°РЅРЅС‹Р№ РґРµРїРѕР·РёС‚ СЃРѕРІРїР°РґР°РµС‚ СЃ min_balance (margin = 0)")
 
 
 if __name__ == "__main__":
     main()
+

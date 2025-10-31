@@ -1,11 +1,11 @@
 #[test_only]
-module lottery_rewards::store_tests {
-    use lottery_core::instances;
-    use lottery_core::rounds;
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_v1;
+module lottery_rewards::rewards_store_tests {
+    use lottery_core::core_instances as instances;
+    use lottery_core::core_rounds as rounds;
+    use lottery_core::core_treasury_multi as treasury_multi;
+    use lottery_core::core_treasury_v1 as treasury_v1;
     use lottery_factory::registry;
-    use lottery_rewards::store;
+    use lottery_rewards::rewards_store as store;
     use lottery_rewards::rewards_test_utils as test_utils;
     use std::option;
     use std::signer;
@@ -179,7 +179,7 @@ module lottery_rewards::store_tests {
         lottery_admin = @lottery,
         buyer = @player2,
     )]
-    #[expected_failure(location = lottery_rewards::store, abort_code = store::E_INSUFFICIENT_STOCK)]
+    #[expected_failure(location = lottery_rewards::rewards_store, abort_code = store::E_INSUFFICIENT_STOCK)]
     fun purchase_more_than_stock_aborts(
         vrf_admin: &signer,
         factory_admin: &signer,
@@ -204,3 +204,7 @@ module lottery_rewards::store_tests {
         store::purchase(buyer, lottery_id, 7, 2);
     }
 }
+
+
+
+

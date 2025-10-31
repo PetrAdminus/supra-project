@@ -1,7 +1,7 @@
-module lottery_rewards::jackpot {
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_multi::MultiTreasuryCap;
-    use lottery_core::treasury_v1;
+module lottery_rewards::rewards_jackpot {
+    use lottery_core::core_treasury_multi as treasury_multi;
+    use lottery_core::core_treasury_multi::MultiTreasuryCap;
+    use lottery_core::core_treasury_v1 as treasury_v1;
     use std::option;
     use std::signer;
     use std::vector;
@@ -547,3 +547,7 @@ module lottery_rewards::jackpot {
         }
     }
 }
+
+
+
+

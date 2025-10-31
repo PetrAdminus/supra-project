@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -76,7 +76,7 @@ class ClientWhitelistTests(TestCase):
         exec_mock.assert_called_once_with(
             supra_cli_bin="/supra/supra",
             profile="testnet",
-            function_id="0xlottery::main_v2::record_client_whitelist_snapshot",
+            function_id="0xlottery::core_main_v2::record_client_whitelist_snapshot",
             args=["u128:100", "u128:200", "u128:300"],
             supra_config=None,
             assume_yes=True,
@@ -119,10 +119,11 @@ class ConsumerWhitelistTests(TestCase):
         exec_mock.assert_called_once_with(
             supra_cli_bin="/supra/supra",
             profile="testnet",
-            function_id="0xlottery::main_v2::record_consumer_whitelist_snapshot",
+            function_id="0xlottery::core_main_v2::record_consumer_whitelist_snapshot",
             args=["u128:111", "u128:222"],
             supra_config=None,
             assume_yes=True,
             dry_run=False,
             now=now,
         )
+

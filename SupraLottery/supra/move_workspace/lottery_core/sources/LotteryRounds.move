@@ -1,7 +1,7 @@
-module lottery_core::rounds {
-    use lottery_core::instances;
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_v1;
+module lottery_core::core_rounds {
+    use lottery_core::core_instances as instances;
+    use lottery_core::core_treasury_multi as treasury_multi;
+    use lottery_core::core_treasury_v1 as treasury_v1;
     use lottery_factory::registry;
     use std::option;
     use std::signer;
@@ -662,6 +662,16 @@ module lottery_core::rounds {
         option::fill(&mut control.history_cap, cap);
     }
 
+    /// Restores the history capability to the controller if it was lost.
+    public entry fun restore_history_cap(caller: &signer) acquires CoreControl {
+        ensure_core_control_initialized();
+        ensure_core_admin(caller);
+        let control = borrow_global_mut<CoreControl>(@lottery);
+        if (!option::is_some(&control.history_cap)) {
+            option::fill(&mut control.history_cap, HistoryWriterCap {});
+        };
+    }
+
     /// Issues the autopurchase capability and aborts if it is already taken.
     public fun borrow_autopurchase_round_cap(
         caller: &signer,
@@ -1111,3 +1121,5 @@ module lottery_core::rounds {
         }
     }
 }
+
+

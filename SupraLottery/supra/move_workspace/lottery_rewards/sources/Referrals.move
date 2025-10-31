@@ -1,6 +1,6 @@
-module lottery_rewards::referrals {
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_multi::MultiTreasuryCap;
+module lottery_rewards::rewards_referrals {
+    use lottery_core::core_treasury_multi as treasury_multi;
+    use lottery_core::core_treasury_multi::MultiTreasuryCap;
     use std::option;
     use std::signer;
     use std::vector;
@@ -702,3 +702,6 @@ module lottery_rewards::referrals {
         }
     }
 }
+
+
+

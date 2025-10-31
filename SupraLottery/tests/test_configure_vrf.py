@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+﻿from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
@@ -47,7 +47,7 @@ class ConfigureVrfGasTests(TestCase):
         exec_mock.assert_called_once_with(
             supra_cli_bin="/supra/supra",
             profile="testnet",
-            function_id="0xlottery::main_v2::configure_vrf_gas",
+            function_id="0xlottery::core_main_v2::configure_vrf_gas",
             args=["u128:1000", "u128:2000", "u128:900", "u128:1500", "u128:5000"],
             supra_config=None,
             assume_yes=True,
@@ -113,7 +113,7 @@ class ConfigureVrfRequestTests(TestCase):
         exec_mock.assert_called_once_with(
             supra_cli_bin="/supra/supra",
             profile="testnet",
-            function_id="0xlottery::main_v2::configure_vrf_request",
+            function_id="0xlottery::core_main_v2::configure_vrf_request",
             args=["u8:7", "u64:5", "u64:99"],
             supra_config=None,
             assume_yes=True,
@@ -179,10 +179,11 @@ class RemoveSubscriptionTests(TestCase):
         exec_mock.assert_called_once_with(
             supra_cli_bin="/supra/supra",
             profile="testnet",
-            function_id="0xlottery::main_v2::remove_subscription",
+            function_id="0xlottery::core_main_v2::remove_subscription",
             args=[],
             supra_config=None,
             assume_yes=True,
             dry_run=False,
             now=now,
         )
+

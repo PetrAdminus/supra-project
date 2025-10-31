@@ -1,9 +1,9 @@
-module lottery_rewards::autopurchase {
-    use lottery_core::instances;
-    use lottery_core::rounds;
-    use lottery_core::rounds::AutopurchaseRoundCap;
-    use lottery_core::treasury_v1;
-    use lottery_core::treasury_v1::AutopurchaseTreasuryCap;
+module lottery_rewards::rewards_autopurchase {
+    use lottery_core::core_instances as instances;
+    use lottery_core::core_rounds as rounds;
+    use lottery_core::core_rounds::AutopurchaseRoundCap;
+    use lottery_core::core_treasury_v1 as treasury_v1;
+    use lottery_core::core_treasury_v1::AutopurchaseTreasuryCap;
     use lottery_factory::registry;
     use std::option;
     use std::signer;
@@ -774,3 +774,6 @@ module lottery_rewards::autopurchase {
         );
     }
 }
+
+
+

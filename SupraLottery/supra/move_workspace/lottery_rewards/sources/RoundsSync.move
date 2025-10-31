@@ -1,8 +1,8 @@
-module lottery_rewards::rounds_sync {
-    use lottery_core::rounds;
-    use lottery_core::rounds::PendingPurchaseRecord;
-    use lottery_rewards::referrals;
-    use lottery_rewards::vip;
+module lottery_rewards::rewards_rounds_sync {
+    use lottery_core::core_rounds as rounds;
+    use lottery_core::core_rounds::PendingPurchaseRecord;
+    use lottery_rewards::rewards_referrals as referrals;
+    use lottery_rewards::rewards_vip as vip;
     use std::signer;
     use std::vector;
 
@@ -40,3 +40,7 @@ module lottery_rewards::rounds_sync {
         };
     }
 }
+
+
+
+

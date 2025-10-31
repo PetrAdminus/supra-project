@@ -1,14 +1,14 @@
-module lottery_rewards::store {
+module lottery_rewards::rewards_store {
     use std::option;
     use std::vector;
     use std::signer;
     use supra_framework::account;
     use supra_framework::event;
     use vrf_hub::table;
-    use lottery_core::instances;
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_multi::MultiTreasuryCap;
-    use lottery_core::treasury_v1;
+    use lottery_core::core_instances as instances;
+    use lottery_core::core_treasury_multi as treasury_multi;
+    use lottery_core::core_treasury_multi::MultiTreasuryCap;
+    use lottery_core::core_treasury_v1 as treasury_v1;
 
     const E_NOT_AUTHORIZED: u64 = 1;
     const E_ALREADY_INITIALIZED: u64 = 2;
@@ -598,3 +598,6 @@ module lottery_rewards::store {
         SOURCE_STORE
     }
 }
+
+
+

@@ -71,3 +71,6 @@ tmp_update.py
 .codex-tmp/
 SupraLottery.backup/
 SupraLottery/supra/configs/testnet.local.yaml
+
+SupraLottery/supra/move_workspace/lottery_backup/
+

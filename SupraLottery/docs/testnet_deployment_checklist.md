@@ -34,20 +34,21 @@ docker compose run --rm --entrypoint bash supra_cli `
   ```
 
 ## 2. Publish
-- [ ] Publish `lottery_core` (store tx hash).
-- [ ] Publish `lottery_support`.
-- [ ] Publish `lottery_rewards`.
-- [ ] Ensure `vrf_hub` and `lottery_factory` are published and up to date.
+- [x] Publish `lottery_core` (store tx hash).
+- [x] Publish `lottery_support`.
+- [x] Publish `lottery_rewards`.
+- [x] Ensure `vrf_hub` and `lottery_factory` are published and up to date.
+  - Tx-хеши публикаций не зафиксированы: вывод CLI был усечён в терминале.
 
 ## 3. Initialisation
-- [ ] Run `bash supra/scripts/sync_lottery_queues.sh`.
-- [ ] Configure VRF whitelisting and deposits.
-- [ ] Confirm treasury state (`lottery_core::treasury_v1::is_initialized`).
+- [x] Run `bash supra/scripts/sync_lottery_queues.sh`. *(выполнено эквивалентными вызовами `support_history::sync_draws_from_rounds` и `rewards_rounds_sync::sync_purchases_from_rounds`, tx hashes записаны в журнал.)*
+- [x] Configure VRF whitelisting and deposits.
+- [x] Confirm treasury state (`lottery_core::core_treasury_v1::is_initialized`).
 
 ## 4. Integration tests
 - [ ] Execute a manual ticket purchase and draw.
 - [ ] Validate VIP/referral bonus flows (if enabled).
-- [ ] Fetch history snapshot (`lottery_support::history::get_history_snapshot`).
+- [ ] Fetch history snapshot (`lottery_support::support_history::get_history_snapshot`).
 
 ## 5. Documentation
 - [ ] Update `docs/testnet_runbook.md` with actual tx hashes and gas params.
@@ -58,3 +59,4 @@ docker compose run --rm --entrypoint bash supra_cli `
 - [ ] Tag the release (e.g. `release/testnet-YYYYMMDD`).
 - [ ] Prepare a summary of actions and any deviations.
 - [ ] Update frontend/integration configs if required.
+

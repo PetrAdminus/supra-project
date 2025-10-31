@@ -1,11 +1,11 @@
 #[test_only]
 module lottery_rewards::multi_treasury_scope_tests {
-    use lottery_core::treasury_multi;
-    use lottery_rewards::jackpot;
-    use lottery_rewards::referrals;
-    use lottery_rewards::store;
+    use lottery_core::core_treasury_multi as treasury_multi;
+    use lottery_rewards::rewards_jackpot as jackpot;
+    use lottery_rewards::rewards_referrals as referrals;
+    use lottery_rewards::rewards_store as store;
     use lottery_rewards::rewards_test_utils as test_utils;
-    use lottery_rewards::vip;
+    use lottery_rewards::rewards_vip as vip;
 
     #[test(admin = @lottery, factory = @lottery_factory, vrf = @vrf_hub)]
     fun scopes_are_isolated(admin: &signer, factory: &signer, vrf: &signer) {
@@ -82,7 +82,7 @@ module lottery_rewards::multi_treasury_scope_tests {
 
     #[test(admin = @lottery, factory = @lottery_factory, vrf = @vrf_hub)]
     #[expected_failure(
-        location = lottery_core::treasury_multi,
+        location = lottery_core::core_treasury_multi,
         abort_code = treasury_multi::E_CORE_CAP_BORROWED,
     )]
     fun cannot_double_borrow_same_scope(admin: &signer, factory: &signer, vrf: &signer) {
@@ -93,3 +93,7 @@ module lottery_rewards::multi_treasury_scope_tests {
         let _ = vrf;
     }
 }
+
+
+
+

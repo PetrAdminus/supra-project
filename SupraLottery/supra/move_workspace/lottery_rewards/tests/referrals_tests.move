@@ -1,12 +1,12 @@
 #[test_only]
-module lottery_rewards::referrals_tests {
-    use lottery_core::instances;
-    use lottery_core::rounds;
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_v1;
+module lottery_rewards::rewards_referrals_tests {
+    use lottery_core::core_instances as instances;
+    use lottery_core::core_rounds as rounds;
+    use lottery_core::core_treasury_multi as treasury_multi;
+    use lottery_core::core_treasury_v1 as treasury_v1;
     use lottery_factory::registry;
-    use lottery_rewards::referrals;
-    use lottery_rewards::rounds_sync;
+    use lottery_rewards::rewards_referrals as referrals;
+    use lottery_rewards::rewards_rounds_sync as rounds_sync;
     use lottery_rewards::rewards_test_utils as test_utils;
     use std::option;
     use std::signer;
@@ -206,7 +206,7 @@ module lottery_rewards::referrals_tests {
         referrer = @player4,
     )]
     #[expected_failure(
-        location = lottery_rewards::referrals,
+        location = lottery_rewards::rewards_referrals,
         abort_code = referrals::E_INVALID_CONFIG,
     )]
     fun invalid_config_rejected(
@@ -233,3 +233,7 @@ module lottery_rewards::referrals_tests {
         referrals::set_lottery_config(lottery_admin, lottery_id, 1_200, 400);
     }
 }
+
+
+
+

@@ -1,5 +1,5 @@
-module lottery_core::instances {
-    friend lottery_core::rounds;
+module lottery_core::core_instances {
+    friend lottery_core::core_rounds;
 
     use std::option;
     use std::signer;
@@ -605,3 +605,4 @@ module lottery_core::instances {
         (stats.tickets_sold, stats.jackpot_accumulated, stats.active)
     }
 }
+

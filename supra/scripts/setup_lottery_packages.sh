@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -10,32 +10,33 @@ PACKAGES=("lottery_core" "lottery_support" "lottery_rewards")
 BASE_PACKAGE_FILE="${WORKSPACE_ROOT}/lottery/Move.toml"
 
 if [ ! -f "${BASE_PACKAGE_FILE}" ]; then
-  echo "[setup_lottery_packages] Не найден базовый пакет lottery (${BASE_PACKAGE_FILE})" >&2
+  echo "[setup_lottery_packages] РќРµ РЅР°Р№РґРµРЅ Р±Р°Р·РѕРІС‹Р№ РїР°РєРµС‚ lottery (${BASE_PACKAGE_FILE})" >&2
   exit 1
 fi
 
 declare -A PACKAGE_MODULES=(
-  [lottery_core]="main_v2 instances rounds operators treasury_v1 treasury_multi"
-  [lottery_support]="history metadata migration"
-  [lottery_rewards]="autopurchase jackpot nft_rewards referrals store vip"
+  [lottery_core]="core_main_v2 core_instances core_rounds core_operators core_treasury_v1 core_treasury_multi"
+  [lottery_support]="support_history support_metadata support_migration"
+  [lottery_rewards]="rewards_autopurchase rewards_jackpot rewards_nft rewards_referrals rewards_store rewards_vip rewards_rounds_sync"
 )
 
 declare -A MODULE_FILES=(
-  [lottery_core:main_v2]="Lottery.move"
-  [lottery_core:instances]="LotteryInstances.move"
-  [lottery_core:rounds]="LotteryRounds.move"
-  [lottery_core:operators]="Operators.move"
-  [lottery_core:treasury_v1]="Treasury.move"
-  [lottery_core:treasury_multi]="TreasuryMulti.move"
-  [lottery_support:history]="History.move"
-  [lottery_support:metadata]="Metadata.move"
-  [lottery_support:migration]="Migration.move"
-  [lottery_rewards:autopurchase]="Autopurchase.move"
-  [lottery_rewards:jackpot]="Jackpot.move"
-  [lottery_rewards:nft_rewards]="NftRewards.move"
-  [lottery_rewards:referrals]="Referrals.move"
-  [lottery_rewards:store]="Store.move"
-  [lottery_rewards:vip]="Vip.move"
+  [lottery_core:core_main_v2]="Lottery.move"
+  [lottery_core:core_instances]="LotteryInstances.move"
+  [lottery_core:core_rounds]="LotteryRounds.move"
+  [lottery_core:core_operators]="Operators.move"
+  [lottery_core:core_treasury_v1]="Treasury.move"
+  [lottery_core:core_treasury_multi]="TreasuryMulti.move"
+  [lottery_support:support_history]="History.move"
+  [lottery_support:support_metadata]="Metadata.move"
+  [lottery_support:support_migration]="Migration.move"
+  [lottery_rewards:rewards_autopurchase]="Autopurchase.move"
+  [lottery_rewards:rewards_jackpot]="Jackpot.move"
+  [lottery_rewards:rewards_nft]="NftRewards.move"
+  [lottery_rewards:rewards_referrals]="Referrals.move"
+  [lottery_rewards:rewards_store]="Store.move"
+  [lottery_rewards:rewards_vip]="Vip.move"
+  [lottery_rewards:rewards_rounds_sync]="RoundsSync.move"
 )
 
 update_addresses_block() {
@@ -51,21 +52,21 @@ target_path = Path(sys.argv[3])
 
 try:
     import tomllib  # type: ignore[attr-defined]
-except ModuleNotFoundError:  # pragma: no cover - fallback для более старых Python
+except ModuleNotFoundError:  # pragma: no cover - fallback РґР»СЏ Р±РѕР»РµРµ СЃС‚Р°СЂС‹С… Python
     import tomli as tomllib  # type: ignore
 
 if not base_path.exists():
-    print(f"[setup_lottery_packages] Не найден базовый Move.toml: {base_path}", file=sys.stderr)
+    print(f"[setup_lottery_packages] РќРµ РЅР°Р№РґРµРЅ Р±Р°Р·РѕРІС‹Р№ Move.toml: {base_path}", file=sys.stderr)
     sys.exit(1)
 
 if not target_path.exists():
-    print(f"[setup_lottery_packages] Не найден целевой Move.toml: {target_path}", file=sys.stderr)
+    print(f"[setup_lottery_packages] РќРµ РЅР°Р№РґРµРЅ С†РµР»РµРІРѕР№ Move.toml: {target_path}", file=sys.stderr)
     sys.exit(1)
 
 data = tomllib.loads(base_path.read_text())
 addresses = data.get("addresses")
 if not isinstance(addresses, dict) or not addresses:
-    print(f"[setup_lottery_packages] В {base_path} отсутствует секция [addresses]", file=sys.stderr)
+    print(f"[setup_lottery_packages] Р’ {base_path} РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ СЃРµРєС†РёСЏ [addresses]", file=sys.stderr)
     sys.exit(1)
 
 items = list(addresses.items())
@@ -79,7 +80,7 @@ alias_keys = alias_map.get(pkg, [])
 if alias_keys:
     base_value = addresses.get("lottery")
     if base_value is None:
-        print(f"[setup_lottery_packages] В {base_path} отсутствует адрес 'lottery'", file=sys.stderr)
+        print(f"[setup_lottery_packages] Р’ {base_path} РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ Р°РґСЂРµСЃ 'lottery'", file=sys.stderr)
         sys.exit(1)
 
     insert_idx = keys.index("lottery") + 1 if "lottery" in keys else len(items)
@@ -138,12 +139,12 @@ ensure_symlink() {
   fi
 
   if [ -e "${link_path}" ]; then
-    echo "[setup_lottery_packages] Предупреждение: ${link_path} существует и не является симлинком." >&2
+    echo "[setup_lottery_packages] РџСЂРµРґСѓРїСЂРµР¶РґРµРЅРёРµ: ${link_path} СЃСѓС‰РµСЃС‚РІСѓРµС‚ Рё РЅРµ СЏРІР»СЏРµС‚СЃСЏ СЃРёРјР»РёРЅРєРѕРј." >&2
     return
   fi
 
   ln -s "${target_rel}" "${link_path}"
-  echo "[setup_lottery_packages] Создан симлинк ${link_path} -> ${target_rel}"
+  echo "[setup_lottery_packages] РЎРѕР·РґР°РЅ СЃРёРјР»РёРЅРє ${link_path} -> ${target_rel}"
 }
 
 ensure_workspace_member() {
@@ -151,7 +152,7 @@ ensure_workspace_member() {
   local workspace_file="${WORKSPACE_ROOT}/Move.toml"
 
   if [ ! -f "${workspace_file}" ]; then
-    echo "[setup_lottery_packages] Пропущено обновление workspace: не найден ${workspace_file}" >&2
+    echo "[setup_lottery_packages] РџСЂРѕРїСѓС‰РµРЅРѕ РѕР±РЅРѕРІР»РµРЅРёРµ workspace: РЅРµ РЅР°Р№РґРµРЅ ${workspace_file}" >&2
     return 1
   fi
 
@@ -179,7 +180,7 @@ for idx, line in enumerate(lines):
         break
 
 if members_start is None:
-    print("[setup_lottery_packages] Не удалось найти секцию members в Move.toml", file=sys.stderr)
+    print("[setup_lottery_packages] РќРµ СѓРґР°Р»РѕСЃСЊ РЅР°Р№С‚Рё СЃРµРєС†РёСЋ members РІ Move.toml", file=sys.stderr)
     sys.exit(1)
 
 closing_idx = None
@@ -189,7 +190,7 @@ for idx in range(members_start + 1, len(lines)):
         break
 
 if closing_idx is None:
-    print("[setup_lottery_packages] Не удалось найти закрывающую скобку секции members", file=sys.stderr)
+    print("[setup_lottery_packages] РќРµ СѓРґР°Р»РѕСЃСЊ РЅР°Р№С‚Рё Р·Р°РєСЂС‹РІР°СЋС‰СѓСЋ СЃРєРѕР±РєСѓ СЃРµРєС†РёРё members", file=sys.stderr)
     sys.exit(1)
 
 if closing_idx == members_start + 1:
@@ -205,7 +206,7 @@ lines.insert(closing_idx, f"{indent}\"{pkg}\",")
 workspace_file.write_text("\n".join(lines) + ("\n" if text.endswith("\n") else ""))
 PYTHON
 
-  echo "[setup_lottery_packages] Добавлен ${pkg} в workspace members"
+  echo "[setup_lottery_packages] Р”РѕР±Р°РІР»РµРЅ ${pkg} РІ workspace members"
 }
 
 write_move_toml() {
@@ -313,7 +314,7 @@ TOML
   esac
 
   update_addresses_block "${pkg}" "${target}"
-  echo "[setup_lottery_packages] Создан ${pkg}/Move.toml"
+  echo "[setup_lottery_packages] РЎРѕР·РґР°РЅ ${pkg}/Move.toml"
 }
 
 write_module_stub() {
@@ -327,228 +328,228 @@ write_module_stub() {
   fi
 
   case "${pkg}:${module}" in
-    lottery_core:main_v2)
+    lottery_core:core_main_v2)
       cat <<'MOVE' >"${target}"
-/// Временная заглушка модуля ядра лотереи.
-/// TODO: перенести реализацию из монолита `lottery::main_v2`.
-module lottery_core::main_v2 {
-    /// Заглушка, чтобы модуль успешно компилировался до переноса кода.
+/// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° РјРѕРґСѓР»СЏ СЏРґСЂР° Р»РѕС‚РµСЂРµРё.
+/// TODO: РїРµСЂРµРЅРµСЃС‚Рё СЂРµР°Р»РёР·Р°С†РёСЋ РёР· РјРѕРЅРѕР»РёС‚Р° `lottery::core_main_v2`.
+module lottery_core::core_main_v2 {
+    /// Р—Р°РіР»СѓС€РєР°, С‡С‚РѕР±С‹ РјРѕРґСѓР»СЊ СѓСЃРїРµС€РЅРѕ РєРѕРјРїРёР»РёСЂРѕРІР°Р»СЃСЏ РґРѕ РїРµСЂРµРЅРѕСЃР° РєРѕРґР°.
     const TODO_PLACEHOLDER: bool = false;
 }
 MOVE
       ;;
-    lottery_core:instances)
+    lottery_core:core_instances)
       cat <<'MOVE' >"${target}"
-/// Реализация `lottery_core::instances` перенесена из монолита.
-/// Заглушка больше не требуется; файл заполняется реальным кодом в репозитории.
-module lottery_core::instances {
-    /// Этот шаблон остаётся на случай повтора скрипта.
+/// Р РµР°Р»РёР·Р°С†РёСЏ `lottery_core::core_instances` РїРµСЂРµРЅРµСЃРµРЅР° РёР· РјРѕРЅРѕР»РёС‚Р°.
+/// Р—Р°РіР»СѓС€РєР° Р±РѕР»СЊС€Рµ РЅРµ С‚СЂРµР±СѓРµС‚СЃСЏ; С„Р°Р№Р» Р·Р°РїРѕР»РЅСЏРµС‚СЃСЏ СЂРµР°Р»СЊРЅС‹Рј РєРѕРґРѕРј РІ СЂРµРїРѕР·РёС‚РѕСЂРёРё.
+module lottery_core::core_instances {
+    /// Р­С‚РѕС‚ С€Р°Р±Р»РѕРЅ РѕСЃС‚Р°С‘С‚СЃСЏ РЅР° СЃР»СѓС‡Р°Р№ РїРѕРІС‚РѕСЂР° СЃРєСЂРёРїС‚Р°.
     const TODO_PLACEHOLDER: bool = false;
 }
 MOVE
       ;;
-    lottery_core:rounds)
+    lottery_core:core_rounds)
       cat <<'MOVE' >"${target}"
-/// Временная заглушка `lottery_core::rounds`.
-/// TODO: перенести реализацию из `lottery::rounds` и адаптировать capability API.
-module lottery_core::rounds {
-    /// Заглушка для поддержания сборки.
+/// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° `lottery_core::core_rounds`.
+/// TODO: РїРµСЂРµРЅРµСЃС‚Рё СЂРµР°Р»РёР·Р°С†РёСЋ РёР· `lottery::rounds` Рё Р°РґР°РїС‚РёСЂРѕРІР°С‚СЊ capability API.
+module lottery_core::core_rounds {
+    /// Р—Р°РіР»СѓС€РєР° РґР»СЏ РїРѕРґРґРµСЂР¶Р°РЅРёСЏ СЃР±РѕСЂРєРё.
     const TODO_PLACEHOLDER: bool = false;
 }
 MOVE
       ;;
-    lottery_core:operators)
+    lottery_core:core_operators)
       cat <<'MOVE' >"${target}"
-/// Временная заглушка `lottery_core::operators`.
-/// Рабочая реализация перенесена в репозиторий; заглушка остаётся для первичной генерации каркаса.
-module lottery_core::operators {
-    /// Заглушка для поддержания сборки.
+/// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° `lottery_core::core_operators`.
+/// Р Р°Р±РѕС‡Р°СЏ СЂРµР°Р»РёР·Р°С†РёСЏ РїРµСЂРµРЅРµСЃРµРЅР° РІ СЂРµРїРѕР·РёС‚РѕСЂРёР№; Р·Р°РіР»СѓС€РєР° РѕСЃС‚Р°С‘С‚СЃСЏ РґР»СЏ РїРµСЂРІРёС‡РЅРѕР№ РіРµРЅРµСЂР°С†РёРё РєР°СЂРєР°СЃР°.
+module lottery_core::core_operators {
+    /// Р—Р°РіР»СѓС€РєР° РґР»СЏ РїРѕРґРґРµСЂР¶Р°РЅРёСЏ СЃР±РѕСЂРєРё.
     const TODO_PLACEHOLDER: bool = false;
 }
 MOVE
       ;;
-    lottery_core:treasury_v1)
+    lottery_core:core_treasury_v1)
       cat <<'MOVE' >"${target}"
-/// Временная заглушка модуля `lottery_core::treasury_v1`.
-/// TODO: перенести реализацию из `lottery::treasury_v1` с учётом новой модели capability.
-module lottery_core::treasury_v1 {
-    /// Заглушка для поддержания сборки.
+/// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° РјРѕРґСѓР»СЏ `lottery_core::core_treasury_v1`.
+/// TODO: РїРµСЂРµРЅРµСЃС‚Рё СЂРµР°Р»РёР·Р°С†РёСЋ РёР· `lottery::treasury_v1` СЃ СѓС‡С‘С‚РѕРј РЅРѕРІРѕР№ РјРѕРґРµР»Рё capability.
+module lottery_core::core_treasury_v1 {
+    /// Р—Р°РіР»СѓС€РєР° РґР»СЏ РїРѕРґРґРµСЂР¶Р°РЅРёСЏ СЃР±РѕСЂРєРё.
     const TODO_PLACEHOLDER: bool = false;
 }
 MOVE
       ;;
-    lottery_core:treasury_multi)
+    lottery_core:core_treasury_multi)
       cat <<'MOVE' >"${target}"
-/// Временная заглушка `lottery_core::treasury_multi`.
-/// TODO: перенести реализацию из `lottery::treasury_multi` и добавить выдачу `MultiTreasuryCap`.
-module lottery_core::treasury_multi {
-    /// Заглушка для поддержания сборки.
+/// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° `lottery_core::core_treasury_multi`.
+/// TODO: РїРµСЂРµРЅРµСЃС‚Рё СЂРµР°Р»РёР·Р°С†РёСЋ РёР· `lottery::treasury_multi` Рё РґРѕР±Р°РІРёС‚СЊ РІС‹РґР°С‡Сѓ `MultiTreasuryCap`.
+module lottery_core::core_treasury_multi {
+    /// Р—Р°РіР»СѓС€РєР° РґР»СЏ РїРѕРґРґРµСЂР¶Р°РЅРёСЏ СЃР±РѕСЂРєРё.
     const TODO_PLACEHOLDER: bool = false;
 }
 MOVE
       ;;
-    lottery_support:history)
+    lottery_support:support_history)
       cat <<'MOVE' >"${target}"
-/// Временная заглушка `lottery_support::history`.
-/// TODO: подключить capability записи истории из `lottery_core::rounds`.
-module lottery_support::history {
+/// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° `lottery_support::support_history`.
+/// TODO: РїРѕРґРєР»СЋС‡РёС‚СЊ capability Р·Р°РїРёСЃРё РёСЃС‚РѕСЂРёРё РёР· `lottery_core::core_rounds`.
+module lottery_support::support_history {
     use std::signer;
 
-    /// Заглушка для поддержания сборки.
+    /// Р—Р°РіР»СѓС€РєР° РґР»СЏ РїРѕРґРґРµСЂР¶Р°РЅРёСЏ СЃР±РѕСЂРєРё.
     const TODO_PLACEHOLDER: bool = false;
 
-    /// Временная функция для инициализации capability истории.
+    /// Р’СЂРµРјРµРЅРЅР°СЏ С„СѓРЅРєС†РёСЏ РґР»СЏ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё capability РёСЃС‚РѕСЂРёРё.
     public fun ensure_caps_initialized(admin: &signer) {
         let _ = signer::address_of(admin);
     }
 }
 MOVE
       ;;
-    lottery_support:metadata)
+    lottery_support:support_metadata)
       cat <<'MOVE' >"${target}"
-/// Временная заглушка `lottery_support::metadata`.
-/// TODO: перенести логику реестра метаданных и обновить зависимости на `lottery_core`.
-module lottery_support::metadata {
+/// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° `lottery_support::support_metadata`.
+/// TODO: РїРµСЂРµРЅРµСЃС‚Рё Р»РѕРіРёРєСѓ СЂРµРµСЃС‚СЂР° РјРµС‚Р°РґР°РЅРЅС‹С… Рё РѕР±РЅРѕРІРёС‚СЊ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РЅР° `lottery_core`.
+module lottery_support::support_metadata {
     use std::signer;
 
-    /// Заглушка для поддержания сборки.
+    /// Р—Р°РіР»СѓС€РєР° РґР»СЏ РїРѕРґРґРµСЂР¶Р°РЅРёСЏ СЃР±РѕСЂРєРё.
     const TODO_PLACEHOLDER: bool = false;
 
-    /// Временная функция для инициализации capability метаданных.
+    /// Р’СЂРµРјРµРЅРЅР°СЏ С„СѓРЅРєС†РёСЏ РґР»СЏ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё capability РјРµС‚Р°РґР°РЅРЅС‹С….
     public fun ensure_caps_initialized(admin: &signer) {
         let _ = signer::address_of(admin);
     }
 }
 MOVE
       ;;
-    lottery_support:migration)
+    lottery_support:support_migration)
       cat <<'MOVE' >"${target}"
-/// Временная заглушка `lottery_support::migration`.
-/// TODO: перенести миграционные сценарии и интегрировать capability из ядра.
-module lottery_support::migration {
+/// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° `lottery_support::support_migration`.
+/// TODO: РїРµСЂРµРЅРµСЃС‚Рё РјРёРіСЂР°С†РёРѕРЅРЅС‹Рµ СЃС†РµРЅР°СЂРёРё Рё РёРЅС‚РµРіСЂРёСЂРѕРІР°С‚СЊ capability РёР· СЏРґСЂР°.
+module lottery_support::support_migration {
     use std::signer;
 
-    /// Заглушка для поддержания сборки.
+    /// Р—Р°РіР»СѓС€РєР° РґР»СЏ РїРѕРґРґРµСЂР¶Р°РЅРёСЏ СЃР±РѕСЂРєРё.
     const TODO_PLACEHOLDER: bool = false;
 
-    /// Временная функция инициализации capability миграции.
+    /// Р’СЂРµРјРµРЅРЅР°СЏ С„СѓРЅРєС†РёСЏ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё capability РјРёРіСЂР°С†РёРё.
     public fun ensure_caps_initialized(admin: &signer) {
         let _ = signer::address_of(admin);
     }
 }
 MOVE
       ;;
-    lottery_rewards:autopurchase)
+    lottery_rewards:rewards_autopurchase)
       cat <<'MOVE' >"${target}"
-/// Временная заглушка `lottery_rewards::autopurchase`.
-/// TODO: перенести функционал автопокупок и запрос capability у `lottery_core::rounds` и `treasury_v1`.
-module lottery_rewards::autopurchase {
+/// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° `lottery_rewards::rewards_autopurchase`.
+/// TODO: РїРµСЂРµРЅРµСЃС‚Рё С„СѓРЅРєС†РёРѕРЅР°Р» Р°РІС‚РѕРїРѕРєСѓРїРѕРє Рё Р·Р°РїСЂРѕСЃ capability Сѓ `lottery_core::core_rounds` Рё `treasury_v1`.
+module lottery_rewards::rewards_autopurchase {
     use std::signer;
 
-    /// Scope для доступа автопокупок к ресурсам ядра.
+    /// Scope РґР»СЏ РґРѕСЃС‚СѓРїР° Р°РІС‚РѕРїРѕРєСѓРїРѕРє Рє СЂРµСЃСѓСЂСЃР°Рј СЏРґСЂР°.
     pub const SCOPE_AUTOPURCHASE: u64 = 10;
 
-    /// Заглушка структуры контроля доступа к capability раундов и казначейства.
+    /// Р—Р°РіР»СѓС€РєР° СЃС‚СЂСѓРєС‚СѓСЂС‹ РєРѕРЅС‚СЂРѕР»СЏ РґРѕСЃС‚СѓРїР° Рє capability СЂР°СѓРЅРґРѕРІ Рё РєР°Р·РЅР°С‡РµР№СЃС‚РІР°.
     struct AutopurchaseAccess has key { dummy: bool }
 
-    /// Временная функция для ленивой инициализации capability.
+    /// Р’СЂРµРјРµРЅРЅР°СЏ С„СѓРЅРєС†РёСЏ РґР»СЏ Р»РµРЅРёРІРѕР№ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё capability.
     public fun ensure_caps_initialized(admin: &signer) {
         let _ = signer::address_of(admin);
     }
 }
 MOVE
       ;;
-    lottery_rewards:jackpot)
+    lottery_rewards:rewards_jackpot)
       cat <<'MOVE' >"${target}"
-/// Временная заглушка `lottery_rewards::jackpot`.
-/// TODO: перенести механику джекпота и ограничить доступ `MultiTreasuryCap`.
-module lottery_rewards::jackpot {
+/// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° `lottery_rewards::rewards_jackpot`.
+/// TODO: РїРµСЂРµРЅРµСЃС‚Рё РјРµС…Р°РЅРёРєСѓ РґР¶РµРєРїРѕС‚Р° Рё РѕРіСЂР°РЅРёС‡РёС‚СЊ РґРѕСЃС‚СѓРї `MultiTreasuryCap`.
+module lottery_rewards::rewards_jackpot {
     use std::signer;
 
-    /// Scope для доступа джекпота к `MultiTreasuryCap`.
+    /// Scope РґР»СЏ РґРѕСЃС‚СѓРїР° РґР¶РµРєРїРѕС‚Р° Рє `MultiTreasuryCap`.
     pub const SCOPE_JACKPOT: u64 = 20;
 
-    /// Заглушка структуры контроля джекпота.
+    /// Р—Р°РіР»СѓС€РєР° СЃС‚СЂСѓРєС‚СѓСЂС‹ РєРѕРЅС‚СЂРѕР»СЏ РґР¶РµРєРїРѕС‚Р°.
     struct JackpotControl has key { dummy: bool }
 
-    /// Временная функция инициализации capability казначейства.
+    /// Р’СЂРµРјРµРЅРЅР°СЏ С„СѓРЅРєС†РёСЏ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё capability РєР°Р·РЅР°С‡РµР№СЃС‚РІР°.
     public fun ensure_caps_initialized(admin: &signer) {
         let _ = signer::address_of(admin);
     }
 }
 MOVE
       ;;
-    lottery_rewards:nft_rewards)
+    lottery_rewards:rewards_nft)
       cat <<'MOVE' >"${target}"
-/// Временная заглушка `lottery_rewards::nft_rewards`.
-/// TODO: перенести NFT-награды и ресурсы бейджей.
-module lottery_rewards::nft_rewards {
+/// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° `lottery_rewards::rewards_nft`.
+/// TODO: РїРµСЂРµРЅРµСЃС‚Рё NFT-РЅР°РіСЂР°РґС‹ Рё СЂРµСЃСѓСЂСЃС‹ Р±РµР№РґР¶РµР№.
+module lottery_rewards::rewards_nft {
     use std::signer;
 
-    /// Заглушка структуры контроля NFT-наград.
+    /// Р—Р°РіР»СѓС€РєР° СЃС‚СЂСѓРєС‚СѓСЂС‹ РєРѕРЅС‚СЂРѕР»СЏ NFT-РЅР°РіСЂР°Рґ.
     struct NftRewardsControl has key { dummy: bool }
 
-    /// Временная функция инициализации capability минтера бейджей.
+    /// Р’СЂРµРјРµРЅРЅР°СЏ С„СѓРЅРєС†РёСЏ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё capability РјРёРЅС‚РµСЂР° Р±РµР№РґР¶РµР№.
     public fun ensure_caps_initialized(admin: &signer) {
         let _ = signer::address_of(admin);
     }
 }
 MOVE
       ;;
-    lottery_rewards:referrals)
+    lottery_rewards:rewards_referrals)
       cat <<'MOVE' >"${target}"
-/// Временная заглушка `lottery_rewards::referrals`.
-/// TODO: перенести реферальную программу и использовать `MultiTreasuryCap` с нужным scope.
-module lottery_rewards::referrals {
+/// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° `lottery_rewards::rewards_referrals`.
+/// TODO: РїРµСЂРµРЅРµСЃС‚Рё СЂРµС„РµСЂР°Р»СЊРЅСѓСЋ РїСЂРѕРіСЂР°РјРјСѓ Рё РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ `MultiTreasuryCap` СЃ РЅСѓР¶РЅС‹Рј scope.
+module lottery_rewards::rewards_referrals {
     use std::signer;
 
-    /// Scope для доступа реферальной программы к `MultiTreasuryCap`.
+    /// Scope РґР»СЏ РґРѕСЃС‚СѓРїР° СЂРµС„РµСЂР°Р»СЊРЅРѕР№ РїСЂРѕРіСЂР°РјРјС‹ Рє `MultiTreasuryCap`.
     pub const SCOPE_REFERRALS: u64 = 21;
 
-    /// Заглушка структуры контроля рефералов.
+    /// Р—Р°РіР»СѓС€РєР° СЃС‚СЂСѓРєС‚СѓСЂС‹ РєРѕРЅС‚СЂРѕР»СЏ СЂРµС„РµСЂР°Р»РѕРІ.
     struct ReferralsControl has key { dummy: bool }
 
-    /// Временная функция инициализации capability казначейства.
+    /// Р’СЂРµРјРµРЅРЅР°СЏ С„СѓРЅРєС†РёСЏ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё capability РєР°Р·РЅР°С‡РµР№СЃС‚РІР°.
     public fun ensure_caps_initialized(admin: &signer) {
         let _ = signer::address_of(admin);
     }
 }
 MOVE
       ;;
-    lottery_rewards:store)
+    lottery_rewards:rewards_store)
       cat <<'MOVE' >"${target}"
-/// Временная заглушка `lottery_rewards::store`.
-/// TODO: перенести магазин наград и ограничить операции `MultiTreasuryCap`.
-module lottery_rewards::store {
+/// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° `lottery_rewards::rewards_store`.
+/// TODO: РїРµСЂРµРЅРµСЃС‚Рё РјР°РіР°Р·РёРЅ РЅР°РіСЂР°Рґ Рё РѕРіСЂР°РЅРёС‡РёС‚СЊ РѕРїРµСЂР°С†РёРё `MultiTreasuryCap`.
+module lottery_rewards::rewards_store {
     use std::signer;
 
-    /// Scope для доступа магазина к `MultiTreasuryCap`.
+    /// Scope РґР»СЏ РґРѕСЃС‚СѓРїР° РјР°РіР°Р·РёРЅР° Рє `MultiTreasuryCap`.
     pub const SCOPE_STORE: u64 = 22;
 
-    /// Заглушка структуры контроля магазина.
+    /// Р—Р°РіР»СѓС€РєР° СЃС‚СЂСѓРєС‚СѓСЂС‹ РєРѕРЅС‚СЂРѕР»СЏ РјР°РіР°Р·РёРЅР°.
     struct StoreControl has key { dummy: bool }
 
-    /// Временная функция инициализации capability казначейства.
+    /// Р’СЂРµРјРµРЅРЅР°СЏ С„СѓРЅРєС†РёСЏ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё capability РєР°Р·РЅР°С‡РµР№СЃС‚РІР°.
     public fun ensure_caps_initialized(admin: &signer) {
         let _ = signer::address_of(admin);
     }
 }
 MOVE
       ;;
-    lottery_rewards:vip)
+    lottery_rewards:rewards_vip)
       cat <<'MOVE' >"${target}"
-/// Временная заглушка `lottery_rewards::vip`.
-/// TODO: перенести VIP-подписки и привязать их к capability распределения наград.
-module lottery_rewards::vip {
+/// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° `lottery_rewards::rewards_vip`.
+/// TODO: РїРµСЂРµРЅРµСЃС‚Рё VIP-РїРѕРґРїРёСЃРєРё Рё РїСЂРёРІСЏР·Р°С‚СЊ РёС… Рє capability СЂР°СЃРїСЂРµРґРµР»РµРЅРёСЏ РЅР°РіСЂР°Рґ.
+module lottery_rewards::rewards_vip {
     use std::signer;
 
-    /// Scope для доступа VIP-подписок к `MultiTreasuryCap`.
+    /// Scope РґР»СЏ РґРѕСЃС‚СѓРїР° VIP-РїРѕРґРїРёСЃРѕРє Рє `MultiTreasuryCap`.
     pub const SCOPE_VIP: u64 = 23;
 
-    /// Заглушка структуры контроля VIP.
+    /// Р—Р°РіР»СѓС€РєР° СЃС‚СЂСѓРєС‚СѓСЂС‹ РєРѕРЅС‚СЂРѕР»СЏ VIP.
     struct VipControl has key { dummy: bool }
 
-    /// Временная функция инициализации capability казначейства.
+    /// Р’СЂРµРјРµРЅРЅР°СЏ С„СѓРЅРєС†РёСЏ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё capability РєР°Р·РЅР°С‡РµР№СЃС‚РІР°.
     public fun ensure_caps_initialized(admin: &signer) {
         let _ = signer::address_of(admin);
     }
@@ -556,12 +557,12 @@ module lottery_rewards::vip {
 MOVE
       ;;
     *)
-      echo "[setup_lottery_packages] Неизвестная комбинация ${pkg}:${module}" >&2
+      echo "[setup_lottery_packages] РќРµРёР·РІРµСЃС‚РЅР°СЏ РєРѕРјР±РёРЅР°С†РёСЏ ${pkg}:${module}" >&2
       return 1
       ;;
   esac
 
-  echo "[setup_lottery_packages] Создан ${pkg}/sources/${file_name}"
+  echo "[setup_lottery_packages] РЎРѕР·РґР°РЅ ${pkg}/sources/${file_name}"
 }
 
 main() {
@@ -578,3 +579,5 @@ main() {
 }
 
 main "$@"
+
+

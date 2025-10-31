@@ -1,4 +1,4 @@
-module lottery_support::metadata {
+module lottery_support::support_metadata {
     use std::option;
     use std::signer;
     use std::vector;
@@ -327,3 +327,4 @@ module lottery_support::metadata {
         };
     }
 }
+

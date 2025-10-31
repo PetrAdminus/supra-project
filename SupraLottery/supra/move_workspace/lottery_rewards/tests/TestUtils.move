@@ -1,9 +1,9 @@
 #[test_only]
 module lottery_rewards::rewards_test_utils {
-    use lottery_core::instances;
-    use lottery_core::rounds;
-    use lottery_core::treasury_multi;
-    use lottery_core::treasury_v1;
+    use lottery_core::core_instances as instances;
+    use lottery_core::core_rounds as rounds;
+    use lottery_core::core_treasury_multi as treasury_multi;
+    use lottery_core::core_treasury_v1 as treasury_v1;
     use lottery_factory::registry;
     use std::account;
     use std::option;
@@ -11,7 +11,7 @@ module lottery_rewards::rewards_test_utils {
     use std::vector;
     use supra_framework::event;
     use vrf_hub::hub;
-    use lottery_rewards::autopurchase;
+    use lottery_rewards::rewards_autopurchase as autopurchase;
 
     const FRAMEWORK_ADDRESS: address = @SupraFramework;
 
@@ -162,3 +162,7 @@ module lottery_rewards::rewards_test_utils {
         };
     }
 }
+
+
+
+

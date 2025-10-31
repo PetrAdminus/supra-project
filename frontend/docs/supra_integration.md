@@ -1,4 +1,4 @@
-# Supra Integration Guide
+﻿# Supra Integration Guide
 
 This guide explains how the frontend communicates with SupraLottery contracts.
 
@@ -9,7 +9,7 @@ This guide explains how the frontend communicates with SupraLottery contracts.
 - RPC endpoints: `https://rpc-testnet.supra.com` or `https://rpc-mainnet.supra.com`.
 
 ## 2. API layer (`src/api/supraClient.ts`)
-- View requests use JSON-RPC `move_view` (e.g. `lottery_core::main_v2::get_lottery_status`).
+- View requests use JSON-RPC `move_view` (e.g. `lottery_core::core_main_v2::get_lottery_status`).
 - Mutating requests build BCS transactions (`EntryFunction`) and sign them through StarKey SDK helpers.
 - Helper functions in the file convert RPC responses to typed objects (`LotteryStatus`, `WhitelistStatus`, etc.).
 
@@ -29,3 +29,4 @@ Mock mode remains available through static JSON.
 - https://docs.supra.com
 - StarKey SDK (examples of signing)
 - `supra/scripts/sync_lottery_queues.sh`
+
