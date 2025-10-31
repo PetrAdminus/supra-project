@@ -2,6 +2,12 @@
 
 Актуальная пошаговая инструкция для развёртывания и проверки лотереи в Supra testnet. Документ обновлён с учётом реальной работы в Windows + Docker + PowerShell/Git Bash.
 
+## Временные допущения для тестового развёртывания
+
+- Пока VRF-поток обкатываем, все доли (приз, джекпот, операции) временно направляем на аккаунт администратора (`lottery_admin`). Это упрощает контроль балансов во время тестов.
+- Перед вызовами `core_treasury_multi::init` или `set_recipients` обязательно создаём primary store через `core_treasury_v1::register_store_for` для выбранного адреса.
+- Когда перейдём к боевой конфигурации, замените адреса на отдельные кошельки для джекпота и операционного фонда и обновите документацию/скрипты публикации.
+
 ---
 
 ## 0. Предпосылки и соглашения
@@ -202,6 +208,116 @@ min_balance = (max_gas_limit + verification_gas_value) * max_gas_price * window
 ```
 
 После подписки можно запрашивать случайность (`core_rounds::request_randomness`) и отслеживать исполнение.
+
+---
+
+## 9. Покупка билетов и VRF-поток (пример на новой лотерее)
+
+Ниже — последовательность, которую мы проходили на лотерее ID = 4. Подставляйте свой `LOTTERY_ID` и текущий `REQUEST_ID`.
+
+1) Зарегистрировать primary store для администратора и направить туда все доли (в тестах используем `lottery_admin`):
+```
+/supra/supra move tool run \
+  --profile my_new_profile \
+  --function-id 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::core_treasury_v1::register_store_for \
+  --args address:0x3bd5cb43528ea967459e0741d8120fa4472f0c580a8b7c04f598cc3dd3341fbc \
+  --gas-unit-price 100 --max-gas 5000 --expiration-secs 300
+
+/supra/supra move tool run \
+  --profile my_new_profile \
+  --function-id 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::core_treasury_multi::set_recipients \
+  --args address:0x3bd5cb43528ea967459e0741d8120fa4472f0c580a8b7c04f598cc3dd3341fbc \
+  --args address:0x3bd5cb43528ea967459e0741d8120fa4472f0c580a8b7c04f598cc3dd3341fbc \
+  --gas-unit-price 100 --max-gas 5000 --expiration-secs 300
+
+/supra/supra move tool run \
+  --profile my_new_profile \
+  --function-id 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::core_treasury_multi::upsert_lottery_config \
+  --args u64:4 \
+  --args u64:6000 \
+  --args u64:3000 \
+  --args u64:1000 \
+  --gas-unit-price 100 --max-gas 5000 --expiration-secs 300
+```
+> Замените `4` на фактический `LOTTERY_ID`.
+
+2) Покупка билета игроком:
+```
+APTOS_CONFIG=/supra/SupraLottery/supra/configs/player1.yaml \
+/supra/supra move tool run \
+  --profile player1 \
+  --function-id 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::core_rounds::buy_ticket \
+  --args u64:4 \
+  --gas-unit-price 100 --max-gas 5000 --expiration-secs 300
+```
+
+3) Подготовка розыгрыша:
+```
+/supra/supra move tool run \
+  --profile my_new_profile \
+  --function-id 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::core_rounds::schedule_draw \
+  --args u64:4 \
+  --gas-unit-price 100 --max-gas 5000 --expiration-secs 300
+
+/supra/supra move tool run \
+  --profile my_new_profile \
+  --function-id 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::hub::set_callback_sender \
+  --args address:0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0 \
+  --gas-unit-price 100 --max-gas 5000 --expiration-secs 300
+
+/supra/supra move tool run \
+  --profile my_new_profile \
+  --function-id 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::core_rounds::request_randomness \
+  --args u64:4 \
+  --args hex:0x \
+  --gas-unit-price 100 --max-gas 5000 --expiration-secs 300
+```
+
+4) Мониторинг ожидания VRF:
+```
+/supra/supra move tool view \
+  --profile my_new_profile \
+  --function-id 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::core_rounds::pending_request_id \
+  --args u64:4
+
+/supra/supra move tool view \
+  --profile my_new_profile \
+  --function-id 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::hub::get_request \
+  --args u64:2
+
+/supra/supra move tool view \
+  --profile my_new_profile \
+  --function-id 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::hub::list_pending_request_ids
+```
+Если `pending_request_id` пуст, заявка отработана. Пока `hub::get_request` возвращает запись, Supra VRF ещё не прислал ответ.
+
+5) Завершение розыгрыша:
+- **Боевой сценарий.** Ждём появления `hub::RandomnessFulfilledEvent` и того, что `hub::get_request` вернул `null`, затем вызываем `core_rounds::fulfill_draw`, передавая реальный `random_bytes`.
+- **Тестовый сценарий (ручной).** Пока ждём боевой ответ, можно закрыть раунд тестовыми байтами:
+```
+/supra/supra move tool run \
+  --profile my_new_profile \
+  --function-id 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::core_rounds::fulfill_draw \
+  --args u64:2 \
+  --args hex:0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+  --gas-unit-price 100 --max-gas 5000 --expiration-secs 300
+```
+> Замените `2` на фактический `REQUEST_ID`.
+
+6) Проверяем итоги:
+```
+/supra/supra move tool view \
+  --profile my_new_profile \
+  --function-id 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::core_rounds::get_round_snapshot \
+  --args u64:4
+
+/supra/supra move tool view \
+  --profile my_new_profile \
+  --function-id 0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0::core_treasury_multi::get_lottery_summary \
+  --args u64:4
+```
+
+> Статус на момент обновления: лотерея ID = 3 продолжает ожидать реального ответа Supra VRF (request_id = 1); лотерея ID = 4 прошла ручной цикл — вручную вызван `core_rounds::fulfill_draw` с тестовыми байтами (request_id = 2), игрок 0x553fd4...1762 получил приз 18 000 000 SUPRA, операционный пул пополнился на 3 000 000.
 
 ---
 

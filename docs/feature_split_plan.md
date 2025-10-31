@@ -36,3 +36,4 @@ Each package has its own `Move.toml`, `sources/`, tests, and publish commands in
 - [ ] Harden capability usage in extension packages and extend test coverage.
 - [ ] Update CI/publish scripts for the modular layout.
 - [ ] Perform a dry-run deployment on Supra testnet and record real gas settings/transaction hashes.
+- [ ] Document the temporary single-address treasury setup for testnet runs (jackpot and operations pools share the admin account while VRF workflow is under test).
