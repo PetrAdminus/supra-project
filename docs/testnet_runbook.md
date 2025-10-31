@@ -1,131 +1,208 @@
-# SupraLottery – Testnet Runbook
+# SupraLottery — Testnet Runbook
 
-Полный сценарий подготовки, сборки, публикации и проверки модульных контрактов SupraLottery на Supra testnet.
-
----
-
-## 0. Предварительные требования
-- Docker Desktop или Podman (поддержка `docker compose`).
-- Python 3.10+.
-- Тестовые токены SUPRA на аккаунте.
-- Профиль Supra CLI:
-  1. Скопируйте `supra/configs/testnet.yaml` → `supra/configs/testnet.local.yaml`.
-  2. Заполните `account_address`, `private_key`, параметры газа.
-  3. Файл уже исключён `.gitignore`.
-
-Проверка баланса:
-```powershell
-docker compose run --rm -e SUPRA_PROFILE=my_profile --entrypoint bash supra_cli `
-  -lc "/supra/supra move account balance --profile my_profile"
-```
+Актуальная пошаговая инструкция для развёртывания и проверки лотереи в Supra testnet. Документ обновлён с учётом реальной работы в Windows + Docker + PowerShell/Git Bash.
 
 ---
 
-## 1. Зависимости Move (aptos-core)
-### Linux / WSL
-```bash
-bash supra/scripts/bootstrap_move_deps.sh
-```
-Команда скачает aptos-core commit `7d1e62c9a5394a279a73515a150e880200640f06` и заполнит кеш `~/.move`.
+## 0. Предпосылки и соглашения
 
-### Windows без WSL
-```powershell
-python -c "import os, tarfile, tempfile, shutil, urllib.request; from pathlib import Path; commit='7d1e62c9a5394a279a73515a150e880200640f06'; repo_url='https://github.com/Entropy-Foundation/aptos-core'; framework_subpath=Path('aptos-move/framework'); needed_dirs=['move-stdlib','supra-framework','aptos-stdlib','supra-stdlib']; move_home=Path(os.environ.get('MOVE_HOME', Path.home()/'.move')); cache_prefix=f'https___github_com_Entropy-Foundation_aptos-core_git_{commit}'; target_base=move_home/cache_prefix/framework_subpath;
-if all((target_base/d).exists() for d in needed_dirs):
-    print('Dependencies already cached at', target_base); raise SystemExit(0)
-move_home.mkdir(parents=True, exist_ok=True)
-with tempfile.TemporaryDirectory() as tmpdir:
-    tmpdir=Path(tmpdir); archive=tmpdir/'aptos-core.tar.gz'; url=f'{repo_url}/archive/{commit}.tar.gz'; print('Downloading', url);
-    with urllib.request.urlopen(url) as resp, open(archive,'wb') as f: shutil.copyfileobj(resp, f)
-    print('Extracting archive...');
-    with tarfile.open(archive, 'r:gz') as tf: tf.extractall(tmpdir); source_base=tmpdir/f'aptos-core-{commit}'/framework_subpath
-    if not source_base.exists(): raise SystemExit(f'Missing {source_base}')
-    for d in needed_dirs:
-        src=source_base/d; dst=target_base/d; dst.parent.mkdir(parents=True, exist_ok=True);
-        if dst.exists(): shutil.rmtree(dst); shutil.copytree(src, dst); print('Installed', dst)
-print('Move dependencies installed at', target_base)"
+- Установлен Docker Desktop (используется `docker compose`).
+- Профили Supra CLI подготовлены в репозитории: `SupraLottery/supra/configs/*.yaml` (например, `testnet.yaml` — админ, `player1.yaml`… — игроки).
+- Все команды выполняются из корня репозитория: `C:\Users\spell\Desktop\projects\supra-project`.
+
+Общий шаблон вызова Supra CLI в контейнере (PowerShell):
+
 ```
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  "-lc" "mkdir -p /supra/.aptos && cp /supra/SupraLottery/supra/configs/<profile>.yaml /supra/.aptos/config.yaml && <supra command>"
+```
+
+Где `<profile>.yaml` — файл профиля (например, `testnet.yaml`, `player1.yaml`). Важно:
+- Ключ `-lc` передаётся как отдельный аргумент (в кавычках).
+- Путь к бинарю — строго `/supra/supra` (латиница).
+- Для интерактивного ввода пароля удобно зайти внутрь контейнера:  
+  `docker compose -f SupraLottery/compose.yaml run --rm -it --entrypoint bash supra_cli`
+
+Плейсхолдеры в командах:
+- `LOTTERY_ADDR` — адрес аккаунта, где опубликованы модули лотереи (например, `0xbc9595…caafe0`).
+- `PLAYER_ADDR` — адрес игрока из соответствующего `playerN.yaml`.
 
 ---
 
-## 2. Компиляция пакетов
-Все команды выполняются внутри контейнера `supra_cli`.
-```powershell
+## 1. Сборка пакетов Move
+
+```
 # lottery_core
 docker compose run --rm --entrypoint bash supra_cli `
-  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_core         --skip-fetch-latest-git-deps"
+  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_core --skip-fetch-latest-git-deps"
 # lottery_support
 docker compose run --rm --entrypoint bash supra_cli `
-  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_support         --skip-fetch-latest-git-deps"
+  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_support --skip-fetch-latest-git-deps"
 # lottery_rewards
 docker compose run --rm --entrypoint bash supra_cli `
-  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_rewards         --skip-fetch-latest-git-deps"
+  -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_rewards --skip-fetch-latest-git-deps"
 ```
-(Для Podman адаптируйте команду.)
 
 ---
 
-## 3. Unit-тесты
-```bash
-python -m supra.scripts.cli move-test --workspace supra/move_workspace --package lottery_core --skip-fetch-latest-git-deps
-python -m supra.scripts.cli move-test --workspace supra/move_workspace --package lottery_support --skip-fetch-latest-git-deps
-python -m supra.scripts.cli move-test --workspace supra/move_workspace --package lottery_rewards --skip-fetch-latest-git-deps
+## 2. Публикация (Supra testnet)
+
+Публикация производится для `lottery_core` (далее по необходимости — support/rewards):
+
 ```
-или
-```powershell
 docker compose run --rm --entrypoint bash supra_cli `
-  -lc "/supra/supra move tool test --package-dir /supra/move_workspace/lottery_core --skip-fetch-latest-git-deps"
+  -lc "/supra/supra move tool publish --package-dir /supra/move_workspace/lottery_core \
+       --included-artifacts none --skip-fetch-latest-git-deps \
+       --gas-unit-price 100 --max-gas 150000 --expiration-secs 600 --assume-yes"
+```
+
+После публикации запомните адрес аккаунта (далее `LOTTERY_ADDR`).
+
+---
+
+## 3. Инициализация основного контракта (core_main_v2)
+
+Новый основной модуль — `core_main_v2`. Перед покупкой билетов требуется создать ресурс лотереи.
+
+```
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  "-lc" "mkdir -p /supra/.aptos && cp /supra/SupraLottery/supra/configs/testnet.yaml /supra/.aptos/config.yaml && \
+          /supra/supra move tool run \
+            --profile my_new_profile \
+            --function-id LOTTERY_ADDR::core_main_v2::init \
+            --gas-unit-price 100 --max-gas 5000 --expiration-secs 300"
+```
+
+Проверка статуса:
+
+```
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  "-lc" "/supra/supra move tool view --profile my_new_profile --function-id LOTTERY_ADDR::core_main_v2::get_lottery_status"
 ```
 
 ---
 
-## 4. Публикация пакетов (Supra testnet)
-Последовательность: core → support → rewards.
-```powershell
-docker compose run --rm -e SUPRA_PROFILE=my_profile --entrypoint bash supra_cli `
-  -lc "/supra/supra move tool publish --package-dir /supra/move_workspace/lottery_core         --included-artifacts none --skip-fetch-latest-git-deps         --gas-unit-price 100 --max-gas 150000 --expiration-secs 600 --assume-yes"
+## 4. Подготовка игроков и покупка билетов
+
+Для каждого игрока `playerN`:
+
+1) Зарегистрировать primary store (однократно):
 ```
-После выполнения сохраните хеш транзакции и повторите команду для `lottery_support`, `lottery_rewards`.
-
----
-
-## 5. Инициализация после публикации
-```powershell
-bash supra/scripts/sync_lottery_queues.sh
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  "-lc" "mkdir -p /supra/.aptos && cp /supra/SupraLottery/supra/configs/playerN.yaml /supra/.aptos/config.yaml && \
+          /supra/supra move tool run \
+            --profile playerN \
+            --function-id LOTTERY_ADDR::core_treasury_v1::register_store \
+            --gas-unit-price 100 --max-gas 5000 --expiration-secs 300"
 ```
-Если bash недоступен, выполните команды из скрипта через контейнер `supra_cli`. Скрипт синхронизирует очереди истории/покупок и проверяет capability.
 
-Дополнительно выполните whitelisting VRF и депозиты согласно `SupraLottery/docs/testnet_deployment_checklist.md`.
-
----
-
-## 6. Проверки
-- `supra move tool show --query module ...` — модули опубликованы.
-- `lottery_core::treasury_v1::is_initialized`, `lottery_core::rounds::history_queue_length` — состояние ресурсов.
-- Тестовый сценарий: покупка билета, ручной розыгрыш.
-- Сохраните хеши транзакций и параметры газа в runbook/чеклисте.
-
----
-
-## 7. Legacy fallback
-Для возврата к монолитной версии:
-```powershell
-docker compose run --rm -e SUPRA_PROFILE=my_profile --entrypoint bash supra_cli `
-  -lc "/supra/supra move tool publish --package-dir /supra/move_workspace/lottery_backup         --included-artifacts none --skip-fetch-latest-git-deps         --gas-unit-price 100 --max-gas 200000 --expiration-secs 600 --assume-yes"
+2) Начислить LOT игроку (от админа):
 ```
-Дальнейшие шаги — по разделу Legacy в чеклисте.
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  "-lc" "mkdir -p /supra/.aptos && cp /supra/SupraLottery/supra/configs/testnet.yaml /supra/.aptos/config.yaml && \
+          /supra/supra move tool run \
+            --profile my_new_profile \
+            --function-id LOTTERY_ADDR::core_treasury_v1::mint_to \
+            --args address:PLAYER_ADDR --args u64:100000000 \
+            --gas-unit-price 100 --max-gas 5000 --expiration-secs 300"
+```
+
+3) Купить билет (у функции нет аргументов):
+```
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  "-lc" "mkdir -p /supra/.aptos && cp /supra/SupraLottery/supra/configs/playerN.yaml /supra/.aptos/config.yaml && \
+          /supra/supra move tool run \
+            --profile playerN \
+            --function-id LOTTERY_ADDR::core_main_v2::buy_ticket \
+            --gas-unit-price 100 --max-gas 5000 --expiration-secs 300"
+```
+
+После не менее 5 покупок (можно с разных игроков) проверьте статус:
+```
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  "-lc" "/supra/supra move tool view --profile my_new_profile --function-id LOTTERY_ADDR::core_main_v2::get_lottery_status"
+```
 
 ---
 
-## 8. Полезные ссылки
-- <https://docs.supra.com>
-- `supra/scripts/publish_lottery_packages.sh`
-- `supra/scripts/sync_lottery_queues.sh`
-- `SupraLottery/docs/testnet_deployment_checklist.md`
+## 5. Планирование розыгрыша
+
+```
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  "-lc" "/supra/supra move tool run --profile my_new_profile \
+          --function-id LOTTERY_ADDR::core_rounds::schedule_draw \
+          --args u64:0 --gas-unit-price 100 --max-gas 5000 --expiration-secs 300"
+```
 
 ---
 
-## 9. Завершение релиза
-- Чеклист выполнен, хеши/параметры задокументированы.
-- Создан git-тег (`release/testnet-YYYYMMDD`) или релизная ветка.
-- Обновлены фронтенд/интеграционные конфиги при необходимости.
+## 6. Статус‑репорт (Git Bash)
+
+Скрипты bash удобно запускать из Git Bash:
+
+```
+"C:\\Program Files\\Git\\bin\\bash.exe" -lc '
+  cd "/c/Users/spell/Desktop/projects/supra-project/SupraLottery" &&
+  PROFILE=my_new_profile \
+  LOTTERY_ADDR=0xbc9595...caafe0 \
+  DEPOSIT_ADDR=0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e \
+  bash supra/scripts/testnet_status_report.sh --cli /supra/supra --profile my_new_profile
+'
+```
+
+---
+
+## 7. Типичные ошибки и решения
+
+- `Status: Fail` в PowerShell без подробностей — выполняйте команды в интерактивной сессии контейнера (`docker compose … -it`) или через Git Bash с `winpty`.
+- `E_STORE_NOT_REGISTERED` на `buy_ticket` — выполните `core_treasury_v1::register_store` под игроком, затем `core_treasury_v1::mint_to` от админа, затем повторите покупку.
+- `429 Too Many Requests` у faucet — подождите указанное время или переведите газ с другого аккаунта (`move account transfer`).
+- Модуль/функции — используйте `core_main_v2::*` вместо устаревшего `main_v2::*`.
+- Пути: убедитесь, что везде используется латиница (`/supra/supra`).
+
+---
+
+## 8. Конфигурация VRF и депозита (важно перед подпиской)
+
+Перед созданием подписки задайте лимиты газа и снимки whitelist, иначе `create_subscription` может падать:
+
+1) Задать газ‑конфиг VRF (примеры):
+```
+/supra/supra move tool run --profile my_new_profile \
+  --function-id LOTTERY_ADDR::core_main_v2::configure_vrf_gas \
+  --args u128:1000 --args u128:500000 --args u128:1000 --args u128:500000 --args u128:25000 \
+  --gas-unit-price 100 --max-gas 5000 --expiration-secs 300
+```
+
+2) Зафиксировать снимки whitelist под эти значения:
+```
+/supra/supra move tool run --profile my_new_profile \
+  --function-id LOTTERY_ADDR::core_main_v2::record_client_whitelist_snapshot \
+  --args u128:1000 --args u128:500000 --args u128:<MIN_BALANCE_LIMIT> \
+  --gas-unit-price 100 --max-gas 5000 --expiration-secs 300
+
+/supra/supra move tool run --profile my_new_profile \
+  --function-id LOTTERY_ADDR::core_main_v2::record_consumer_whitelist_snapshot \
+  --args u128:1000 --args u128:500000 \
+  --gas-unit-price 100 --max-gas 5000 --expiration-secs 300
+```
+
+Примечание: минимальный баланс рассчитывается как
+```
+min_balance = (max_gas_limit + verification_gas_value) * max_gas_price * window
+```
+При `1000/500000/25000` и `window=30` получается `15_750_000_000`. Если баланс SUPRA на админском профиле меньше — уменьшите параметры (например, `100/100000/10000` даёт `330_000_000`) и внесите меньший депозит.
+
+3) Создать подписку (депозит в SUPRA):
+```
+/supra/supra move tool run --profile my_new_profile \
+  --function-id LOTTERY_ADDR::core_main_v2::create_subscription \
+  --args u64:<DEPOSIT_AMOUNT> \
+  --gas-unit-price 100 --max-gas 5000 --expiration-secs 300
+```
+
+После подписки можно запрашивать случайность (`core_rounds::request_randomness`) и отслеживать исполнение.
+
+---
+
+Документ проверен в среде Windows + Docker + PowerShell/Git Bash и отражает фактические шаги, необходимые для корректной покупки билетов и последующего розыгрыша.

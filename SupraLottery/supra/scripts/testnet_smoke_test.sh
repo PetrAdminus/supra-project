@@ -34,7 +34,7 @@ supra_cli_info "Minting ${TICKET_FUND} tokens to admin"
 supra_cli_move_run "--function-id ${LOTTERY_ADDR}::treasury_v1::mint_to --args address:${ADMIN_ADDR} u64:${TICKET_FUND} --assume-yes"
 
 supra_cli_info "Reading ticket price"
-PRICE_JSON=$(supra_cli_move_view "--function-id ${LOTTERY_ADDR}::main_v2::get_ticket_price" | tr -d '\r')
+PRICE_JSON=$(supra_cli_move_view "--function-id ${LOTTERY_ADDR}::core_main_v2::get_ticket_price" | tr -d '\r')
 TICKET_PRICE=$(python - "$PRICE_JSON" <<'PY'
 import json, sys
 try:
@@ -57,12 +57,12 @@ fi
 supra_cli_info "Buying tickets"
 for ((i = 1; i <= TICKETS_REQUIRED; ++i)); do
   supra_cli_info "Ticket #${i}"
-  supra_cli_move_run "--function-id ${LOTTERY_ADDR}::main_v2::buy_ticket --assume-yes"
+  supra_cli_move_run "--function-id ${LOTTERY_ADDR}::core_main_v2::buy_ticket --assume-yes"
   sleep 1
 done
 
 supra_cli_info "Checking lottery status"
-STATUS_JSON=$(supra_cli_move_view "--function-id ${LOTTERY_ADDR}::main_v2::get_lottery_status" | tr -d '\r')
+STATUS_JSON=$(supra_cli_move_view "--function-id ${LOTTERY_ADDR}::core_main_v2::get_lottery_status" | tr -d '\r')
 python - "$STATUS_JSON" <<'PY'
 import json, sys
 try:
@@ -74,9 +74,9 @@ print("pending_request:", data.get("pending_request"))
 PY
 
 supra_cli_info "Configuring VRF request"
-supra_cli_move_run "--function-id ${LOTTERY_ADDR}::main_v2::configure_vrf_request --args u8:${RNG_COUNT} u64:${NUM_CONFIRMATIONS} u64:${CLIENT_SEED} --assume-yes"
+supra_cli_move_run "--function-id ${LOTTERY_ADDR}::core_main_v2::configure_vrf_request --args u8:${RNG_COUNT} u64:${NUM_CONFIRMATIONS} u64:${CLIENT_SEED} --assume-yes"
 
 supra_cli_info "Calling manual_draw"
-supra_cli_move_run "--function-id ${LOTTERY_ADDR}::main_v2::manual_draw --assume-yes"
+supra_cli_move_run "--function-id ${LOTTERY_ADDR}::core_main_v2::manual_draw --assume-yes"
 
 supra_cli_info "Smoke test triggered manual_draw. Monitor DrawHandledEvent via docs/dvrf_event_monitoring.md"
