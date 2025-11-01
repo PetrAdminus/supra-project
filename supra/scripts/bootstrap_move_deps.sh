@@ -31,7 +31,7 @@ main() {
 
   local tmpdir
   tmpdir="$(mktemp -d)"
-  trap 'rm -rf "${tmpdir}"' EXIT
+  trap 'if [ -n "${tmpdir:-}" ]; then rm -rf "${tmpdir}"; fi' EXIT
 
   local archive="${tmpdir}/aptos-core.tar.gz"
   log "Fetching ${REPO_URL} (${REV})"

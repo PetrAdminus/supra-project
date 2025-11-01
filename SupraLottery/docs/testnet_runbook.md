@@ -176,6 +176,8 @@ Supra CLI РЅР°С‡РёРЅР°СЏ СЃ СЂРµР»РёР·Р° 2025.05 С
 
    > Р•СЃР»Рё `create_subscription` Р·Р°РІРµСЂС€РёР»Р°СЃСЊ РѕС€РёР±РєРѕР№ `ECLIENT_NOT_EXIST`, Р·РЅР°С‡РёС‚ Supra РµС‰С‘ РЅРµ Р·Р°С„РёРєСЃРёСЂРѕРІР°Р»Р° РІР°С€ РєР»РёРµРЅС‚. РџРѕРІС‚РѕСЂРёС‚Рµ С€Р°РіРё 4вЂ“5 РїРѕР·РґРЅРµРµ; РјРµР¶РґСѓ РѕРЅР±РѕСЂРґРёРЅРіРѕРј Рё whitelisting РјРѕР¶РµС‚ РїРѕС‚СЂРµР±РѕРІР°С‚СЊСЃСЏ РґРѕ РЅРµСЃРєРѕР»СЊРєРёС… РјРёРЅСѓС‚.
 
+   РљРѕРЅС‚СЂР°РєС‚ РїСЂРё СЌС‚РѕРј СЃРѕС…СЂР°РЅСЏРµС‚ client/consumer snapshots, РїРѕСЌС‚РѕРјСѓ РїРѕРІС‚РѕСЂРЅС‹Рµ РІС‹Р·РѕРІС‹ `lottery::core_main_v2::configure_vrf_gas` Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё РІС‹Р·С‹РІР°СЋС‚ `deposit::updateMaxGasPrice/Limit` Рё `deposit::updateCallbackGasPrice/Limit`, РєРѕРіРґР° СЃРЅР°РїС€РѕС‚С‹ РїСЂРёСЃСѓС‚СЃС‚РІСѓСЋС‚.
+
 7. **(РћРїС†РёРѕРЅР°Р»СЊРЅРѕ) СЃРёРЅС…СЂРѕРЅРёР·РёСЂСѓР№С‚Рµ РјРёРЅРёРјР°Р»СЊРЅС‹Р№ Р±Р°Р»Р°РЅСЃ РІСЂСѓС‡РЅСѓСЋ.** РСЃРїРѕР»СЊР·СѓР№С‚Рµ РїСЂРё РёР·РјРµРЅРµРЅРёРё Р»РёРјРёС‚РѕРІ РіР°Р·Р° РЅР° СЃС‚РѕСЂРѕРЅРµ Supra.
    ```bash
    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery::core_main_v2::set_minimum_balance --assume-yes"
@@ -189,7 +191,7 @@ Supra CLI РЅР°С‡РёРЅР°СЏ СЃ СЂРµР»РёР·Р° 2025.05 С
    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery::core_main_v2::record_consumer_whitelist_snapshot --args u128:<CALLBACK_GAS_PRICE> u128:<CALLBACK_GAS_LIMIT>"
    ```
 
-9. **РЈРїСЂР°РІР»РµРЅРёРµ РґРµРїРѕР·РёС‚РѕРј РЅР°РїСЂСЏРјСѓСЋ (РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё).** Р’СЃРµ С„СѓРЅРєС†РёРё РїСЂРёРЅРёРјР°СЋС‚ camelCase-РёРјРµРЅР° РїСЂРё РІС‹Р·РѕРІРµ С‡РµСЂРµР· Supra CLI.
+9. **РЈРїСЂР°РІР»РµРЅРёРµ РґРµРїРѕР·РёС‚РѕРј РЅР°РїСЂСЏРјСѓСЋ (РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё).** Р’СЃРµ С„СѓРЅРєС†РёРё РїСЂРёРЅРёРјР°СЋС‚ camelCase-РёРјРµРЅР° РїСЂРё РІС‹Р·РѕРІРµ С‡РµСЂРµР· Supra CLI. РџРѕСЃР»Рµ С‚РѕРіРѕ РєР°Рє СЃРЅР°РїС€РѕС‚С‹ whitelisting Р·Р°С„РёРєСЃРёСЂРѕРІР°РЅС‹, РєРѕРЅС‚СЂР°РєС‚ СЃР°Рј СЃРёРЅС…СЂРѕРЅРёР·РёСЂСѓРµС‚ `deposit::update*` РїСЂРё РёР·РјРµРЅРµРЅРёРё РєРѕРЅС„РёРіСѓСЂР°С†РёРё, РїРѕСЌС‚РѕРјСѓ СЌС‚Рё РєРѕРјР°РЅРґС‹ РЅСѓР¶РЅС‹ С‚РѕР»СЊРєРѕ РєР°Рє СЂРµР·РµСЂРІРЅС‹Р№ СЃС†РµРЅР°СЂРёР№.
    ```bash
    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::deposit::clientSettingMinimumBalance --args u128:<MIN_BALANCE> --assume-yes"
    ```
@@ -251,7 +253,7 @@ Supra CLI РЅР°С‡РёРЅР°СЏ СЃ СЂРµР»РёР·Р° 2025.05 С
       --supra-cli-bin /supra/supra \
       --supra-config $SUPRA_CONFIG
     ```
-    РЎРєСЂРёРїС‚ РІС‹Р·С‹РІР°РµС‚ `lottery::core_main_v2::remove_subscription`, РїСѓР±Р»РёРєСѓРµС‚ СЃРѕР±С‹С‚РёРµ `SubscriptionContractRemovedEvent` Рё РїСЂРѕРєСЃРёСЂСѓРµС‚ `deposit::remove_contract_from_whitelist`. РџСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё РјРѕР¶РЅРѕ РІС‹РїРѕР»РЅРёС‚СЊ РєРѕРјР°РЅРґСѓ РЅР°РїСЂСЏРјСѓСЋ С‡РµСЂРµР· Supra CLI:
+    РЎРєСЂРёРїС‚ РІС‹Р·С‹РІР°РµС‚ `lottery::core_main_v2::remove_subscription`, РїСѓР±Р»РёРєСѓРµС‚ СЃРѕР±С‹С‚РёРµ `SubscriptionContractRemovedEvent` Рё РїСЂРѕРєСЃРёСЂСѓРµС‚ `deposit::removeContractFromWhitelist`. РџРѕСЃР»Рµ СѓРґР°Р»РµРЅРёСЏ СЃРЅР°РїС€РѕС‚С‹ client/consumer СЃР±С€РёРІР°СЋС‚СЃСЏ, С‚Р°Рє С‡С‚Рѕ РїРѕСЃР»РµРґСѓСЋС‰РёРµ `configure_vrf_gas` РЅРµ С‚СЂРѕРіР°СЋС‚ РґРµРїРѕР·РёС‚ РґРѕ РЅРѕРІРѕР№ РїРѕРґРїРёСЃРєРё. РџСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё РјРѕР¶РЅРѕ РІС‹РїРѕР»РЅРёС‚СЊ РєРѕРјР°РЅРґСѓ РЅР°РїСЂСЏРјСѓСЋ С‡РµСЂРµР· Supra CLI:
     ```bash
     docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery::core_main_v2::remove_subscription --assume-yes"
     ```
@@ -655,3 +657,12 @@ docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli
 - `error[E04004]`/`error[E04005]` РїСЂРё РѕР±РѕСЂР°С‡РёРІР°РЅРёРё РєРѕСЂС‚РµР¶РµР№ РІ `Option` вЂ” Р·Р°РјРµРЅСЏР№С‚Рµ РєРѕСЂС‚РµР¶Рё РѕС‚РґРµР»СЊРЅС‹РјРё СЃС‚СЂСѓРєС‚СѓСЂР°РјРё `*_View`.
 - РџРѕР»РЅС‹Р№ СЃРїСЂР°РІРѕС‡РЅРёРє СЃ РєРѕРґР°РјРё РѕС€РёР±РѕРє СЃРј. РІ РґРѕРєСѓРјРµРЅС‚Рµ [docs/move_common_errors_ru.md](move_common_errors_ru.md).
 
+
+### 3.11 Оффлайн и демо режим
+
+- Если необходимо показать розыгрыш без dVRF (демо, песочница), используйте `core_main_v2::simple_draw`. Команда аналогична другим вызовам CLI:
+  ```bash
+  docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery::core_main_v2::simple_draw --gas-unit-price 100 --max-gas 5000 --expiration-secs 300"
+  ```
+- После оффлайн-розыгрыша проверьте `get_lottery_status` — счётчики VRF не увеличиваются, поэтому перед возвращением к `request_draw` убедитесь, что `pending_request` очищен.
+- Коды ошибок и рекомендации собраны в [справочнике dVRF 3.0](../../docs/dvrf_error_reference.md).

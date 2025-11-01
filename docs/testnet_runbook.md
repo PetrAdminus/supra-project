@@ -199,6 +199,25 @@ min_balance = (max_gas_limit + verification_gas_value) * max_gas_price * window
 ```
 При `1000/500000/25000` и `window=30` получается `15_750_000_000`. Если баланс SUPRA на админском профиле меньше — уменьшите параметры (например, `100/100000/10000` даёт `330_000_000`) и внесите меньший депозит.
 
+Дополнительные коды ошибок и способы их устранения собраны в [справочнике dVRF 3.0](./dvrf_error_reference.md).
+
+### 8.1 Оффлайн и демо режим
+
+Иногда требуется показать розыгрыш без живого ответа от Supra dVRF (например, на демо или до завершения whitelisting). Контракт сохраняет упрощённый путь `simple_draw`, который использует локальные данные билетов.
+
+1) Убедитесь, что билеты куплены и розыгрыш запланирован (`core_rounds::schedule_draw`). Если планирование не требуется, можно просто подтвердить наличие билетов через `get_lottery_status`.
+2) Запустите оффлайн-розыгрыш от имени администратора:
+   ```bash
+   docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli \
+     "-lc" "/supra/supra move tool run --profile my_new_profile \
+            --function-id LOTTERY_ADDR::core_main_v2::simple_draw \
+            --gas-unit-price 100 --max-gas 5000 --expiration-secs 300"
+   ```
+3) Проверьте событие `WinnerSelected` и состояние через `get_lottery_status` — колбэк VRF в этом сценарии не вызывается.
+4) Перед возвращением к полноценному VRF-потоку убедитесь, что `pending_request` очищен и при необходимости заново вызовите `request_draw`.
+
+> Предупреждение: `simple_draw` не обновляет счётчики VRF, поэтому не используйте его одновременно с активными dVRF-запросами.
+
 3) Создать подписку (депозит в SUPRA):
 ```
 /supra/supra move tool run --profile my_new_profile \
@@ -318,6 +337,132 @@ APTOS_CONFIG=/supra/SupraLottery/supra/configs/player1.yaml \
 ```
 
 > Статус на момент обновления: лотерея ID = 3 продолжает ожидать реального ответа Supra VRF (request_id = 1); лотерея ID = 4 прошла ручной цикл — вручную вызван `core_rounds::fulfill_draw` с тестовыми байтами (request_id = 2), игрок 0x553fd4...1762 получил приз 18 000 000 SUPRA, операционный пул пополнился на 3 000 000.
+
+---
+
+## 7. Миграция подписки dVRF 3.0
+
+Порядок действий соответствует camelCase API Supra и предполагает, что Move-пакеты уже опубликованы на `LOTTERY_ADDR`.
+
+### 7.1. Перевод клиента Supra на v3
+
+```powershell
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli \
+  "-lc" "mkdir -p /supra/.aptos && cp /supra/SupraLottery/supra/configs/testnet.yaml /supra/.aptos/config.yaml && \
+          /supra/supra move tool run \
+            --profile my_new_profile \
+            --function-id DEPOSIT_ADDR::deposit::migrateClient \
+            --args u128:100000 --args u128:150000 \
+            --gas-unit-price 100 --max-gas 20000 --expiration-secs 300"
+```
+
+Значения `u128` аргументов соответствуют `max_gas_price` и `max_gas_limit` клиента. После миграции запускаем self-whitelisting:
+
+```powershell
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli \
+  "-lc" "mkdir -p /supra/.aptos && cp /supra/SupraLottery/supra/configs/testnet.yaml /supra/.aptos/config.yaml && \
+          /supra/supra move tool run \
+            --profile my_new_profile \
+            --function-id DEPOSIT_ADDR::deposit::addClientToWhitelist \
+            --args u128:100000 --args u128:150000 \
+            --gas-unit-price 100 --max-gas 20000 --expiration-secs 300"
+```
+
+### 7.2. Настройка минимума и депозита
+
+```powershell
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli \
+  "-lc" "mkdir -p /supra/.aptos && cp /supra/SupraLottery/supra/configs/testnet.yaml /supra/.aptos/config.yaml && \
+          /supra/supra move tool run \
+            --profile my_new_profile \
+            --function-id DEPOSIT_ADDR::deposit::clientSettingMinimumBalance \
+            --args u128:5000000000 \
+            --gas-unit-price 100 --max-gas 20000 --expiration-secs 300"
+
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli \
+  "-lc" "mkdir -p /supra/.aptos && cp /supra/SupraLottery/supra/configs/testnet.yaml /supra/.aptos/config.yaml && \
+          /supra/supra move tool run \
+            --profile my_new_profile \
+            --function-id DEPOSIT_ADDR::deposit::depositFundClient \
+            --args u64:10000000000 \
+            --gas-unit-price 100 --max-gas 20000 --expiration-secs 300"
+```
+
+После первого вызова `create_subscription` контракт записывает снапшоты whitelisting. Любой последующий вызов `lottery::core_main_v2::configure_vrf_gas` автоматически выполнит `deposit::updateMaxGasPrice` и `deposit::updateMaxGasLimit`, поэтому ручной CLI пригодится только для отладки или аварийной синхронизации.
+
+### 7.3. Добавление контракта-Consumer
+
+```powershell
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli \
+  "-lc" "mkdir -p /supra/.aptos && cp /supra/SupraLottery/supra/configs/testnet.yaml /supra/.aptos/config.yaml && \
+          /supra/supra move tool run \
+            --profile my_new_profile \
+            --function-id DEPOSIT_ADDR::deposit::addContractToWhitelist \
+            --args address:LOTTERY_ADDR \
+            --args u128:30000 --args u128:120000 \
+            --gas-unit-price 100 --max-gas 20000 --expiration-secs 300"
+```
+
+Для callback-газа действует та же схема: `configure_vrf_gas` синхронизирует `deposit::updateCallbackGasPrice` и `deposit::updateCallbackGasLimit`, пока в контракте сохранён снапшот consumer whitelist. Ручные команды Supra CLI оставьте в резерв на случай отсутствия снапшота.
+
+### 7.4. Проверка конфигурации dVRF 3.0
+
+```powershell
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli \
+  "-lc" "/supra/supra move tool view --profile my_new_profile \
+          --function-id LOTTERY_ADDR::core_main_v2::get_client_whitelist_snapshot"
+
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli \
+  "-lc" "/supra/supra move tool view --profile my_new_profile \
+          --function-id LOTTERY_ADDR::core_main_v2::get_consumer_whitelist_snapshot"
+
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli \
+  "-lc" "/supra/supra move tool view --profile my_new_profile \
+          --function-id DEPOSIT_ADDR::deposit::checkClientFund \
+          --args address:LOTTERY_ADDR"
+```
+
+Сравните возвращаемые значения с конфигурацией в `LotteryData` (события `SubscriptionConfiguredEvent`, `GasConfigUpdatedEvent`).
+
+---
+
+## 8. Тестирование Move-пакетов
+
+Для автоматизации используем Python-обёртку, которая ищет Supra CLI (`supra`) или vanilla Move CLI (`move`). Рекомендуется запускать тесты в контейнере Supra CLI:
+
+```bash
+# 1. Устанавливаем Move-фреймворки Supra во внутренний кэш (~/.move).
+bash supra/scripts/bootstrap_move_deps.sh
+
+# 2. Запускаем Move-тесты (пример для пакета lottery_core) внутри Docker-контейнера.
+docker compose run --rm --entrypoint bash supra_cli \
+  -lc 'cd /supra/SupraLottery && \
+       PYTHONPATH=/supra/SupraLottery python3 -m supra.scripts.cli move-test \
+         --workspace SupraLottery/supra/move_workspace \
+         --package lottery_core \
+         --cli /supra/supra \
+         --report-json tmp/move-test-report.json \
+         --report-junit tmp/move-test-report.xml \
+         --report-log tmp/move-test-report.log'
+```
+
+Артефакты выполнения (`tmp/move-test-report.{json,xml,log}`) сохраняются в репозитории и фиксируют используемый CLI, команду и результат. В текущей ревизии зафиксирован dry-run со статусом `skipped`; после получения Supra CLI повторите команду без `--dry-run`, чтобы получить отчёты с фактическим прогоном.
+
+Команду запускаем из каталога `SupraLottery` (или с переменной `PYTHONPATH=SupraLottery`), чтобы Python нашёл модуль `supra.scripts`. Если в среде нет доступа к Docker, передайте путь к локальному бинарю через `--cli=/path/to/supra`. При отсутствии CLI скрипт завершится ошибкой `MoveCliNotFoundError`.
+
+Если Supra CLI временно недоступен, выполните сухой прогон, чтобы убедиться в корректности конфигурации named addresses и зафиксировать набор команд:
+
+```bash
+PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test \
+  --workspace SupraLottery/supra/move_workspace \
+  --package lottery_core \
+  --dry-run \
+  --report-json tmp/move-test-report.json \
+  --report-junit tmp/move-test-report.xml \
+  --report-log tmp/move-test-report.log
+```
+
+Отчёты с префиксом `tmp/move-test-report.*` пригодятся для аудита: JSON и JUnit содержат команды и статусы пакетов, лог отражает используемые бинарии и именованные адреса. Полноценные тесты нужно повторить после получения CLI.
 
 ---
 

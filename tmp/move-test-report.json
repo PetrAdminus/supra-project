@@ -1,71 +1,26 @@
 {
-  "workspace": "C:\\Users\\spell\\Desktop\\projects\\supra-project\\SupraLottery\\supra\\move_workspace",
-  "cli_path": "tmp\\aptos.cmd",
-  "cli_flavour": "aptos",
+  "workspace": "/workspace/supra-project/SupraLottery/supra/move_workspace",
+  "cli_path": "/supra/supra",
+  "cli_flavour": "supra",
   "results": [
     {
-      "package": "lottery",
+      "package": "lottery_core",
       "command": [
-        "tmp\\aptos.cmd",
+        "/supra/supra",
         "move",
+        "tool",
         "test",
         "--package-dir",
-        "C:\\Users\\spell\\Desktop\\projects\\supra-project\\SupraLottery\\supra\\move_workspace\\lottery",
-        "--skip-fetch-latest-git-deps"
+        "/workspace/supra-project/SupraLottery/supra/move_workspace/lottery_core",
+        "--named-addresses",
+        "jackpot_pool=0x0000000000000000000000000000000000000000000000000000000000000109,lottery=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0,lottery_contract=0x0000000000000000000000000000000000000000000000000000000000000104,lottery_core=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0,lottery_factory=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0,lottery_owner=0x0000000000000000000000000000000000000000000000000000000000000103,lottery_rewards=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0,lottery_support=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0,operations_pool=0x000000000000000000000000000000000000000000000000000000000000010a,player1=0x0000000000000000000000000000000000000000000000000000000000000105,player2=0x0000000000000000000000000000000000000000000000000000000000000106,player3=0x0000000000000000000000000000000000000000000000000000000000000107,player4=0x0000000000000000000000000000000000000000000000000000000000000108,supra_addr=0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e,vrf_hub=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
       ],
-      "flavour": "aptos",
-      "cli": "tmp\\aptos.cmd",
-      "status": "passed",
-      "return_code": 0,
-      "duration_seconds": 305.08687138557434
-    },
-    {
-      "package": "lottery_factory",
-      "command": [
-        "tmp\\aptos.cmd",
-        "move",
-        "test",
-        "--package-dir",
-        "C:\\Users\\spell\\Desktop\\projects\\supra-project\\SupraLottery\\supra\\move_workspace\\lottery_factory",
-        "--skip-fetch-latest-git-deps"
-      ],
-      "flavour": "aptos",
-      "cli": "tmp\\aptos.cmd",
-      "status": "failed",
-      "return_code": 1,
-      "duration_seconds": 0.013344287872314453
-    },
-    {
-      "package": "SupraVrf",
-      "command": [
-        "tmp\\aptos.cmd",
-        "move",
-        "test",
-        "--package-dir",
-        "C:\\Users\\spell\\Desktop\\projects\\supra-project\\SupraLottery\\supra\\move_workspace\\SupraVrf",
-        "--skip-fetch-latest-git-deps"
-      ],
-      "flavour": "aptos",
-      "cli": "tmp\\aptos.cmd",
-      "status": "failed",
-      "return_code": 1,
-      "duration_seconds": 0.013553142547607422
-    },
-    {
-      "package": "vrf_hub",
-      "command": [
-        "tmp\\aptos.cmd",
-        "move",
-        "test",
-        "--package-dir",
-        "C:\\Users\\spell\\Desktop\\projects\\supra-project\\SupraLottery\\supra\\move_workspace\\vrf_hub",
-        "--skip-fetch-latest-git-deps"
-      ],
-      "flavour": "aptos",
-      "cli": "tmp\\aptos.cmd",
-      "status": "failed",
-      "return_code": 1,
-      "duration_seconds": 0.015059232711791992
+      "flavour": "supra",
+      "cli": "/supra/supra",
+      "named_addresses": "jackpot_pool=0x0000000000000000000000000000000000000000000000000000000000000109,lottery=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0,lottery_contract=0x0000000000000000000000000000000000000000000000000000000000000104,lottery_core=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0,lottery_factory=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0,lottery_owner=0x0000000000000000000000000000000000000000000000000000000000000103,lottery_rewards=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0,lottery_support=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0,operations_pool=0x000000000000000000000000000000000000000000000000000000000000010a,player1=0x0000000000000000000000000000000000000000000000000000000000000105,player2=0x0000000000000000000000000000000000000000000000000000000000000106,player3=0x0000000000000000000000000000000000000000000000000000000000000107,player4=0x0000000000000000000000000000000000000000000000000000000000000108,supra_addr=0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e,vrf_hub=0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0",
+      "status": "skipped",
+      "return_code": null,
+      "duration_seconds": 0.0
     }
   ]
 }
