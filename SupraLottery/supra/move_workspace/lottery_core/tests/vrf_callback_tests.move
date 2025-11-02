@@ -2,7 +2,6 @@
 module lottery_core::core_vrf_callback_tests {
     use std::hash;
     use std::option;
-    use std::signer;
     use std::vector;
     use lottery_core::core_main_v2 as main_v2;
     use lottery_core::core_treasury_v1 as treasury_v1;
@@ -38,14 +37,14 @@ module lottery_core::core_vrf_callback_tests {
         main_v2::set_pending_request_for_test(option::some(111));
 
         let fake_message = vector::empty<u8>();
-        let mut randomness = vector::empty<u256>();
+        let randomness = vector::empty<u256>();
         vector::push_back(&mut randomness, 0u256);
 
         main_v2::handle_verified_random_for_test(
             999, // mismatched nonce
             fake_message,
             randomness,
-            main_v2::EXPECTED_RNG_COUNT,
+            main_v2::expected_rng_count_for_test(),
             0,
             @vrf_hub,
         );
@@ -73,8 +72,8 @@ module lottery_core::core_vrf_callback_tests {
         main_v2::set_draw_state_for_test(true, tickets);
         main_v2::set_jackpot_amount_for_test(0);
 
-        let rng_count: u8 = main_v2::EXPECTED_RNG_COUNT;
-        let confirmations: u64 = main_v2::EXPECTED_CONFIRMATIONS;
+        let rng_count: u8 = main_v2::expected_rng_count_for_test();
+        let confirmations: u64 = main_v2::expected_confirmations_for_test();
         let client_seed: u64 = 7;
         let nonce: u64 = 42;
         let requester = @lottery;
@@ -99,14 +98,14 @@ module lottery_core::core_vrf_callback_tests {
             option::some(requester),
         );
 
-        let mut tampered_message = clone_bytes(&canonical_message);
+        let tampered_message = clone_bytes(&canonical_message);
         if (vector::length(&tampered_message) > 0) {
             let first = *vector::borrow(&tampered_message, 0);
             let mut_ref = vector::borrow_mut(&mut tampered_message, 0);
             *mut_ref = if (first == 255) { 0 } else { first + 1 };
         };
 
-        let mut randomness = vector::empty<u256>();
+        let randomness = vector::empty<u256>();
         vector::push_back(&mut randomness, 0u256);
 
         main_v2::handle_verified_random_for_test(
@@ -141,13 +140,13 @@ module lottery_core::core_vrf_callback_tests {
     }
 
     fun clone_bytes(source: &vector<u8>): vector<u8> {
-        let copy = vector::empty<u8>();
+        let result = vector::empty<u8>();
         let len = vector::length(source);
         let i = 0;
         while (i < len) {
-            vector::push_back(&mut copy, *vector::borrow(source, i));
+            vector::push_back(&mut result, *vector::borrow(source, i));
             i = i + 1;
         };
-        copy
+        result
     }
 }

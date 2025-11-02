@@ -26,6 +26,16 @@ module lottery_core::core_main_v2 {
     const MIN_REQUEST_WINDOW_U128: u128 = 30;
     const EXPECTED_RNG_COUNT: u8 = 1;
     const EXPECTED_CONFIRMATIONS: u64 = 1;
+
+    #[test_only]
+    public fun expected_rng_count_for_test(): u8 {
+        EXPECTED_RNG_COUNT
+    }
+
+    #[test_only]
+    public fun expected_confirmations_for_test(): u64 {
+        EXPECTED_CONFIRMATIONS
+    }
     const MAX_CONFIRMATIONS: u64 = 20;
     const E_TREASURY_NOT_INITIALIZED: u64 = 12;
     const E_PLAYER_STORE_NOT_REGISTERED: u64 = 13;
@@ -53,10 +63,17 @@ module lottery_core::core_main_v2 {
     const E_RNG_RESPONSE_OVERFLOW: u64 = 35;
     const E_RANDOM_INDEX_OVERFLOW: u64 = 36;
     const E_CANNOT_REMOVE_DEFAULT_CONSUMER: u64 = 37;
+    const E_INVALID_TICKET_PRICE: u64 = 38;
+    const E_INVALID_DRAW_THRESHOLD: u64 = 39;
     const U64_MAX: u64 = 18446744073709551615;
     const U64_MAX_AS_U128: u128 = 18446744073709551615;
     const U128_MAX: u128 = 340282366920938463463374607431768211455;
-    const TICKET_PRICE: u64 = 10000000; // 0.01 SUPRA
+    const DEFAULT_TICKET_PRICE: u64 = 10000000; // 0.01 SUPRA
+    const MIN_TICKET_PRICE: u64 = 1000000; // 0.001 SUPRA
+    const MAX_TICKET_PRICE: u64 = 1000000000000; // 10 SUPRA
+    const DEFAULT_AUTO_DRAW_THRESHOLD: u64 = 5;
+    const MIN_AUTO_DRAW_THRESHOLD: u64 = 1;
+    const MAX_AUTO_DRAW_THRESHOLD: u64 = 1000;
 
     struct ClientWhitelistSnapshot has copy, drop, store {
         max_gas_price: u128,
@@ -102,12 +119,19 @@ module lottery_core::core_main_v2 {
         client_whitelist_snapshot: option::Option<ClientWhitelistSnapshot>,
         consumer_whitelist_snapshot: option::Option<ConsumerWhitelistSnapshot>,
         vrf_request_config: option::Option<VrfRequestConfig>,
+        ticket_price: u64,
+        auto_draw_threshold: u64,
     }
 
     #[event]
     struct TicketBought has store, copy, drop { buyer: address, ticket_id: u64, amount: u64 }
     #[event]
     struct WinnerSelected has store, copy, drop { winner: address, prize: u64 }
+    #[event]
+    struct LotteryConfigUpdatedEvent has store, copy, drop {
+        ticket_price: u64,
+        auto_draw_threshold: u64,
+    }
     #[event]
     struct SubscriptionConfiguredEvent has drop, store, copy {
         min_balance: u64,
@@ -453,11 +477,14 @@ module lottery_core::core_main_v2 {
             client_whitelist_snapshot: option::none<ClientWhitelistSnapshot>(),
             consumer_whitelist_snapshot: option::none<ConsumerWhitelistSnapshot>(),
             vrf_request_config: option::none<VrfRequestConfig>(),
+            ticket_price: DEFAULT_TICKET_PRICE,
+            auto_draw_threshold: DEFAULT_AUTO_DRAW_THRESHOLD,
         });
 
         event::emit(ConsumerWhitelistedEvent { consumer: @lottery });
 
         let lottery_snapshot = borrow_global<LotteryData>(@lottery);
+        emit_config_event(lottery_snapshot);
         emit_whitelist_snapshot(
             &lottery_snapshot.whitelisted_consumers,
             &lottery_snapshot.whitelisted_callback_sender,
@@ -466,12 +493,16 @@ module lottery_core::core_main_v2 {
 
     public entry fun buy_ticket(user: &signer) acquires LotteryData {
         let user_addr = signer::address_of(user);
-        let ticket_price = TICKET_PRICE; // 0.01 SUPRA
-
         assert!(treasury_v1::store_registered(user_addr), E_PLAYER_STORE_NOT_REGISTERED);
+
+        let ticket_price = {
+            let lottery_view = borrow_global<LotteryData>(@lottery);
+            lottery_view.ticket_price
+        };
 
         // Withdraw from user and add to contract pool
         treasury_v1::deposit_from_user(user, ticket_price);
+
         let lottery = borrow_global_mut<LotteryData>(@lottery);
         let new_jackpot = safe_add_u64(lottery.jackpot_amount, ticket_price, E_JACKPOT_OVERFLOW);
         lottery.jackpot_amount = new_jackpot;
@@ -483,9 +514,38 @@ module lottery_core::core_main_v2 {
 
         event::emit(TicketBought { buyer: user_addr, ticket_id, amount: ticket_price });
 
-        // If 5+ tickets and draw not scheduled - mark as ready for draw
-        if (vector::length(&lottery.tickets) >= 5 && !lottery.draw_scheduled) {
+        let threshold = lottery.auto_draw_threshold;
+        let ticket_count = vector::length(&lottery.tickets);
+        if (threshold > 0 && ticket_count >= threshold && !lottery.draw_scheduled) {
             lottery.draw_scheduled = true;
+        };
+    }
+
+    public entry fun set_ticket_price(admin: &signer, new_price: u64) acquires LotteryData {
+        ensure_admin(admin);
+        assert!(new_price >= MIN_TICKET_PRICE, E_INVALID_TICKET_PRICE);
+        assert!(new_price <= MAX_TICKET_PRICE, E_INVALID_TICKET_PRICE);
+
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
+        if (lottery.ticket_price != new_price) {
+            lottery.ticket_price = new_price;
+            emit_config_event(lottery);
+        };
+    }
+
+    public entry fun set_auto_draw_threshold(admin: &signer, new_threshold: u64) acquires LotteryData {
+        ensure_admin(admin);
+        assert!(new_threshold >= MIN_AUTO_DRAW_THRESHOLD, E_INVALID_DRAW_THRESHOLD);
+        assert!(new_threshold <= MAX_AUTO_DRAW_THRESHOLD, E_INVALID_DRAW_THRESHOLD);
+
+        let lottery = borrow_global_mut<LotteryData>(@lottery);
+        if (lottery.auto_draw_threshold != new_threshold) {
+            lottery.auto_draw_threshold = new_threshold;
+            let ticket_count = vector::length(&lottery.tickets);
+            if (new_threshold > 0 && ticket_count >= new_threshold && !lottery.draw_scheduled) {
+                lottery.draw_scheduled = true;
+            };
+            emit_config_event(lottery);
         };
     }
 
@@ -1708,8 +1768,15 @@ module lottery_core::core_main_v2 {
     }
 
     #[view]
-    public fun get_ticket_price(): u64 {
-        TICKET_PRICE
+    public fun get_ticket_price(): u64 acquires LotteryData {
+        let lottery = borrow_global<LotteryData>(@lottery);
+        lottery.ticket_price
+    }
+
+    #[view]
+    public fun get_auto_draw_threshold(): u64 acquires LotteryData {
+        let lottery = borrow_global<LotteryData>(@lottery);
+        lottery.auto_draw_threshold
     }
 
     #[view]
@@ -1973,6 +2040,17 @@ module lottery_core::core_main_v2 {
         assert!(max_gas_price > 0, E_GAS_CONFIG_NOT_SET);
         assert!(max_gas_limit > 0, E_GAS_CONFIG_NOT_SET);
         assert!(verification_gas_value > 0, E_GAS_CONFIG_NOT_SET);
+    }
+
+    fun emit_config_event(lottery: &LotteryData) {
+        event::emit(LotteryConfigUpdatedEvent {
+            ticket_price: lottery.ticket_price,
+            auto_draw_threshold: lottery.auto_draw_threshold,
+        });
+    }
+
+    fun ensure_admin(admin: &signer) {
+        assert!(signer::address_of(admin) == @lottery, E_NOT_OWNER);
     }
 
     fun ensure_callback_sender_configured(lottery: &LotteryData): address {

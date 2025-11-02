@@ -86,6 +86,42 @@ docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli
   "-lc" "/supra/supra move tool view --profile my_new_profile --function-id LOTTERY_ADDR::core_main_v2::get_lottery_status"
 ```
 
+### Настройка параметров лотереи
+
+По умолчанию `core_main_v2` стартует с ценой билета 0.01 SUPRA (`1_000_000` микросупра) и автоматическим запуском розыгрыша при 5 билетах. Эти значения можно менять без обновления пакета.
+
+```
+# Установка новой цены (пример: 0.02 SUPRA = 2_000_000 микросупра)
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  "-lc" "/supra/supra move tool run \
+        --profile my_new_profile \
+        --function-id LOTTERY_ADDR::core_main_v2::set_ticket_price \
+        --args u64:2000000 \
+        --gas-unit-price 100 --max-gas 2000 --expiration-secs 300"
+
+# Изменение порога автоматического розыгрыша (пример: 3 билета)
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  "-lc" "/supra/supra move tool run \
+        --profile my_new_profile \
+        --function-id LOTTERY_ADDR::core_main_v2::set_auto_draw_threshold \
+        --args u64:3 \
+        --gas-unit-price 100 --max-gas 2000 --expiration-secs 300"
+```
+
+Проверить текущие значения можно `view`-запросами:
+
+```
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  "-lc" "/supra/supra move tool view \
+        --profile my_new_profile \
+        --function-id LOTTERY_ADDR::core_main_v2::get_ticket_price"
+
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  "-lc" "/supra/supra move tool view \
+        --profile my_new_profile \
+        --function-id LOTTERY_ADDR::core_main_v2::get_auto_draw_threshold"
+```
+
 ---
 
 ## 4. Подготовка игроков и покупка билетов
@@ -446,9 +482,9 @@ docker compose run --rm --entrypoint bash supra_cli \
          --report-log tmp/move-test-report.log'
 ```
 
-Артефакты выполнения (`tmp/move-test-report.{json,xml,log}`) сохраняются в репозитории и фиксируют используемый CLI, команду и результат. В текущей ревизии зафиксирован dry-run со статусом `skipped`; после получения Supra CLI повторите команду без `--dry-run`, чтобы получить отчёты с фактическим прогоном.
+Артефакты выполнения (`tmp/move-test-report.{json,xml,log}`) сохраняются в каталоге `SupraLottery/tmp` и фиксируют используемый CLI, команду и статус. 02.11.2025 прогон для `lottery_core`, `lottery_support` и `lottery_rewards` завершился статусом `success`; результаты доступны в `SupraLottery/tmp/move-test-report.log`.
 
-Команду запускаем из каталога `SupraLottery` (или с переменной `PYTHONPATH=SupraLottery`), чтобы Python нашёл модуль `supra.scripts`. Если в среде нет доступа к Docker, передайте путь к локальному бинарю через `--cli=/path/to/supra`. При отсутствии CLI скрипт завершится ошибкой `MoveCliNotFoundError`.
+Команду запускаем из каталога `SupraLottery` (или с переменной `PYTHONPATH=SupraLottery`), чтобы Python нашёл модуль `supra.scripts`. Если в среде нет доступа к Docker, передайте путь к локальному бинарю через `--cli=/path/to/supra`. При отсутствии Supra CLI временно используйте `--dry-run`, чтобы проверить конфигурацию named addresses и зафиксировать набор команд.
 
 Если Supra CLI временно недоступен, выполните сухой прогон, чтобы убедиться в корректности конфигурации named addresses и зафиксировать набор команд:
 
@@ -462,7 +498,7 @@ PYTHONPATH=SupraLottery python -m supra.scripts.cli move-test \
   --report-log tmp/move-test-report.log
 ```
 
-Отчёты с префиксом `tmp/move-test-report.*` пригодятся для аудита: JSON и JUnit содержат команды и статусы пакетов, лог отражает используемые бинарии и именованные адреса. Полноценные тесты нужно повторить после получения CLI.
+Отчёты с префиксом `tmp/move-test-report.*` пригодятся для аудита: JSON и JUnit содержат команды и статусы пакетов, лог отражает используемые бинарии и именованные адреса. Для регрессионных проверок повторяйте прогон после каждого значимого изменения Move-пакетов.
 
 ---
 
