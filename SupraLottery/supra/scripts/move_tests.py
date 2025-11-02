@@ -1,4 +1,4 @@
-"""Helper to run Move tests or checks via Supra, Aptos, or vanilla Move CLI.
+"""Helper to run Move tests or checks via Supra or vanilla Move CLI.
 
 The migration runbook requires automated execution of
 `supra move tool test` for the workspace `supra/move_workspace`.  When the
@@ -6,8 +6,7 @@ Supra CLI binary is unavailable in a developer environment, the helper offers
 graceful fallbacks:
 
 1. Try running `supra move tool <mode> --package-dir <package>`.
-2. If Supra CLI is missing, fall back to `aptos move <mode>`.
-3. As a last resort, use the plain Move CLI (`move <mode>`).
+2. As a last resort, use the plain Move CLI (`move <mode>`).
 
 The module integrates with the main Supra CLI entry point
 (`python -m supra.scripts.cli move-test`) and accepts arguments that control
@@ -49,13 +48,11 @@ class MoveCliNotFoundError(RuntimeError):
 
 
 def _classify_cli(executable: str) -> str:
-    """Classifies CLI flavour (supra / aptos / move) by executable name."""
+    """Classifies CLI flavour (supra / move) by executable name."""
 
     name = Path(executable).name.lower()
     if "supra" in name:
         return "supra"
-    if "aptos" in name:
-        return "aptos"
     return "move"
 
 
@@ -66,7 +63,7 @@ def _iter_candidate_cli(preferred: str | None) -> Iterable[str]:
         yield preferred
         return
 
-    for candidate in ("supra", "aptos", "move"):
+    for candidate in ("supra", "move"):
         yield candidate
 
 
@@ -83,7 +80,7 @@ def _resolve_cli(preferred: str | None) -> Tuple[str, str]:
             return path, flavour
 
     raise MoveCliNotFoundError(
-        "Could not find Supra CLI (`supra`), Aptos CLI (`aptos`), or Move CLI (`move`). "
+        "Could not find Supra CLI (`supra`) or Move CLI (`move`). "
         "Install Supra CLI or pass an explicit path via --cli."
     )
 
@@ -110,16 +107,6 @@ def _build_command(
             action,
             "--package-dir",
             str(package_dir),
-        ]
-    elif flavour == "aptos":
-        aptos_action = "compile" if action == "check" else action
-        base_cmd = [
-            cli_path,
-            "move",
-            aptos_action,
-            "--package-dir",
-            str(package_dir),
-            "--skip-fetch-latest-git-deps",
         ]
     else:
         # Vanilla Move CLI expects `--package-dir` that points to the package root.
@@ -199,7 +186,7 @@ def discover_packages(workspace: Path) -> List[str]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run SupraLottery Move tests via Supra/Aptos/Move CLI",
+        description="Run SupraLottery Move tests via Supra or Move CLI",
     )
     parser.add_argument(
         "--workspace",
@@ -228,11 +215,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--cli",
-        help="path to the preferred CLI binary (supra, aptos, or move)",
+        help="path to the preferred CLI binary (supra or move)",
     )
     parser.add_argument(
         "--cli-flavour",
-        choices=("supra", "aptos", "move"),
+        choices=("supra", "move"),
         help="explicit CLI flavour hint when --dry-run is used without a binary",
     )
     parser.add_argument(

@@ -84,15 +84,15 @@ run_with_move_cli() {
 
   if [ -n "${MOVE_CLI:-}" ]; then
     cli_path="${MOVE_CLI}"
-  elif command -v aptos >/dev/null 2>&1; then
-    cli_path="$(command -v aptos)"
+  elif command -v move >/dev/null 2>&1; then
+    cli_path="$(command -v move)"
   fi
 
   if [ -z "${cli_path}" ]; then
     cat >&2 <<'MSG'
-[build_lottery_packages] Не удалось найти Supra CLI и контейнеры. Установите Aptos CLI
-(`MOVE_CLI=/path/to/aptos`) или добавьте его в PATH, чтобы использовать Python-обёртку
-`supra.scripts.cli move-test` для локальной проверки пакетов.
+[build_lottery_packages] Не удалось найти Supra CLI и контейнеры. Установите Supra CLI
+(`MOVE_CLI=/path/to/supra`) или добавьте бинарь Move CLI в PATH, чтобы использовать
+Python-обёртку `supra.scripts.cli move-test` для локальной проверки пакетов.
 MSG
     return 1
   fi
@@ -114,19 +114,17 @@ main() {
 
   if command -v supra >/dev/null 2>&1; then
     runner=run_with_local_cli
-  elif [ -n "${MOVE_CLI:-}" ]; then
-    runner=run_with_move_cli
   elif [ -n "$COMPOSE_CMD" ]; then
     runner=run_in_compose
   elif [ -n "${PODMAN_BIN:-}" ]; then
     runner=run_with_podman
-  elif command -v aptos >/dev/null 2>&1; then
+  elif [ -n "${MOVE_CLI:-}" ] || command -v move >/dev/null 2>&1; then
     runner=run_with_move_cli
   else
     cat >&2 <<'MSG'
-[build_lottery_packages] Не удалось найти бинарь `supra`, Docker Compose, Podman или Aptos CLI.
-Установите Supra CLI (либо настройте Docker/Podman), либо скачайте бинарь Aptos CLI и укажите
-его через переменную `MOVE_CLI`, чтобы воспользоваться Python-обёрткой `supra.scripts.cli`.
+[build_lottery_packages] Не удалось найти бинарь `supra`, Docker Compose, Podman или Move CLI.
+Установите Supra CLI (либо настройте Docker/Podman) или укажите путь к Supra/Move CLI через
+переменную `MOVE_CLI`, чтобы воспользоваться Python-обёрткой `supra.scripts.cli`.
 MSG
     exit 1
   fi
@@ -137,7 +135,7 @@ MSG
     local image="${PODMAN_IMAGE:-$PODMAN_IMAGE_DEFAULT}"
     echo "[build_lottery_packages] Используется Podman (${PODMAN_BIN}) с образом ${image}."
   elif [ "$runner" = run_with_move_cli ]; then
-    local cli_display="${MOVE_CLI:-$(command -v aptos 2>/dev/null || echo "aptos")}" 
+    local cli_display="${MOVE_CLI:-$(command -v move 2>/dev/null || echo "move")}" 
     echo "[build_lottery_packages] Используется Python-обёртка supra.scripts.cli (CLI: ${cli_display})."
   fi
 
