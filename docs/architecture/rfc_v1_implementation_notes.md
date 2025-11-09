@@ -30,7 +30,7 @@
 | `tags` | Классификаторы, фильтрация, маски | In Progress | Валидация масок, ограничение по бюджету тегов | 2025-11-08 |
 | `price_feed` | Оракулы SUPRA/USD и прочие активы | In Progress | Реализован `PriceFeedRegistry` с событиями обновления/фолбэка/клампа, добавлены константы SUPRA/USDT | 2025-11-08 |
 | `feature_switch` | Управление доступом к функциям | In Progress | Добавлен реестр режимов и devnet override | 2025-11-08 |
-| `automation` | AutomationBot, dry-run, репутация | Not Started |  | _YYYY-MM-DD_ |
+| `automation` | AutomationBot, dry-run, репутация | In Progress | Реализован модуль `automation` с регистрацией ботов, событиями dry-run/tick/error и учётом репутации | 2025-11-08 |
 
 ## 3. Контроль ключевых инвариантов
 

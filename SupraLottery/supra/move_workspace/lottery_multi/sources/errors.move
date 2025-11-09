@@ -77,4 +77,18 @@ module lottery_multi::errors {
     pub const E_PRICE_FALLBACK_ACTIVE: u64 = 0x1905;
     pub const E_PRICE_CLAMP_TRIGGERED: u64 = 0x1906;
     pub const E_PRICE_CLAMP_ACTIVE: u64 = 0x1907;
+
+    /// Automation / automation bot errors
+    pub const E_AUTOBOT_REGISTRY_MISSING: u64 = 0x1A01;
+    pub const E_AUTOBOT_ALREADY_REGISTERED: u64 = 0x1A02;
+    pub const E_AUTOBOT_NOT_REGISTERED: u64 = 0x1A03;
+    pub const E_AUTOBOT_EXPIRED: u64 = 0x1A04;
+    pub const E_AUTOBOT_FORBIDDEN_TARGET: u64 = 0x1A05;
+    pub const E_AUTOBOT_FAILURE_LIMIT: u64 = 0x1A06;
+    pub const E_AUTOBOT_TIMELOCK: u64 = 0x1A07;
+    pub const E_AUTOBOT_PENDING_EXISTS: u64 = 0x1A08;
+    pub const E_AUTOBOT_PENDING_MISMATCH: u64 = 0x1A09;
+    pub const E_AUTOBOT_PENDING_REQUIRED: u64 = 0x1A0A;
+    pub const E_AUTOBOT_ACTION_HASH_EMPTY: u64 = 0x1A0B;
+    pub const E_AUTOBOT_CALLER_MISMATCH: u64 = 0x1A0C;
 }

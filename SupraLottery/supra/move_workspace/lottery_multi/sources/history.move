@@ -7,6 +7,7 @@ module lottery_multi::history {
     pub const EVENT_CATEGORY_SALES: u8 = 3;
     pub const EVENT_CATEGORY_DRAW: u8 = 4;
     pub const EVENT_CATEGORY_PAYOUT: u8 = 5;
+    pub const EVENT_CATEGORY_AUTOMATION: u8 = 6;
 
     pub struct LotteryCreatedEvent has drop, store {
         pub event_version: u16,
@@ -104,6 +105,55 @@ module lottery_multi::history {
         pub winners_paid: u64,
         pub prize_paid: u64,
         pub operations_paid: u64,
+        pub timestamp: u64,
+    }
+
+    pub struct AutomationDryRunPlannedEvent has drop, store {
+        pub event_version: u16,
+        pub event_category: u8,
+        pub operator: address,
+        pub action_id: u64,
+        pub action_hash: vector<u8>,
+        pub executes_after_ts: u64,
+    }
+
+    pub struct AutomationCallRejectedEvent has drop, store {
+        pub event_version: u16,
+        pub event_category: u8,
+        pub operator: address,
+        pub action_id: u64,
+        pub action_hash: vector<u8>,
+        pub reason_code: u64,
+    }
+
+    pub struct AutomationKeyRotatedEvent has drop, store {
+        pub event_version: u16,
+        pub event_category: u8,
+        pub operator: address,
+        pub schedule_hash: vector<u8>,
+        pub expires_at: u64,
+    }
+
+    pub struct AutomationTickEvent has drop, store {
+        pub event_version: u16,
+        pub event_category: u8,
+        pub operator: address,
+        pub action_id: u64,
+        pub action_hash: vector<u8>,
+        pub executed_ts: u64,
+        pub success: bool,
+        pub reputation_score: u64,
+        pub success_streak: u64,
+        pub failure_count: u64,
+    }
+
+    pub struct AutomationErrorEvent has drop, store {
+        pub event_version: u16,
+        pub event_category: u8,
+        pub operator: address,
+        pub action_id: u64,
+        pub action_hash: vector<u8>,
+        pub error_code: u64,
         pub timestamp: u64,
     }
 }
