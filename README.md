@@ -18,6 +18,7 @@ Each package lives in `SupraLottery/supra/move_workspace/<name>` and has its own
 - `SupraLottery/supra/scripts/move_tests.py` — запускает Move-тесты через Supra CLI или ванильный Move CLI
 
 ## Documentation
+- `docs/handbook/README.md` — «книга проекта» с архитектурой, ролями, контрактами и runbook’ами
 - `docs/testnet_runbook.md` — end-to-end deployment steps
 - `docs/testnet_deployment_checklist.md` — pre-flight checklist
 - `docs/architecture/modules.md` — capability model and package boundaries

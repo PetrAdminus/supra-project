@@ -7,6 +7,7 @@ members = [
   "vrf_hub",
   "lottery_factory",
   "SupraVrf",
+  "lottery_multi",
 ]
 
 [package]

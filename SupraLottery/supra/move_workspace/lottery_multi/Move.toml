@@ -1,0 +1,19 @@
+[package]
+name = "lottery_multi"
+version = "0.1.0"
+
+[addresses]
+std = "0x1"
+MoveStdlib = "0x1"
+SupraFramework = "0x1"
+supra_addr = "0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e"
+lottery = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
+lottery_multi = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
+lottery_support = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
+
+[dependencies]
+MoveStdlib = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/move-stdlib", rev = "7d1e62c9a5394a279a73515a150e880200640f06" }
+SupraFramework = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/supra-framework", rev = "7d1e62c9a5394a279a73515a150e880200640f06" }
+lottery_support = { local = "../lottery_support" }
+lottery_rewards = { local = "../lottery_rewards" }
+
