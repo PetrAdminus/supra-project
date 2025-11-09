@@ -3,6 +3,7 @@ module lottery_multi::views {
     use std::string;
     use std::vector;
 
+    use lottery_multi::history;
     use lottery_multi::economics;
     use lottery_multi::sales;
     use lottery_multi::registry;
@@ -63,6 +64,14 @@ module lottery_multi::views {
 
     public fun accounting_snapshot(id: u64): economics::Accounting {
         sales::accounting_snapshot(id)
+    }
+
+    public fun get_lottery_summary(id: u64): history::LotterySummary acquires history::ArchiveLedger {
+        history::get_summary(id)
+    }
+
+    public fun list_finalized_ids(from: u64, limit: u64): vector<u64> acquires history::ArchiveLedger {
+        history::list_finalized(from, limit)
     }
 
     public fun list_by_primary_type(primary_type: u8, from: u64, limit: u64): vector<u64> acquires registry::Registry {

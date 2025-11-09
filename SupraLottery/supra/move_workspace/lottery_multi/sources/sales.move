@@ -339,6 +339,19 @@ module lottery_multi::sales {
         copy state.accounting
     }
 
+    public fun sales_totals(lottery_id: u64): (u64, u64, u64) acquires SalesLedger {
+        let ledger_addr = @lottery_multi;
+        if (!exists<SalesLedger>(ledger_addr)) {
+            abort errors::E_REGISTRY_MISSING;
+        };
+        let ledger = borrow_global<SalesLedger>(ledger_addr);
+        if (!table::contains(&ledger.states, lottery_id)) {
+            abort errors::E_REGISTRY_MISSING;
+        };
+        let state = table::borrow(&ledger.states, lottery_id);
+        (state.tickets_sold, state.proceeds_accum, state.last_purchase_ts)
+    }
+
     public fun ticket_owner(lottery_id: u64, ticket_index: u64): address acquires SalesLedger {
         let ledger_addr = @lottery_multi;
         if (!exists<SalesLedger>(ledger_addr)) {

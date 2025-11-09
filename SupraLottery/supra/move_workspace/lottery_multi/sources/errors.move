@@ -94,4 +94,9 @@ module lottery_multi::errors {
     pub const E_AUTOBOT_PENDING_REQUIRED: u64 = 0x1A0A;
     pub const E_AUTOBOT_ACTION_HASH_EMPTY: u64 = 0x1A0B;
     pub const E_AUTOBOT_CALLER_MISMATCH: u64 = 0x1A0C;
+
+    /// История и финализация
+    pub const E_HISTORY_MISSING: u64 = 0x1B01;
+    pub const E_HISTORY_MISMATCH: u64 = 0x1B02;
+    pub const E_FINALIZATION_INCOMPLETE: u64 = 0x1B03;
 }

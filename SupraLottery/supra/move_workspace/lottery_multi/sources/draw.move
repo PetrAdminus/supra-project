@@ -35,6 +35,19 @@ module lottery_multi::draw {
         chain_id: u8,
     }
 
+    pub struct FinalizationSnapshot has copy, drop, store {
+        pub snapshot_hash: vector<u8>,
+        pub payload_hash: vector<u8>,
+        pub winners_batch_hash: vector<u8>,
+        pub checksum_after_batch: vector<u8>,
+        pub schema_version: u16,
+        pub attempt: u8,
+        pub closing_block_height: u64,
+        pub chain_id: u8,
+        pub request_ts: u64,
+        pub vrf_status: u8,
+    }
+
     struct DrawState has store {
         vrf_state: types::VrfState,
         rng_count: u8,
@@ -281,12 +294,37 @@ module lottery_multi::draw {
         state.checksum_after_batch = copy *checksum_after_batch;
     }
 
+    pub fun finalization_snapshot(lottery_id: u64): FinalizationSnapshot acquires DrawLedger {
+        let ledger = borrow_ledger_ref();
+        let state = table::borrow(&ledger.states, lottery_id);
+        FinalizationSnapshot {
+            snapshot_hash: copy state.snapshot_hash,
+            payload_hash: copy state.vrf_state.payload_hash,
+            winners_batch_hash: copy state.winners_batch_hash,
+            checksum_after_batch: copy state.checksum_after_batch,
+            schema_version: state.vrf_state.schema_version,
+            attempt: state.vrf_state.attempt,
+            closing_block_height: state.vrf_state.closing_block_height,
+            chain_id: state.vrf_state.chain_id,
+            request_ts: state.last_request_ts,
+            vrf_status: state.vrf_state.status,
+        }
+    }
+
     fun borrow_ledger_mut(): &mut DrawLedger acquires DrawLedger {
         let addr = @lottery_multi;
         if (!exists<DrawLedger>(addr)) {
             abort errors::E_REGISTRY_MISSING;
         };
         borrow_global_mut<DrawLedger>(addr)
+    }
+
+    fun borrow_ledger_ref(): &DrawLedger acquires DrawLedger {
+        let addr = @lottery_multi;
+        if (!exists<DrawLedger>(addr)) {
+            abort errors::E_REGISTRY_MISSING;
+        };
+        borrow_global<DrawLedger>(addr)
     }
 
     fun borrow_or_create_state(states: &mut table::Table<u64, DrawState>, id: u64): &mut DrawState {

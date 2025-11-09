@@ -238,6 +238,56 @@ module lottery_multi::payouts {
         event::emit_event(&mut ledger.payout_events, event);
     }
 
+    public entry fun finalize_lottery_admin(
+        admin: &signer,
+        lottery_id: u64,
+        finalized_at: u64,
+    ) acquires PayoutLedger, registry::Registry, sales::SalesLedger, draw::DrawLedger, history::ArchiveLedger {
+        let admin_addr = signer::address_of(admin);
+        assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
+
+        let status = registry::get_status(lottery_id);
+        assert!(status == types::STATUS_PAYOUT, errors::E_DRAW_STATUS_INVALID);
+
+        let ledger = borrow_ledger_mut();
+        if (!table::contains(&ledger.states, lottery_id)) {
+            abort errors::E_PAYOUT_STATE_MISSING;
+        };
+        let state = table::borrow_mut(&mut ledger.states, lottery_id);
+        assert!(state.total_required > 0, errors::E_FINALIZATION_INCOMPLETE);
+        assert!(state.total_assigned == state.total_required, errors::E_FINALIZATION_INCOMPLETE);
+
+        let (tickets_sold, proceeds_accum, last_purchase_ts) = sales::sales_totals(lottery_id);
+        let config = registry::borrow_config(lottery_id);
+        let draw_snapshot = draw::finalization_snapshot(lottery_id);
+        let slots_checksum = registry::slots_checksum(lottery_id);
+
+        let closed_ts = if (last_purchase_ts > 0) { last_purchase_ts } else { draw_snapshot.request_ts };
+
+        let summary = history::LotterySummary {
+            id: lottery_id,
+            status: types::STATUS_FINALIZED,
+            event_slug: copy config.event_slug,
+            series_code: copy config.series_code,
+            run_id: config.run_id,
+            tickets_sold,
+            proceeds_accum,
+            vrf_status: draw_snapshot.vrf_status,
+            primary_type: config.primary_type,
+            tags_mask: config.tags_mask,
+            snapshot_hash: copy draw_snapshot.snapshot_hash,
+            slots_checksum,
+            winners_batch_hash: copy draw_snapshot.winners_batch_hash,
+            checksum_after_batch: copy draw_snapshot.checksum_after_batch,
+            payout_round: state.payout_round,
+            created_at: config.sales_window.sales_start,
+            closed_at: closed_ts,
+            finalized_at,
+        };
+        history::record_summary(lottery_id, summary);
+        registry::mark_finalized(lottery_id);
+    }
+
     fun append_record(
         lottery_id: u64,
         state: &mut WinnerState,
