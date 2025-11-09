@@ -12,5 +12,6 @@ spec module lottery_multi::registry {
             || status == types::STATUS_FINALIZED
             || status == types::STATUS_CANCELED;
         invariant snapshot_frozen ==> status >= types::STATUS_CLOSING;
+        invariant len(slots_checksum) == 32;
     }
 }

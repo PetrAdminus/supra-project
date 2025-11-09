@@ -36,8 +36,8 @@
 
 | Инвариант | Инструменты проверки | Текущий статус | Комментарий |
 |-----------|----------------------|----------------|-------------|
-| `snapshot_hash` неизменен после `Closing` | Move Prover, unit-тесты | In Progress | Базовые инварианты заданы в `spec/registry.move`, требуется довести доказательство |
-| `payout_round` строго возрастает | Move Prover | In Progress | Добавлена структура `WinnerState` в `spec/payouts.move`, готовим доказательство |
+| `snapshot_hash` неизменен после `Closing` | Move Prover, unit-тесты | In Progress | Инварианты длины хэшей и заморозки добавлены в `spec/registry.move`, требуется доказательство неизменности |
+| `payout_round` строго возрастает | Move Prover | In Progress | `spec/payouts.move` теперь фиксирует длины хэшей и связь `next_winner_batch_no ≥ payout_round`, остаётся формальное доказательство роста |
 | `allocated >= paid` во всех пулах | Unit-тесты, property-тесты | In Progress | Инвариант `spec/economics.move` контролирует базовое условие, нужны тесты |
 | `jackpot_allowance_token` не увеличивается | Move Prover | In Progress | Инвариант `spec/economics.move` ограничивает рост, необходимо формальное доказательство |
 | Детерминированный выбор победителей | Differential / property tests | Not Started |  |

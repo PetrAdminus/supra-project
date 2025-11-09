@@ -13,6 +13,9 @@ spec module lottery_multi::types {
         invariant status == VRF_STATUS_REQUESTED ==> !consumed;
         invariant consumed ==> status == VRF_STATUS_FULFILLED;
         invariant schema_version >= 1;
+        invariant retry_strategy == 0 || retry_strategy == 1;
+        invariant closing_block_height >= 0;
+        invariant chain_id >= 0;
     }
 
     spec struct WinnerCursor {
