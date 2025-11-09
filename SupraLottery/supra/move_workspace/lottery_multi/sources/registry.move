@@ -180,7 +180,7 @@ module lottery_multi::registry {
     }
 
     fun borrow_registry_ref(): &Registry acquires Registry {
-        // Registry хранится по адресу владельца (тот же, что и модуль lottery_multi).
+        // The registry is stored at the module address (@lottery_multi).
         let registry_addr = @lottery_multi;
         if (!exists<Registry>(registry_addr)) {
             abort errors::E_REGISTRY_MISSING;

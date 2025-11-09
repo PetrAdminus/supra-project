@@ -32,7 +32,7 @@ module lottery_multi::tags {
                 primary_type == TYPE_VIP,
             errors::E_TAG_PRIMARY_TYPE,
         );
-        // Проверяем, что маска не содержит неизвестных битов (зарезервированного пространства).
+        // Ensure the mask does not contain unknown (reserved) bits.
         let unknown_bits = tags_mask & !KNOWN_TAG_BITS;
         assert!(unknown_bits == 0, errors::E_TAG_UNKNOWN_BIT);
     }

@@ -1,15 +1,15 @@
 // sources/errors.move
 module lottery_multi::errors {
-    /// Общие ошибки тегов
+    /// Common tag errors
     pub const E_TAG_PRIMARY_TYPE: u64 = 0x1001;
     pub const E_TAG_UNKNOWN_BIT: u64 = 0x1002;
     pub const E_TAG_BUDGET_EXCEEDED: u64 = 0x1003;
 
-    /// Ошибки партнёрских ограничений
+    /// Partner capability errors
     pub const E_PRIMARY_TYPE_NOT_ALLOWED: u64 = 0x1101;
     pub const E_TAG_MASK_NOT_ALLOWED: u64 = 0x1102;
 
-    /// Ошибки реестра и конфигурации
+    /// Registry and configuration errors
     pub const E_ALREADY_INITIALIZED: u64 = 0x1201;
     pub const E_REGISTRY_MISSING: u64 = 0x1202;
     pub const E_LOTTERY_EXISTS: u64 = 0x1203;
@@ -23,15 +23,27 @@ module lottery_multi::errors {
     pub const E_PRIZE_PLAN_EMPTY: u64 = 0x120B;
     pub const E_PRIZE_SLOT_INVALID: u64 = 0x120C;
     pub const E_DRAW_ALGO_UNSUPPORTED: u64 = 0x120D;
+    pub const E_SALES_WINDOW_CLOSED: u64 = 0x120E;
+    pub const E_LOTTERY_NOT_ACTIVE: u64 = 0x120F;
 
-    /// Ошибки учёта и распределения
+    /// Accounting and allocation errors
     pub const E_DISTRIBUTION_BPS_INVALID: u64 = 0x1301;
     pub const E_JACKPOT_ALLOWANCE_UNDERFLOW: u64 = 0x1302;
 
-    /// Ошибки feature switch
+    /// Feature switch errors
     pub const E_FEATURE_UNKNOWN: u64 = 0x1401;
     pub const E_FEATURE_MODE_INVALID: u64 = 0x1402;
+    pub const E_FEATURE_DISABLED: u64 = 0x1403;
 
-    /// Ошибки валидации и вьюх
+    /// Validation and view errors
     pub const E_PAGINATION_LIMIT: u64 = 0x1501;
+
+    /// Ticket purchase errors
+    pub const E_PURCHASE_QTY_ZERO: u64 = 0x1601;
+    pub const E_PURCHASE_QTY_LIMIT: u64 = 0x1602;
+    pub const E_PURCHASE_TOTAL_LIMIT: u64 = 0x1603;
+    pub const E_PURCHASE_ADDRESS_LIMIT: u64 = 0x1604;
+    pub const E_AMOUNT_OVERFLOW: u64 = 0x1605;
+    pub const E_PREMIUM_CAP_MISMATCH: u64 = 0x1606;
+    pub const E_PREMIUM_CAP_EXPIRED: u64 = 0x1607;
 }

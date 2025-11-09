@@ -9,7 +9,7 @@ module lottery_multi::feature_switch {
     pub const FEATURE_MODE_ENABLED_ALL: u8 = 1;
     pub const FEATURE_MODE_PREMIUM_ONLY: u8 = 2;
 
-    /// Зарезервированные идентификаторы фич.
+    /// Reserved feature identifiers.
     pub const FEATURE_PURCHASE: u64 = 1;
     pub const FEATURE_CLOSE: u64 = 2;
     pub const FEATURE_DRAW: u64 = 3;
@@ -97,5 +97,10 @@ module lottery_multi::feature_switch {
             abort errors::E_REGISTRY_MISSING;
         };
         borrow_global<FeatureSwitchRegistry>(addr)
+    }
+
+    public fun is_initialized(): bool {
+        let addr = @lottery_multi;
+        exists<FeatureSwitchRegistry>(addr)
     }
 }
