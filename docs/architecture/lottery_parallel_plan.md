@@ -22,17 +22,45 @@
 
 ## 3. Архитектурные контуры
 ### 3.1 Пакеты Move
-- **Новый пакет `lottery_multi`.** Он разбит на «тонкие» модули (`registry`, `sales`, `draw`, `payouts`, `history`, `views`, `roles`, `economics`, `feature_switch`), чтобы каждый файл оставался значительно ниже лимита 60 000 байт. Общие типы и константы выносятся в `lottery_multi::types`, а переиспользуемая валидация — в `lottery_multi::validators`. Пакет зависит от `lottery_core` (повторное использование библиотек работы с билетами, сейфами и комиссией) и `lottery_support` (существующие структуры истории и миграций). Дополнительно следует задокументировать зависимости в `SupraLottery/supra/move_workspace/Move.toml`.
+- **Новый пакет `lottery_multi`.** Он разбит на «тонкие» модули (`registry`, `sales`, `draw`, `payouts`, `history`, `views`, `roles`, `economics`, `feature_switch`, `tags`), чтобы каждый файл оставался значительно ниже лимита 60 000 байт. Общие типы и константы выносятся в `lottery_multi::types`, валидации — в `lottery_multi::validators`, а базовые классификаторы находятся в новом модуле `lottery_multi::tags`. Пакет зависит от `lottery_core` (повторное использование библиотек работы с билетами, сейфами и комиссией) и `lottery_support` (существующие структуры истории и миграций). Дополнительно следует задокументировать зависимости в `SupraLottery/supra/move_workspace/Move.toml`.
 - **`lottery_rewards`.** Пакет сохраняет ответственность за агрегирование наград (`Jackpot`, `Store`, `NftRewards`). Новый пакет `lottery_multi` взаимодействует с ним только через мост `lottery_multi::reward_bridge`, который предоставляет узкий набор функций (`reserve_from_sales`, `release_to_partner_vault`, `escrow_nft`, `mint_reward_nft`). Прямые обращения других модулей к хранилищам наград запрещены и сопровождаются lint-проверками.
 - **`lottery_factory`.** Существующий модуль фабрики расширяется функциями для выпуска идентификаторов (`run_id`), хранения глобального счётчика и выдачи capability создания лотерей. Пакет перестраивается так, чтобы создавать ресурсы `LotteryInstance`, которые потом регистрируются в `lottery_multi::registry`.
 
 ### 3.2 Структуры данных (черновик)
 ```move
+module lottery_multi::tags {
+
+    const TYPE_BASIC: u8   = 0;
+    const TYPE_PARTNER: u8 = 1;
+    const TYPE_JACKPOT: u8 = 2;
+    const TYPE_VIP: u8     = 3;
+
+    const TAG_NFT: u64         = 1 << 0;
+    const TAG_DAILY: u64       = 1 << 1;
+    const TAG_WEEKLY: u64      = 1 << 2;
+    const TAG_SPLIT_PRIZE: u64 = 1 << 3;
+    const TAG_PROMO: u64       = 1 << 4;
+
+    public fun validate(primary_type: u8, tags_mask: u64) {
+        assert!(
+            primary_type == TYPE_BASIC ||
+            primary_type == TYPE_PARTNER ||
+            primary_type == TYPE_JACKPOT ||
+            primary_type == TYPE_VIP,
+            errors::E_TAG_PRIMARY_TYPE
+        );
+        let _ = tags_mask;
+    }
+}
+
+// `errors::E_TAG_PRIMARY_TYPE` объявляется в `lottery_multi::errors` и добавляется в общий каталог кодов.
+
 module lottery_multi::registry {
 
     use std::option;
     use std::vector;
 
+    use lottery_multi::tags;
     use lottery_multi::types::{AutoClosePolicy, PrizeSlot, RewardBackend, SalesWindow, VrfStatus};
 
     struct Lottery has key {
@@ -50,6 +78,8 @@ module lottery_multi::registry {
         prize_plan: vector<PrizeSlot>,
         auto_close_policy: AutoClosePolicy,
         reward_backend: RewardBackend,
+        primary_type: u8,
+        tags_mask: u64,
         winners_dedup: bool,
         draw_algo: u8,
     }
@@ -68,7 +98,7 @@ module lottery_multi::registry {
 ```
 - `State` хранит моментальные значения (проданные билеты, уникальные участники, закрыта ли продажа).
 - `Accounting` резервирует доли джекпота/продаж, средства для NFT и комиссию, а также хранит накопительные агрегаты (`total_sales_accum`, `total_prize_paid_accum`, `total_ops_paid_accum`) и контрольную сумму `slots_checksum = sha3-256(prize_plan)`, чтобы фронтенд и индексаторы могли быстро сверять данные без полного перебора записей.
-- `PrizeSlot` содержит информацию о типе награды (`FromSales`, `FromJackpot`, `NftEscrow`, `CustomHook`).
+- `PrizeSlot` содержит информацию о типе награды (`FromSales`, `FromJackpot`, `NftEscrow`, `CustomHook`). Все конфигурации проходят через `tags::validate(config.primary_type, config.tags_mask)`, а также соответствующие проверки партнёрских квот.
 
 ### 3.3 Жизненный цикл
 1. **Draft.** Создание и проверка конфигурации; резервирование призов и регистрация в `registry`. На этом шаге запускаются валидации (корректность временных окон, допустимые идентификаторы, наличие лимитов).
@@ -81,11 +111,14 @@ module lottery_multi::registry {
 8. **Finalized/Archived.** Перенос статистики в историю, очистка оперативных структур (чанки билетов, временные таблицы), публикация `LotteryFinalized`. При финализации сверяется `slots_checksum` и `snapshot_hash`, чтобы предотвратить изменение данных между расчётом и архивом.
 9. **Canceled.** Сценарии отказа (невыполненный VRF, ручная отмена) и рефанд. Должны быть предусмотрены события `LotteryCanceled` и функции возврата средств.
 
+**Редактирование классификаторов.** Значение `Config.primary_type` доступно к изменению только в состоянии `Draft`; переход в `Active` фиксирует его окончательно. Поле `Config.tags_mask` разрешено корректировать в `Draft` и `Active`, но после установки статуса `Closing` любые изменения запрещены (за исключением аварийных операций с явным подтверждением `RootAdmin`).
+
 #### 3.3.0 Машина состояний и строгие переходы
 - **Единственный контроллер.** Изменение `state.status` разрешено только из функций модуля `lottery_multi::registry::set_status`, который принимает ожидаемое состояние (`from`) и новое (`to`). Все остальные модули вызывают его опосредованно, что гарантирует единое место проверки.
 - **Допустимые пары.** Разрешены переходы: `Draft → Active`, `Draft → Canceled`, `Active → Closing`, `Closing → AwaitingVRF`, `AwaitingVRF → VrfFulfilled`, `VrfFulfilled → WinnerComputation`, `WinnerComputation → Payout`, `Payout → Finalized`, `Payout → Canceled`, `AwaitingVRF → Canceled`, `Closing → Canceled`. Любая другая комбинация приводит к `abort(E_STATE_TRANSITION_INVALID)`.
 - **Документация abort_if.** Для каждой `entry`-функции документируется `abort_if state.status != EXPECTED`, и тесты проверяют, что нарушение ожидания приводит к ошибке. В «книге проекта» приводится диаграмма состояний и таблица переходов для аудита.
 - **Фиксация снапшота.** Переход `Active → Closing` дополнительно записывает `snapshot_hash = sha3-256(ticket_chunks)` и `snapshot_block_height`. Любая попытка изменить билеты после установки `snapshot_hash` завершается `abort(E_SNAPSHOT_FROZEN)`.
+- **Заморозка классификаторов.** `set_status(Draft, Active)` устанавливает флаг `primary_type_locked = true`; последующие попытки изменить `Config.primary_type` приводят к `abort(E_TAG_PRIMARY_LOCKED)`. Переход `Active → Closing` выставляет `tags_mask_locked = true`, чтобы предотвратить модификацию битов перед VRF.
 - **Проверка входных данных батча.** `WinnerComputation` при каждом запуске сравнивает `snapshot_hash` и `processed_chunks_hash`, которые вычисляются по чанкам и курсору. Несовпадение приводит к `abort(E_WINNER_INPUT_CHANGED)` и инициирует аварийную остановку.
 
 #### 3.3.1 Детерминированный выбор победителей и защита от bias
@@ -108,7 +141,7 @@ module lottery_multi::registry {
 - **Миграции и тесты.** В тестовом наборе появляются сценарии: (1) успешный колбэк с новой схемой payload, (2) повторный колбэк, (3) подмена хэша. Дополнительно документируется процедура обновления схемы payload в разделе `docs/handbook/architecture/vrf-integration.md`.
 
 ### 3.4 События
-- `LotteryCreated(id, cfg_hash, config_version, creator, event_code, series_code, run_id)`
+- `LotteryCreated(id, cfg_hash, config_version, creator, event_code, series_code, run_id, primary_type, tags_mask)`
 - `TicketBought(id, buyer, ticket_no, amount, sales_batch_code)`
 - `SalesClosed(id, total_tickets, timestamp, closing_block)`
 - `VrfRequested(id, request_id, payload_hash, schema_version, max_gas_limit, max_gas_price)`
@@ -116,7 +149,7 @@ module lottery_multi::registry {
 - `WinnerComputed(id, batch_no, winners_hash, processed_count, cursor_from, cursor_to)`
 - `PayoutBatch(id, batch_no, paid, total, asset_type_code, cursor_from, cursor_to, payout_nonce)`
 - `PartnerPayout(id, partner_addr, payout_slot_code, asset_type_code, amount, payout_nonce)`
-- `LotteryFinalized(id, archive_slot_hash)`
+- `LotteryFinalized(id, archive_slot_hash, primary_type, tags_mask)`
 - `LotteryCanceled(id, reason_code)`
 
 События должны обеспечивать трассировку «розыгрыш ↔ VRF ↔ победители» для аудиторов и фронтенда. Поля с суффиксом `_code` используют короткие числовые/байтовые идентификаторы вместо строк, уменьшая газовые затраты и нагрузку на индексаторы. Поле `payout_nonce` соответствует `payout_round` и обеспечивает защиту от повторных выплат.
@@ -127,7 +160,8 @@ module lottery_multi::registry {
 - **Избыточные индексы и обслуживание.** Чтобы избежать разрастания таблиц, каждая лотерея имеет лимиты `max_chunks`, `max_user_refs` и счётчик «грязных» записей. AutomationBot периодически выполняет процедуру `defragment_user_index`: объединяет малозаполненные чанки, удаляет пустые ссылки и переносит переполненные записи в off-chain кеш (с фиксацией хэша в событии `UserIndexSnapshot`). При превышении лимитов продажа новых билетов блокируется `abort(E_INDEX_SATURATED)`, а фронтенд показывает требование дождаться обслуживания. В документации описывается план эвакуации данных в случае приближения к лимиту газа/памяти, а также стратегия дефрагментации по расписанию, чтобы поддерживать постоянное время выборок.
 - **События как неизменяемый журнал.** Архив дополняется событиями `LotteryFinalized`, `PayoutBatch`, `PartnerPayout`, `WinnerComputed`, что позволяет внешним индексаторам и фронтенду поддерживать собственные БД/кеши без потери проверяемости и всегда сверять данные с ончейн-источником. В документе нужно хранить описание форматов событий, чтобы аналитики могли настроить парсеры без изучения кода.
 - **Pagination и сортировка.** Все view возвращают данные с пагинацией `from/limit` и стабильной сортировкой: для глобальных списков — `id DESC`, затем `status`, затем `created_at`; для пользовательских историй — по паре `(lottery_id DESC, local_index DESC)`. Такие правила фиксируются в документации и дублируются тестами.
-- **View-функции для фронтенда.** Модуль `lottery_multi::views` предоставляет выборки `get_lottery_summary(id)`, `get_lottery_status(id)` (компактный агрегат `status`, `tickets_sold`, `proceeds_accum`, `vrf_status`), `list_lotteries(status, from, limit)`, `get_user_participation(addr, from, limit)`, `get_user_rewards(addr)` и `get_partner_allowance(addr)`. Фронтендовый раздел «История» строится поверх этих вью и событий; дополнительные SQL/JSON-хранилища разрешены только как кеши, синхронизируемые по событиям.
+- **View-функции для фронтенда.** Модуль `lottery_multi::views` предоставляет выборки `get_lottery_summary(id)`, `get_lottery_status(id)` (компактный агрегат `status`, `tickets_sold`, `proceeds_accum`, `vrf_status`, `primary_type`, `tags_mask`), `get_lottery_badges(id)` (возвращает `(primary_type, tags_mask)` для бейджей и подсветки на фронтенде), `list_lotteries(status, from, limit)`, `list_by_primary_type(primary_type, from, limit)`, `list_by_tag_bit(tag_bit, from, limit)`, `get_user_participation(addr, from, limit)`, `get_user_rewards(addr)` и `get_partner_allowance(addr)`. Все списки следуют стабильной сортировке `id DESC` и пагинации `(from, limit)`.
+- **Валидация конфигураций.** `views::validate_config` и любые функции редактирования конфигурации вызывают `tags::validate` и проверяют согласованность с capability инициатора: для партнёров — вхождение `primary_type` в белый список и принадлежность всех битов `tags_mask` разрешённой маске.
 - **Контроль согласованности.** `UserTicketRef` содержит `snapshot_hash` и `ticket_local_index`. Если фронтенд обнаруживает расхождение хэша с актуальным архивом, он инициирует процедуру восстановления (запрос по событиям) и сообщает об этом пользователю.
 
 ### 3.6 Управление способностями (capabilities)
@@ -302,10 +336,10 @@ module lottery_multi::registry {
 - **Единая деноминация и коды ошибок.** Все денежные значения и события (например, `TicketBought`, `PayoutBatch`) публикуются в минимальной ончейн-единице SUPRA, чтобы исключить расхождения округлений. Для новых модулей создаётся `lottery_multi::errors` с перечислением `E_*`-кодов; документация и комментарии в коде ссылаются на этот модуль, а произвольные `abort` без ссылок запрещены lint-проверкой.
 
 ### 4.C Партнёрская роль: scoped capability и страховые механизмы
-- **Выдача ограниченной capability.** Партнёр получает `PartnerCreateCap` со строгими параметрами: `allowed_event_slug`, список разрешённых `series_code`, `max_parallel` активных розыгрышей и `expires_at`. Все ограничения проверяются при создании `Draft`, при попытке выхода за лимиты происходит `abort`.
+- **Выдача ограниченной capability.** Партнёр получает `PartnerCreateCap` со строгими параметрами: `allowed_event_slug`, список разрешённых `series_code`, `max_parallel` активных розыгрышей, `expires_at`, `allowed_primary_types` и `allowed_tags_mask`. Все ограничения проверяются при создании `Draft`: `primary_type` обязан входить в белый список, а `config.tags_mask & ~allowed_tags_mask == 0`. При попытке выхода за лимиты происходит `abort`.
 - **Собственные источники наград.** Для каждого партнёра регистрируется `PartnerVault` (монеты) и `PartnerNftEscrow` (NFT). Партнёрские лотереи могут резервировать призы только из этих ресурсов; доступ к джекпоту или операционным средствам проекта запрещён на уровне типов. Попытка выбрать `PrizeSlot::FromJackpot` приводит к ошибке.
 - **Шаблоны конфигураций.** Создание допускается только по утверждённым пресетам (`basic`, `split`, `nft`). Пресет содержит ограничители по `allowance`, `max_winners`, `max_ticket_price`, `max_duration`, `rng_count`. Партнёр передаёт ссылку на пресет, а контракт сверяет, что параметры не выходят за рамки шаблона.
-- **Ончейн-инварианты.** При создании проверяются условия: `sales_start < sales_end`, `winners_count > 0`, `max_tickets ≥ winners_count`, цена билета попадает в разрешённый диапазон, сумма долей + комиссий ≤ 100 %. Перед активацией проверяется наличие достаточного резерва в `PartnerVault` и эскроу NFT (при `mint_on_claim=false`). Недостаток средств ⇒ автоматический `Canceled` и возврат билетов.
+- **Ончейн-инварианты.** При создании проверяются условия: `sales_start < sales_end`, `winners_count > 0`, `max_tickets ≥ winners_count`, цена билета попадает в разрешённый диапазон, сумма долей + комиссий ≤ 100 %, а также `tags::validate` и соблюдение партнёрских масок. Перед активацией проверяется наличие достаточного резерва в `PartnerVault` и эскроу NFT (при `mint_on_claim=false`). Недостаток средств ⇒ автоматический `Canceled` и возврат билетов.
 - **Газ и VRF.** Партнёр обязан пополнять депозит VRF-колбэка для своих розыгрышей (либо использовать квоту, выделенную оператором). Контракт отслеживает расход квоты, при превышении — блокирует новые запросы до пополнения.
 - **Idempotency и изоляция.** VRF-колбэк партнёра только записывает `seed/proof`; вычисления и выплаты проводятся в батчах через отдельные функции, требующие `PartnerPayoutCap` и соблюдающие лимиты газа.
 - **Управление рисками.** Предусмотрена двухэтапная активация: новые партнёры запускают розыгрыш как `Draft`, и только `OperationalAdmin` переводит его в `Active`. Дополнительно вводятся функции `pause_partner`, `revoke_partner_cap` и автоматическая экспирация `PartnerCreateCap`. Есть rate-limit на частоту `create` и VRF-запросов, чтобы исключить злоупотребления.
@@ -351,9 +385,9 @@ module lottery_multi::registry {
 - **Документация и ответственность.** В матрице RACI закрепляется ответственность DevOps за мониторинг и пополнение депозитов, RootAdmin — за утверждение лимитов, TreasuryCustodian — за перевод средств. В «книге проекта» создаётся отдельный раздел `docs/handbook/operations/vrf_deposit.md` с чек-листом и ссылкой на официальный канал Supra для уведомлений о изменениях требований по газу.
 
 ### 4.I Фронтенд-панели создания лотерей
-- **Админская консоль.** Для ролей `RootAdmin` и `OperationalAdmin` проектируется отдельный интерфейс «Конструктор лотерей» с полным доступом ко всем параметрам конфигурации (`event_slug`, `series_code`, пресет призов, лимиты билетов, окна продаж, параметры VRF). Панель подтягивает текущие `config_version`, позволяет собирать индивидуальные конфигурации, вызывает `lottery_multi::views::validate_config` и получает структурированный список нарушений (`error_code`, `field`, `hint`), который немедленно отображается в UI. Перед отправкой транзакции пользователь видит дифф по сравнению с утверждёнными пресетами и подтверждает изменения. Поддерживаются черновики: админ может сохранить Draft без публикации и вернуться к нему позже. Все действия завершаются транзакциями `create_custom_lottery`/`update_lottery_config`, подписываемыми кошельком администратора.
-- **Партнёрский мастер.** Партнёры работают только через упрощённый мастер из заранее утверждённых шаблонов. UI показывает доступные пресеты, остаток квот (`allowance`, `max_parallel`, `expires_at`), доступные интервалы дат и автоматические ограничения (`max_ticket_price`, `max_duration`). Перед отправкой транзакции `create_from_template` фронтенд выполняет локальную валидацию и вызывает view `get_partner_template_limits(partner)` для сверки лимитов; данные из view возвращаются в реальном времени и отображают текущее состояние песочницы. Если лимиты превышены, интерфейс блокирует шаг и показывает ссылку на процедуру продления через `RootAdmin`; автоматизация через governance добавится на позднем этапе.
-- **Единый backend API.** Обе панели используют один backend-шлюз (GraphQL/REST) для чтения вспомогательных данных (пресеты, словари серий, статистику партнёров). Шлюз не имеет права подписи — он лишь агрегирует публичные view и события. Все транзакции формируются и подписываются на стороне клиента, что исключает появление «скрытых» действий.
+- **Админская консоль.** Для ролей `RootAdmin` и `OperationalAdmin` проектируется отдельный интерфейс «Конструктор лотерей» с полным доступом ко всем параметрам конфигурации (`event_slug`, `series_code`, пресет призов, лимиты билетов, окна продаж, параметры VRF, `primary_type`, `tags_mask`). Панель подтягивает текущие `config_version`, позволяет собирать индивидуальные конфигурации, вызывает `lottery_multi::views::validate_config` и получает структурированный список нарушений (`error_code`, `field`, `hint`), который немедленно отображается в UI. Перед отправкой транзакции пользователь видит дифф по сравнению с утверждёнными пресетами и подтверждает изменения. Поддерживаются черновики: админ может сохранить Draft без публикации и вернуться к нему позже. Все действия завершаются транзакциями `create_custom_lottery`/`update_lottery_config`, подписываемыми кошельком администратора.
+- **Партнёрский мастер.** Партнёры работают только через упрощённый мастер из заранее утверждённых шаблонов. UI показывает доступные пресеты, остаток квот (`allowance`, `max_parallel`, `expires_at`), доступные интервалы дат и автоматические ограничения (`max_ticket_price`, `max_duration`, допустимые `primary_type` и биты `tags_mask`). Перед отправкой транзакции `create_from_template` фронтенд выполняет локальную валидацию и вызывает view `get_partner_template_limits(partner)` для сверки лимитов; данные из view возвращаются в реальном времени и отображают текущее состояние песочницы. Если лимиты превышены или выбран недопустимый тег, интерфейс блокирует шаг и показывает ссылку на процедуру продления через `RootAdmin`; автоматизация через governance добавится на позднем этапе.
+- **Единый backend API.** Обе панели используют один backend-шлюз (GraphQL/REST) для чтения вспомогательных данных (пресеты, словари серий, статистику партнёров). Шлюз не имеет права подписи — он лишь агрегирует публичные view и события (включая `get_lottery_badges`, `list_by_primary_type`, `list_by_tag_bit`). Все транзакции формируются и подписываются на стороне клиента, что исключает появление «скрытых» действий.
 - **Синхронизация с документацией.** Для каждой панели в «книге проекта» создаются отдельные руководства (`docs/handbook/frontend/admin_console.md`, `docs/handbook/frontend/partner_console.md`) с описанием UX-потока, проверок и ссылками на соответствующие разделы контрактов. Комментарии в функциях `create_custom_lottery` и `create_from_template` ссылаются на эти документы.
 
 ### 4.J Ончейн-прайс-фиды и многовалютная поддержка
@@ -494,9 +528,9 @@ module lottery_multi::registry {
   автоматический `move check` для нового пакета `lottery_multi` в CI.
 
 ### 9.1 Тест-матрица (минимальный набор)
-- **Unit-тесты.** Создание/пауза/закрытие лотерей, лимиты на пользователя и общий лимит, пограничные значения временных окон; VRF-сценарии (одиночный колбэк, повторный, out-of-order, retry); расчёт победителей для 1, N-1 и N победителей при `winners_dedup=true/false`; газовые тесты на 10 000 билетов (≤ 80 % лимита); батчевые выплаты, повторный запуск того же батча (идемпотентность) и случаи исчерпания бюджета.
-- **Property-based тесты.** Проверка неизменности результата при одинаковом `seed`, отсутствие дубликатов при `winners_dedup=true`, сохранение `slots_checksum` и `snapshot_hash` между вычислениями.
-- **Интеграционные сценарии.** Партнёрские квоты и allowance, VRF-депозит и повторные запросы, backfill старой истории, аварийные паузы и восстановление, автоматические задачи `AutomationBot` (в том числе `dry_run`).
+- **Unit-тесты.** Создание/пауза/закрытие лотерей, лимиты на пользователя и общий лимит, пограничные значения временных окон; VRF-сценарии (одиночный колбэк, повторный, out-of-order, retry); расчёт победителей для 1, N-1 и N победителей при `winners_dedup=true/false`; валидация `lottery_multi::tags` (неизвестный `primary_type` → `abort`, корректный `TYPE_BASIC`/`tags_mask=0` → success); партнёрские ограничения по типам и тегам; газовые тесты на 10 000 билетов (≤ 80 % лимита); батчевые выплаты, повторный запуск того же батча (идемпотентность) и случаи исчерпания бюджета.
+- **Property-based тесты.** Проверка неизменности результата при одинаковом `seed`, отсутствие дубликатов при `winners_dedup=true`, сохранение `slots_checksum` и `snapshot_hash` между вычислениями, стабильная сортировка и отсутствие пропусков при генерации выборок `list_by_primary_type`/`list_by_tag_bit`.
+- **Интеграционные сценарии.** Партнёрские квоты и allowance, VRF-депозит и повторные запросы, backfill старой истории, миграция тегов (`TYPE_BASIC`, `tags_mask = 0`), аварийные паузы и восстановление, автоматические задачи `AutomationBot` (в том числе `dry_run`).
 - **Security-тесты.** Попытки реэнтранси (через внешние вызовы), replay выплат (`payout_round`), эскалация ролей, подмена payload VRF, атаки на rate-limit. Для каждого сценария фиксируются ожидаемые коды из `lottery_multi::errors`.
 - **Документация тестов.** Каждая группа тестов ссылается на соответствующий раздел «книги проекта»; при добавлении нового сценария обновляется таблица `docs/handbook/qa/test_matrix.md` с статусом покрытия.
 
@@ -505,10 +539,11 @@ module lottery_multi::registry {
   - Подтвердить состав модулей `lottery_multi::{registry, views, history, roles, automation, economics}` и схему зависимостей.
   - Согласовать с командами фронтенда и DevOps формат событий, alias лотерей и список view-функций (зафиксировать протокол созвона в `docs/handbook/operations/meeting_notes.md`).
   - Выпустить RFC с описанием миграции и получить утверждение `RootAdmin`/губернанса.
+  - Утвердить словарь классификаторов: значения `tags::TYPE_*`, доступные биты `tags::TAG_*`, требования к бейджам и отображению на фронтенде.
 - **Этап 1 — инфраструктура пакета.**
   - Реализовать ресурсы `Lottery`, `LotteryRegistry`, `LotteryFactoryState`, `RoleRegistry` с минимальными проверками.
   - Поддержать создание/закрытие лотерей без VRF и выплат, убедившись, что архив и события генерируются корректно.
-  - Настроить базовые view-функции (`get_lottery`, `list_active`), интегрировать `move check`/`move unit-test` в CI.
+  - Настроить базовые view-функции (`get_lottery`, `list_active`, `get_lottery_badges`), интегрировать `move check`/`move unit-test` в CI.
 - **Этап 2 — VRF и расчёт победителей.**
   - Перенести из `core_main_v2` механику формирования payload, проверки `rng_count`, хэширования и хранения `VrfState`.
   - Внедрить очередь повторных запросов и обработку колбэка без тяжёлых вычислений, добавить тесты на параллельные VRF.
@@ -521,6 +556,7 @@ module lottery_multi::registry {
 - **Этап 4 — миграция и backfill.**
   - Заморозить текущий контракт, экспортировать историю (`lottery_support::History`) и импортировать в `LotteryHistoryArchive`.
   - Протестировать сценарий отката: в случае сбоя уметь восстановить старую модель без потери билетов и резервов.
+  - Назначить для всех унаследованных розыгрышей `primary_type = tags::TYPE_BASIC` и `tags_mask = 0`, зафиксировать миграцию в событиях `LotteryFinalized`/`LotteryHistoryArchive`.
   - Обновить CLI/фронтенд, провести UAT со списком тестовых лотерей.
 - **Этап 5 — запуск ядра под управлением администратора.**
   - Активировать `RoleRegistry`, выдать capabilities администраторам, партнёрам, аудиторам и автоматизации, закрепив ручное управление за `RootAdmin`.
