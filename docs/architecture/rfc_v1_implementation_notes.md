@@ -28,7 +28,7 @@
 | `views` | Публичные API, фильтры, JSON-схемы | In Progress | Реализованы фильтры по типам и тегам, выдача бейджей | 2025-11-08 |
 | `roles` | Capabilities, партнёры, премиальные подписки | In Progress | Расширены PartnerCap и введён `PremiumAccessCap` | 2025-11-08 |
 | `tags` | Классификаторы, фильтрация, маски | In Progress | Валидация масок, ограничение по бюджету тегов | 2025-11-08 |
-| `price_feed` | Оракулы SUPRA/USD и прочие активы | Not Started |  | _YYYY-MM-DD_ |
+| `price_feed` | Оракулы SUPRA/USD и прочие активы | In Progress | Реализован `PriceFeedRegistry` с событиями обновления/фолбэка/клампа, добавлены константы SUPRA/USDT | 2025-11-08 |
 | `feature_switch` | Управление доступом к функциям | In Progress | Добавлен реестр режимов и devnet override | 2025-11-08 |
 | `automation` | AutomationBot, dry-run, репутация | Not Started |  | _YYYY-MM-DD_ |
 

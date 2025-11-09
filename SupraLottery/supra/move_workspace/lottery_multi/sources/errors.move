@@ -68,4 +68,13 @@ module lottery_multi::errors {
     pub const E_PAYOUT_STATE_MISSING: u64 = 0x1805;
     pub const E_PAYOUT_ROUND_NON_MONOTONIC: u64 = 0x1806;
     pub const E_PAYOUT_COOLDOWN: u64 = 0x1807;
+
+    /// Price feed errors
+    pub const E_PRICE_FEED_EXISTS: u64 = 0x1901;
+    pub const E_PRICE_FEED_NOT_FOUND: u64 = 0x1902;
+    pub const E_PRICE_DECIMALS_INVALID: u64 = 0x1903;
+    pub const E_PRICE_STALE: u64 = 0x1904;
+    pub const E_PRICE_FALLBACK_ACTIVE: u64 = 0x1905;
+    pub const E_PRICE_CLAMP_TRIGGERED: u64 = 0x1906;
+    pub const E_PRICE_CLAMP_ACTIVE: u64 = 0x1907;
 }
