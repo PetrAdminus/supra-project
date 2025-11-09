@@ -1,18 +1,21 @@
 // sources/sales.move
 module lottery_multi::sales {
+    use std::bcs;
+    use std::hash;
     use std::signer;
     use std::table;
     use std::vector;
     use supra_framework::event;
 
     use lottery_multi::errors;
+    use lottery_multi::history;
     use lottery_multi::feature_switch;
     use lottery_multi::registry;
     use lottery_multi::roles;
     use lottery_multi::types;
 
     const PURCHASE_EVENT_VERSION_V1: u16 = 1;
-    const EVENT_CATEGORY_SALES: u8 = 3;
+    const EVENT_CATEGORY_SALES: u8 = history::EVENT_CATEGORY_SALES;
     const CHUNK_CAPACITY: u64 = 256;
     const MAX_TICKETS_PER_TX: u64 = 128;
 
@@ -199,6 +202,42 @@ module lottery_multi::sales {
                 state.next_chunk_seq = state.next_chunk_seq + 1;
             };
         };
+    }
+
+    public fun snapshot_for_draw(lottery_id: u64): (vector<u8>, u64, u64) acquires SalesLedger {
+        let ledger_addr = @lottery_multi;
+        if (!exists<SalesLedger>(ledger_addr)) {
+            return (hash::sha3_256(b"lottery_multi::snapshot_empty"), 0, 0);
+        };
+        let ledger = borrow_global<SalesLedger>(ledger_addr);
+        if (!table::contains(&ledger.states, lottery_id)) {
+            return (hash::sha3_256(b"lottery_multi::snapshot_empty"), 0, 0);
+        };
+        let state = table::borrow(&ledger.states, lottery_id);
+        let snapshot_hash = compute_snapshot_hash(state);
+        (snapshot_hash, state.tickets_sold, state.proceeds_accum)
+    }
+
+    fun compute_snapshot_hash(state: &SalesState): vector<u8> {
+        let mut digest = hash::sha3_256(b"lottery_multi::snapshot_seed");
+        let mut seq = 0u64;
+        while (seq < state.next_chunk_seq) {
+            if (table::contains(&state.ticket_chunks, seq)) {
+                let chunk = table::borrow(&state.ticket_chunks, seq);
+                let tuple = (chunk.chunk_seq, chunk.start_index, copy chunk.buyers);
+                let chunk_bytes = bcs::to_bytes(&tuple);
+                let mut combined = copy digest;
+                vector::append(&mut combined, chunk_bytes);
+                digest = hash::sha3_256(combined);
+            };
+            seq = seq + 1;
+        };
+        let mut combined_totals = copy digest;
+        let tickets_bytes = bcs::to_bytes(&state.tickets_sold);
+        vector::append(&mut combined_totals, tickets_bytes);
+        let proceeds_bytes = bcs::to_bytes(&state.proceeds_accum);
+        vector::append(&mut combined_totals, proceeds_bytes);
+        hash::sha3_256(combined_totals)
     }
 
     fun apply_sale(state: &mut SalesState, quantity: u64, ticket_price: u64, now_ts: u64) {

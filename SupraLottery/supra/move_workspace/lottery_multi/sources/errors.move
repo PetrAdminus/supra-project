@@ -25,6 +25,7 @@ module lottery_multi::errors {
     pub const E_DRAW_ALGO_UNSUPPORTED: u64 = 0x120D;
     pub const E_SALES_WINDOW_CLOSED: u64 = 0x120E;
     pub const E_LOTTERY_NOT_ACTIVE: u64 = 0x120F;
+    pub const E_DRAW_STATUS_INVALID: u64 = 0x1210;
 
     /// Accounting and allocation errors
     pub const E_DISTRIBUTION_BPS_INVALID: u64 = 0x1301;
@@ -46,4 +47,16 @@ module lottery_multi::errors {
     pub const E_AMOUNT_OVERFLOW: u64 = 0x1605;
     pub const E_PREMIUM_CAP_MISMATCH: u64 = 0x1606;
     pub const E_PREMIUM_CAP_EXPIRED: u64 = 0x1607;
+
+    /// VRF / draw errors
+    pub const E_VRF_PENDING: u64 = 0x1701;
+    pub const E_VRF_NOT_REQUESTED: u64 = 0x1702;
+    pub const E_VRF_NONCE_UNKNOWN: u64 = 0x1703;
+    pub const E_VRF_PAYLOAD_MISMATCH: u64 = 0x1704;
+    pub const E_VRF_ATTEMPT_OUT_OF_ORDER: u64 = 0x1705;
+    pub const E_VRF_RNG_COUNT_INVALID: u64 = 0x1706;
+    pub const E_VRF_SNAPSHOT_EMPTY: u64 = 0x1707;
+    pub const E_VRF_CONSUMED: u64 = 0x1708;
+    pub const E_VRF_RETRY_WINDOW: u64 = 0x1709;
+    pub const E_VRF_CLIENT_SEED_OVERFLOW: u64 = 0x170A;
 }

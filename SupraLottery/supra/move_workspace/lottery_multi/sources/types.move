@@ -68,8 +68,10 @@ module lottery_multi::types {
         pub status: u8,
     }
 
+    pub const MAX_RNG_COUNT: u64 = 255;
+
     pub struct VrfState has copy, drop, store {
-        pub request_id: vector<u8>,
+        pub request_id: u64,
         pub payload_hash: vector<u8>,
         pub schema_version: u16,
         pub attempt: u8,
@@ -127,7 +129,7 @@ module lottery_multi::types {
 
     pub fun new_vrf_state(): VrfState {
         VrfState {
-            request_id: b"",
+            request_id: 0,
             payload_hash: b"",
             schema_version: DEFAULT_SCHEMA_VERSION,
             attempt: 0,
@@ -182,5 +184,14 @@ module lottery_multi::types {
     pub fun prize_plan_checksum(prize_plan: &vector<PrizeSlot>): vector<u8> {
         let bytes = bcs::to_bytes(prize_plan);
         hash::sha3_256(bytes)
+    }
+
+    pub fun assert_rng_count(count: u64) {
+        assert!(count > 0 && count <= MAX_RNG_COUNT, errors::E_VRF_RNG_COUNT_INVALID);
+    }
+
+    pub fun as_u8(value: u64): u8 {
+        assert!(value <= MAX_RNG_COUNT, errors::E_VRF_RNG_COUNT_INVALID);
+        value as u8
     }
 }

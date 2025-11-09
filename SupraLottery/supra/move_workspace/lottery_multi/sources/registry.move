@@ -16,7 +16,11 @@ module lottery_multi::registry {
     pub const STATUS_DRAFT: u8 = types::STATUS_DRAFT;
     pub const STATUS_ACTIVE: u8 = types::STATUS_ACTIVE;
     pub const STATUS_CLOSING: u8 = types::STATUS_CLOSING;
+    pub const STATUS_DRAW_REQUESTED: u8 = types::STATUS_DRAW_REQUESTED;
+    pub const STATUS_DRAWN: u8 = types::STATUS_DRAWN;
+    pub const STATUS_PAYOUT: u8 = types::STATUS_PAYOUT;
     pub const STATUS_FINALIZED: u8 = types::STATUS_FINALIZED;
+    pub const STATUS_CANCELED: u8 = types::STATUS_CANCELED;
 
     pub struct Config has copy, drop, store {
         pub event_slug: vector<u8>,
@@ -211,15 +215,61 @@ module lottery_multi::registry {
         &lottery.config
     }
 
+    public fun slots_checksum(id: u64): vector<u8> acquires Registry {
+        let registry = borrow_registry_ref();
+        let lottery = table::borrow(&registry.lotteries, id);
+        copy lottery.slots_checksum
+    }
+
+    public fun mark_draw_requested(id: u64) acquires Registry {
+        let registry = borrow_registry_mut();
+        let lottery = table::borrow_mut(&mut registry.lotteries, id);
+        assert!(
+            lottery.status == STATUS_CLOSING || lottery.status == STATUS_DRAW_REQUESTED,
+            errors::E_DRAW_STATUS_INVALID,
+        );
+        lottery.status = STATUS_DRAW_REQUESTED;
+    }
+
+    public fun mark_drawn(id: u64) acquires Registry {
+        let registry = borrow_registry_mut();
+        let lottery = table::borrow_mut(&mut registry.lotteries, id);
+        assert!(lottery.status == STATUS_DRAW_REQUESTED, errors::E_DRAW_STATUS_INVALID);
+        lottery.status = STATUS_DRAWN;
+    }
+
+    public fun mark_payout(id: u64) acquires Registry {
+        let registry = borrow_registry_mut();
+        let lottery = table::borrow_mut(&mut registry.lotteries, id);
+        assert!(lottery.status == STATUS_DRAWN, errors::E_DRAW_STATUS_INVALID);
+        lottery.status = STATUS_PAYOUT;
+    }
+
+    public fun mark_finalized(id: u64) acquires Registry {
+        let registry = borrow_registry_mut();
+        let lottery = table::borrow_mut(&mut registry.lotteries, id);
+        assert!(lottery.status == STATUS_PAYOUT, errors::E_DRAW_STATUS_INVALID);
+        lottery.status = STATUS_FINALIZED;
+    }
+
     fun is_transition_allowed(current: u8, next: u8): bool {
-        if (current == STATUS_DRAFT && next == STATUS_ACTIVE) {
-            return true;
+        if (current == STATUS_DRAFT) {
+            return next == STATUS_ACTIVE || next == STATUS_CANCELED;
         };
-        if (current == STATUS_ACTIVE && next == STATUS_CLOSING) {
-            return true;
+        if (current == STATUS_ACTIVE) {
+            return next == STATUS_CLOSING || next == STATUS_CANCELED;
         };
-        if (current == STATUS_CLOSING && next == STATUS_FINALIZED) {
-            return true;
+        if (current == STATUS_CLOSING) {
+            return next == STATUS_DRAW_REQUESTED || next == STATUS_FINALIZED || next == STATUS_CANCELED;
+        };
+        if (current == STATUS_DRAW_REQUESTED) {
+            return next == STATUS_DRAWN || next == STATUS_CANCELED;
+        };
+        if (current == STATUS_DRAWN) {
+            return next == STATUS_PAYOUT || next == STATUS_CANCELED;
+        };
+        if (current == STATUS_PAYOUT) {
+            return next == STATUS_FINALIZED || next == STATUS_CANCELED;
         };
         false
     }
