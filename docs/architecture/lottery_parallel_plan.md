@@ -197,8 +197,7 @@ module lottery_multi::registry {
 - `PartnerPayout(event_version, event_category, id, partner_addr, payout_slot_code, asset_type_code, amount, payout_nonce)`
 - `LotteryFinalized(event_version, event_category, id, archive_slot_hash, primary_type, tags_mask)`
 - `LotteryCanceled(event_version, event_category, id, reason_code)`
-- `PurchaseRateLimitHit(event_version, event_category, id, signer, limit_code)`
-- `SalesGraceRejected(event_version, event_category, id, signer, submitted_at)`
+- `PurchaseRateLimitHit(event_version, event_category, lottery_id, buyer, timestamp, current_block, reason_code)`
 - `AutomationDryRunPlanned(event_version, event_category, action_hash, executes_after_ts)`
 - `AutomationCallRejected(event_version, event_category, action_hash, reason_code)`
 - `AutomationKeyRotated(event_version, event_category, new_key_hash)`
@@ -471,9 +470,9 @@ module lottery_multi::registry {
 - **Size growth metric.** CI публикует метрику `size_growth_pct` (рост байткода относительно предыдущего релиза); если тренд превышает установленный порог (например, 2 % за релиз), задача попадает в бэклог оптимизации. Это позволяет отслеживать постепенное приближение к лимитам заранее.
 
 ### 4.N Защита от DoS при покупке и «честное закрытие» продаж
-- **Анти-флуд лимиты.** `purchase_ticket` получает конфигурацию локальных ограничений: максимум билетов за транзакцию, максимум транзакций пользователя за блок и за rolling-окно (по умолчанию 5 минут). При превышении публикуется событие `PurchaseRateLimitHit { event_version, lottery_id, signer, limit_code }`, фронтенд показывает понятное сообщение, а контракт возвращает `abort(E_PURCHASE_RATE_LIMIT)`.
-- **Fairness в конце окна.** Когда `now` приближается к `sales_window.end_ts`, автоматизация включает «grace window»: принимаются только транзакции, хэши которых уже находились в мемпуле до `end_ts`. Для новых попыток публикуется событие `SalesGraceRejected`. В документации фиксируется, как индексатор вычисляет попадание в grace (по полю `submitted_at`), чтобы участники не считали продажи несправедливыми.
-- **Тесты и мониторинг.** В тестах моделируются всплески покупок, чтобы убедиться, что лимиты не мешают честным пользователям. Мониторинг собирает метрику `purchase_rate_limit_hits`, что позволяет реагировать на аномалии.
+- **Анти-флуд лимиты.** `purchase_ticket` реализует три уровня защиты: (1) максимум 128 билетов за транзакцию, (2) не более 64 покупок на блок (`MAX_PURCHASES_PER_BLOCK`), (3) не более 10 покупок на адрес за скользящее окно 60 секунд (`RATE_LIMIT_WINDOW_SECS`). При превышении публикуется событие `PurchaseRateLimitHit` с `reason_code` (`1` — блокировка по блоку, `2` — превышение окна), а контракт завершает работу `abort(E_PURCHASE_RATE_LIMIT_BLOCK)` или `abort(E_PURCHASE_RATE_LIMIT_WINDOW)`.
+- **Fairness в конце окна.** За 15 секунд до `sales_window.end_ts` (`GRACE_WINDOW_SECS`) новые покупатели блокируются: если адрес ещё не приобретал билеты и не обладает премиум-подпиской, публикуется `PurchaseRateLimitHit` с `reason_code = 3`, а функция возвращает `abort(E_PURCHASE_GRACE_RESTRICTED)`. Уже участвующие игроки и премиальные адреса могут докупить билеты до самого `sales_end`.
+- **Тесты и мониторинг.** В тестах моделируются всплески покупок, чтобы убедиться, что лимиты не мешают честным пользователям. Метрика `purchase_rate_limit_hits` агрегирует события по каждому `reason_code`; алерты срабатывают при аномальном росте (например, > 5 срабатываний в минуту).
 
 ### 4.O Безопасность AutomationBot и управление ключами
 - **Белый список вызовов.** `AutomationBot` работает только с заранее утверждённым списком call-targets (`auto_close`, `retry_vrf`, `defragment_user_index`, `top_up_vrf_deposit`). Любая попытка вызвать другую функцию приводит к `abort(E_AUTOBOT_FORBIDDEN_TARGET)` и событию `AutomationCallRejected`.

@@ -16,9 +16,18 @@ module lottery_multi::sales {
     use lottery_multi::types;
 
     const PURCHASE_EVENT_VERSION_V1: u16 = 1;
+    const RATE_LIMIT_EVENT_VERSION_V1: u16 = 1;
     const EVENT_CATEGORY_SALES: u8 = history::EVENT_CATEGORY_SALES;
     const CHUNK_CAPACITY: u64 = 256;
     const MAX_TICKETS_PER_TX: u64 = 128;
+    const MAX_PURCHASES_PER_BLOCK: u64 = 64;
+    const RATE_LIMIT_WINDOW_SECS: u64 = 60;
+    const MAX_PURCHASES_PER_WINDOW: u64 = 10;
+    const GRACE_WINDOW_SECS: u64 = 15;
+
+    const RATE_LIMIT_REASON_BLOCK: u8 = 1;
+    const RATE_LIMIT_REASON_WINDOW: u8 = 2;
+    const RATE_LIMIT_REASON_GRACE: u8 = 3;
 
     struct TicketChunk has store {
         lottery_id: u64,
@@ -42,14 +51,32 @@ module lottery_multi::sales {
         pub proceeds_accum: u64,
     }
 
+    pub struct PurchaseRateLimitHitEvent has drop, store {
+        pub event_version: u16,
+        pub event_category: u8,
+        pub lottery_id: u64,
+        pub buyer: address,
+        pub timestamp: u64,
+        pub current_block: u64,
+        pub reason_code: u8,
+    }
+
+    struct RateTrack has store {
+        window_start: u64,
+        purchase_count: u64,
+    }
+
     struct SalesState has store {
         ticket_price: u64,
         tickets_sold: u64,
         proceeds_accum: u64,
         last_purchase_ts: u64,
+        last_purchase_block: u64,
+        block_purchase_count: u64,
         next_chunk_seq: u64,
         tickets_per_address: table::Table<address, u64>,
         ticket_chunks: table::Table<u64, TicketChunk>,
+        rate_track: table::Table<address, RateTrack>,
         distribution: economics::SalesDistribution,
         accounting: economics::Accounting,
     }
@@ -57,6 +84,7 @@ module lottery_multi::sales {
     struct SalesLedger has key {
         states: table::Table<u64, SalesState>,
         purchase_events: event::EventHandle<TicketPurchaseEvent>,
+        rate_limit_events: event::EventHandle<PurchaseRateLimitHitEvent>,
     }
 
     public entry fun init_sales(admin: &signer) {
@@ -66,6 +94,7 @@ module lottery_multi::sales {
         let ledger = SalesLedger {
             states: table::new(),
             purchase_events: event::new_event_handle<TicketPurchaseEvent>(admin),
+            rate_limit_events: event::new_event_handle<PurchaseRateLimitHitEvent>(admin),
         };
         move_to(admin, ledger);
     }
@@ -75,8 +104,9 @@ module lottery_multi::sales {
         lottery_id: u64,
         quantity: u64,
         now_ts: u64,
+        current_block: u64,
     ) acquires SalesLedger, registry::Registry {
-        purchase_internal(buyer, lottery_id, quantity, now_ts, false);
+        purchase_internal(buyer, lottery_id, quantity, now_ts, current_block, false);
     }
 
     public entry fun purchase_tickets_premium(
@@ -85,12 +115,13 @@ module lottery_multi::sales {
         quantity: u64,
         now_ts: u64,
         premium_cap: &roles::PremiumAccessCap,
+        current_block: u64,
     ) acquires SalesLedger, registry::Registry {
         let buyer_addr = signer::address_of(buyer);
         assert!(premium_cap.holder == buyer_addr, errors::E_PREMIUM_CAP_MISMATCH);
         let active = roles::is_premium_active(premium_cap, now_ts);
         assert!(active, errors::E_PREMIUM_CAP_EXPIRED);
-        purchase_internal(buyer, lottery_id, quantity, now_ts, true);
+        purchase_internal(buyer, lottery_id, quantity, now_ts, current_block, true);
     }
 
     fun purchase_internal(
@@ -98,6 +129,7 @@ module lottery_multi::sales {
         lottery_id: u64,
         quantity: u64,
         now_ts: u64,
+        current_block: u64,
         has_premium: bool,
     ) acquires SalesLedger, registry::Registry {
         assert!(quantity > 0, errors::E_PURCHASE_QTY_ZERO);
@@ -117,16 +149,50 @@ module lottery_multi::sales {
         );
 
         let ledger = borrow_ledger_mut();
+        let purchase_events_ref = &mut ledger.purchase_events;
+        let rate_limit_events_ref = &mut ledger.rate_limit_events;
+        let states_ref = &mut ledger.states;
         let state = borrow_or_create_state(
-            ledger,
+            states_ref,
             lottery_id,
             config.ticket_price,
             &config.sales_distribution,
         );
 
-        assert_total_limit(state, &config.ticket_limits, quantity);
         let buyer_addr = signer::address_of(buyer);
         let existing = per_address_count(state, buyer_addr);
+
+        let grace_reason = check_grace_window(existing, now_ts, config.sales_window.sales_end, has_premium);
+        if (grace_reason != 0) {
+            emit_rate_limit_event(
+                rate_limit_events_ref,
+                lottery_id,
+                buyer_addr,
+                now_ts,
+                current_block,
+                grace_reason,
+            );
+            abort errors::E_PURCHASE_GRACE_RESTRICTED;
+        };
+
+        let rate_reason = check_and_update_rate_limits(state, buyer_addr, now_ts, current_block);
+        if (rate_reason != 0) {
+            emit_rate_limit_event(
+                rate_limit_events_ref,
+                lottery_id,
+                buyer_addr,
+                now_ts,
+                current_block,
+                rate_reason,
+            );
+            if (rate_reason == RATE_LIMIT_REASON_BLOCK) {
+                abort errors::E_PURCHASE_RATE_LIMIT_BLOCK;
+            } else {
+                abort errors::E_PURCHASE_RATE_LIMIT_WINDOW;
+            };
+        };
+
+        assert_total_limit(state, &config.ticket_limits, quantity);
         assert_address_limit(&config.ticket_limits, existing, quantity);
         update_per_address(state, buyer_addr, existing, quantity);
 
@@ -146,7 +212,7 @@ module lottery_multi::sales {
         );
 
         emit_purchase_event(
-            ledger,
+            purchase_events_ref,
             lottery_id,
             buyer_addr,
             quantity,
@@ -160,26 +226,29 @@ module lottery_multi::sales {
     }
 
     fun borrow_or_create_state(
-        ledger: &mut SalesLedger,
+        states: &mut table::Table<u64, SalesState>,
         lottery_id: u64,
         ticket_price: u64,
         distribution: &economics::SalesDistribution,
     ): &mut SalesState {
-        if (!table::contains(&ledger.states, lottery_id)) {
+        if (!table::contains(states, lottery_id)) {
             let state = SalesState {
                 ticket_price,
                 tickets_sold: 0,
                 proceeds_accum: 0,
                 last_purchase_ts: 0,
+                last_purchase_block: 0,
+                block_purchase_count: 0,
                 next_chunk_seq: 0,
                 tickets_per_address: table::new(),
                 ticket_chunks: table::new(),
+                rate_track: table::new(),
                 distribution: copy *distribution,
                 accounting: economics::new_accounting(),
             };
-            table::add(&mut ledger.states, lottery_id, state);
+            table::add(states, lottery_id, state);
         };
-        table::borrow_mut(&mut ledger.states, lottery_id)
+        table::borrow_mut(states, lottery_id)
     }
 
     fun per_address_count(state: &SalesState, buyer: address): u64 {
@@ -352,7 +421,7 @@ module lottery_multi::sales {
     }
 
     fun emit_purchase_event(
-        ledger: &mut SalesLedger,
+        purchase_events: &mut event::EventHandle<TicketPurchaseEvent>,
         lottery_id: u64,
         buyer: address,
         quantity: u64,
@@ -377,7 +446,99 @@ module lottery_multi::sales {
             tickets_sold: state.tickets_sold,
             proceeds_accum: state.proceeds_accum,
         };
-        event::emit_event(&mut ledger.purchase_events, event);
+        event::emit_event(purchase_events, event);
+    }
+
+    fun emit_rate_limit_event(
+        rate_limit_events: &mut event::EventHandle<PurchaseRateLimitHitEvent>,
+        lottery_id: u64,
+        buyer: address,
+        now_ts: u64,
+        current_block: u64,
+        reason: u8,
+    ) {
+        let event = PurchaseRateLimitHitEvent {
+            event_version: RATE_LIMIT_EVENT_VERSION_V1,
+            event_category: EVENT_CATEGORY_SALES,
+            lottery_id,
+            buyer,
+            timestamp: now_ts,
+            current_block,
+            reason_code: reason,
+        };
+        event::emit_event(rate_limit_events, event);
+    }
+
+    fun check_and_update_rate_limits(
+        state: &mut SalesState,
+        buyer: address,
+        now_ts: u64,
+        current_block: u64,
+    ): u8 {
+        let mut block_count = state.block_purchase_count;
+        let mut last_block = state.last_purchase_block;
+        if (last_block != current_block) {
+            last_block = current_block;
+            block_count = 0;
+        };
+        if (block_count + 1 > MAX_PURCHASES_PER_BLOCK) {
+            return RATE_LIMIT_REASON_BLOCK;
+        };
+        block_count = block_count + 1;
+
+        let mut window_start = now_ts;
+        let mut purchase_count = 0u64;
+        let mut has_track = false;
+        if (table::contains(&state.rate_track, buyer)) {
+            {
+                let track_ref = table::borrow(&state.rate_track, buyer);
+                window_start = track_ref.window_start;
+                purchase_count = track_ref.purchase_count;
+            };
+            has_track = true;
+        };
+        if (now_ts >= window_start + RATE_LIMIT_WINDOW_SECS) {
+            window_start = now_ts;
+            purchase_count = 0;
+        };
+        if (purchase_count + 1 > MAX_PURCHASES_PER_WINDOW) {
+            return RATE_LIMIT_REASON_WINDOW;
+        };
+        purchase_count = purchase_count + 1;
+
+        state.last_purchase_block = last_block;
+        state.block_purchase_count = block_count;
+
+        if (has_track) {
+            let track_mut = table::borrow_mut(&mut state.rate_track, buyer);
+            track_mut.window_start = window_start;
+            track_mut.purchase_count = purchase_count;
+        } else {
+            let track = RateTrack {
+                window_start,
+                purchase_count,
+            };
+            table::add(&mut state.rate_track, buyer, track);
+        };
+        0
+    }
+
+    fun check_grace_window(
+        existing: u64,
+        now_ts: u64,
+        sales_end: u64,
+        has_premium: bool,
+    ): u8 {
+        if (has_premium) {
+            return 0;
+        };
+        if (sales_end <= GRACE_WINDOW_SECS) {
+            return 0;
+        };
+        if (now_ts + GRACE_WINDOW_SECS >= sales_end && existing == 0) {
+            return RATE_LIMIT_REASON_GRACE;
+        };
+        0
     }
 
     fun assert_total_limit(state: &SalesState, limits: &types::TicketLimits, quantity: u64) {

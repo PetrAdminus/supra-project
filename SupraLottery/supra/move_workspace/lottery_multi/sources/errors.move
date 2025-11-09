@@ -47,6 +47,9 @@ module lottery_multi::errors {
     pub const E_AMOUNT_OVERFLOW: u64 = 0x1605;
     pub const E_PREMIUM_CAP_MISMATCH: u64 = 0x1606;
     pub const E_PREMIUM_CAP_EXPIRED: u64 = 0x1607;
+    pub const E_PURCHASE_RATE_LIMIT_BLOCK: u64 = 0x1608;
+    pub const E_PURCHASE_RATE_LIMIT_WINDOW: u64 = 0x1609;
+    pub const E_PURCHASE_GRACE_RESTRICTED: u64 = 0x160A;
 
     /// VRF / draw errors
     pub const E_VRF_PENDING: u64 = 0x1701;
