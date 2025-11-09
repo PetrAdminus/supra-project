@@ -3,6 +3,8 @@ module lottery_multi::views {
     use std::string;
     use std::vector;
 
+    use lottery_multi::economics;
+    use lottery_multi::sales;
     use lottery_multi::registry;
     use lottery_multi::errors;
     use lottery_multi::tags;
@@ -27,6 +29,7 @@ module lottery_multi::views {
         types::assert_sales_window(&config.sales_window);
         types::assert_ticket_price(config.ticket_price);
         types::assert_ticket_limits(&config.ticket_limits);
+        economics::assert_distribution(&config.sales_distribution);
         types::assert_prize_plan(&config.prize_plan);
         types::assert_draw_algo(config.draw_algo);
     }
@@ -56,6 +59,10 @@ module lottery_multi::views {
             primary_type,
             tags_mask,
         }
+    }
+
+    public fun accounting_snapshot(id: u64): economics::Accounting {
+        sales::accounting_snapshot(id)
     }
 
     public fun list_by_primary_type(primary_type: u8, from: u64, limit: u64): vector<u64> acquires registry::Registry {

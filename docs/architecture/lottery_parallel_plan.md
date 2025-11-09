@@ -118,7 +118,8 @@ module lottery_multi::registry {
     struct Config has copy, drop, store {
         sales_window: SalesWindow,
         ticket_price: u64,
-        max_tickets_per_user: option::Option<u64>,
+        ticket_limits: TicketLimits,
+        sales_distribution: SalesDistribution,
         prize_plan: vector<PrizeSlot>,
         auto_close_policy: AutoClosePolicy,
         reward_backend: RewardBackend,
@@ -141,13 +142,13 @@ module lottery_multi::registry {
     }
 }
 ```
-- `State` хранит моментальные значения (проданные билеты, уникальные участники, закрыта ли продажа).
-- `Accounting` резервирует доли джекпота/продаж, средства для NFT и комиссию, а также хранит накопительные агрегаты (`total_sales_accum`, `total_prize_paid_accum`, `total_ops_paid_accum`) и контрольную сумму `slots_checksum = sha3-256(prize_plan)`, чтобы фронтенд и индексаторы могли быстро сверять данные без полного перебора записей.
+- `State` хранит моментальные значения (проданные билеты, уникальные участники, закрыта ли продажа) и копию распределения продаж, зафиксированную в момент первой покупки.
+- `Accounting` резервирует доли джекпота/продаж, средства для NFT и комиссию, а также хранит накопительные агрегаты (`total_sales`, `total_allocated`, `total_prize_paid`, `total_operations_paid`, `jackpot_allowance_token`). Контрольная сумма `slots_checksum = sha3-256(prize_plan)` и сериализация `accounting` входят в `snapshot_hash`, чтобы фронтенд и индексаторы могли быстро сверять данные без полного перебора записей.
 - `PrizeSlot` содержит информацию о типе награды (`FromSales`, `FromJackpot`, `NftEscrow`, `CustomHook`). Все конфигурации проходят через `tags::validate(config.primary_type, config.tags_mask)`, а также соответствующие проверки партнёрских квот.
 
 ### 3.3 Жизненный цикл
 1. **Draft.** Создание и проверка конфигурации; резервирование призов и регистрация в `registry`. На этом шаге запускаются валидации (корректность временных окон, допустимые идентификаторы, наличие лимитов).
-2. **Active.** Продажа билетов, учёт лимитов, публикация событий `TicketBought`. Пользовательские билеты заносятся в чанки, формируется индекс по адресам.
+2. **Active.** Продажа билетов, учёт лимитов, публикация событий `TicketPurchase`. Пользовательские билеты заносятся в чанки, формируется индекс по адресам.
 3. **Closing.** Завершение продаж, фиксация снапшота участников, подготовка данных к VRF-запросу (расчёт `payload_hash`, сохранение количества билетов, запись `snapshot_id` и `snapshot_total_tickets`, которые затем входят в payload и любые проверки).
 4. **AwaitingVRF.** Создание VRF-запроса и публикация события `VrfRequested`. В состоянии хранятся параметры газа и идентификатор запроса.
 5. **VrfFulfilled.** Получение seed и валидация payload (в т.ч. `rng_count`). Колбэк только сохраняет данные и публикует `VrfFulfilled`, вычисления откладываются.
@@ -187,7 +188,7 @@ module lottery_multi::registry {
 
 ### 3.4 События
 - `LotteryCreated(event_version, event_category, id, cfg_hash, config_version, creator, event_code, series_code, run_id, primary_type, tags_mask)`
-- `TicketBought(event_version, event_category, id, buyer, ticket_no, amount, sales_batch_code)`
+- `TicketPurchase(event_version, event_category, lottery_id, buyer, quantity, sale_amount, prize_allocation, jackpot_allocation, operations_allocation, reserve_allocation, tickets_sold, proceeds_accum)`
 - `SalesClosed(event_version, event_category, id, total_tickets, timestamp, closing_block)`
 - `VrfRequested(event_version, event_category, id, request_id, payload_hash, schema_version, max_gas_limit, max_gas_price)`
 - `VrfFulfilled(event_version, event_category, id, request_id, payload_hash, attempt, proof_hash, seed_hash)`
@@ -218,7 +219,7 @@ module lottery_multi::registry {
 - **Избыточные индексы и обслуживание.** Чтобы избежать разрастания таблиц, каждая лотерея имеет лимиты `max_chunks`, `max_user_refs` и счётчик «грязных» записей. AutomationBot периодически выполняет процедуру `defragment_user_index`: объединяет малозаполненные чанки, удаляет пустые ссылки и переносит переполненные записи в off-chain кеш (с фиксацией хэша в событии `UserIndexSnapshot`). При превышении лимитов продажа новых билетов блокируется `abort(E_INDEX_SATURATED)`, а фронтенд показывает требование дождаться обслуживания. В документации описывается план эвакуации данных в случае приближения к лимиту газа/памяти, а также стратегия дефрагментации по расписанию, чтобы поддерживать постоянное время выборок.
 - **События как неизменяемый журнал.** Архив дополняется событиями `LotteryFinalized`, `PayoutBatch`, `PartnerPayout`, `WinnerComputed`, что позволяет внешним индексаторам и фронтенду поддерживать собственные БД/кеши без потери проверяемости и всегда сверять данные с ончейн-источником. В документе нужно хранить описание форматов событий, чтобы аналитики могли настроить парсеры без изучения кода.
 - **Pagination и сортировка.** Все view возвращают данные с пагинацией `from/limit` и стабильной сортировкой: для глобальных списков — `id DESC`, затем `status`, затем `created_at`; для пользовательских историй — по паре `(lottery_id DESC, local_index DESC)`. Такие правила фиксируются в документации и дублируются тестами.
-- **View-функции для фронтенда.** Модуль `lottery_multi::views` предоставляет выборки `get_lottery_summary(id)`, `get_lottery_status(id)` (компактный агрегат `status`, `tickets_sold`, `proceeds_accum`, `vrf_status`, `primary_type`, `tags_mask`), `get_lottery_badges(id)` (возвращает `(primary_type, tags_mask)` для бейджей и подсветки на фронтенде), `get_badge_metadata(primary_type, tags_mask)` (JSON-описание бейджа без хардкода на фронте), `list_lotteries(status, from, limit)`, `list_by_primary_type(primary_type, from, limit)`, `list_by_tag_mask(tag_mask, from, limit)` (возвращает ID лотерей, где `(tags_mask & tag_mask) != 0`), `list_by_all_tags(tag_mask, from, limit)` (возвращает ID, удовлетворяющие `(tags_mask & tag_mask) == tag_mask`), `get_user_participation(addr, from, limit)`, `get_user_rewards(addr)` и `get_partner_allowance(addr)`. Все списки следуют стабильной сортировке `id DESC` и пагинации `(from, limit)`.
+- **View-функции для фронтенда.** Модуль `lottery_multi::views` предоставляет выборки `get_lottery_summary(id)`, `get_lottery_status(id)` (компактный агрегат `status`, `tickets_sold`, `proceeds_accum`, `vrf_status`, `primary_type`, `tags_mask`), `get_lottery_badges(id)` (возвращает `(primary_type, tags_mask)` для бейджей и подсветки на фронтенде), `get_badge_metadata(primary_type, tags_mask)` (JSON-описание бейджа без хардкода на фронте), `accounting_snapshot(id)` (возвращает агрегированные суммы `total_sales`, `total_allocated`, `total_prize_paid`, `total_operations_paid`, `jackpot_allowance_token`), `list_lotteries(status, from, limit)`, `list_by_primary_type(primary_type, from, limit)`, `list_by_tag_mask(tag_mask, from, limit)` (возвращает ID лотерей, где `(tags_mask & tag_mask) != 0`), `list_by_all_tags(tag_mask, from, limit)` (возвращает ID, удовлетворяющие `(tags_mask & tag_mask) == tag_mask`), `get_user_participation(addr, from, limit)`, `get_user_rewards(addr)` и `get_partner_allowance(addr)`. Все списки следуют стабильной сортировке `id DESC` и пагинации `(from, limit)`.
 - **Валидация конфигураций.** `views::validate_config` и любые функции редактирования конфигурации вызывают `tags::validate` и проверяют согласованность с capability инициатора: для партнёров — вхождение `primary_type` в белый список и принадлежность всех битов `tags_mask` разрешённой маске.
 - **Контроль согласованности.** `UserTicketRef` содержит `snapshot_hash` и `ticket_local_index`. Если фронтенд обнаруживает расхождение хэша с актуальным архивом, он инициирует процедуру восстановления (запрос по событиям) и сообщает об этом пользователю.
 
@@ -392,7 +393,7 @@ module lottery_multi::registry {
 - **Профили получателей.** Получатели комиссий и долей джекпота описываются в реестре профилей с возможностью наследования значений по умолчанию и локального переопределения на уровне лотереи. Любое изменение сопровождается событием и проверкой лимитов.
 - **Лимиты на бонусы.** Механизмы `OperationsBonusPaid` и `OperationsIncomeRecorded` дополняются бюджетами на период и требованием ручного подтверждения `RootAdmin` при превышении лимита. После запуска governance контроль планируется передать в соответствующий процесс (см. Этап 7).
 - **Предложенное распределение продаж.** Базовая схема: 70 % в призовой пул текущей лотереи, 15 % в глобальный джекпот, 10 % на операционные расходы, 5 % в фонд развития/резерва. Значения хранятся в базис-пойнтах (10 000 = 100 %) и валидируются проверкой `Σ allocations == 10_000`, что избавляет от ошибок округления и упрощает тестирование.
-- **Единая деноминация и коды ошибок.** Все денежные значения и события (например, `TicketBought`, `PayoutBatch`) публикуются в минимальной ончейн-единице SUPRA, чтобы исключить расхождения округлений. Для новых модулей создаётся `lottery_multi::errors` с перечислением `E_*`-кодов; документация и комментарии в коде ссылаются на этот модуль, а произвольные `abort` без ссылок запрещены lint-проверкой. В `docs/handbook/reference/errors.md` поддерживается таблица (hex-коды, описание, ответственный модуль) с зарезервированными диапазонами для `registry`, `sales`, `draw`, `payouts`, `history`, `views`, `roles`, `economics`, `feature_switch` и `tags`.
+- **Единая деноминация и коды ошибок.** Все денежные значения и события (например, `TicketPurchase`, `PayoutBatch`) публикуются в минимальной ончейн-единице SUPRA, чтобы исключить расхождения округлений. Для новых модулей создаётся `lottery_multi::errors` с перечислением `E_*`-кодов; документация и комментарии в коде ссылаются на этот модуль, а произвольные `abort` без ссылок запрещены lint-проверкой. В `docs/handbook/reference/errors.md` поддерживается таблица (hex-коды, описание, ответственный модуль) с зарезервированными диапазонами для `registry`, `sales`, `draw`, `payouts`, `history`, `views`, `roles`, `economics`, `feature_switch` и `tags`.
 
 ### 4.C Партнёрская роль: scoped capability и страховые механизмы
 - **Выдача ограниченной capability.** Партнёр получает `PartnerCreateCap` со строгими параметрами: `allowed_event_slug`, список разрешённых `series_code`, `max_parallel` активных розыгрышей, `expires_at`, `allowed_primary_types` и `allowed_tags_mask`. Все ограничения проверяются при создании `Draft`: `primary_type` обязан входить в белый список, а `config.tags_mask & ~allowed_tags_mask == 0`. При попытке выхода за лимиты происходит `abort`.

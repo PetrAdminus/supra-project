@@ -7,6 +7,7 @@ module lottery_multi::sales {
     use std::vector;
     use supra_framework::event;
 
+    use lottery_multi::economics;
     use lottery_multi::errors;
     use lottery_multi::history;
     use lottery_multi::feature_switch;
@@ -32,6 +33,11 @@ module lottery_multi::sales {
         pub lottery_id: u64,
         pub buyer: address,
         pub quantity: u64,
+        pub sale_amount: u64,
+        pub prize_allocation: u64,
+        pub jackpot_allocation: u64,
+        pub operations_allocation: u64,
+        pub reserve_allocation: u64,
         pub tickets_sold: u64,
         pub proceeds_accum: u64,
     }
@@ -44,6 +50,8 @@ module lottery_multi::sales {
         next_chunk_seq: u64,
         tickets_per_address: table::Table<address, u64>,
         ticket_chunks: table::Table<u64, TicketChunk>,
+        distribution: economics::SalesDistribution,
+        accounting: economics::Accounting,
     }
 
     struct SalesLedger has key {
@@ -109,7 +117,12 @@ module lottery_multi::sales {
         );
 
         let ledger = borrow_ledger_mut();
-        let state = borrow_or_create_state(ledger, lottery_id, config.ticket_price);
+        let state = borrow_or_create_state(
+            ledger,
+            lottery_id,
+            config.ticket_price,
+            &config.sales_distribution,
+        );
 
         assert_total_limit(state, &config.ticket_limits, quantity);
         let buyer_addr = signer::address_of(buyer);
@@ -118,15 +131,39 @@ module lottery_multi::sales {
         update_per_address(state, buyer_addr, existing, quantity);
 
         append_tickets(state, lottery_id, buyer_addr, quantity);
-        apply_sale(state, quantity, config.ticket_price, now_ts);
+        let (
+            sale_amount,
+            prize_allocation,
+            jackpot_allocation,
+            operations_allocation,
+            reserve_allocation,
+        ) = apply_sale(
+            state,
+            quantity,
+            config.ticket_price,
+            &config.sales_distribution,
+            now_ts,
+        );
 
-        emit_purchase_event(ledger, lottery_id, buyer_addr, quantity, state);
+        emit_purchase_event(
+            ledger,
+            lottery_id,
+            buyer_addr,
+            quantity,
+            sale_amount,
+            prize_allocation,
+            jackpot_allocation,
+            operations_allocation,
+            reserve_allocation,
+            state,
+        );
     }
 
     fun borrow_or_create_state(
         ledger: &mut SalesLedger,
         lottery_id: u64,
         ticket_price: u64,
+        distribution: &economics::SalesDistribution,
     ): &mut SalesState {
         if (!table::contains(&ledger.states, lottery_id)) {
             let state = SalesState {
@@ -137,6 +174,8 @@ module lottery_multi::sales {
                 next_chunk_seq: 0,
                 tickets_per_address: table::new(),
                 ticket_chunks: table::new(),
+                distribution: copy *distribution,
+                accounting: economics::new_accounting(),
             };
             table::add(&mut ledger.states, lottery_id, state);
         };
@@ -218,6 +257,19 @@ module lottery_multi::sales {
         (snapshot_hash, state.tickets_sold, state.proceeds_accum)
     }
 
+    public fun accounting_snapshot(lottery_id: u64): economics::Accounting acquires SalesLedger {
+        let ledger_addr = @lottery_multi;
+        if (!exists<SalesLedger>(ledger_addr)) {
+            abort errors::E_REGISTRY_MISSING;
+        };
+        let ledger = borrow_global<SalesLedger>(ledger_addr);
+        if (!table::contains(&ledger.states, lottery_id)) {
+            abort errors::E_REGISTRY_MISSING;
+        };
+        let state = table::borrow(&ledger.states, lottery_id);
+        copy state.accounting
+    }
+
     public fun ticket_owner(lottery_id: u64, ticket_index: u64): address acquires SalesLedger {
         let ledger_addr = @lottery_multi;
         if (!exists<SalesLedger>(ledger_addr)) {
@@ -267,10 +319,20 @@ module lottery_multi::sales {
         vector::append(&mut combined_totals, tickets_bytes);
         let proceeds_bytes = bcs::to_bytes(&state.proceeds_accum);
         vector::append(&mut combined_totals, proceeds_bytes);
+        let distribution_bytes = bcs::to_bytes(&state.distribution);
+        vector::append(&mut combined_totals, distribution_bytes);
+        let accounting_bytes = bcs::to_bytes(&state.accounting);
+        vector::append(&mut combined_totals, accounting_bytes);
         hash::sha3_256(combined_totals)
     }
 
-    fun apply_sale(state: &mut SalesState, quantity: u64, ticket_price: u64, now_ts: u64) {
+    fun apply_sale(
+        state: &mut SalesState,
+        quantity: u64,
+        ticket_price: u64,
+        distribution: &economics::SalesDistribution,
+        now_ts: u64,
+    ): (u64, u64, u64, u64, u64) {
         let total_after = state.tickets_sold + quantity;
         state.tickets_sold = total_after;
         let sale_amount_u128 = (quantity as u128) * (ticket_price as u128);
@@ -278,6 +340,15 @@ module lottery_multi::sales {
         let sale_amount = sale_amount_u128 as u64;
         state.proceeds_accum = state.proceeds_accum + sale_amount;
         state.last_purchase_ts = now_ts;
+        let (prize, jackpot, operations, reserve) =
+            economics::apply_sale(&mut state.accounting, sale_amount, distribution);
+        (
+            sale_amount,
+            prize,
+            jackpot,
+            operations,
+            reserve,
+        )
     }
 
     fun emit_purchase_event(
@@ -285,6 +356,11 @@ module lottery_multi::sales {
         lottery_id: u64,
         buyer: address,
         quantity: u64,
+        sale_amount: u64,
+        prize_allocation: u64,
+        jackpot_allocation: u64,
+        operations_allocation: u64,
+        reserve_allocation: u64,
         state: &SalesState,
     ) {
         let event = TicketPurchaseEvent {
@@ -293,6 +369,11 @@ module lottery_multi::sales {
             lottery_id,
             buyer,
             quantity,
+            sale_amount,
+            prize_allocation,
+            jackpot_allocation,
+            operations_allocation,
+            reserve_allocation,
             tickets_sold: state.tickets_sold,
             proceeds_accum: state.proceeds_accum,
         };

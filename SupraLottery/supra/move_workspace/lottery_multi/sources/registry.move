@@ -8,6 +8,7 @@ module lottery_multi::registry {
     use supra_framework::event;
 
     use lottery_multi::history;
+    use lottery_multi::economics;
     use lottery_multi::errors;
     use lottery_multi::roles;
     use lottery_multi::tags;
@@ -32,6 +33,7 @@ module lottery_multi::registry {
         pub sales_window: types::SalesWindow,
         pub ticket_price: u64,
         pub ticket_limits: types::TicketLimits,
+        pub sales_distribution: economics::SalesDistribution,
         pub prize_plan: vector<types::PrizeSlot>,
         pub winners_dedup: bool,
         pub draw_algo: u8,
@@ -202,6 +204,7 @@ module lottery_multi::registry {
         types::assert_sales_window(&config.sales_window);
         types::assert_ticket_price(config.ticket_price);
         types::assert_ticket_limits(&config.ticket_limits);
+        economics::assert_distribution(&config.sales_distribution);
         types::assert_prize_plan(&config.prize_plan);
         types::assert_draw_algo(config.draw_algo);
     }
