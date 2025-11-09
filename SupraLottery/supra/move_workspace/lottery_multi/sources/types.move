@@ -1,5 +1,11 @@
 // sources/types.move
 module lottery_multi::types {
+    use std::bcs;
+    use std::hash;
+    use std::vector;
+
+    use lottery_multi::errors;
+
     pub const STATUS_DRAFT: u8 = 0;
     pub const STATUS_ACTIVE: u8 = 1;
     pub const STATUS_CLOSING: u8 = 2;
@@ -13,8 +19,21 @@ module lottery_multi::types {
     pub const DRAW_ALGO_WITH_REPLACEMENT: u8 = 1;
     pub const DRAW_ALGO_STRIDE: u8 = 2;
 
+    pub const REWARD_FROM_SALES: u8 = 0;
+    pub const REWARD_FROM_JACKPOT: u8 = 1;
+    pub const REWARD_NFT_ESCROW: u8 = 2;
+    pub const REWARD_CUSTOM_HOOK: u8 = 3;
+
+    pub const BACKEND_NATIVE: u8 = 0;
+    pub const BACKEND_PARTNER: u8 = 1;
+
     pub const RETRY_STRATEGY_FIXED: u8 = 0;
     pub const RETRY_STRATEGY_EXPONENTIAL: u8 = 1;
+
+    pub const VRF_STATUS_IDLE: u8 = 0;
+    pub const VRF_STATUS_REQUESTED: u8 = 1;
+    pub const VRF_STATUS_FULFILLED: u8 = 2;
+    pub const VRF_STATUS_FAILED: u8 = 3;
 
     pub const DEFAULT_SCHEMA_VERSION: u16 = 1;
 
@@ -28,6 +47,27 @@ module lottery_multi::types {
         pub max_tickets_per_address: u64,
     }
 
+    pub struct AutoClosePolicy has copy, drop, store {
+        pub enabled: bool,
+        pub grace_period_secs: u64,
+    }
+
+    pub struct PrizeSlot has copy, drop, store {
+        pub slot_id: u64,
+        pub winners_per_slot: u16,
+        pub reward_type: u8,
+        pub reward_payload: vector<u8>,
+    }
+
+    pub struct RewardBackend has copy, drop, store {
+        pub backend_type: u8,
+        pub config_blob: vector<u8>,
+    }
+
+    pub struct VrfStatus has copy, drop, store {
+        pub status: u8,
+    }
+
     pub struct VrfState has copy, drop, store {
         pub request_id: vector<u8>,
         pub payload_hash: vector<u8>,
@@ -38,6 +78,7 @@ module lottery_multi::types {
         pub retry_strategy: u8,
         pub closing_block_height: u64,
         pub chain_id: u8,
+        pub status: u8,
     }
 
     pub struct WinnerCursor has copy, drop, store {
@@ -59,6 +100,31 @@ module lottery_multi::types {
         }
     }
 
+    pub fun new_auto_close_policy(enabled: bool, grace_period_secs: u64): AutoClosePolicy {
+        AutoClosePolicy { enabled, grace_period_secs }
+    }
+
+    pub fun new_prize_slot(
+        slot_id: u64,
+        winners_per_slot: u16,
+        reward_type: u8,
+        reward_payload: vector<u8>,
+    ): PrizeSlot {
+        PrizeSlot {
+            slot_id,
+            winners_per_slot,
+            reward_type,
+            reward_payload,
+        }
+    }
+
+    pub fun new_reward_backend(backend_type: u8, config_blob: vector<u8>): RewardBackend {
+        RewardBackend {
+            backend_type,
+            config_blob,
+        }
+    }
+
     pub fun new_vrf_state(): VrfState {
         VrfState {
             request_id: b"",
@@ -70,6 +136,51 @@ module lottery_multi::types {
             retry_strategy: RETRY_STRATEGY_FIXED,
             closing_block_height: 0,
             chain_id: 0,
+            status: VRF_STATUS_IDLE,
         }
+    }
+
+    pub fun assert_sales_window(window: &SalesWindow) {
+        let start = window.sales_start;
+        let end = window.sales_end;
+        assert!(start < end, errors::E_SALES_WINDOW_INVALID);
+    }
+
+    pub fun assert_ticket_price(ticket_price: u64) {
+        assert!(ticket_price > 0, errors::E_TICKET_PRICE_ZERO);
+    }
+
+    pub fun assert_ticket_limits(limits: &TicketLimits) {
+        assert!(limits.max_tickets_total > 0, errors::E_TICKET_LIMIT_INVALID);
+        if (limits.max_tickets_per_address > 0) {
+            assert!(
+                limits.max_tickets_per_address <= limits.max_tickets_total,
+                errors::E_TICKET_LIMIT_INVALID,
+            );
+        };
+    }
+
+    pub fun assert_draw_algo(draw_algo: u8) {
+        let supported = draw_algo == DRAW_ALGO_WITHOUT_REPLACEMENT
+            || draw_algo == DRAW_ALGO_WITH_REPLACEMENT
+            || draw_algo == DRAW_ALGO_STRIDE;
+        assert!(supported, errors::E_DRAW_ALGO_UNSUPPORTED);
+    }
+
+    pub fun assert_prize_plan(prize_plan: &vector<PrizeSlot>) {
+        let len = vector::length(prize_plan);
+        assert!(len > 0, errors::E_PRIZE_PLAN_EMPTY);
+        let mut idx = 0;
+        while (idx < len) {
+            let slot = vector::borrow(prize_plan, idx);
+            assert!(slot.winners_per_slot > 0, errors::E_PRIZE_SLOT_INVALID);
+            assert!(slot.reward_type <= REWARD_CUSTOM_HOOK, errors::E_PRIZE_SLOT_INVALID);
+            idx = idx + 1;
+        };
+    }
+
+    pub fun prize_plan_checksum(prize_plan: &vector<PrizeSlot>): vector<u8> {
+        let bytes = bcs::to_bytes(prize_plan);
+        hash::sha3_256(bytes)
     }
 }

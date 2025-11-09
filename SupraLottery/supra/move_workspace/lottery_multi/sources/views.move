@@ -6,6 +6,7 @@ module lottery_multi::views {
     use lottery_multi::registry;
     use lottery_multi::errors;
     use lottery_multi::tags;
+    use lottery_multi::types;
 
     pub struct BadgeMetadata has drop, store {
         pub primary_label: string::String,
@@ -23,6 +24,11 @@ module lottery_multi::views {
     public fun validate_config(config: &registry::Config) {
         tags::validate(config.primary_type, config.tags_mask);
         tags::assert_tag_budget(config.tags_mask);
+        types::assert_sales_window(&config.sales_window);
+        types::assert_ticket_price(config.ticket_price);
+        types::assert_ticket_limits(&config.ticket_limits);
+        types::assert_prize_plan(&config.prize_plan);
+        types::assert_draw_algo(config.draw_algo);
     }
 
     public fun get_lottery_badges(id: u64): (u8, u64) acquires registry::Registry {

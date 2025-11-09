@@ -17,6 +17,7 @@ module lottery_multi::history {
         pub run_id: u64,
         pub primary_type: u8,
         pub tags_mask: u64,
+        pub slots_checksum: vector<u8>,
     }
 
     pub struct LotteryFinalizedEvent has drop, store {

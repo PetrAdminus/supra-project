@@ -25,6 +25,14 @@ module lottery_multi::registry {
         pub config_version: u64,
         pub primary_type: u8,
         pub tags_mask: u64,
+        pub sales_window: types::SalesWindow,
+        pub ticket_price: u64,
+        pub ticket_limits: types::TicketLimits,
+        pub prize_plan: vector<types::PrizeSlot>,
+        pub winners_dedup: bool,
+        pub draw_algo: u8,
+        pub auto_close_policy: types::AutoClosePolicy,
+        pub reward_backend: types::RewardBackend,
     }
 
     struct Lottery has store {
@@ -32,6 +40,7 @@ module lottery_multi::registry {
         config: Config,
         status: u8,
         snapshot_frozen: bool,
+        slots_checksum: vector<u8>,
     }
 
     struct Registry has key {
@@ -57,8 +66,7 @@ module lottery_multi::registry {
     }
 
     public entry fun create_draft_admin(admin: &signer, id: u64, config: Config) acquires Registry {
-        tags::validate(config.primary_type, config.tags_mask);
-        tags::assert_tag_budget(config.tags_mask);
+        ensure_config_valid(&config);
         let creator = signer::address_of(admin);
         create_lottery_internal(creator, id, config);
     }
@@ -69,8 +77,7 @@ module lottery_multi::registry {
         id: u64,
         config: Config,
     ) acquires Registry {
-        tags::validate(config.primary_type, config.tags_mask);
-        tags::assert_tag_budget(config.tags_mask);
+        ensure_config_valid(&config);
         roles::ensure_primary_type_allowed(cap, config.primary_type);
         roles::ensure_tags_allowed(cap, config.tags_mask);
         let creator = signer::address_of(partner);
@@ -130,33 +137,21 @@ module lottery_multi::registry {
         let registry = borrow_registry_mut();
         assert!(!table::contains(&registry.lotteries, id), errors::E_LOTTERY_EXISTS);
         vector::push_back(&mut registry.ordered_ids, id);
-        let Config {
-            event_slug,
-            series_code,
-            run_id,
-            config_version,
-            primary_type,
-            tags_mask,
-        } = config;
-        let event_slug_for_event = event_slug;
-        let series_code_for_event = series_code;
-        let primary_type_for_event = primary_type;
-        let tags_mask_for_event = tags_mask;
-        let cfg_for_store = Config {
-            event_slug,
-            series_code,
-            run_id,
-            config_version,
-            primary_type,
-            tags_mask,
-        };
-        let cfg_bytes = bcs::to_bytes(&cfg_for_store);
+        let slots_checksum = types::prize_plan_checksum(&config.prize_plan);
+        let event_slug_for_event = copy config.event_slug;
+        let series_code_for_event = copy config.series_code;
+        let primary_type_for_event = config.primary_type;
+        let tags_mask_for_event = config.tags_mask;
+        let run_id = config.run_id;
+        let config_version = config.config_version;
+        let cfg_bytes = bcs::to_bytes(&config);
         let cfg_hash = hash::sha3_256(cfg_bytes);
         let lottery = Lottery {
             id,
-            config: cfg_for_store,
+            config,
             status: STATUS_DRAFT,
             snapshot_frozen: false,
+            slots_checksum: copy slots_checksum,
         };
         table::add(&mut registry.lotteries, id, lottery);
         let event = history::LotteryCreatedEvent {
@@ -171,6 +166,7 @@ module lottery_multi::registry {
             run_id,
             primary_type: primary_type_for_event,
             tags_mask: tags_mask_for_event,
+            slots_checksum,
         };
         event::emit_event(&mut registry.created_events, event);
     }
@@ -194,6 +190,16 @@ module lottery_multi::registry {
 
     public fun borrow_registry_for_view(): &Registry acquires Registry {
         borrow_registry_ref()
+    }
+
+    fun ensure_config_valid(config: &Config) {
+        tags::validate(config.primary_type, config.tags_mask);
+        tags::assert_tag_budget(config.tags_mask);
+        types::assert_sales_window(&config.sales_window);
+        types::assert_ticket_price(config.ticket_price);
+        types::assert_ticket_limits(&config.ticket_limits);
+        types::assert_prize_plan(&config.prize_plan);
+        types::assert_draw_algo(config.draw_algo);
     }
 
     public fun ordered_ids_view(registry_ref: &Registry): &vector<u64> {
