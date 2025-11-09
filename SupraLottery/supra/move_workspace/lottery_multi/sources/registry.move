@@ -8,21 +8,15 @@ module lottery_multi::registry {
     use supra_framework::event;
 
     use lottery_multi::history;
+    use lottery_multi::errors;
     use lottery_multi::roles;
     use lottery_multi::tags;
+    use lottery_multi::types;
 
-    const E_ALREADY_INITIALIZED: u64 = 0x1201;
-    const E_REGISTRY_MISSING: u64 = 0x1202;
-    const E_LOTTERY_EXISTS: u64 = 0x1203;
-    const E_STATUS_TRANSITION_NOT_ALLOWED: u64 = 0x1205;
-    const E_PRIMARY_TYPE_LOCKED: u64 = 0x1206;
-    const E_TAGS_LOCKED: u64 = 0x1207;
-    const E_SNAPSHOT_FROZEN: u64 = 0x1208;
-
-    pub const STATUS_DRAFT: u8 = 0;
-    pub const STATUS_ACTIVE: u8 = 1;
-    pub const STATUS_CLOSING: u8 = 2;
-    pub const STATUS_FINALIZED: u8 = 3;
+    pub const STATUS_DRAFT: u8 = types::STATUS_DRAFT;
+    pub const STATUS_ACTIVE: u8 = types::STATUS_ACTIVE;
+    pub const STATUS_CLOSING: u8 = types::STATUS_CLOSING;
+    pub const STATUS_FINALIZED: u8 = types::STATUS_FINALIZED;
 
     pub struct Config has copy, drop, store {
         pub event_slug: vector<u8>,
@@ -48,10 +42,10 @@ module lottery_multi::registry {
 
     public entry fun init_registry(admin: &signer) {
         let registry_addr = signer::address_of(admin);
-        assert!(registry_addr == @lottery_multi, E_REGISTRY_MISSING);
+        assert!(registry_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
         assert!(
             !exists<Registry>(registry_addr),
-            E_ALREADY_INITIALIZED,
+            errors::E_ALREADY_INITIALIZED,
         );
         let created_events = event::new_event_handle<history::LotteryCreatedEvent>(admin);
         let registry = Registry {
@@ -86,7 +80,7 @@ module lottery_multi::registry {
     public entry fun set_primary_type(admin: &signer, id: u64, primary_type: u8) acquires Registry {
         let registry = borrow_registry_mut();
         let lottery = table::borrow_mut(&mut registry.lotteries, id);
-        assert!(lottery.status == STATUS_DRAFT, E_PRIMARY_TYPE_LOCKED);
+        assert!(lottery.status == STATUS_DRAFT, errors::E_PRIMARY_TYPE_LOCKED);
         if (lottery.config.primary_type != primary_type) {
             tags::validate(primary_type, lottery.config.tags_mask);
             lottery.config.primary_type = primary_type;
@@ -96,8 +90,8 @@ module lottery_multi::registry {
     public entry fun set_tags_mask(admin: &signer, id: u64, tags_mask: u64) acquires Registry {
         let registry = borrow_registry_mut();
         let lottery = table::borrow_mut(&mut registry.lotteries, id);
-        assert!(lottery.status == STATUS_DRAFT || lottery.status == STATUS_ACTIVE, E_TAGS_LOCKED);
-        assert!(!lottery.snapshot_frozen, E_TAGS_LOCKED);
+        assert!(lottery.status == STATUS_DRAFT || lottery.status == STATUS_ACTIVE, errors::E_TAGS_LOCKED);
+        assert!(!lottery.snapshot_frozen, errors::E_TAGS_LOCKED);
         tags::validate(lottery.config.primary_type, tags_mask);
         tags::assert_tag_budget(tags_mask);
         lottery.config.tags_mask = tags_mask;
@@ -106,8 +100,9 @@ module lottery_multi::registry {
     public entry fun advance_status(admin: &signer, id: u64, next_status: u8) acquires Registry {
         let registry = borrow_registry_mut();
         let lottery = table::borrow_mut(&mut registry.lotteries, id);
-        assert!(is_transition_allowed(lottery.status, next_status), E_STATUS_TRANSITION_NOT_ALLOWED);
+        assert!(is_transition_allowed(lottery.status, next_status), errors::E_STATUS_TRANSITION_NOT_ALLOWED);
         if (next_status == STATUS_CLOSING) {
+            assert!(!lottery.snapshot_frozen, errors::E_SNAPSHOT_FROZEN);
             lottery.snapshot_frozen = true;
         };
         lottery.status = next_status;
@@ -133,7 +128,7 @@ module lottery_multi::registry {
 
     fun create_lottery_internal(creator: address, id: u64, config: Config) acquires Registry {
         let registry = borrow_registry_mut();
-        assert!(!table::contains(&registry.lotteries, id), E_LOTTERY_EXISTS);
+        assert!(!table::contains(&registry.lotteries, id), errors::E_LOTTERY_EXISTS);
         vector::push_back(&mut registry.ordered_ids, id);
         let Config {
             event_slug,
@@ -183,7 +178,7 @@ module lottery_multi::registry {
     fun borrow_registry_mut(): &mut Registry acquires Registry {
         let registry_addr = @lottery_multi;
         if (!exists<Registry>(registry_addr)) {
-            abort E_REGISTRY_MISSING;
+            abort errors::E_REGISTRY_MISSING;
         };
         borrow_global_mut<Registry>(registry_addr)
     }
@@ -192,7 +187,7 @@ module lottery_multi::registry {
         // Registry хранится по адресу владельца (тот же, что и модуль lottery_multi).
         let registry_addr = @lottery_multi;
         if (!exists<Registry>(registry_addr)) {
-            abort E_REGISTRY_MISSING;
+            abort errors::E_REGISTRY_MISSING;
         };
         borrow_global<Registry>(registry_addr)
     }

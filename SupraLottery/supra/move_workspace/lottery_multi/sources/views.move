@@ -4,9 +4,8 @@ module lottery_multi::views {
     use std::vector;
 
     use lottery_multi::registry;
+    use lottery_multi::errors;
     use lottery_multi::tags;
-
-    const E_PAGINATION_LIMIT: u64 = 0x1301;
 
     pub struct BadgeMetadata has drop, store {
         pub primary_label: string::String,
@@ -70,7 +69,7 @@ module lottery_multi::views {
     const MODE_TAG_ALL: u8 = 2;
 
     fun collect_ids(primary_type: u8, tag_mask: u64, mode: u8, from: u64, limit: u64): vector<u64> acquires registry::Registry {
-        assert!(limit <= 1000, E_PAGINATION_LIMIT);
+        assert!(limit <= 1000, errors::E_PAGINATION_LIMIT);
         let registry_ref = registry::borrow_registry_for_view();
         let ids = registry::ordered_ids_view(registry_ref);
         let mut result = vector::empty<u64>();

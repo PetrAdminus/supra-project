@@ -1,7 +1,8 @@
 // sources/tags.move
 module lottery_multi::tags {
 
-    const E_INVALID_PRIMARY_TYPE: u64 = 0x1001;
+    use lottery_multi::errors;
+
     const MAX_ACTIVE_TAGS: u8 = 16;
 
     pub const TYPE_BASIC: u8 = 0;
@@ -16,15 +17,24 @@ module lottery_multi::tags {
     pub const TAG_PROMO: u64 = 1u64 << 4;
     pub const TAG_EXPERIMENTAL: u64 = 0x8000000000000000;
 
+    const KNOWN_TAG_BITS: u64 = TAG_NFT
+        | TAG_DAILY
+        | TAG_WEEKLY
+        | TAG_SPLIT_PRIZE
+        | TAG_PROMO
+        | TAG_EXPERIMENTAL;
+
     public fun validate(primary_type: u8, tags_mask: u64) {
         assert!(
             primary_type == TYPE_BASIC ||
                 primary_type == TYPE_PARTNER ||
                 primary_type == TYPE_JACKPOT ||
                 primary_type == TYPE_VIP,
-            E_INVALID_PRIMARY_TYPE,
+            errors::E_TAG_PRIMARY_TYPE,
         );
-        let _ = tags_mask;
+        // Проверяем, что маска не содержит неизвестных битов (зарезервированного пространства).
+        let unknown_bits = tags_mask & !KNOWN_TAG_BITS;
+        assert!(unknown_bits == 0, errors::E_TAG_UNKNOWN_BIT);
     }
 
     public fun count_active_tags(tags_mask: u64): u8 {
@@ -41,7 +51,7 @@ module lottery_multi::tags {
 
     public fun assert_tag_budget(tags_mask: u64) {
         let active = count_active_tags(tags_mask);
-        assert!(active <= MAX_ACTIVE_TAGS, 0x1002);
+        assert!(active <= MAX_ACTIVE_TAGS, errors::E_TAG_BUDGET_EXCEEDED);
     }
 }
 
