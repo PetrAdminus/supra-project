@@ -218,6 +218,36 @@ module lottery_multi::sales {
         (snapshot_hash, state.tickets_sold, state.proceeds_accum)
     }
 
+    public fun ticket_owner(lottery_id: u64, ticket_index: u64): address acquires SalesLedger {
+        let ledger_addr = @lottery_multi;
+        if (!exists<SalesLedger>(ledger_addr)) {
+            abort errors::E_WINNER_INDEX_OUT_OF_RANGE;
+        };
+        let ledger = borrow_global<SalesLedger>(ledger_addr);
+        if (!table::contains(&ledger.states, lottery_id)) {
+            abort errors::E_WINNER_INDEX_OUT_OF_RANGE;
+        };
+        let state = table::borrow(&ledger.states, lottery_id);
+        if (ticket_index >= state.tickets_sold) {
+            abort errors::E_WINNER_INDEX_OUT_OF_RANGE;
+        };
+        let mut seq = 0u64;
+        while (seq <= state.next_chunk_seq) {
+            if (table::contains(&state.ticket_chunks, seq)) {
+                let chunk = table::borrow(&state.ticket_chunks, seq);
+                let start = chunk.start_index;
+                let len = vector::length(&chunk.buyers);
+                if (ticket_index >= start && ticket_index < start + len) {
+                    let offset = ticket_index - start;
+                    let buyer = *vector::borrow(&chunk.buyers, offset);
+                    return buyer;
+                };
+            };
+            seq = seq + 1;
+        };
+        abort errors::E_WINNER_INDEX_OUT_OF_RANGE;
+    }
+
     fun compute_snapshot_hash(state: &SalesState): vector<u8> {
         let mut digest = hash::sha3_256(b"lottery_multi::snapshot_seed");
         let mut seq = 0u64;

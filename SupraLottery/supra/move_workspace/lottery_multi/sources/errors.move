@@ -59,4 +59,13 @@ module lottery_multi::errors {
     pub const E_VRF_CONSUMED: u64 = 0x1708;
     pub const E_VRF_RETRY_WINDOW: u64 = 0x1709;
     pub const E_VRF_CLIENT_SEED_OVERFLOW: u64 = 0x170A;
+
+    /// Winner computation / payouts
+    pub const E_WINNER_VRF_NOT_READY: u64 = 0x1801;
+    pub const E_WINNER_ALL_ASSIGNED: u64 = 0x1802;
+    pub const E_WINNER_INDEX_OUT_OF_RANGE: u64 = 0x1803;
+    pub const E_WINNER_DEDUP_EXHAUSTED: u64 = 0x1804;
+    pub const E_PAYOUT_STATE_MISSING: u64 = 0x1805;
+    pub const E_PAYOUT_ROUND_NON_MONOTONIC: u64 = 0x1806;
+    pub const E_PAYOUT_COOLDOWN: u64 = 0x1807;
 }

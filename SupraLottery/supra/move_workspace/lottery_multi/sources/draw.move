@@ -241,6 +241,46 @@ module lottery_multi::draw {
         };
     }
 
+    public fun prepare_for_winner_computation(
+        lottery_id: u64,
+    ): (
+        vector<u256>,
+        vector<u8>,
+        vector<u8>,
+        u64,
+        u16,
+        u8,
+    ) acquires DrawLedger {
+        let ledger = borrow_ledger_mut();
+        let state = table::borrow_mut(&mut ledger.states, lottery_id);
+        assert!(
+            state.vrf_state.status == types::VRF_STATUS_FULFILLED,
+            errors::E_WINNER_VRF_NOT_READY,
+        );
+        assert!(!state.vrf_state.consumed, errors::E_VRF_CONSUMED);
+        let numbers: vector<u256> = bcs::from_bytes(&state.verified_payload);
+        state.vrf_state.consumed = true;
+        (
+            numbers,
+            copy state.snapshot_hash,
+            copy state.vrf_state.payload_hash,
+            state.total_tickets,
+            state.vrf_state.schema_version,
+            state.vrf_state.attempt,
+        )
+    }
+
+    public fun record_winner_hashes(
+        lottery_id: u64,
+        winners_batch_hash: &vector<u8>,
+        checksum_after_batch: &vector<u8>,
+    ) acquires DrawLedger {
+        let ledger = borrow_ledger_mut();
+        let state = table::borrow_mut(&mut ledger.states, lottery_id);
+        state.winners_batch_hash = copy *winners_batch_hash;
+        state.checksum_after_batch = copy *checksum_after_batch;
+    }
+
     fun borrow_ledger_mut(): &mut DrawLedger acquires DrawLedger {
         let addr = @lottery_multi;
         if (!exists<DrawLedger>(addr)) {

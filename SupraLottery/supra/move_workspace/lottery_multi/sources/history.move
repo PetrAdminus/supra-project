@@ -6,6 +6,7 @@ module lottery_multi::history {
     pub const EVENT_CATEGORY_ARCHIVE: u8 = 2;
     pub const EVENT_CATEGORY_SALES: u8 = 3;
     pub const EVENT_CATEGORY_DRAW: u8 = 4;
+    pub const EVENT_CATEGORY_PAYOUT: u8 = 5;
 
     pub struct LotteryCreatedEvent has drop, store {
         pub event_version: u16,
@@ -82,6 +83,28 @@ module lottery_multi::history {
         pub created_at: u64,
         pub closed_at: u64,
         pub finalized_at: u64,
+    }
+
+    pub struct WinnersComputedEvent has drop, store {
+        pub event_version: u16,
+        pub event_category: u8,
+        pub lottery_id: u64,
+        pub batch_no: u64,
+        pub assigned_in_batch: u64,
+        pub total_assigned: u64,
+        pub winners_batch_hash: vector<u8>,
+        pub checksum_after_batch: vector<u8>,
+    }
+
+    pub struct PayoutBatchEvent has drop, store {
+        pub event_version: u16,
+        pub event_category: u8,
+        pub lottery_id: u64,
+        pub payout_round: u64,
+        pub winners_paid: u64,
+        pub prize_paid: u64,
+        pub operations_paid: u64,
+        pub timestamp: u64,
     }
 }
 
