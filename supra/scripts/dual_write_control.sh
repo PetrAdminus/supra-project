@@ -21,6 +21,7 @@ usage() {
   mirror <lottery_id>                              — вручную зеркалировать сводку
   status <lottery_id>                              — показать статус конкретной лотереи
   flags                                            — вывести текущие флаги dual-write
+  pending                                          — вывести список лотерей с ожидаемым хэшем
 
 Опции:
   --profile <имя>        Профиль Supra CLI (например, default)
@@ -333,6 +334,9 @@ case "$COMMAND" in
     ;;
   flags)
     view_move "lottery_multi::legacy_bridge::dual_write_flags"
+    ;;
+  pending)
+    view_move "lottery_multi::legacy_bridge::pending_expected_hashes"
     ;;
   *)
     echo "[dual_write_control] Неизвестная команда: $COMMAND" >&2

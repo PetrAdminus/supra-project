@@ -55,6 +55,13 @@ module lottery_multi::price_feed {
         pub threshold_bps: u64,
     }
 
+    pub struct PriceFeedClampClearedEvent has drop, store {
+        pub event_version: u16,
+        pub event_category: u8,
+        pub asset_id: u64,
+        pub cleared_ts: u64,
+    }
+
     pub struct PriceFeedView has drop, store {
         pub asset_id: u64,
         pub price: u64,
@@ -73,6 +80,7 @@ module lottery_multi::price_feed {
         updates: event::EventHandle<PriceFeedUpdatedEvent>,
         fallbacks: event::EventHandle<PriceFeedFallbackEvent>,
         clamps: event::EventHandle<PriceFeedClampEvent>,
+        clamp_clears: event::EventHandle<PriceFeedClampClearedEvent>,
     }
 
     public entry fun init_price_feed(admin: &signer, version: u16) {
@@ -85,6 +93,7 @@ module lottery_multi::price_feed {
             updates: event::new_event_handle<PriceFeedUpdatedEvent>(admin),
             fallbacks: event::new_event_handle<PriceFeedFallbackEvent>(admin),
             clamps: event::new_event_handle<PriceFeedClampEvent>(admin),
+            clamp_clears: event::new_event_handle<PriceFeedClampClearedEvent>(admin),
         };
         move_to(admin, registry);
     }
@@ -126,8 +135,10 @@ module lottery_multi::price_feed {
     ) acquires PriceFeedRegistry {
         let registry = borrow_registry_mut();
         let record = borrow_record_mut(&mut registry.feeds, asset_id);
-        let old_price = record.price;
-        check_clamp(record, price, &mut registry.clamps);
+        let clamped = check_clamp(record, price, &mut registry.clamps);
+        if (clamped) {
+            return;
+        };
         record.price = price;
         record.last_updated_ts = updated_ts;
         record.fallback_active = false;
@@ -149,6 +160,19 @@ module lottery_multi::price_feed {
             record.clamp_active = false;
         };
         emit_fallback(&mut registry.fallbacks, asset_id, active, reason);
+    }
+
+    public entry fun clear_clamp(
+        admin: &signer,
+        asset_id: u64,
+        cleared_ts: u64,
+    ) acquires PriceFeedRegistry {
+        let registry = borrow_registry_mut();
+        let record = borrow_record_mut(&mut registry.feeds, asset_id);
+        assert!(record.clamp_active, errors::E_PRICE_CLAMP_NOT_ACTIVE);
+        record.clamp_active = false;
+        record.last_updated_ts = cleared_ts;
+        emit_clamp_cleared(&mut registry.clamp_clears, asset_id, cleared_ts);
     }
 
     public fun latest_price(asset_id: u64, now_ts: u64): (u64, u8) acquires PriceFeedRegistry {
@@ -238,14 +262,27 @@ module lottery_multi::price_feed {
         });
     }
 
+    fun emit_clamp_cleared(
+        handle: &mut event::EventHandle<PriceFeedClampClearedEvent>,
+        asset_id: u64,
+        cleared_ts: u64,
+    ) {
+        event::emit(handle, PriceFeedClampClearedEvent {
+            event_version: EVENT_VERSION_V1,
+            event_category: EVENT_CATEGORY_PRICE,
+            asset_id,
+            cleared_ts,
+        });
+    }
+
     fun check_clamp(
         record: &mut PriceFeedRecord,
         new_price: u64,
         clamp_handle: &mut event::EventHandle<PriceFeedClampEvent>,
-    ) {
+    ): bool {
         let old_price = record.price;
         if (old_price == 0) {
-            return;
+            return false;
         };
         let threshold = record.clamp_threshold_bps;
         let diff = if (new_price > old_price) {
@@ -258,7 +295,9 @@ module lottery_multi::price_feed {
         if (diff_scaled > base) {
             record.clamp_active = true;
             emit_clamp(clamp_handle, record.asset_id, old_price, new_price, threshold);
-            abort errors::E_PRICE_CLAMP_TRIGGERED;
+            true
+        } else {
+            false
         };
     }
 

@@ -81,6 +81,44 @@ module lottery_multi::history_dual_write_tests {
         assert!(mirrored.finalized_at == summary.finalized_at, 3);
     }
 
+    #[test(account = @lottery_multi)]
+    fun dual_write_mismatch_requires_manual_clear(account: &signer) {
+        history::init_history(account);
+        legacy_bridge::init_dual_write(account, false, true);
+        let mut mismatch = vector::empty<u8>();
+        vector::push_back(&mut mismatch, 7);
+        legacy_bridge::set_expected_hash(account, 6, copy mismatch);
+        let summary = sample_summary(6);
+        history::record_summary(6, summary);
+        let pending = legacy_bridge::has_expected_hash(6);
+        assert!(pending, 0);
+        let stored = history::get_summary(6);
+        assert!(stored.id == 6, 1);
+        legacy_bridge::clear_expected_hash(account, 6);
+        let pending_after = legacy_bridge::has_expected_hash(6);
+        assert!(!pending_after, 2);
+    }
+
+    #[test(account = @lottery_multi)]
+    fun dual_write_pending_list(account: &signer) {
+        history::init_history(account);
+        legacy_bridge::init_dual_write(account, false, true);
+        let summary_11 = sample_summary(11);
+        let hash_11 = hash::sha3_256(bcs::to_bytes(&summary_11));
+        legacy_bridge::set_expected_hash(account, 11, copy hash_11);
+        let summary_12 = sample_summary(12);
+        let hash_12 = hash::sha3_256(bcs::to_bytes(&summary_12));
+        legacy_bridge::set_expected_hash(account, 12, copy hash_12);
+        let pending = legacy_bridge::pending_expected_hashes();
+        assert!(vector::length(&pending) == 2, 0);
+        assert!(*vector::borrow(&pending, 0) == 11, 1);
+        assert!(*vector::borrow(&pending, 1) == 12, 2);
+        history::record_summary(11, summary_11);
+        let pending_after = legacy_bridge::pending_expected_hashes();
+        assert!(vector::length(&pending_after) == 1, 3);
+        assert!(*vector::borrow(&pending_after, 0) == 12, 4);
+    }
+
     fun sample_summary(id: u64): history::LotterySummary {
         history::LotterySummary {
             id,

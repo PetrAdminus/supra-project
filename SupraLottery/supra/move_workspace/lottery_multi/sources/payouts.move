@@ -240,7 +240,7 @@ module lottery_multi::payouts {
         assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
 
         let status = registry::get_status(lottery_id);
-        assert!(status == types::STATUS_PAYOUT || status == types::STATUS_FINALIZED, errors::E_DRAW_STATUS_INVALID);
+        assert!(status == types::STATUS_PAYOUT, errors::E_DRAW_STATUS_INVALID);
 
         let batch_cap = roles::borrow_payout_batch_cap_mut();
         roles::consume_payout_batch(batch_cap, winners_paid, operations_paid, timestamp, payout_round);
@@ -284,7 +284,7 @@ module lottery_multi::payouts {
         assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
 
         let status = registry::get_status(lottery_id);
-        assert!(status == types::STATUS_PAYOUT || status == types::STATUS_FINALIZED, errors::E_DRAW_STATUS_INVALID);
+        assert!(status == types::STATUS_PAYOUT, errors::E_DRAW_STATUS_INVALID);
 
         let partner_cap = roles::borrow_partner_payout_cap_mut(partner);
         roles::consume_partner_payout(partner_cap, amount, timestamp, payout_round);

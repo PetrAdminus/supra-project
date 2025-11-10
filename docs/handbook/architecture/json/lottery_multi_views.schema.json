@@ -1,0 +1,549 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supra.dev/schemas/lottery_multi/views/v1",
+  "title": "lottery_multi view responses",
+  "description": "JSON Schema v1 для структур ответов view-функций пакета lottery_multi.",
+  "type": "object",
+  "properties": {
+    "info": {
+      "type": "object",
+      "description": "Служебная информация о версии схемы и последнем обновлении.",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Версия схемы (major.minor.patch).",
+          "pattern": "^1\\.0\\.[0-9]+$"
+        },
+        "updated_at": {
+          "type": "string",
+          "description": "Дата последнего обновления схемы в формате ISO 8601 (YYYY-MM-DD).",
+          "pattern": "^20[0-9]{2}-[0-9]{2}-[0-9]{2}$"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "views": {
+      "type": "object",
+      "description": "Коллекция примерных ответов view-функций lottery_multi.",
+      "properties": {
+        "get_lottery": {
+          "$ref": "#/$defs/LotteryConfig"
+        },
+        "get_lottery_status": {
+          "$ref": "#/$defs/LotteryStatusView"
+        },
+        "get_lottery_badges": {
+          "$ref": "#/$defs/LotteryBadges"
+        },
+        "get_badge_metadata": {
+          "$ref": "#/$defs/BadgeMetadata"
+        },
+        "accounting_snapshot": {
+          "$ref": "#/$defs/Accounting"
+        },
+        "get_vrf_deposit_status": {
+          "$ref": "#/$defs/VrfDepositStatusView"
+        },
+        "get_lottery_summary": {
+          "$ref": "#/$defs/LotterySummary"
+        },
+        "list_active": {
+          "$ref": "#/$defs/LotteryIdList"
+        },
+        "list_by_primary_type": {
+          "$ref": "#/$defs/LotteryIdList"
+        },
+        "list_by_tag_mask": {
+          "$ref": "#/$defs/LotteryIdList"
+        },
+        "list_by_all_tags": {
+          "$ref": "#/$defs/LotteryIdList"
+        },
+        "list_finalized_ids": {
+          "$ref": "#/$defs/LotteryIdList"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "info"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "HexBytes": {
+      "type": "string",
+      "description": "Строка в формате 0x<hex>, сериализующая vector<u8> из Move.",
+      "pattern": "^0x[0-9a-fA-F]*$"
+    },
+    "U64": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Неотрицательное целое число, сериализованное из u64."
+    },
+    "U8": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255,
+      "description": "Неотрицательное целое число, сериализованное из u8."
+    },
+    "BadgeMetadata": {
+      "type": "object",
+      "description": "Метаданные бейджа лотереи.",
+      "properties": {
+        "primary_label": {
+          "type": "string",
+          "description": "Человеко-читаемый тип лотереи (`basic`, `partner`, `jackpot`, `vip`)."
+        },
+        "is_experimental": {
+          "type": "boolean",
+          "description": "Флаг экспериментального режима (наличие бита TAG_EXPERIMENTAL)."
+        },
+        "tags_mask": {
+          "$ref": "#/$defs/U64",
+          "description": "Битовая маска тегов, передаётся в десятичном виде."
+        }
+      },
+      "required": [
+        "primary_label",
+        "is_experimental",
+        "tags_mask"
+      ],
+      "additionalProperties": false
+    },
+    "LotteryBadges": {
+      "type": "object",
+      "description": "Ответ функции get_lottery_badges в нормализованном виде.",
+      "properties": {
+        "primary_type": {
+          "$ref": "#/$defs/U8"
+        },
+        "tags_mask": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "primary_type",
+        "tags_mask"
+      ],
+      "additionalProperties": false
+    },
+    "LotteryStatusView": {
+      "type": "object",
+      "description": "Ответ функции get_lottery_status.",
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/U8",
+          "description": "Текущий статус (`registry::STATUS_*`)."
+        },
+        "snapshot_frozen": {
+          "type": "boolean",
+          "description": "Признак замороженного снапшота."
+        },
+        "primary_type": {
+          "$ref": "#/$defs/U8",
+          "description": "Идентификатор основного типа (`tags::TYPE_*`)."
+        },
+        "tags_mask": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "status",
+        "snapshot_frozen",
+        "primary_type",
+        "tags_mask"
+      ],
+      "additionalProperties": false
+    },
+    "SalesWindow": {
+      "type": "object",
+      "description": "Окно продаж лотереи.",
+      "properties": {
+        "sales_start": {
+          "$ref": "#/$defs/U64"
+        },
+        "sales_end": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "sales_start",
+        "sales_end"
+      ],
+      "additionalProperties": false
+    },
+    "TicketLimits": {
+      "type": "object",
+      "description": "Лимиты на продажи билетов.",
+      "properties": {
+        "max_tickets_total": {
+          "$ref": "#/$defs/U64"
+        },
+        "max_tickets_per_address": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "max_tickets_total",
+        "max_tickets_per_address"
+      ],
+      "additionalProperties": false
+    },
+    "SalesDistribution": {
+      "type": "object",
+      "description": "Распределение выручки в базис-поинтах.",
+      "properties": {
+        "prize_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "jackpot_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "operations_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "reserve_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "prize_bps",
+        "jackpot_bps",
+        "operations_bps",
+        "reserve_bps"
+      ],
+      "additionalProperties": false
+    },
+    "PrizeSlot": {
+      "type": "object",
+      "description": "Конфигурация призового слота.",
+      "properties": {
+        "slot_id": {
+          "$ref": "#/$defs/U64"
+        },
+        "winners_per_slot": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "reward_type": {
+          "$ref": "#/$defs/U8"
+        },
+        "reward_payload": {
+          "$ref": "#/$defs/HexBytes"
+        }
+      },
+      "required": [
+        "slot_id",
+        "winners_per_slot",
+        "reward_type",
+        "reward_payload"
+      ],
+      "additionalProperties": false
+    },
+    "AutoClosePolicy": {
+      "type": "object",
+      "description": "Параметры автоматического закрытия.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "grace_period_secs": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "enabled",
+        "grace_period_secs"
+      ],
+      "additionalProperties": false
+    },
+    "RewardBackend": {
+      "type": "object",
+      "description": "Настройки backend’а выдачи наград.",
+      "properties": {
+        "backend_type": {
+          "$ref": "#/$defs/U8"
+        },
+        "config_blob": {
+          "$ref": "#/$defs/HexBytes"
+        }
+      },
+      "required": [
+        "backend_type",
+        "config_blob"
+      ],
+      "additionalProperties": false
+    },
+    "LotteryConfig": {
+      "type": "object",
+      "description": "Конфигурация лотереи (`registry::Config`).",
+      "properties": {
+        "event_slug": {
+          "$ref": "#/$defs/HexBytes"
+        },
+        "series_code": {
+          "$ref": "#/$defs/HexBytes"
+        },
+        "run_id": {
+          "$ref": "#/$defs/U64"
+        },
+        "config_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "primary_type": {
+          "$ref": "#/$defs/U8"
+        },
+        "tags_mask": {
+          "$ref": "#/$defs/U64"
+        },
+        "sales_window": {
+          "$ref": "#/$defs/SalesWindow"
+        },
+        "ticket_price": {
+          "$ref": "#/$defs/U64"
+        },
+        "ticket_limits": {
+          "$ref": "#/$defs/TicketLimits"
+        },
+        "sales_distribution": {
+          "$ref": "#/$defs/SalesDistribution"
+        },
+        "prize_plan": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PrizeSlot"
+          }
+        },
+        "winners_dedup": {
+          "type": "boolean"
+        },
+        "draw_algo": {
+          "$ref": "#/$defs/U8"
+        },
+        "auto_close_policy": {
+          "$ref": "#/$defs/AutoClosePolicy"
+        },
+        "reward_backend": {
+          "$ref": "#/$defs/RewardBackend"
+        }
+      },
+      "required": [
+        "event_slug",
+        "series_code",
+        "run_id",
+        "config_version",
+        "primary_type",
+        "tags_mask",
+        "sales_window",
+        "ticket_price",
+        "ticket_limits",
+        "sales_distribution",
+        "prize_plan",
+        "winners_dedup",
+        "draw_algo",
+        "auto_close_policy",
+        "reward_backend"
+      ],
+      "additionalProperties": false
+    },
+    "VrfDepositStatusView": {
+      "type": "object",
+      "description": "Ответ функции get_vrf_deposit_status.",
+      "properties": {
+        "total_balance": {
+          "$ref": "#/$defs/U64"
+        },
+        "minimum_balance": {
+          "$ref": "#/$defs/U64"
+        },
+        "effective_balance": {
+          "$ref": "#/$defs/U64"
+        },
+        "required_minimum": {
+          "$ref": "#/$defs/U64"
+        },
+        "last_update_ts": {
+          "$ref": "#/$defs/U64"
+        },
+        "requests_paused": {
+          "type": "boolean"
+        },
+        "paused_since_ts": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "total_balance",
+        "minimum_balance",
+        "effective_balance",
+        "required_minimum",
+        "last_update_ts",
+        "requests_paused",
+        "paused_since_ts"
+      ],
+      "additionalProperties": false
+    },
+    "Accounting": {
+      "type": "object",
+      "description": "Структура учёта продаж и выплат из economics::Accounting.",
+      "properties": {
+        "total_sales": {
+          "$ref": "#/$defs/U64"
+        },
+        "total_allocated": {
+          "$ref": "#/$defs/U64"
+        },
+        "total_prize_paid": {
+          "$ref": "#/$defs/U64"
+        },
+        "total_operations_paid": {
+          "$ref": "#/$defs/U64"
+        },
+        "total_operations_allocated": {
+          "$ref": "#/$defs/U64"
+        },
+        "jackpot_allowance_token": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "total_sales",
+        "total_allocated",
+        "total_prize_paid",
+        "total_operations_paid",
+        "total_operations_allocated",
+        "jackpot_allowance_token"
+      ],
+      "additionalProperties": false
+    },
+    "LotterySummary": {
+      "type": "object",
+      "description": "Структура архива финализированной лотереи (history::LotterySummary).",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/U64"
+        },
+        "status": {
+          "$ref": "#/$defs/U8"
+        },
+        "event_slug": {
+          "$ref": "#/$defs/HexBytes"
+        },
+        "series_code": {
+          "$ref": "#/$defs/HexBytes"
+        },
+        "run_id": {
+          "$ref": "#/$defs/U64"
+        },
+        "tickets_sold": {
+          "$ref": "#/$defs/U64"
+        },
+        "proceeds_accum": {
+          "$ref": "#/$defs/U64"
+        },
+        "total_allocated": {
+          "$ref": "#/$defs/U64"
+        },
+        "total_prize_paid": {
+          "$ref": "#/$defs/U64"
+        },
+        "total_operations_paid": {
+          "$ref": "#/$defs/U64"
+        },
+        "vrf_status": {
+          "$ref": "#/$defs/U8"
+        },
+        "primary_type": {
+          "$ref": "#/$defs/U8"
+        },
+        "tags_mask": {
+          "$ref": "#/$defs/U64"
+        },
+        "snapshot_hash": {
+          "$ref": "#/$defs/HexBytes"
+        },
+        "slots_checksum": {
+          "$ref": "#/$defs/HexBytes"
+        },
+        "winners_batch_hash": {
+          "$ref": "#/$defs/HexBytes"
+        },
+        "checksum_after_batch": {
+          "$ref": "#/$defs/HexBytes"
+        },
+        "payout_round": {
+          "$ref": "#/$defs/U64"
+        },
+        "created_at": {
+          "$ref": "#/$defs/U64"
+        },
+        "closed_at": {
+          "$ref": "#/$defs/U64"
+        },
+        "finalized_at": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "event_slug",
+        "series_code",
+        "run_id",
+        "tickets_sold",
+        "proceeds_accum",
+        "total_allocated",
+        "total_prize_paid",
+        "total_operations_paid",
+        "vrf_status",
+        "primary_type",
+        "tags_mask",
+        "snapshot_hash",
+        "slots_checksum",
+        "winners_batch_hash",
+        "checksum_after_batch",
+        "payout_round",
+        "created_at",
+        "closed_at",
+        "finalized_at"
+      ],
+      "additionalProperties": false
+    },
+    "LotteryIdList": {
+      "type": "array",
+      "description": "Пагинированный список идентификаторов лотерей (результат list_*).",
+      "items": {
+        "$ref": "#/$defs/U64"
+      }
+    }
+  },
+  "examples": [
+    {
+      "info": {
+        "version": "1.0.0",
+        "updated_at": "2025-11-19"
+      },
+      "views": {
+        "get_lottery_status": {
+          "status": 1,
+          "snapshot_frozen": false,
+          "primary_type": 0,
+          "tags_mask": 1
+        }
+      }
+    }
+  ]
+}

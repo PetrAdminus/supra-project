@@ -4,7 +4,7 @@
 - **Пакет `core`** — базовые ресурсы сети, депозиты VRF и миграции.
 - **Пакет `support`** — вспомогательные утилиты и общие хранилища.
 - **Пакет `reward`** — управление призовыми пулами и NFT-наградами.
-- **Пакет `lottery_multi`** — параллельные лотереи, включающие модули `registry`, `sales`, `draw`, `payouts`, `economics`, `history`, `views`, `feature_switch`, `price_feed`, `automation`, `vrf_deposit`, `tags`.
+- **Пакет `lottery_multi`** — параллельные лотереи, включающие модули `registry`, `sales`, `draw`, `payouts`, `economics`, `history`, `views`, `feature_switch`, `price_feed`, `automation`, `vrf_deposit`, `tags` (подробности по оракулу цен см. в [price_feeds.md](price_feeds.md)).
 - **Off-chain сервисы** — Supra CLI для деплоя, AutomationBot, индексатор истории, фронтенд.
 
 ## Жизненный цикл лотереи
@@ -25,11 +25,11 @@
 - **Registry** хранит конфигурации, статусы и хэши снапшотов.
 - **Sales** оперирует чанками билетов и агрегатами распределений.
 - **History** ведёт события и архив `ArchiveLedger` с dual-write проверкой.
-- **Views** предоставляют пагинацию по типам, тегам и статусам.
+- **Views** предоставляют пагинацию по типам, тегам и статусам; структура ответов зафиксирована в [view_schemas.md](view_schemas.md).
 
 ## Внешние зависимости
 - **Supra dVRF v3** — поставщик случайных чисел.
 - **Supra Price Oracle** — курсы SUPRA/USD и прочих токенов.
 - **AutomationBot** — автоматизация батчей и проверка депозита VRF.
 
-Подробнее см. [rfc_status.md](rfc_status.md) и [../architecture/lottery_parallel_plan.md](../../architecture/lottery_parallel_plan.md).
+Подробнее см. [rfc_status.md](rfc_status.md), [../operations/runbooks.md](../operations/runbooks.md), [../operations/monitoring.md](../operations/monitoring.md), [../operations/release_checklist.md](../operations/release_checklist.md) и [../architecture/lottery_parallel_plan.md](../../architecture/lottery_parallel_plan.md).

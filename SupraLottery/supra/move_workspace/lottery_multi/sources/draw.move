@@ -334,6 +334,22 @@ module lottery_multi::draw {
         state.checksum_after_batch = b"";
     }
 
+    #[test_only]
+    public fun test_override_vrf_state(
+        lottery_id: u64,
+        status: u8,
+        consumed: bool,
+        retry_after_ts: u64,
+        attempt: u8,
+    ) acquires DrawLedger {
+        let ledger = borrow_ledger_mut();
+        let state = table::borrow_mut(&mut ledger.states, lottery_id);
+        state.vrf_state.status = status;
+        state.vrf_state.consumed = consumed;
+        state.vrf_state.retry_after_ts = retry_after_ts;
+        state.vrf_state.attempt = attempt;
+    }
+
     pub fun finalization_snapshot(lottery_id: u64): FinalizationSnapshot acquires DrawLedger {
         let ledger = borrow_ledger_ref();
         let state = table::borrow(&ledger.states, lottery_id);
