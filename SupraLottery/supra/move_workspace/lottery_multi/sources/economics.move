@@ -16,6 +16,7 @@ module lottery_multi::economics {
         pub total_allocated: u64,
         pub total_prize_paid: u64,
         pub total_operations_paid: u64,
+        pub total_operations_allocated: u64,
         pub jackpot_allowance_token: u64,
     }
 
@@ -49,6 +50,7 @@ module lottery_multi::economics {
             total_allocated: 0,
             total_prize_paid: 0,
             total_operations_paid: 0,
+            total_operations_allocated: 0,
             jackpot_allowance_token: 0,
         }
     }
@@ -62,14 +64,23 @@ module lottery_multi::economics {
         let (prize, jackpot, operations, reserve) = split_amount(amount, distribution);
         accounting.total_sales = accounting.total_sales + amount;
         accounting.total_allocated = accounting.total_allocated + prize + reserve;
+        accounting.total_operations_allocated = accounting.total_operations_allocated + operations;
         (prize, jackpot, operations, reserve)
     }
 
     pub fun record_prize_payout(accounting: &mut Accounting, amount: u64) {
+        assert!(
+            accounting.total_prize_paid + amount <= accounting.total_allocated,
+            errors::E_PAYOUT_ALLOC_EXCEEDED,
+        );
         accounting.total_prize_paid = accounting.total_prize_paid + amount;
     }
 
     pub fun record_operations_payout(accounting: &mut Accounting, amount: u64) {
+        assert!(
+            accounting.total_operations_paid + amount <= accounting.total_operations_allocated,
+            errors::E_OPERATIONS_ALLOC_EXCEEDED,
+        );
         accounting.total_operations_paid = accounting.total_operations_paid + amount;
     }
 

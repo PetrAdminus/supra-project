@@ -8,6 +8,9 @@ module lottery_multi::errors {
     /// Partner capability errors
     pub const E_PRIMARY_TYPE_NOT_ALLOWED: u64 = 0x1101;
     pub const E_TAG_MASK_NOT_ALLOWED: u64 = 0x1102;
+    pub const E_ROLES_NOT_INITIALIZED: u64 = 0x1103;
+    pub const E_PAYOUT_BATCH_CAP_MISSING: u64 = 0x1104;
+    pub const E_PARTNER_PAYOUT_CAP_MISSING: u64 = 0x1105;
 
     /// Registry and configuration errors
     pub const E_ALREADY_INITIALIZED: u64 = 0x1201;
@@ -31,6 +34,8 @@ module lottery_multi::errors {
     pub const E_DISTRIBUTION_BPS_INVALID: u64 = 0x1301;
     pub const E_JACKPOT_ALLOWANCE_UNDERFLOW: u64 = 0x1302;
     pub const E_JACKPOT_ALLOWANCE_INCREASE: u64 = 0x1303;
+    pub const E_PAYOUT_ALLOC_EXCEEDED: u64 = 0x1304;
+    pub const E_OPERATIONS_ALLOC_EXCEEDED: u64 = 0x1305;
 
     /// Feature switch errors
     pub const E_FEATURE_UNKNOWN: u64 = 0x1401;
@@ -75,6 +80,14 @@ module lottery_multi::errors {
     pub const E_PAYOUT_STATE_MISSING: u64 = 0x1805;
     pub const E_PAYOUT_ROUND_NON_MONOTONIC: u64 = 0x1806;
     pub const E_PAYOUT_COOLDOWN: u64 = 0x1807;
+    pub const E_PAYOUT_BATCH_TOO_LARGE: u64 = 0x1808;
+    pub const E_PAYOUT_BATCH_COOLDOWN: u64 = 0x1809;
+    pub const E_PAYOUT_BATCH_NONCE: u64 = 0x180A;
+    pub const E_PAYOUT_OPERATIONS_BUDGET: u64 = 0x180B;
+    pub const E_PARTNER_PAYOUT_BUDGET_EXCEEDED: u64 = 0x180C;
+    pub const E_PARTNER_PAYOUT_COOLDOWN: u64 = 0x180D;
+    pub const E_PARTNER_PAYOUT_NONCE: u64 = 0x180E;
+    pub const E_PARTNER_PAYOUT_HOLDER_MISMATCH: u64 = 0x180F;
 
     /// Price feed errors
     pub const E_PRICE_FEED_EXISTS: u64 = 0x1901;
