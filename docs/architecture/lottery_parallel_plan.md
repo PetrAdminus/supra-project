@@ -210,7 +210,8 @@ module lottery_multi::registry {
 - `RefundBatchCompleted(event_version, event_category, id, batch_no, processed_refunds)`
 - `RefundSlaBreached(event_version, event_category, id, breached_metric)`
 - `GarbageCollected(event_version, event_category, id, reclaimed_slots)`
-- `ArchiveDualWriteCompleted(event_version, event_category, series_code, run_id)`
+- `ArchiveDualWriteStarted(event_version, event_category, lottery_id, expected_hash)`
+- `ArchiveDualWriteCompleted(event_version, event_category, lottery_id, archive_hash, finalized_at)`
 
 События должны обеспечивать трассировку «розыгрыш ↔ VRF ↔ победители» для аудиторов и фронтенда. Каждое событие включает базовые поля `event_version` и `event_category` (Sales/VRF/Draw/Payout/Admin), что упрощает группировку на индексаторах. Поля с суффиксом `_code` используют короткие числовые/байтовые идентификаторы вместо строк, уменьшая газовые затраты и нагрузку на индексаторы. Поле `event_version` позволяет эволюционировать формат без ломки парсеров: изменения происходят через инкремент версии и описание миграции в `docs/handbook/reference/events.md`. Поле `payout_nonce` соответствует `payout_round` и обеспечивает защиту от повторных выплат.
 
@@ -231,6 +232,8 @@ module lottery_multi::registry {
 - **Новые capabilities для мультираундовой логики.** Планируется ввести отдельные возможности `LotteryAdminCap` (создание/настройка
   розыгрышей), `PayoutBatchCap` (инициация батчевых выплат) и `ArchiveWriterCap` (публикация сводок в `LotteryHistoryArchive`). Эти ресурсы
   хранятся в контроллере пакета и выдаются только тем операциям, которые должны выполнять чувствительные действия.
+  Для выплат реализован реестр `roles::RoleStore`, который хранит `PayoutBatchCap` и `PartnerPayoutCap`; функции `consume_payout_batch`
+  и `consume_partner_payout` проверяют размер батча, бюджет операций, cooldown и монотонность nonce перед вызовами `payouts::record_*`.
 - **Совместимость с текущими пакетами.** `lottery_multi` получает доступ к существующим возможностям через контроллер `lottery_core`:
   функции выпуска/возврата capabilities остаются точкой интеграции, чтобы избежать конфликтов при миграции. Для утилит поддержки
   предусматриваем функции `borrow_history_cap_or_abort`, `try_borrow_autopurchase_cap`, аналогичные имеющимся, но учитывающие множественность
@@ -254,7 +257,9 @@ module lottery_multi::registry {
   - **Полномочия.** Создание и активация лотерей в разрешённых сегментах, закрытие продаж, запуск VRF-запросов и батчей выплат, публикация
     архивов, пауза конкретных розыгрышей, запуск сценариев миграции. Все действия фиксируются событиями `AdminAction`/`PayoutBatch`.
   - **Ограничения.** Каждая capability несёт `vector<LotteryScope>` и квоты `max_open`, `max_batch_size`, `remaining_budget`. Попытка выйти за
-    лимиты приводит к `abort`. Операторы не имеют доступа к глобальным хранилищам (`JackpotVault`, системные настройки), не могут чеканить
+    лимиты приводит к `abort`. Реализация `roles::consume_payout_batch` и `roles::consume_partner_payout` использует ошибки
+    `E_PAYOUT_BATCH_TOO_LARGE`, `E_PAYOUT_OPERATIONS_BUDGET`, `E_PARTNER_PAYOUT_BUDGET_EXCEEDED`, `E_PARTNER_PAYOUT_COOLDOWN`, `E_PARTNER_PAYOUT_NONCE`.
+    Операторы не имеют доступа к глобальным хранилищам (`JackpotVault`, системные настройки), не могут чеканить
     новые capability и не меняют пресеты конфигураций.
   - **Наблюдаемость.** План предусматривает ежедневные отчёты по использованию лимитов (`operational_usage_report`), которые фронтенд и
     аудиторы могут выгружать через view.
@@ -498,7 +503,7 @@ module lottery_multi::registry {
 
 ### 4.S Управление хранением и сборка мусора
 - **Квоты на структуру.** Каждая лотерея получает лимиты на количество чанков билетов, размер пользовательского индекса и глубину истории выплат. При достижении лимита продажа останавливается до завершения процедуры `GarbageCollect`. Событие `GarbageCollected { event_version, lottery_id, reclaimed_slots }` фиксирует объём освобождённых ресурсов.
-- **Двойная запись при миграции.** Во время миграции на новый архив включается режим dual-write: данные пишутся и в старый `lottery_support::History`, и в новый `LotteryHistoryArchive`, пока индексатор не подтвердит совпадение хэшей. Контроль выполняется модулем `legacy_bridge`, который хранит эталонные хэши и после каждой batched-записи проверяет `if archive_new.hash != expected_hash { abort(E_HISTORY_MISMATCH); }`, что предотвращает расхождение архивов. После успешной финальной сверки публикуется `ArchiveDualWriteCompleted` и старый путь выключается.
+- **Двойная запись при миграции.** Во время миграции на новый архив включается режим dual-write: данные пишутся и в старый `lottery_support::History`, и в новый `LotteryHistoryArchive`, пока индексатор не подтвердит совпадение хэшей. Контроль выполняется модулем `legacy_bridge`, который хранит эталонные хэши, эмитирует `ArchiveDualWriteStarted` при добавлении ожиданий, после каждой записи сводки вызывает `mirror_summary_to_legacy` (зеркалирует BCS в `lottery_support::history_bridge::LegacySummary`) и затем `notify_summary_written`. Совпадение хэша удаляет ожидание и приводит к событию `ArchiveDualWriteCompleted` с `archive_hash` и `finalized_at`; при расхождении и активном флаге `abort_on_mismatch` транзакция завершается `E_HISTORY_MISMATCH`. View `dual_write_status` позволяет наблюдать флаги и ожидаемые хэши, Supra CLI-скрипт `supra/scripts/dual_write_control.sh` автоматизирует команды `init`, `update-flags`, `set`, `clear`, `enable-mirror`, `disable-mirror`, `mirror`, `status`, `flags`.
 - **JSON-схемы view.** Для всех публичных view (`get_lottery_status`, `get_lottery_badges`, `list_by_primary_type`, `get_user_feed` и др.) описываются JSON Schema в `docs/handbook/frontend/schemas/`. Фронтенд и интеграторы валидируют ответы, что помогает ловить breaking changes до релиза.
 ## 5. Структура «книги проекта»
 
@@ -648,21 +653,25 @@ module lottery_multi::registry {
   - Описать и задокументировать справедливый алгоритм `draw_algo` (включая `stride`) и подготовить дифференциальные тесты с off-chain эталоном.
 - **Этап 3 — выплаты и экономический учёт.**
   - Подключить `lottery_rewards::{Jackpot, Store, NftRewards}` через слой `economics`, реализовать распределение 70/15/10/5.
-  - Добавить агрегаты `total_allocated`, `total_prize_paid`, `total_operations_paid`, настроить события `PayoutBatch` и `PartnerPayout`.
+  - ✅ (2025-11-13) Добавлены агрегаты `total_allocated`, `total_prize_paid`, `total_operations_paid`, события `PayoutBatch`, `PartnerPayout`, `PurchaseRateLimitHit`, а также учёт выплат (`sales::record_payouts`, `payouts::record_partner_payout_admin`).
+  - ✅ (2025-11-14) Написаны юнит-тесты `lottery_multi::payouts_tests` для проверки обновления агрегатов `Accounting`, партнёрских выплат и защиты лимитов операций.
   - Написать интеграционные тесты на многослотные призы, партнёрские выплаты и лимиты `PartnerPayoutCap`.
   - Интегрировать партнёрские лимиты: пресеты, `max_parallel`, allowance, контроль депозитов VRF и публикацию `PartnerVaultReserved`.
   - Реализовать анти-DoS лимиты для `purchase_ticket`, события `PurchaseRateLimitHit`/`SalesGraceRejected` и отладить мониторинг `purchase_rate_limit_hits`.
+  - **См. подготовительный чек-лист:** `docs/architecture/lottery_multi_preparation.md` фиксирует подэтапы аналитики, проектирования, тест-планов и документации перед реализацией.
 - **Этап 4 — миграция и backfill.**
   - Заморозить текущий контракт, экспортировать историю (`lottery_support::History`) и импортировать в `LotteryHistoryArchive`.
   - Протестировать сценарий отката: в случае сбоя уметь восстановить старую модель без потери билетов и резервов.
   - Назначить для всех унаследованных розыгрышей `primary_type = tags::TYPE_BASIC` и `tags_mask = 0`, зафиксировать миграцию в событиях `LotteryFinalized`/`LotteryHistoryArchive`.
   - Обновить CLI/фронтенд, провести UAT со списком тестовых лотерей.
-  - Запустить режим dual-write (старый и новый архив), подготовить JSON Schema для всех view и завершить миграцию после сверки хэшей (`ArchiveDualWriteCompleted`).
+  - Запустить режим dual-write (старый и новый архив), подготовить JSON Schema для всех view и завершить миграцию после сверки хэшей (`ArchiveDualWriteStarted` → `ArchiveDualWriteCompleted` через `notify_summary_written`, контроль по `dual_write_status`/CLI).
+  - **Подготовка по подэтапам:** ориентироваться на раздел «Этап 4» в `docs/architecture/lottery_multi_preparation.md` для последовательности аналитики, инструментов и коммуникации.
 - **Этап 5 — запуск ядра под управлением администратора.**
   - Активировать `RoleRegistry`, выдать capabilities администраторам, партнёрам, аудиторам и автоматизации, закрепив ручное управление за `RootAdmin`.
   - Задокументировать регламенты ручных решений: как `RootAdmin` подтверждает операции сверх лимитов, как фиксируются overrides и как вести журнал `AdminAction`.
   - Выпустить релиз (`git tag`, обновление `Move.toml`, запись в «книге проекта»), провести баг-баунти и собрать обратную связь.
   - Настроить операционные процедуры: ротацию ключей AutomationBot, таймлоки для чувствительных действий, runbook компрометации и обновление разделов compliance/a11y.
+  - **Подготовка по подэтапам:** раздел «Этап 5» в `docs/architecture/lottery_multi_preparation.md` описывает шаги выдачи ролей, релизного процесса, runbook’ов и баг-баунти.
 - **Этап 6 — пострелизная поддержка.**
   - Настроить наблюдаемость, алерты и статусную страницу; убедиться, что метрики покрывают продажи, VRF, выплаты.
   - Обновить дорожную карту: определить следующие итерации (кастомные серии, дополнительные призовые механики).

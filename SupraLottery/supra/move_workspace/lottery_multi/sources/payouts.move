@@ -12,12 +12,14 @@ module lottery_multi::payouts {
     use lottery_multi::errors;
     use lottery_multi::history;
     use lottery_multi::registry;
+    use lottery_multi::roles;
     use lottery_multi::sales;
     use lottery_multi::types;
 
     const EVENT_CATEGORY_PAYOUT: u8 = history::EVENT_CATEGORY_PAYOUT;
     const WINNER_EVENT_VERSION_V1: u16 = 1;
     const PAYOUT_EVENT_VERSION_V1: u16 = 1;
+    const PARTNER_EVENT_VERSION_V1: u16 = 1;
     const WINNER_CHUNK_CAPACITY: u64 = 64;
     const MAX_REHASH_ATTEMPTS: u8 = 16;
     const WINNER_HASH_SEED: vector<u8> = b"lottery_multi::winner_seed";
@@ -60,6 +62,7 @@ module lottery_multi::payouts {
         states: table::Table<u64, WinnerState>,
         winner_events: event::EventHandle<history::WinnersComputedEvent>,
         payout_events: event::EventHandle<history::PayoutBatchEvent>,
+        partner_events: event::EventHandle<history::PartnerPayoutEvent>,
     }
 
     public entry fun init_payouts(admin: &signer) {
@@ -70,6 +73,7 @@ module lottery_multi::payouts {
             states: table::new(),
             winner_events: event::new_event_handle<history::WinnersComputedEvent>(admin),
             payout_events: event::new_event_handle<history::PayoutBatchEvent>(admin),
+            partner_events: event::new_event_handle<history::PartnerPayoutEvent>(admin),
         };
         move_to(admin, ledger);
     }
@@ -231,12 +235,15 @@ module lottery_multi::payouts {
         prize_paid: u64,
         operations_paid: u64,
         timestamp: u64,
-    ) acquires PayoutLedger, registry::Registry {
+    ) acquires PayoutLedger, registry::Registry, sales::SalesLedger, roles::RoleStore {
         let admin_addr = signer::address_of(admin);
         assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
 
         let status = registry::get_status(lottery_id);
         assert!(status == types::STATUS_PAYOUT || status == types::STATUS_FINALIZED, errors::E_DRAW_STATUS_INVALID);
+
+        let batch_cap = roles::borrow_payout_batch_cap_mut();
+        roles::consume_payout_batch(batch_cap, winners_paid, operations_paid, timestamp, payout_round);
 
         let ledger = borrow_ledger_mut();
         if (!table::contains(&ledger.states, lottery_id)) {
@@ -250,6 +257,8 @@ module lottery_multi::payouts {
         state.payout_round = payout_round;
         state.last_payout_ts = timestamp;
 
+        sales::record_payouts(lottery_id, prize_paid, operations_paid);
+
         let event = history::PayoutBatchEvent {
             event_version: PAYOUT_EVENT_VERSION_V1,
             event_category: EVENT_CATEGORY_PAYOUT,
@@ -261,6 +270,44 @@ module lottery_multi::payouts {
             timestamp,
         };
         event::emit_event(&mut ledger.payout_events, event);
+    }
+
+    public entry fun record_partner_payout_admin(
+        admin: &signer,
+        lottery_id: u64,
+        partner: address,
+        amount: u64,
+        payout_round: u64,
+        timestamp: u64,
+    ) acquires PayoutLedger, registry::Registry, sales::SalesLedger, roles::RoleStore {
+        let admin_addr = signer::address_of(admin);
+        assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
+
+        let status = registry::get_status(lottery_id);
+        assert!(status == types::STATUS_PAYOUT || status == types::STATUS_FINALIZED, errors::E_DRAW_STATUS_INVALID);
+
+        let partner_cap = roles::borrow_partner_payout_cap_mut(partner);
+        roles::consume_partner_payout(partner_cap, amount, timestamp, payout_round);
+
+        let ledger = borrow_ledger_mut();
+        if (!table::contains(&ledger.states, lottery_id)) {
+            abort errors::E_PAYOUT_STATE_MISSING;
+        };
+        let state = table::borrow_mut(&mut ledger.states, lottery_id);
+        assert!(payout_round >= state.payout_round, errors::E_PAYOUT_ROUND_NON_MONOTONIC);
+
+        sales::record_payouts(lottery_id, 0, amount);
+
+        let event = history::PartnerPayoutEvent {
+            event_version: PARTNER_EVENT_VERSION_V1,
+            event_category: EVENT_CATEGORY_PAYOUT,
+            lottery_id,
+            partner,
+            amount,
+            payout_round,
+            timestamp,
+        };
+        event::emit_event(&mut ledger.partner_events, event);
     }
 
     public entry fun finalize_lottery_admin(
@@ -289,6 +336,8 @@ module lottery_multi::payouts {
 
         let closed_ts = if (last_purchase_ts > 0) { last_purchase_ts } else { draw_snapshot.request_ts };
 
+        let accounting = sales::accounting_snapshot(lottery_id);
+
         let summary = history::LotterySummary {
             id: lottery_id,
             status: types::STATUS_FINALIZED,
@@ -297,6 +346,9 @@ module lottery_multi::payouts {
             run_id: config.run_id,
             tickets_sold,
             proceeds_accum,
+            total_allocated: accounting.total_allocated,
+            total_prize_paid: accounting.total_prize_paid,
+            total_operations_paid: accounting.total_operations_paid,
             vrf_status: draw_snapshot.vrf_status,
             primary_type: config.primary_type,
             tags_mask: config.tags_mask,

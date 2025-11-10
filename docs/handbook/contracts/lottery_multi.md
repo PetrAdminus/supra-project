@@ -21,6 +21,7 @@
 - Анти-DoS механики: per-block счётчик, скользящее окно и grace window; нарушение фиксируется `PurchaseRateLimitHit`.
 - `emit_purchase_event` формирует `TicketPurchaseEvent` с распределением выручки.
 - `accounting_snapshot` возвращает агрегаты `Accounting` для фронтенда и аудита.
+- `record_payouts` обновляет агрегаты `total_allocated`/`total_prize_paid`/`total_operations_paid` по факту выплат.
 
 ### `draw`
 - `init_draw` готовит ресурсы для VRF-процесса.
@@ -30,8 +31,10 @@
 ### `payouts`
 - `init_payouts` разворачивает инфраструктуру выплат.
 - `compute_winners_admin` выполняет детерминированный алгоритм выбора победителей по батчам, эмитируя `WinnerBatchComputed` с `checksum_after_batch`.
-- `record_payout_batch_admin` формирует выплатные записи и контролирует `payout_round`.
+- `record_payout_batch_admin` требует `roles::PayoutBatchCap`, использует `roles::consume_payout_batch` для проверки `max_batch_size`, бюджета операций, cooldown и nonce, затем обновляет агрегаты продаж и `payout_round`.
+- `record_partner_payout_admin` требует `roles::PartnerPayoutCap`, вычитает бюджет через `roles::consume_partner_payout` и публикует `PartnerPayoutEvent` с адресом партнёра, суммой, раундом и таймстампом.
 - `finalize_lottery_admin` переводит розыгрыш в `Finalized`, проверяя, что все выплаты завершены.
+- Юнит `lottery_multi::payouts_tests` подтверждает обновление `Accounting`, лимиты операций, сценарии партнёрских выплат и обязательность наличия капабилити.
 
 ### `views`
 - `validate_config` выполняет ончейн-валидацию конфигурации перед созданием.
@@ -54,13 +57,14 @@
 ## Этап 2. Миграции и инфраструктура
 
 ### `history`
-- `ArchiveLedger` хранит финальные сводки (`LotterySummary`).
+- `ArchiveLedger` хранит финальные сводки (`LotterySummary`) с агрегатами `total_allocated`, `total_prize_paid`, `total_operations_paid`.
 - `finalize_lottery_admin` из `payouts` вызывает `history::record_summary` с проверкой `slots_checksum` и `snapshot_hash`.
+- `PayoutBatchEvent`, `PartnerPayoutEvent`, `PurchaseRateLimitHitEvent` формируют неизменяемый журнал для аудита.
 - `get_summary`, `list_finalized` обслуживают фронтенд «Истории».
 
 ### `legacy_bridge`
-- Управляет dual-write миграциями: `init_dual_write`, `update_flags`, `set_expected_hash`, `clear_expected_hash`.
-- `enforce_dual_write` сравнивает ожидаемый и фактический хэши, при несоответствии вызывает `abort` (по конфигурации).
+  - Управляет dual-write миграциями: `init_dual_write`, `update_flags`, `set_expected_hash`, `clear_expected_hash`, `enable_legacy_mirror`, `disable_legacy_mirror`, `mirror_summary_admin`, `notify_summary_written`, `dual_write_status`, `dual_write_flags`.
+- События `ArchiveDualWriteStartedEvent`/`ArchiveDualWriteCompletedEvent` фиксируют жизненный цикл ожиданий; `mirror_summary_to_legacy` записывает BCS сводки в `lottery_support::history_bridge`, после чего `notify_summary_written` сравнивает ожидаемый и фактический хэш, очищает ожидание и публикует завершение (при конфигурации `abort_on_mismatch` транзакция прерывается).
 
 ### `vrf_deposit`
 - `init_vrf_deposit`, `update_config` задают пороги.
@@ -68,11 +72,15 @@
 - `resume_requests` снимает блокировку, `ensure_requests_allowed` используется при новом запросе VRF.
 
 ### `roles`
-- `PartnerCreateCap` содержит белый список `allowed_primary_types` и `allowed_tags_mask`, лимиты бюджета и cooldown выплат.
+- `init_roles` разворачивает `RoleStore` с таблицей `PartnerPayoutCap` и опциональной `PayoutBatchCap` (хранится на адресе пакета).
+- `set_payout_batch_cap_admin` и `upsert_partner_payout_cap_admin` позволяют операторам обновлять лимиты капабилити (`max_batch_size`, бюджеты, cooldown, `nonce_stride`).
+- `consume_payout_batch`/`consume_partner_payout` блокируют выплаты при нарушении лимитов (`E_PAYOUT_BATCH_TOO_LARGE`, `E_PAYOUT_OPERATIONS_BUDGET`, `E_PARTNER_PAYOUT_BUDGET_EXCEEDED`, `E_PARTNER_PAYOUT_COOLDOWN`, `E_PARTNER_PAYOUT_NONCE`).
+- `PartnerCreateCap` содержит белый список `allowed_primary_types` и `allowed_tags_mask`, лимиты бюджета и cooldown выплат для контроля `record_partner_payout_admin`.
 - `ensure_primary_type_allowed`, `ensure_tags_allowed` проверяют параметры партнёров при создании лотереи.
 
 ### Дополнительные механики
 - `economics::assert_distribution` и связанные функции проверяют распределение продаж по базис-поинтам (сумма 10_000).
+- `Accounting` отслеживает `total_sales`, `total_allocated`, `total_prize_paid`, `total_operations_paid`, `total_operations_allocated`; функции `record_prize_payout` и `record_operations_payout` защищают от перерасхода (`E_PAYOUT_ALLOC_EXCEEDED`, `E_OPERATIONS_ALLOC_EXCEEDED`).
 - `types::prize_plan_checksum`, `types::winner_cursor` поддерживают контроль целостности слотов и батчей.
 - Move Prover спецификации (`spec/*.move`) фиксируют: неизменность `snapshot_hash`, рост `payout_round`, ограничения `jackpot_allowance_token`.
 

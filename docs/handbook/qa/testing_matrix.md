@@ -2,12 +2,12 @@
 
 ## Unit-тесты
 - Конфигурации (`lottery_multi/tests/config_tests.move`).
-- Продажи: лимиты пользователей, анти-DoS, распределение выручки.
+- Продажи: лимиты пользователей, анти-DoS, распределение выручки, учёт выплат (`lottery_multi/tests/economics_tests.move`).
 - VRF: повторные fulfill, payload V1, защита `consumed`, отказ `request_draw_admin` при паузе депозита.
 - VRF-депозит: пауза запросов при низком остатке и возобновление после пополнения.
 - WinnerComputation (`lottery_multi/tests/winner_tests.move`): dedup on/off, сравнение с эталонным расчётом, контроль checksum после батча.
-- Выплаты: идемпотентность батчей, контроль allowance джекпота.
-- История (`lottery_multi/tests/history_dual_write_tests.move`): включённый dual-write, отсутствие ожидаемого хэша и обработка несоответствий.
+- Выплаты (`lottery_multi/tests/payouts_tests.move`): идемпотентность батчей, контроль allowance джекпота, обновление агрегатов `Accounting`, события `PartnerPayout`/`PayoutBatch`, превышение лимитов операций и отсутствие `PartnerPayoutCap`.
+- История (`lottery_multi/tests/history_dual_write_tests.move`): включённый dual-write, отсутствие ожидаемого хэша, снятие ожиданий через `notify_summary_written`, зеркальная запись `dual_write_mirror_summary` и проверка `dual_write_status`.
 
 ## Property-based
 - Стабильность победителей при одинаковом seed.

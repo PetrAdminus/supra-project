@@ -84,6 +84,9 @@ module lottery_multi::history {
         pub run_id: u64,
         pub tickets_sold: u64,
         pub proceeds_accum: u64,
+        pub total_allocated: u64,
+        pub total_prize_paid: u64,
+        pub total_operations_paid: u64,
         pub vrf_status: u8,
         pub primary_type: u8,
         pub tags_mask: u64,
@@ -117,6 +120,26 @@ module lottery_multi::history {
         pub prize_paid: u64,
         pub operations_paid: u64,
         pub timestamp: u64,
+    }
+
+    pub struct PartnerPayoutEvent has drop, store {
+        pub event_version: u16,
+        pub event_category: u8,
+        pub lottery_id: u64,
+        pub partner: address,
+        pub amount: u64,
+        pub payout_round: u64,
+        pub timestamp: u64,
+    }
+
+    pub struct PurchaseRateLimitHitEvent has drop, store {
+        pub event_version: u16,
+        pub event_category: u8,
+        pub lottery_id: u64,
+        pub buyer: address,
+        pub timestamp: u64,
+        pub current_block: u64,
+        pub reason_code: u8,
     }
 
     pub struct AutomationDryRunPlannedEvent has drop, store {
@@ -226,7 +249,9 @@ module lottery_multi::history {
         let archive_hash = hash::sha3_256(copy summary_bytes);
         let primary_type = summary.primary_type;
         let tags_mask = summary.tags_mask;
-        legacy_bridge::enforce_dual_write(lottery_id, &archive_hash);
+        let finalized_at = summary.finalized_at;
+        legacy_bridge::mirror_summary_to_legacy(lottery_id, &summary_bytes, &archive_hash, finalized_at);
+        legacy_bridge::notify_summary_written(lottery_id, &archive_hash, finalized_at);
         if (table::contains(&ledger.summaries, lottery_id)) {
             let existing = table::borrow_mut(&mut ledger.summaries, lottery_id);
             let existing_bytes = bcs::to_bytes(&*existing);

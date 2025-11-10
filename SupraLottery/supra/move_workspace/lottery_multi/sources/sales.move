@@ -51,16 +51,6 @@ module lottery_multi::sales {
         pub proceeds_accum: u64,
     }
 
-    pub struct PurchaseRateLimitHitEvent has drop, store {
-        pub event_version: u16,
-        pub event_category: u8,
-        pub lottery_id: u64,
-        pub buyer: address,
-        pub timestamp: u64,
-        pub current_block: u64,
-        pub reason_code: u8,
-    }
-
     struct RateTrack has store {
         window_start: u64,
         purchase_count: u64,
@@ -84,7 +74,7 @@ module lottery_multi::sales {
     struct SalesLedger has key {
         states: table::Table<u64, SalesState>,
         purchase_events: event::EventHandle<TicketPurchaseEvent>,
-        rate_limit_events: event::EventHandle<PurchaseRateLimitHitEvent>,
+        rate_limit_events: event::EventHandle<history::PurchaseRateLimitHitEvent>,
     }
 
     public entry fun init_sales(admin: &signer) {
@@ -352,6 +342,24 @@ module lottery_multi::sales {
         (state.tickets_sold, state.proceeds_accum, state.last_purchase_ts)
     }
 
+    public fun record_payouts(
+        lottery_id: u64,
+        prize_paid: u64,
+        operations_paid: u64,
+    ) acquires SalesLedger {
+        let ledger = borrow_ledger_mut();
+        if (!table::contains(&ledger.states, lottery_id)) {
+            abort errors::E_REGISTRY_MISSING;
+        };
+        let state = table::borrow_mut(&mut ledger.states, lottery_id);
+        if (prize_paid > 0) {
+            economics::record_prize_payout(&mut state.accounting, prize_paid);
+        };
+        if (operations_paid > 0) {
+            economics::record_operations_payout(&mut state.accounting, operations_paid);
+        };
+    }
+
     public fun ticket_owner(lottery_id: u64, ticket_index: u64): address acquires SalesLedger {
         let ledger_addr = @lottery_multi;
         if (!exists<SalesLedger>(ledger_addr)) {
@@ -463,14 +471,14 @@ module lottery_multi::sales {
     }
 
     fun emit_rate_limit_event(
-        rate_limit_events: &mut event::EventHandle<PurchaseRateLimitHitEvent>,
+        rate_limit_events: &mut event::EventHandle<history::PurchaseRateLimitHitEvent>,
         lottery_id: u64,
         buyer: address,
         now_ts: u64,
         current_block: u64,
         reason: u8,
     ) {
-        let event = PurchaseRateLimitHitEvent {
+        let event = history::PurchaseRateLimitHitEvent {
             event_version: RATE_LIMIT_EVENT_VERSION_V1,
             event_category: EVENT_CATEGORY_SALES,
             lottery_id,
