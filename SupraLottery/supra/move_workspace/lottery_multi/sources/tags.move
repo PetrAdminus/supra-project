@@ -5,17 +5,17 @@ module lottery_multi::tags {
 
     const MAX_ACTIVE_TAGS: u8 = 16;
 
-    pub const TYPE_BASIC: u8 = 0;
-    pub const TYPE_PARTNER: u8 = 1;
-    pub const TYPE_JACKPOT: u8 = 2;
-    pub const TYPE_VIP: u8 = 3;
+    const TYPE_BASIC: u8 = 0;
+    const TYPE_PARTNER: u8 = 1;
+    const TYPE_JACKPOT: u8 = 2;
+    const TYPE_VIP: u8 = 3;
 
-    pub const TAG_NFT: u64 = 1u64 << 0;
-    pub const TAG_DAILY: u64 = 1u64 << 1;
-    pub const TAG_WEEKLY: u64 = 1u64 << 2;
-    pub const TAG_SPLIT_PRIZE: u64 = 1u64 << 3;
-    pub const TAG_PROMO: u64 = 1u64 << 4;
-    pub const TAG_EXPERIMENTAL: u64 = 0x8000000000000000;
+    const TAG_NFT: u64 = 1u64 << 0;
+    const TAG_DAILY: u64 = 1u64 << 1;
+    const TAG_WEEKLY: u64 = 1u64 << 2;
+    const TAG_SPLIT_PRIZE: u64 = 1u64 << 3;
+    const TAG_PROMO: u64 = 1u64 << 4;
+    const TAG_EXPERIMENTAL: u64 = 0x8000000000000000;
 
     const KNOWN_TAG_BITS: u64 = TAG_NFT
         | TAG_DAILY
