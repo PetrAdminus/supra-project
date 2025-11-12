@@ -39,6 +39,9 @@ module lottery_multi::views {
         pub paused_since_ts: u64,
     }
 
+    pub const REFUND_FIRST_BATCH_SLA_SECS: u64 = 43_200;
+    pub const REFUND_FULL_SLA_SECS: u64 = 86_400;
+
     pub struct StatusOverview has drop, store {
         pub total: u64,
         pub draft: u64,
@@ -54,6 +57,9 @@ module lottery_multi::views {
         pub vrf_retry_blocked: u64,
         pub winners_pending: u64,
         pub payout_backlog: u64,
+        pub refund_active: u64,
+        pub refund_batch_pending: u64,
+        pub refund_sla_breach: bool,
     }
 
     pub struct AutomationBotView has drop, store {
@@ -197,6 +203,9 @@ module lottery_multi::views {
         let mut vrf_retry_blocked = 0u64;
         let mut winners_pending = 0u64;
         let mut payout_backlog = 0u64;
+        let mut refund_active = 0u64;
+        let mut refund_batch_pending = 0u64;
+        let mut refund_sla_breach = false;
 
         let len = vector::length(ids);
         let mut idx = 0u64;
@@ -242,6 +251,32 @@ module lottery_multi::views {
                 payout_backlog = payout_backlog + 1;
             };
 
+            let refund_progress = sales::refund_progress(lottery_id);
+            if (refund_progress.active) {
+                refund_active = refund_active + 1;
+                if (refund_progress.tickets_refunded < refund_progress.tickets_sold) {
+                    let remaining = refund_progress.tickets_sold - refund_progress.tickets_refunded;
+                    refund_batch_pending = refund_batch_pending + remaining;
+                };
+
+                if (!refund_sla_breach) {
+                    let cancel_opt = registry::get_cancellation_from_registry(registry_ref, lottery_id);
+                    if (option::is_some(&cancel_opt)) {
+                        let cancel_ref = option::borrow(&cancel_opt);
+                        let canceled_ts = cancel_ref.canceled_ts;
+                        if (refund_progress.refund_round == 0) {
+                            if (now_ts > canceled_ts + REFUND_FIRST_BATCH_SLA_SECS) {
+                                refund_sla_breach = true;
+                            };
+                        } else if (refund_progress.tickets_refunded < refund_progress.tickets_sold) {
+                            if (now_ts > canceled_ts + REFUND_FULL_SLA_SECS) {
+                                refund_sla_breach = true;
+                            };
+                        };
+                    };
+                };
+            };
+
             idx = idx + 1;
         };
 
@@ -260,6 +295,9 @@ module lottery_multi::views {
             vrf_retry_blocked,
             winners_pending,
             payout_backlog,
+            refund_active,
+            refund_batch_pending,
+            refund_sla_breach,
         }
     }
 

@@ -330,6 +330,7 @@ module lottery_multi::history {
         let computed_hash = hash::sha3_256(copy summary_bytes);
         assert!(computed_hash == expected_hash, errors::E_HISTORY_IMPORT_HASH);
         legacy_bridge::mirror_summary_to_legacy(lottery_id, &summary_bytes, &computed_hash, finalized_at);
+        legacy_bridge::notify_summary_written(lottery_id, &computed_hash, finalized_at);
         let hash_for_store = copy computed_hash;
         store_summary(lottery_id, summary, hash_for_store, true);
         let ledger = borrow_ledger_mut();

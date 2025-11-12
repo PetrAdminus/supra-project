@@ -6,7 +6,7 @@
 ## 1. Ежедневные действия (D-ops)
 - Проверить дашборд Grafana `Lottery Multi Ops` и статусную страницу: убедиться, что ключевые счётчики `status_overview` в зелёной зоне.
 - Просмотреть Alertmanager и подтверждённые алёрты; каждое отклонение фиксируется через `supra/scripts/incident_log.sh`.
-- Сверить очередь рефандов (`views::status_overview.refund_batch_pending`) с чек-листом [refund.md](refund.md) и убедиться, что SLA не нарушен.
+- Сверить показатели рефандов (`views::status_overview.refund_active`, `refund_batch_pending`, `refund_sla_breach`) с чек-листом [refund.md](refund.md) и убедиться, что SLA не нарушен.
 - Подтвердить свежесть прайс-фида по метрикам `price_feed_updates_total`, `price_feed_clamp_active`, `price_feed_fallback_active`.
 - Обновить раздел «Текущее состояние» на статусной странице, если выполнялись аварийные операции или релизные фиксации.
 

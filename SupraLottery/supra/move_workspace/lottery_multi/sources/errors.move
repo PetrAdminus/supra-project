@@ -75,6 +75,9 @@ module lottery_multi::errors {
     pub const E_VRF_DEPOSIT_NOT_INITIALIZED: u64 = 0x170B;
     pub const E_VRF_DEPOSIT_CONFIG: u64 = 0x170C;
     pub const E_VRF_REQUESTS_PAUSED: u64 = 0x170D;
+    pub const E_VRF_RETRY_POLICY_INVALID: u64 = 0x170E;
+    pub const E_VRF_MANUAL_SCHEDULE_REQUIRED: u64 = 0x170F;
+    pub const E_VRF_MANUAL_DEADLINE: u64 = 0x1710;
 
     /// Winner computation / payouts
     pub const E_WINNER_VRF_NOT_READY: u64 = 0x1801;

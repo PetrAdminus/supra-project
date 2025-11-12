@@ -1,6 +1,6 @@
 # JSON Schema view для `lottery_multi`
 
-Этот документ фиксирует структуру ответов on-chain view функций пакета `lottery_multi` и связывает их с фронтенд- и индексаторными компонентами. Схема опубликована в файле [`json/lottery_multi_views.schema.json`](./json/lottery_multi_views.schema.json) (актуальная версия `1.0.3`) и синхронизируется с юнит-тестами `lottery_multi::views_tests`, примером [`json/examples/lottery_multi_view_samples.json`](./json/examples/lottery_multi_view_samples.json) и Python-валидатором `SupraLottery/tests/test_view_schema_examples.py`.
+Этот документ фиксирует структуру ответов on-chain view функций пакета `lottery_multi` и связывает их с фронтенд- и индексаторными компонентами. Схема опубликована в файле [`json/lottery_multi_views.schema.json`](./json/lottery_multi_views.schema.json) (актуальная версия `1.0.5`) и синхронизируется с юнит-тестами `lottery_multi::views_tests`, примером [`json/examples/lottery_multi_view_samples.json`](./json/examples/lottery_multi_view_samples.json) и Python-валидатором `SupraLottery/tests/test_view_schema_examples.py`.
 
 ## Область применения
 

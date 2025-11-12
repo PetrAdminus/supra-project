@@ -194,6 +194,18 @@
         "payout_backlog": {
           "$ref": "#/$defs/U64",
           "description": "Лотереи с невыплаченными батчами (payout_round < next_winner_batch_no)."
+        },
+        "refund_active": {
+          "$ref": "#/$defs/U64",
+          "description": "Количество отменённых лотерей с активной процедурой рефанда."
+        },
+        "refund_batch_pending": {
+          "$ref": "#/$defs/U64",
+          "description": "Количество оставшихся билетов к возврату по всем активным рефандам."
+        },
+        "refund_sla_breach": {
+          "type": "boolean",
+          "description": "Флаг нарушения SLA рефанда (первый батч > 12ч или завершение > 24ч)."
         }
       },
       "required": [
@@ -210,7 +222,10 @@
         "vrf_fulfilled_pending",
         "vrf_retry_blocked",
         "winners_pending",
-        "payout_backlog"
+        "payout_backlog",
+        "refund_active",
+        "refund_batch_pending",
+        "refund_sla_breach"
       ],
       "additionalProperties": false
     },
@@ -469,6 +484,30 @@
       ],
       "additionalProperties": false
     },
+    "RetryPolicy": {
+      "type": "object",
+      "description": "Политика повторов VRF (fixed / exponential / manual).",
+      "properties": {
+        "strategy": {
+          "$ref": "#/$defs/U8",
+          "description": "0 — фиксированный интервал, 1 — экспоненциальный рост, 2 — ручное расписание администратором."
+        },
+        "base_delay_secs": {
+          "$ref": "#/$defs/U64",
+          "description": "Базовое окно ожидания перед повторным запросом."
+        },
+        "max_delay_secs": {
+          "$ref": "#/$defs/U64",
+          "description": "Максимальная задержка между попытками (используется для экспоненциальной стратегии)."
+        }
+      },
+      "required": [
+        "strategy",
+        "base_delay_secs",
+        "max_delay_secs"
+      ],
+      "additionalProperties": false
+    },
     "LotteryConfig": {
       "type": "object",
       "description": "Конфигурация лотереи (`registry::Config`).",
@@ -520,6 +559,9 @@
         },
         "reward_backend": {
           "$ref": "#/$defs/RewardBackend"
+        },
+        "vrf_retry_policy": {
+          "$ref": "#/$defs/RetryPolicy"
         }
       },
       "required": [
@@ -537,7 +579,8 @@
         "winners_dedup",
         "draw_algo",
         "auto_close_policy",
-        "reward_backend"
+        "reward_backend",
+        "vrf_retry_policy"
       ],
       "additionalProperties": false
     },

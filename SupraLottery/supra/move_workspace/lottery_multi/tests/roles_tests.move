@@ -58,6 +58,20 @@ module lottery_multi::roles_tests {
     }
 
     #[test]
+    #[expected_failure(abort_code = errors::E_TAG_UNKNOWN_BIT)]
+    fun partner_cap_rejects_unknown_tags() {
+        let _cap = roles::new_partner_cap(
+            vector::empty<u8>(),
+            vector::empty<vector<u8>>(),
+            vector::empty<u8>(),
+            1u64 << 20,
+            1,
+            0,
+            0,
+        );
+    }
+
+    #[test]
     #[expected_failure(abort_code = errors::E_PARTNER_PAYOUT_EXPIRED)]
     fun partner_cap_blocks_after_expiry() {
         let mut cap = roles::new_partner_payout_cap(@0x77, 10, 0, 1, 50);

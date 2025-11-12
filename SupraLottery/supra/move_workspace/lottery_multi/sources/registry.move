@@ -45,6 +45,7 @@ module lottery_multi::registry {
         pub draw_algo: u8,
         pub auto_close_policy: types::AutoClosePolicy,
         pub reward_backend: types::RewardBackend,
+        pub vrf_retry_policy: types::RetryPolicy,
     }
 
     struct Lottery has store {
@@ -266,6 +267,17 @@ module lottery_multi::registry {
         option::some(copy *record)
     }
 
+    public fun get_cancellation_from_registry(
+        registry_ref: &Registry,
+        id: u64,
+    ): option::Option<CancellationRecord> {
+        if (!table::contains(&registry_ref.cancellations, id)) {
+            return option::none();
+        };
+        let record = table::borrow(&registry_ref.cancellations, id);
+        option::some(copy *record)
+    }
+
     fun borrow_registry_mut(): &mut Registry acquires Registry {
         let registry_addr = @lottery_multi;
         if (!exists<Registry>(registry_addr)) {
@@ -296,6 +308,7 @@ module lottery_multi::registry {
         economics::assert_distribution(&config.sales_distribution);
         types::assert_prize_plan(&config.prize_plan);
         types::assert_draw_algo(config.draw_algo);
+        types::assert_retry_policy(&config.vrf_retry_policy);
     }
 
     public fun ordered_ids_view(registry_ref: &Registry): &vector<u64> {

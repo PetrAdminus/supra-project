@@ -4,8 +4,11 @@ spec module lottery_multi::draw {
 
     use supra_addr::supra_vrf;
 
-    use lottery_multi::draw::{DrawLedger, DrawState, RETRY_DELAY_SECS};
+    use lottery_multi::draw::{DrawLedger, DrawState};
+    use lottery_multi::registry;
     use lottery_multi::types;
+
+    const MAX_VRF_ATTEMPTS: u8 = 5;
 
     spec struct DrawState {
         invariant len(snapshot_hash) == 0 || len(snapshot_hash) == 32;
@@ -13,7 +16,8 @@ spec module lottery_multi::draw {
         invariant vrf_state.status == types::VRF_STATUS_FULFILLED ==> len(snapshot_hash) == 32;
         invariant vrf_state.retry_after_ts == 0
             ==> vrf_state.status == types::VRF_STATUS_IDLE
-                || vrf_state.status == types::VRF_STATUS_FULFILLED;
+                || vrf_state.status == types::VRF_STATUS_FULFILLED
+                || vrf_state.retry_strategy == types::RETRY_STRATEGY_MANUAL;
         invariant vrf_state.status == types::VRF_STATUS_FULFILLED ==> !vrf_state.consumed || len(verified_payload) > 0;
         invariant len(winners_batch_hash) == 0 || len(winners_batch_hash) == 32;
         invariant len(checksum_after_batch) == 0 || len(checksum_after_batch) == 32;
@@ -33,28 +37,66 @@ spec module lottery_multi::draw {
 
     spec request_draw_admin {
         let new_state = draw_state(@lottery_multi, lottery_id);
+        let had_state = old(has_state(@lottery_multi, lottery_id));
+        let old_state = if (had_state) {
+            old(draw_state(@lottery_multi, lottery_id))
+        } else {
+            DrawState {
+                vrf_state: types::new_vrf_state(),
+                rng_count: 0,
+                client_seed: 0,
+                last_request_ts: 0,
+                snapshot_hash: b"",
+                total_tickets: 0,
+                winners_batch_hash: b"",
+                checksum_after_batch: b"",
+                verified_payload: b"",
+                payload: b"",
+                next_client_seed: 0,
+            }
+        };
         ensures has_state(@lottery_multi, lottery_id);
-        ensures new_state.vrf_state.status == types::VRF_STATUS_REQUESTED;
-        ensures new_state.vrf_state.retry_after_ts == now_ts + RETRY_DELAY_SECS;
-        ensures new_state.vrf_state.consumed == false;
-        ensures new_state.vrf_state.schema_version == types::DEFAULT_SCHEMA_VERSION;
-        ensures new_state.vrf_state.retry_strategy == types::RETRY_STRATEGY_FIXED;
-        ensures new_state.vrf_state.chain_id == chain_id;
-        ensures new_state.vrf_state.closing_block_height == closing_block_height;
-        ensures new_state.last_request_ts == now_ts;
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS
+            ==> new_state.vrf_state.status == types::VRF_STATUS_REQUESTED;
+        ensures old_state.vrf_state.attempt >= MAX_VRF_ATTEMPTS
+            ==> new_state.vrf_state.status == types::VRF_STATUS_FAILED;
+        let config = registry::borrow_config_from_registry(&global<registry::Registry>(@lottery_multi), lottery_id);
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS
+            ==> new_state.vrf_state.retry_strategy == config.vrf_retry_policy.strategy;
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS && config.vrf_retry_policy.strategy == types::RETRY_STRATEGY_MANUAL
+            ==> new_state.vrf_state.retry_after_ts == 0;
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS && config.vrf_retry_policy.strategy != types::RETRY_STRATEGY_MANUAL
+            ==> new_state.vrf_state.retry_after_ts >= now_ts;
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS && config.vrf_retry_policy.strategy != types::RETRY_STRATEGY_MANUAL
+            ==> new_state.vrf_state.retry_after_ts <= now_ts + config.vrf_retry_policy.max_delay_secs;
+        ensures old_state.vrf_state.attempt >= MAX_VRF_ATTEMPTS ==> new_state.vrf_state.retry_after_ts == 0;
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS ==> new_state.vrf_state.consumed == false;
+        ensures old_state.vrf_state.attempt >= MAX_VRF_ATTEMPTS ==> new_state.vrf_state.consumed == true;
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS
+            ==> new_state.vrf_state.schema_version == types::DEFAULT_SCHEMA_VERSION;
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS
+            ==> new_state.vrf_state.retry_strategy == config.vrf_retry_policy.strategy;
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS
+            ==> new_state.vrf_state.chain_id == chain_id;
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS
+            ==> new_state.vrf_state.closing_block_height == closing_block_height;
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS ==> new_state.last_request_ts == now_ts;
+        ensures old_state.vrf_state.attempt >= MAX_VRF_ATTEMPTS ==> new_state.last_request_ts == old_state.last_request_ts;
         ensures new_state.verified_payload == b"";
         ensures new_state.winners_batch_hash == b"";
         ensures new_state.checksum_after_batch == b"";
-        ensures new_state.client_seed < new_state.next_client_seed;
-        ensures old(has_state(@lottery_multi, lottery_id))
-            ==> new_state.vrf_state.attempt == old(draw_state(@lottery_multi, lottery_id)).vrf_state.attempt + 1;
-        ensures !old(has_state(@lottery_multi, lottery_id)) ==> new_state.vrf_state.attempt == 1;
-        ensures old(has_state(@lottery_multi, lottery_id))
-            ==> new_state.next_client_seed == old(draw_state(@lottery_multi, lottery_id)).next_client_seed + 1;
-        ensures !old(has_state(@lottery_multi, lottery_id)) ==> new_state.next_client_seed == 1;
-        ensures old(has_state(@lottery_multi, lottery_id))
-            ==> new_state.client_seed == old(draw_state(@lottery_multi, lottery_id)).next_client_seed;
-        ensures !old(has_state(@lottery_multi, lottery_id)) ==> new_state.client_seed == 0;
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS ==> new_state.client_seed < new_state.next_client_seed;
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS
+            ==> new_state.vrf_state.attempt == old_state.vrf_state.attempt + 1;
+        ensures old_state.vrf_state.attempt >= MAX_VRF_ATTEMPTS
+            ==> new_state.vrf_state.attempt == old_state.vrf_state.attempt;
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS
+            ==> new_state.next_client_seed == old_state.next_client_seed + 1;
+        ensures old_state.vrf_state.attempt >= MAX_VRF_ATTEMPTS
+            ==> new_state.next_client_seed == old_state.next_client_seed;
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS
+            ==> new_state.client_seed == old_state.next_client_seed;
+        ensures old_state.vrf_state.attempt >= MAX_VRF_ATTEMPTS ==> new_state.client_seed == old_state.client_seed;
     }
 
     spec vrf_callback {
@@ -90,6 +132,11 @@ spec module lottery_multi::draw {
         ensures new_state.vrf_state.payload_hash == old_state.vrf_state.payload_hash;
         ensures new_state.winners_batch_hash == *winners_batch_hash;
         ensures new_state.checksum_after_batch == *checksum_after_batch;
+    }
+
+    spec schedule_manual_retry_admin {
+        let new_state = draw_state(@lottery_multi, lottery_id);
+        ensures new_state.vrf_state.retry_after_ts == retry_after_ts;
     }
 
     spec finalization_snapshot {

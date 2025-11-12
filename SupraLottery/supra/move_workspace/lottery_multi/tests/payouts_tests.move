@@ -1,5 +1,6 @@
 module lottery_multi::payouts_tests {
     use std::hash;
+    use std::option;
     use std::signer;
     use std::vector;
 
@@ -13,28 +14,11 @@ module lottery_multi::payouts_tests {
     use lottery_multi::sales;
     use lottery_multi::tags;
     use lottery_multi::types;
+    use lottery_multi::views;
 
     const EVENT_BYTES: vector<u8> = b"lottery";
     const SERIES_BYTES: vector<u8> = b"daily";
     const MULTI_SERIES_BYTES: vector<u8> = b"multi";
-
-    #[test(account = @lottery_multi, buyer1 = @0x1, buyer2 = @0x2)]
-    fun record_batch_updates_accounting(
-        account: &signer,
-        buyer1: &signer,
-        buyer2: &signer,
-    ) {
-        setup_modules(account);
-        prepare_for_payout(account, buyer1, buyer2, 100);
-
-        payouts::record_payout_batch_admin(account, 100, 1, 2, 140, 10, 30);
-
-        let accounting = sales::accounting_snapshot(100);
-        assert!(accounting.total_sales == 200, 0);
-        assert!(accounting.total_allocated == 150, 0);
-        assert!(accounting.total_prize_paid == 140, 0);
-        assert!(accounting.total_operations_paid == 10, 0);
-    }
 
     #[test(account = @lottery_multi, buyer1 = @0x1, buyer2 = @0x2)]
     fun partner_payout_updates_operations(
@@ -59,37 +43,6 @@ module lottery_multi::payouts_tests {
 
         let cap = roles::borrow_partner_payout_cap_mut(@0x99);
         assert!(cap.remaining_payout == 45, 0);
-    }
-
-    #[test(account = @lottery_multi, buyer1 = @0x1)]
-    fun refund_batch_records_progress(account: &signer, buyer1: &signer) {
-        setup_modules(account);
-        let lottery_id = 301;
-
-        let mut config = new_config();
-        registry::create_draft_admin(account, lottery_id, copy config);
-        registry::advance_status(account, lottery_id, registry::STATUS_ACTIVE);
-        sales::purchase_tickets_public(buyer1, lottery_id, 1, 20, 1);
-
-        registry::cancel_lottery_admin(
-            account,
-            lottery_id,
-            registry::CANCEL_REASON_OPERATIONS,
-            30,
-        );
-
-        let before = sales::refund_progress(lottery_id);
-        assert!(before.active, 0);
-        assert!(before.refund_round == 0, 0);
-
-        payouts::force_refund_batch_admin(account, lottery_id, 1, 1, 70, 30, 40);
-
-        let progress = sales::refund_progress(lottery_id);
-        assert!(progress.refund_round == 1, 0);
-        assert!(progress.tickets_refunded == 1, 0);
-        assert!(progress.prize_refunded == 70, 0);
-        assert!(progress.operations_refunded == 30, 0);
-        assert!(progress.last_refund_ts == 40, 0);
     }
 
     #[test(account = @lottery_multi, buyer1 = @0x1)]
@@ -162,34 +115,87 @@ module lottery_multi::payouts_tests {
         payouts::archive_canceled_lottery_admin(account, lottery_id, 40);
     }
 
-    #[test(account = @lottery_multi, buyer1 = @0x1)]
-    fun archive_canceled_records_summary(account: &signer, buyer1: &signer) {
+    #[test(account = @lottery_multi, buyer1 = @0x1, buyer2 = @0x2)]
+    fun force_cancel_refund_flow_records_history(
+        account: &signer,
+        buyer1: &signer,
+        buyer2: &signer,
+    ) {
         setup_modules(account);
-        let lottery_id = 306;
+        let lottery_id = 307;
 
         let mut config = new_config();
         registry::create_draft_admin(account, lottery_id, copy config);
         registry::advance_status(account, lottery_id, registry::STATUS_ACTIVE);
-        sales::purchase_tickets_public(buyer1, lottery_id, 1, 20, 1);
+
+        sales::purchase_tickets_public(buyer1, lottery_id, 1, 25, 1);
+        sales::purchase_tickets_public(buyer2, lottery_id, 1, 26, 1);
+
+        let status_before = views::get_lottery_status(lottery_id);
+        assert!(status_before.status == registry::STATUS_ACTIVE, 0);
 
         registry::cancel_lottery_admin(
             account,
             lottery_id,
             registry::CANCEL_REASON_OPERATIONS,
-            30,
+            40,
         );
 
-        payouts::force_refund_batch_admin(account, lottery_id, 1, 1, 70, 30, 40);
-        payouts::archive_canceled_lottery_admin(account, lottery_id, 50);
+        let status_after = views::get_lottery_status(lottery_id);
+        assert!(status_after.status == registry::STATUS_CANCELED, 0);
+        assert!(status_after.snapshot_frozen, 0);
+
+        let cancel_record_opt = views::get_cancellation(lottery_id);
+        assert!(option::is_some(&cancel_record_opt), 0);
+        let cancel_record_ref = option::borrow(&cancel_record_opt);
+        assert!(cancel_record_ref.previous_status == registry::STATUS_ACTIVE, 0);
+        assert!(cancel_record_ref.reason_code == registry::CANCEL_REASON_OPERATIONS, 0);
+        assert!(cancel_record_ref.tickets_sold == 2, 0);
+        assert!(cancel_record_ref.proceeds_accum == 200, 0);
+        assert!(cancel_record_ref.canceled_ts == 40, 0);
+
+        let progress_after_cancel = sales::refund_progress(lottery_id);
+        assert!(progress_after_cancel.active, 0);
+        assert!(progress_after_cancel.refund_round == 0, 0);
+        assert!(progress_after_cancel.tickets_refunded == 0, 0);
+
+        payouts::force_refund_batch_admin(account, lottery_id, 1, 1, 70, 30, 55);
+        payouts::force_refund_batch_admin(account, lottery_id, 2, 1, 70, 30, 65);
+
+        let progress_after_batches = sales::refund_progress(lottery_id);
+        assert!(progress_after_batches.refund_round == 2, 0);
+        assert!(progress_after_batches.tickets_refunded == 2, 0);
+        assert!(progress_after_batches.prize_refunded == 140, 0);
+        assert!(progress_after_batches.operations_refunded == 60, 0);
+        assert!(progress_after_batches.last_refund_ts == 65, 0);
+
+        let progress_view = views::get_refund_progress(lottery_id);
+        assert!(progress_view.active, 0);
+        assert!(progress_view.refund_round == progress_after_batches.refund_round, 0);
+        assert!(progress_view.tickets_refunded == progress_after_batches.tickets_refunded, 0);
+        assert!(progress_view.prize_refunded == progress_after_batches.prize_refunded, 0);
+        assert!(progress_view.operations_refunded == progress_after_batches.operations_refunded, 0);
+        assert!(progress_view.last_refund_ts == progress_after_batches.last_refund_ts, 0);
+
+        payouts::archive_canceled_lottery_admin(account, lottery_id, 80);
 
         let summary = history::get_summary(lottery_id);
         assert!(summary.status == types::STATUS_CANCELED, 0);
-        assert!(summary.tickets_sold == 1, 0);
-        assert!(summary.proceeds_accum == 100, 0);
-        assert!(summary.payout_round == 1, 0);
-        assert!(summary.closed_at == 30, 0);
-        assert!(summary.finalized_at == 50, 0);
+        assert!(summary.tickets_sold == 2, 0);
+        assert!(summary.proceeds_accum == 200, 0);
+        assert!(summary.payout_round == 2, 0);
+        assert!(summary.closed_at == 40, 0);
+        assert!(summary.finalized_at == 80, 0);
         assert!(summary.vrf_status == types::VRF_STATUS_IDLE, 0);
+
+        let summary_view = views::get_lottery_summary(lottery_id);
+        assert!(summary_view.status == summary.status, 0);
+        assert!(summary_view.tickets_sold == summary.tickets_sold, 0);
+        assert!(summary_view.proceeds_accum == summary.proceeds_accum, 0);
+        assert!(summary_view.payout_round == summary.payout_round, 0);
+        assert!(summary_view.closed_at == summary.closed_at, 0);
+        assert!(summary_view.finalized_at == summary.finalized_at, 0);
+        assert!(summary_view.vrf_status == summary.vrf_status, 0);
     }
 
     #[test(account = @lottery_multi, buyer1 = @0x1, buyer2 = @0x2, buyer3 = @0x3)]
@@ -377,6 +383,38 @@ module lottery_multi::payouts_tests {
         payouts::record_partner_payout_admin(account, lottery_id, @0x88, 5, 1, 10_000);
     }
 
+    #[test(account = @lottery_multi, buyer1 = @0x1, buyer2 = @0x2)]
+    fun accounting_aligns_with_summary_and_view(
+        account: &signer,
+        buyer1: &signer,
+        buyer2: &signer,
+    ) {
+        setup_modules(account);
+        let lottery_id = 211;
+
+        prepare_for_payout(account, buyer1, buyer2, lottery_id);
+
+        payouts::record_payout_batch_admin(account, lottery_id, 1, 2, 140, 10, 1_000);
+        payouts::finalize_lottery_admin(account, lottery_id, 9_999);
+
+        let accounting = sales::accounting_snapshot(lottery_id);
+        let accounting_view = views::accounting_snapshot(lottery_id);
+        let summary = history::get_summary(lottery_id);
+
+        assert!(accounting.total_sales == 200, 0);
+        assert!(accounting.total_allocated >= accounting.total_prize_paid, 0);
+        assert!(accounting.total_operations_allocated >= accounting.total_operations_paid, 0);
+
+        assert!(summary.total_allocated == accounting.total_allocated, 0);
+        assert!(summary.total_prize_paid == accounting.total_prize_paid, 0);
+        assert!(summary.total_operations_paid == accounting.total_operations_paid, 0);
+        assert!(summary.payout_round == 1, 0);
+
+        assert!(accounting_view.total_prize_paid == accounting.total_prize_paid, 0);
+        assert!(accounting_view.total_operations_paid == accounting.total_operations_paid, 0);
+        assert!(accounting_view.total_operations_allocated == accounting.total_operations_allocated, 0);
+    }
+
     fun setup_modules(account: &signer) {
         registry::init_registry(account);
         sales::init_sales(account);
@@ -438,6 +476,7 @@ module lottery_multi::payouts_tests {
             draw_algo: types::DRAW_ALGO_WITHOUT_REPLACEMENT,
             auto_close_policy: types::new_auto_close_policy(true, 60),
             reward_backend: types::new_reward_backend(types::BACKEND_NATIVE, b""),
+            vrf_retry_policy: types::default_retry_policy(),
         }
     }
 
@@ -547,6 +586,7 @@ module lottery_multi::payouts_tests {
             draw_algo: types::DRAW_ALGO_WITHOUT_REPLACEMENT,
             auto_close_policy: types::new_auto_close_policy(true, 60),
             reward_backend: types::new_reward_backend(types::BACKEND_NATIVE, b""),
+            vrf_retry_policy: types::default_retry_policy(),
         }
     }
 }

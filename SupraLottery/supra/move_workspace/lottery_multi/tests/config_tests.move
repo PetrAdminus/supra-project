@@ -163,6 +163,7 @@ module lottery_multi::config_tests {
             draw_algo: types::DRAW_ALGO_WITHOUT_REPLACEMENT,
             auto_close_policy: types::new_auto_close_policy(true, 60),
             reward_backend: types::new_reward_backend(types::BACKEND_NATIVE, b""),
+            vrf_retry_policy: types::default_retry_policy(),
         }
     }
 }
