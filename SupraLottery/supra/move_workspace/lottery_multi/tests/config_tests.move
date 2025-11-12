@@ -1,4 +1,5 @@
 module lottery_multi::config_tests {
+    use std::option;
     use std::signer;
     use std::vector;
 
@@ -96,6 +97,48 @@ module lottery_multi::config_tests {
         assert!(vector::length(&filtered) == 2, 0);
         assert!(*vector::borrow(&filtered, 0) == 2, 0);
         assert!(*vector::borrow(&filtered, 1) == 1, 0);
+    }
+
+    #[test(account = @lottery_multi)]
+    #[expected_failure(abort_code = lottery_multi::errors::E_TAGS_LOCKED)]
+    fun cannot_update_tags_after_snapshot(account: &signer) {
+        registry::init_registry(account);
+        let mut config = new_config(tags::TYPE_BASIC, tags::TAG_DAILY);
+        registry::create_draft_admin(account, 20, copy config);
+        registry::advance_status(account, 20, registry::STATUS_ACTIVE);
+        registry::set_tags_mask(account, 20, tags::TAG_DAILY | tags::TAG_PROMO);
+        registry::advance_status(account, 20, registry::STATUS_CLOSING);
+        registry::set_tags_mask(account, 20, tags::TAG_WEEKLY);
+    }
+
+    #[test(account = @lottery_multi)]
+    #[expected_failure(abort_code = lottery_multi::errors::E_CANCEL_REASON_INVALID)]
+    fun cancel_requires_reason(account: &signer) {
+        registry::init_registry(account);
+        let config = new_config(tags::TYPE_BASIC, 0);
+        registry::create_draft_admin(account, 30, config);
+        registry::cancel_lottery_admin(account, 30, 0, 0);
+    }
+
+    #[test(account = @lottery_multi)]
+    fun cancel_records_reason(account: &signer) {
+        registry::init_registry(account);
+        let config = new_config(tags::TYPE_BASIC, 0);
+        registry::create_draft_admin(account, 31, copy config);
+        registry::advance_status(account, 31, registry::STATUS_ACTIVE);
+        let canceled_at = 1_234u64;
+        registry::cancel_lottery_admin(account, 31, registry::CANCEL_REASON_VRF_FAILURE, canceled_at);
+        let status = views::get_lottery_status(31);
+        assert!(status.status == registry::STATUS_CANCELED, 0);
+        assert!(status.snapshot_frozen, 0);
+        let info_opt = registry::get_cancellation_record(31);
+        assert!(option::is_some(&info_opt), 0);
+        let info = option::extract(info_opt);
+        assert!(info.reason_code == registry::CANCEL_REASON_VRF_FAILURE, 0);
+        assert!(info.previous_status == registry::STATUS_ACTIVE, 0);
+        assert!(info.canceled_ts == canceled_at, 0);
+        assert!(info.tickets_sold == 0, 0);
+        assert!(info.proceeds_accum == 0, 0);
     }
 
     fun new_config(primary_type: u8, tags_mask: u64): registry::Config {

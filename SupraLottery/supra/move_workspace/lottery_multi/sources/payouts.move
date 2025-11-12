@@ -2,6 +2,7 @@
 module lottery_multi::payouts {
     use std::bcs;
     use std::hash;
+    use std::option;
     use std::signer;
     use std::table;
     use std::vector;
@@ -9,6 +10,7 @@ module lottery_multi::payouts {
     use supra_framework::event;
 
     use lottery_multi::draw;
+    use lottery_multi::economics;
     use lottery_multi::errors;
     use lottery_multi::history;
     use lottery_multi::registry;
@@ -17,9 +19,11 @@ module lottery_multi::payouts {
     use lottery_multi::types;
 
     const EVENT_CATEGORY_PAYOUT: u8 = history::EVENT_CATEGORY_PAYOUT;
+    const EVENT_CATEGORY_REFUND: u8 = history::EVENT_CATEGORY_REFUND;
     const WINNER_EVENT_VERSION_V1: u16 = 1;
     const PAYOUT_EVENT_VERSION_V1: u16 = 1;
     const PARTNER_EVENT_VERSION_V1: u16 = 1;
+    const REFUND_EVENT_VERSION_V1: u16 = 1;
     const WINNER_CHUNK_CAPACITY: u64 = 64;
     const MAX_REHASH_ATTEMPTS: u8 = 16;
     const WINNER_HASH_SEED: vector<u8> = b"lottery_multi::winner_seed";
@@ -58,11 +62,21 @@ module lottery_multi::payouts {
         next_winner_batch_no: u64,
     }
 
+    pub struct WinnerProgressView has copy, drop, store {
+        pub initialized: bool,
+        pub total_required: u64,
+        pub total_assigned: u64,
+        pub payout_round: u64,
+        pub next_winner_batch_no: u64,
+        pub last_payout_ts: u64,
+    }
+
     struct PayoutLedger has key {
         states: table::Table<u64, WinnerState>,
         winner_events: event::EventHandle<history::WinnersComputedEvent>,
         payout_events: event::EventHandle<history::PayoutBatchEvent>,
         partner_events: event::EventHandle<history::PartnerPayoutEvent>,
+        refund_events: event::EventHandle<history::RefundBatchEvent>,
     }
 
     public entry fun init_payouts(admin: &signer) {
@@ -74,6 +88,7 @@ module lottery_multi::payouts {
             winner_events: event::new_event_handle<history::WinnersComputedEvent>(admin),
             payout_events: event::new_event_handle<history::PayoutBatchEvent>(admin),
             partner_events: event::new_event_handle<history::PartnerPayoutEvent>(admin),
+            refund_events: event::new_event_handle<history::RefundBatchEvent>(admin),
         };
         move_to(admin, ledger);
     }
@@ -240,7 +255,7 @@ module lottery_multi::payouts {
         assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
 
         let status = registry::get_status(lottery_id);
-        assert!(status == types::STATUS_PAYOUT || status == types::STATUS_FINALIZED, errors::E_DRAW_STATUS_INVALID);
+        assert!(status == types::STATUS_PAYOUT, errors::E_DRAW_STATUS_INVALID);
 
         let batch_cap = roles::borrow_payout_batch_cap_mut();
         roles::consume_payout_batch(batch_cap, winners_paid, operations_paid, timestamp, payout_round);
@@ -284,7 +299,7 @@ module lottery_multi::payouts {
         assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
 
         let status = registry::get_status(lottery_id);
-        assert!(status == types::STATUS_PAYOUT || status == types::STATUS_FINALIZED, errors::E_DRAW_STATUS_INVALID);
+        assert!(status == types::STATUS_PAYOUT, errors::E_DRAW_STATUS_INVALID);
 
         let partner_cap = roles::borrow_partner_payout_cap_mut(partner);
         roles::consume_partner_payout(partner_cap, amount, timestamp, payout_round);
@@ -308,6 +323,146 @@ module lottery_multi::payouts {
             timestamp,
         };
         event::emit_event(&mut ledger.partner_events, event);
+    }
+
+    public entry fun force_refund_batch_admin(
+        admin: &signer,
+        lottery_id: u64,
+        refund_round: u64,
+        tickets_refunded: u64,
+        prize_refund: u64,
+        operations_refund: u64,
+        timestamp: u64,
+    ) acquires PayoutLedger, registry::Registry, sales::SalesLedger, roles::RoleStore {
+        let admin_addr = signer::address_of(admin);
+        assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
+
+        let status = registry::get_status(lottery_id);
+        assert!(status == types::STATUS_CANCELED, errors::E_REFUND_STATUS_INVALID);
+
+        let batch_cap = roles::borrow_payout_batch_cap_mut();
+        roles::consume_payout_batch(batch_cap, tickets_refunded, operations_refund, timestamp, refund_round);
+
+        let (
+            total_tickets_refunded,
+            total_prize_refunded,
+            total_operations_refunded,
+        ) = sales::record_refund_batch(
+            lottery_id,
+            refund_round,
+            tickets_refunded,
+            prize_refund,
+            operations_refund,
+            timestamp,
+        );
+        let total_amount_refunded = total_prize_refunded + total_operations_refunded;
+
+        let ledger = borrow_ledger_mut();
+        let event = history::RefundBatchEvent {
+            event_version: REFUND_EVENT_VERSION_V1,
+            event_category: EVENT_CATEGORY_REFUND,
+            lottery_id,
+            refund_round,
+            tickets_refunded,
+            prize_refunded: prize_refund,
+            operations_refunded: operations_refund,
+            total_tickets_refunded,
+            total_amount_refunded,
+            timestamp,
+        };
+        event::emit_event(&mut ledger.refund_events, event);
+    }
+
+    public entry fun archive_canceled_lottery_admin(
+        admin: &signer,
+        lottery_id: u64,
+        finalized_at: u64,
+    ) acquires registry::Registry, sales::SalesLedger, draw::DrawLedger, history::ArchiveLedger {
+        let admin_addr = signer::address_of(admin);
+        assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
+
+        let status = registry::get_status(lottery_id);
+        assert!(status == types::STATUS_CANCELED, errors::E_DRAW_STATUS_INVALID);
+
+        let cancel_record_opt = registry::get_cancellation_record(lottery_id);
+        if (!option::is_some(&cancel_record_opt)) {
+            abort errors::E_CANCELLATION_RECORD_MISSING;
+        };
+        let cancel_record = option::destroy_some(cancel_record_opt);
+        assert!(finalized_at >= cancel_record.canceled_ts, errors::E_REFUND_TIMESTAMP);
+
+        let has_sales = sales::has_state(lottery_id);
+        let (tickets_sold, proceeds_accum, last_purchase_ts) = if (has_sales) {
+            sales::sales_totals(lottery_id)
+        } else {
+            (0, 0, 0)
+        };
+
+        let accounting = if (has_sales) {
+            sales::accounting_snapshot(lottery_id)
+        } else {
+            economics::new_accounting()
+        };
+
+        let refund_view = sales::refund_progress(lottery_id);
+        if (tickets_sold > 0) {
+            assert!(refund_view.tickets_refunded == tickets_sold, errors::E_REFUND_PROGRESS_INCOMPLETE);
+            assert!(refund_view.refund_round > 0, errors::E_REFUND_PROGRESS_INCOMPLETE);
+            assert!(refund_view.last_refund_ts > 0, errors::E_REFUND_PROGRESS_INCOMPLETE);
+            let total_refunded = refund_view.prize_refunded + refund_view.operations_refunded;
+            assert!(total_refunded >= proceeds_accum, errors::E_REFUND_PROGRESS_FUNDS);
+        };
+
+        let slots_checksum = registry::slots_checksum(lottery_id);
+        let draw_snapshot = if (draw::has_state(lottery_id)) {
+            draw::finalization_snapshot(lottery_id)
+        } else {
+            let (snapshot_hash, _, _) = sales::snapshot_for_draw(lottery_id);
+            draw::FinalizationSnapshot {
+                snapshot_hash,
+                payload_hash: b"",
+                winners_batch_hash: b"",
+                checksum_after_batch: b"",
+                schema_version: types::DEFAULT_SCHEMA_VERSION,
+                attempt: 0,
+                closing_block_height: 0,
+                chain_id: 0,
+                request_ts: cancel_record.canceled_ts,
+                vrf_status: types::VRF_STATUS_IDLE,
+            }
+        };
+
+        let config = registry::borrow_config(lottery_id);
+        let closed_ts = if (last_purchase_ts > 0) {
+            last_purchase_ts
+        } else {
+            cancel_record.canceled_ts
+        };
+
+        let summary = history::LotterySummary {
+            id: lottery_id,
+            status: types::STATUS_CANCELED,
+            event_slug: copy config.event_slug,
+            series_code: copy config.series_code,
+            run_id: config.run_id,
+            tickets_sold,
+            proceeds_accum,
+            total_allocated: accounting.total_allocated,
+            total_prize_paid: accounting.total_prize_paid,
+            total_operations_paid: accounting.total_operations_paid,
+            vrf_status: draw_snapshot.vrf_status,
+            primary_type: config.primary_type,
+            tags_mask: config.tags_mask,
+            snapshot_hash: copy draw_snapshot.snapshot_hash,
+            slots_checksum,
+            winners_batch_hash: copy draw_snapshot.winners_batch_hash,
+            checksum_after_batch: copy draw_snapshot.checksum_after_batch,
+            payout_round: refund_view.refund_round,
+            created_at: config.sales_window.sales_start,
+            closed_at: closed_ts,
+            finalized_at,
+        };
+        history::record_summary(lottery_id, summary);
     }
 
     public entry fun finalize_lottery_admin(
@@ -363,6 +518,40 @@ module lottery_multi::payouts {
         };
         history::record_summary(lottery_id, summary);
         registry::mark_finalized(lottery_id);
+    }
+
+    pub fun winner_progress(lottery_id: u64): WinnerProgressView acquires PayoutLedger {
+        let addr = @lottery_multi;
+        if (!exists<PayoutLedger>(addr)) {
+            return WinnerProgressView {
+                initialized: false,
+                total_required: 0,
+                total_assigned: 0,
+                payout_round: 0,
+                next_winner_batch_no: 0,
+                last_payout_ts: 0,
+            };
+        };
+        let ledger = borrow_ledger_ref();
+        if (!table::contains(&ledger.states, lottery_id)) {
+            return WinnerProgressView {
+                initialized: false,
+                total_required: 0,
+                total_assigned: 0,
+                payout_round: 0,
+                next_winner_batch_no: 0,
+                last_payout_ts: 0,
+            };
+        };
+        let state = table::borrow(&ledger.states, lottery_id);
+        WinnerProgressView {
+            initialized: state.initialized,
+            total_required: state.total_required,
+            total_assigned: state.total_assigned,
+            payout_round: state.payout_round,
+            next_winner_batch_no: state.next_winner_batch_no,
+            last_payout_ts: state.last_payout_ts,
+        }
     }
 
     fun append_record(
@@ -436,6 +625,14 @@ module lottery_multi::payouts {
             abort errors::E_REGISTRY_MISSING;
         };
         borrow_global_mut<PayoutLedger>(addr)
+    }
+
+    fun borrow_ledger_ref(): &PayoutLedger acquires PayoutLedger {
+        let addr = @lottery_multi;
+        if (!exists<PayoutLedger>(addr)) {
+            abort errors::E_REGISTRY_MISSING;
+        };
+        borrow_global<PayoutLedger>(addr)
     }
 
     struct SlotContext has copy, drop, store {

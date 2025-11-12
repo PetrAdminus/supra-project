@@ -167,6 +167,45 @@ export interface LotteryStatus {
   vrf: VrfStatus;
 }
 
+export interface LotteryMultiViewsInfo {
+  version: string | null;
+  updatedAt: string | null;
+}
+
+export interface LotteryMultiStatusOverview {
+  total: number;
+  draft: number;
+  active: number;
+  closing: number;
+  drawRequested: number;
+  drawn: number;
+  payout: number;
+  finalized: number;
+  canceled: number;
+  vrfRequested: number;
+  vrfFulfilledPending: number;
+  vrfRetryBlocked: number;
+  winnersPending: number;
+  payoutBacklog: number;
+}
+
+export interface LotteryMultiViews {
+  info: LotteryMultiViewsInfo;
+  statusOverview: LotteryMultiStatusOverview;
+  listActive: number[];
+  listByPrimaryType: number[];
+  listByTagMask: number[];
+  listByAllTags: number[];
+  listFinalizedIds: number[];
+}
+
+export interface LotteryMultiViewsOptions {
+  nowTs?: number;
+  limit?: number | null;
+  primaryType?: number | null;
+  tagMask?: number | null;
+}
+
 export interface WhitelistStatus {
   account: string | null;
   profile: string | null;

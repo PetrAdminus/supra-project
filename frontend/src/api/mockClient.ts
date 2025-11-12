@@ -14,6 +14,8 @@ import type {
   ChecklistStatus,
   ChecklistTask,
   ChatMessage,
+  LotteryMultiViews,
+  LotteryMultiViewsOptions,
   LotteryEvent,
   LotteryStatus,
   LotteryVrfLog,
@@ -40,6 +42,7 @@ import adminConfigJson from "../mocks/admin-config.json";
 import vrfLogJson from "../mocks/vrf-log.json";
 import chatMessagesJson from "../mocks/chat-messages.json";
 import announcementsJson from "../mocks/announcements.json";
+import lotteryMultiViewsJson from "../mocks/lottery-multi-views.json";
 
 const NETWORK_LATENCY_MS = 180;
 const DEFAULT_VRF_LOG_LIMIT = 25;
@@ -74,6 +77,9 @@ const announcementStore: Announcement[] = structuredClone(
     lotteryId: announcement.lotteryId ?? null,
     metadata: isRecord(announcement.metadata) ? structuredClone(announcement.metadata) : {},
   })),
+);
+const lotteryMultiViewsSnapshot: LotteryMultiViews = structuredClone(
+  lotteryMultiViewsJson as LotteryMultiViews,
 );
 const profileStore = new Map<string, AccountProfile>();
 const checklistTaskStore = new Map<string, ChecklistTask>();
@@ -626,6 +632,32 @@ export async function recordConsumerWhitelistSnapshotMock(
     updatedAt: result.submittedAt,
   };
   return simulateDelay(result);
+}
+
+export async function fetchLotteryMultiViewsMock(
+  options?: LotteryMultiViewsOptions,
+): Promise<LotteryMultiViews> {
+  const limitValue =
+    typeof options?.limit === "number" && Number.isFinite(options.limit) && options.limit >= 0
+      ? Math.floor(options.limit)
+      : null;
+
+  const clamp = (values: number[]): number[] => {
+    if (limitValue === null) {
+      return structuredClone(values);
+    }
+    return structuredClone(values.slice(0, limitValue));
+  };
+
+  return simulateDelay({
+    info: structuredClone(lotteryMultiViewsSnapshot.info),
+    statusOverview: structuredClone(lotteryMultiViewsSnapshot.statusOverview),
+    listActive: clamp(lotteryMultiViewsSnapshot.listActive),
+    listByPrimaryType: clamp(lotteryMultiViewsSnapshot.listByPrimaryType),
+    listByTagMask: clamp(lotteryMultiViewsSnapshot.listByTagMask),
+    listByAllTags: clamp(lotteryMultiViewsSnapshot.listByAllTags),
+    listFinalizedIds: clamp(lotteryMultiViewsSnapshot.listFinalizedIds),
+  });
 }
 
 export async function fetchLotteryStatusMock(): Promise<LotteryStatus> {

@@ -11,6 +11,8 @@ module lottery_multi::errors {
     pub const E_ROLES_NOT_INITIALIZED: u64 = 0x1103;
     pub const E_PAYOUT_BATCH_CAP_MISSING: u64 = 0x1104;
     pub const E_PARTNER_PAYOUT_CAP_MISSING: u64 = 0x1105;
+    pub const E_PREMIUM_CAP_MISSING: u64 = 0x1106;
+    pub const E_PREMIUM_CAP_EXPIRED: u64 = 0x1107;
 
     /// Registry and configuration errors
     pub const E_ALREADY_INITIALIZED: u64 = 0x1201;
@@ -29,6 +31,8 @@ module lottery_multi::errors {
     pub const E_SALES_WINDOW_CLOSED: u64 = 0x120E;
     pub const E_LOTTERY_NOT_ACTIVE: u64 = 0x120F;
     pub const E_DRAW_STATUS_INVALID: u64 = 0x1210;
+    pub const E_CANCEL_REASON_INVALID: u64 = 0x1211;
+    pub const E_CANCELLATION_RECORD_MISSING: u64 = 0x1212;
 
     /// Accounting and allocation errors
     pub const E_DISTRIBUTION_BPS_INVALID: u64 = 0x1301;
@@ -88,6 +92,16 @@ module lottery_multi::errors {
     pub const E_PARTNER_PAYOUT_COOLDOWN: u64 = 0x180D;
     pub const E_PARTNER_PAYOUT_NONCE: u64 = 0x180E;
     pub const E_PARTNER_PAYOUT_HOLDER_MISMATCH: u64 = 0x180F;
+    pub const E_PARTNER_PAYOUT_EXPIRED: u64 = 0x1810;
+    pub const E_REFUND_NOT_ACTIVE: u64 = 0x1811;
+    pub const E_REFUND_ROUND_NON_MONOTONIC: u64 = 0x1812;
+    pub const E_REFUND_LIMIT_TICKETS: u64 = 0x1813;
+    pub const E_REFUND_LIMIT_FUNDS: u64 = 0x1814;
+    pub const E_REFUND_STATUS_INVALID: u64 = 0x1815;
+    pub const E_REFUND_BATCH_EMPTY: u64 = 0x1816;
+    pub const E_REFUND_TIMESTAMP: u64 = 0x1817;
+    pub const E_REFUND_PROGRESS_INCOMPLETE: u64 = 0x1818;
+    pub const E_REFUND_PROGRESS_FUNDS: u64 = 0x1819;
 
     /// Price feed errors
     pub const E_PRICE_FEED_EXISTS: u64 = 0x1901;
@@ -97,6 +111,7 @@ module lottery_multi::errors {
     pub const E_PRICE_FALLBACK_ACTIVE: u64 = 0x1905;
     pub const E_PRICE_CLAMP_TRIGGERED: u64 = 0x1906;
     pub const E_PRICE_CLAMP_ACTIVE: u64 = 0x1907;
+    pub const E_PRICE_CLAMP_NOT_ACTIVE: u64 = 0x1908;
 
     /// Automation / automation bot errors
     pub const E_AUTOBOT_REGISTRY_MISSING: u64 = 0x1A01;
@@ -119,4 +134,8 @@ module lottery_multi::errors {
     pub const E_HISTORY_NOT_AUTHORIZED: u64 = 0x1B04;
     pub const E_HISTORY_EXPECTED_MISSING: u64 = 0x1B05;
     pub const E_HISTORY_CONTROL_MISSING: u64 = 0x1B06;
+    pub const E_HISTORY_IMPORT_HASH: u64 = 0x1B07;
+    pub const E_HISTORY_ID_MISMATCH: u64 = 0x1B08;
+    pub const E_HISTORY_NOT_LEGACY: u64 = 0x1B09;
+    pub const E_HISTORY_SUMMARY_MISSING: u64 = 0x1B0A;
 }

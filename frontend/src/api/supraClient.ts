@@ -13,6 +13,10 @@ import type {
   ChatMessage,
   DepositStatus,
   HubStatus,
+  LotteryMultiStatusOverview,
+  LotteryMultiViews,
+  LotteryMultiViewsInfo,
+  LotteryMultiViewsOptions,
   LotteryBlueprintSummary,
   LotteryEvent,
   LotteryInstanceSummary,
@@ -75,6 +79,11 @@ interface SupraStatusResponse {
   lotteries?: unknown;
   deposit?: unknown;
   treasury?: unknown;
+}
+
+interface LotteryMultiViewsResponse {
+  info?: unknown;
+  views?: unknown;
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -204,6 +213,90 @@ function toUnknownArray(value: unknown): unknown[] {
     }
   }
   return [];
+}
+
+function toNumberArray(value: unknown): number[] {
+  if (!Array.isArray(value)) {
+    const single = toNumberOrNull(value);
+    return single === null ? [] : [single];
+  }
+
+  const result: number[] = [];
+  for (const item of value) {
+    const parsed = toNumberOrNull(item);
+    if (parsed !== null) {
+      result.push(parsed);
+    }
+  }
+  return result;
+}
+
+function mapViewsInfoPayload(value: unknown): LotteryMultiViewsInfo {
+  const record = toRecord(value);
+  const updatedAt = normalizeTimestamp(record?.updated_at ?? record?.updatedAt);
+  return {
+    version: toStringOrNull(record?.version),
+    updatedAt: updatedAt ?? null,
+  };
+}
+
+function mapStatusOverviewPayload(value: unknown): LotteryMultiStatusOverview {
+  const source = toRecord(value) ?? ({} as JsonRecord);
+  const pick = (primary: string, fallback?: string) => {
+    const primaryValue = toNumberOrNull(source[primary]);
+    if (primaryValue !== null) {
+      return primaryValue;
+    }
+    if (fallback) {
+      const fallbackValue = toNumberOrNull(source[fallback]);
+      if (fallbackValue !== null) {
+        return fallbackValue;
+      }
+    }
+    return 0;
+  };
+  return {
+    total: pick("total"),
+    draft: pick("draft"),
+    active: pick("active"),
+    closing: pick("closing"),
+    drawRequested: pick("draw_requested", "drawRequested"),
+    drawn: pick("drawn"),
+    payout: pick("payout"),
+    finalized: pick("finalized"),
+    canceled: pick("canceled"),
+    vrfRequested: pick("vrf_requested", "vrfRequested"),
+    vrfFulfilledPending: pick(
+      "vrf_fulfilled_pending",
+      "vrfFulfilledPending",
+    ),
+    vrfRetryBlocked: pick("vrf_retry_blocked", "vrfRetryBlocked"),
+    winnersPending: pick("winners_pending", "winnersPending"),
+    payoutBacklog: pick("payout_backlog", "payoutBacklog"),
+  };
+}
+
+function mapLotteryMultiViewsPayload(payload: LotteryMultiViewsResponse): LotteryMultiViews {
+  const views = toRecord(payload.views) ?? ({} as JsonRecord);
+  return {
+    info: mapViewsInfoPayload(payload.info),
+    statusOverview: mapStatusOverviewPayload(
+      views["status_overview"] ?? views["statusOverview"],
+    ),
+    listActive: toNumberArray(views["list_active"] ?? views["listActive"]),
+    listByPrimaryType: toNumberArray(
+      views["list_by_primary_type"] ?? views["listByPrimaryType"],
+    ),
+    listByTagMask: toNumberArray(
+      views["list_by_tag_mask"] ?? views["listByTagMask"],
+    ),
+    listByAllTags: toNumberArray(
+      views["list_by_all_tags"] ?? views["listByAllTags"],
+    ),
+    listFinalizedIds: toNumberArray(
+      views["list_finalized_ids"] ?? views["listFinalizedIds"],
+    ),
+  };
 }
 
 function normalizeChatRoom(value: string | null | undefined): string {
@@ -1185,6 +1278,46 @@ function toAdminMutationResultFromCommand(
 export async function fetchLotteryStatusSupra(): Promise<LotteryStatus> {
   const payload = await loadStatus();
   return mapSupraStatus(payload);
+}
+
+export async function fetchLotteryMultiViewsSupra(
+  options?: LotteryMultiViewsOptions,
+): Promise<LotteryMultiViews> {
+  const params = new URLSearchParams();
+
+  const nowTs = options?.nowTs;
+  if (typeof nowTs === "number" && Number.isFinite(nowTs)) {
+    params.set("now_ts", Math.max(0, Math.floor(nowTs)).toString());
+  }
+
+  const limit = options?.limit;
+  if (limit !== undefined && limit !== null) {
+    const numericLimit = Number(limit);
+    if (Number.isFinite(numericLimit) && numericLimit >= 0) {
+      params.set("limit", Math.floor(numericLimit).toString());
+    }
+  }
+
+  const primaryType = options?.primaryType;
+  if (primaryType !== undefined && primaryType !== null) {
+    const numericPrimary = Number(primaryType);
+    if (Number.isFinite(numericPrimary) && numericPrimary >= 0) {
+      params.set("primary_type", Math.floor(numericPrimary).toString());
+    }
+  }
+
+  const tagMask = options?.tagMask;
+  if (tagMask !== undefined && tagMask !== null) {
+    const numericMask = Number(tagMask);
+    if (Number.isFinite(numericMask) && numericMask >= 0) {
+      params.set("tag_mask", Math.floor(numericMask).toString());
+    }
+  }
+
+  const query = params.toString();
+  const path = `/lottery-multi/views${query ? `?${query}` : ""}`;
+  const payload = await supraRequest<LotteryMultiViewsResponse>(path);
+  return mapLotteryMultiViewsPayload(payload);
 }
 
 export async function fetchChecklistSupra(address: string): Promise<ChecklistStatus> {

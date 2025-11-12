@@ -1,0 +1,27 @@
+{
+  "info": {
+    "version": "1.0.2",
+    "updatedAt": "2025-11-27T00:00:00Z"
+  },
+  "statusOverview": {
+    "total": 48,
+    "draft": 5,
+    "active": 9,
+    "closing": 4,
+    "drawRequested": 2,
+    "drawn": 3,
+    "payout": 6,
+    "finalized": 17,
+    "canceled": 2,
+    "vrfRequested": 2,
+    "vrfFulfilledPending": 1,
+    "vrfRetryBlocked": 1,
+    "winnersPending": 3,
+    "payoutBacklog": 2
+  },
+  "listActive": [201, 198, 177],
+  "listByPrimaryType": [201, 177],
+  "listByTagMask": [201, 198],
+  "listByAllTags": [201],
+  "listFinalizedIds": [190, 188, 170]
+}

@@ -9,6 +9,8 @@ import type {
   ChecklistCompleteInput,
   ChecklistStatus,
   ChatMessage,
+  LotteryMultiViews,
+  LotteryMultiViewsOptions,
   LotteryEvent,
   LotteryVrfLog,
   LotteryStatus,
@@ -30,6 +32,7 @@ import type {
 
 export interface LotteryApi {
   fetchLotteryStatus(): Promise<LotteryStatus>;
+  fetchLotteryMultiViews(options?: LotteryMultiViewsOptions): Promise<LotteryMultiViews>;
   fetchWhitelistStatus(): Promise<WhitelistStatus>;
   fetchTickets(): Promise<TicketPurchase[]>;
   fetchEvents(): Promise<LotteryEvent[]>;

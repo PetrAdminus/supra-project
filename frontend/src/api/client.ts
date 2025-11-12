@@ -9,6 +9,8 @@ import type {
   ChecklistCompleteInput,
   ChecklistStatus,
   ChatMessage,
+  LotteryMultiViews,
+  LotteryMultiViewsOptions,
   LotteryEvent,
   LotteryVrfLog,
   LotteryStatus,
@@ -34,6 +36,7 @@ import {
   fetchAchievementsStatusMock,
   fetchAdminConfigMock,
   fetchAnnouncementsMock,
+  fetchLotteryMultiViewsMock,
   fetchChecklistStatusMock,
   fetchEventsMock,
   fetchLotteryStatusMock,
@@ -65,6 +68,7 @@ import {
   fetchChatMessagesSupra,
   fetchLotteryEventsSupra,
   fetchLotteryStatusSupra,
+  fetchLotteryMultiViewsSupra,
   fetchLotteryVrfLogSupra,
   fetchTicketsSupra,
   fetchTreasuryBalancesSupra,
@@ -89,6 +93,7 @@ import type { ApiMode } from "../config/appConfig";
 
 const mockApi: LotteryApi = {
   fetchLotteryStatus: fetchLotteryStatusMock,
+  fetchLotteryMultiViews: fetchLotteryMultiViewsMock,
   fetchWhitelistStatus: fetchWhitelistStatusMock,
   fetchTickets: fetchTicketsMock,
   fetchEvents: fetchEventsMock,
@@ -118,6 +123,7 @@ const mockApi: LotteryApi = {
 
 const supraApi: LotteryApi = {
   fetchLotteryStatus: fetchLotteryStatusSupra,
+  fetchLotteryMultiViews: fetchLotteryMultiViewsSupra,
   fetchWhitelistStatus: fetchWhitelistStatusSupra,
   fetchTickets: fetchTicketsSupra,
   fetchEvents: fetchLotteryEventsSupra,
@@ -160,6 +166,12 @@ function getApi(): LotteryApi {
 
 export async function fetchLotteryStatus(): Promise<LotteryStatus> {
   return getApi().fetchLotteryStatus();
+}
+
+export async function fetchLotteryMultiViews(
+  options?: LotteryMultiViewsOptions,
+): Promise<LotteryMultiViews> {
+  return getApi().fetchLotteryMultiViews(options);
 }
 
 export async function fetchWhitelistStatus(): Promise<WhitelistStatus> {

@@ -1,13 +1,15 @@
 // sources/automation.move
 module lottery_multi::automation {
     use std::hash;
+    use std::option;
     use std::signer;
-    use std::table;
     use std::vector;
     use supra_framework::event;
 
     use lottery_multi::errors;
     use lottery_multi::history;
+
+    use vrf_hub::table;
 
     const EVENT_VERSION_V1: u16 = history::EVENT_VERSION_V1;
     const EVENT_CATEGORY_AUTOMATION: u8 = history::EVENT_CATEGORY_AUTOMATION;
@@ -47,6 +49,22 @@ module lottery_multi::automation {
         key_rotated_events: event::EventHandle<history::AutomationKeyRotatedEvent>,
         tick_events: event::EventHandle<history::AutomationTickEvent>,
         error_events: event::EventHandle<history::AutomationErrorEvent>,
+    }
+
+    pub struct AutomationBotStatus has drop, store {
+        pub operator: address,
+        pub allowed_actions: vector<u64>,
+        pub timelock_secs: u64,
+        pub max_failures: u64,
+        pub failure_count: u64,
+        pub success_streak: u64,
+        pub reputation_score: u64,
+        pub pending_action_hash: vector<u8>,
+        pub pending_execute_after: u64,
+        pub expires_at: u64,
+        pub cron_spec: vector<u8>,
+        pub last_action_ts: u64,
+        pub last_action_hash: vector<u8>,
     }
 
     public entry fun init_automation(admin: &signer) {
@@ -274,6 +292,33 @@ module lottery_multi::automation {
         assert!(state.failure_count < state.max_failures, errors::E_AUTOBOT_FAILURE_LIMIT);
     }
 
+    public fun automation_status(operator: address): AutomationBotStatus acquires AutomationRegistry {
+        let state = borrow_state_ref(operator);
+        state_to_status(operator, state)
+    }
+
+    public fun automation_status_option(
+        operator: address,
+    ): option::Option<AutomationBotStatus> acquires AutomationRegistry {
+        if (!exists<AutomationRegistry>(@lottery_multi)) {
+            return option::none<AutomationBotStatus>();
+        };
+        let registry = borrow_global<AutomationRegistry>(@lottery_multi);
+        if (!table::contains(&registry.bots, operator)) {
+            return option::none<AutomationBotStatus>();
+        };
+        let state = table::borrow(&registry.bots, operator);
+        option::some(state_to_status(operator, state))
+    }
+
+    public fun automation_operators(): vector<address> acquires AutomationRegistry {
+        if (!exists<AutomationRegistry>(@lottery_multi)) {
+            return vector::empty<address>();
+        };
+        let registry = borrow_global<AutomationRegistry>(@lottery_multi);
+        table::keys(&registry.bots)
+    }
+
     fun emit_tick(
         handle: &mut event::EventHandle<history::AutomationTickEvent>,
         operator: address,
@@ -375,6 +420,36 @@ module lottery_multi::automation {
             idx = idx + 1;
         };
         out
+    }
+
+    fun clone_u64s(source: &vector<u64>): vector<u64> {
+        let len = vector::length(source);
+        let mut out = vector::empty<u64>();
+        let mut idx = 0;
+        while (idx < len) {
+            let value = *vector::borrow(source, idx);
+            vector::push_back(&mut out, value);
+            idx = idx + 1;
+        };
+        out
+    }
+
+    fun state_to_status(operator: address, state: &AutomationState): AutomationBotStatus {
+        AutomationBotStatus {
+            operator,
+            allowed_actions: clone_u64s(&state.allowed_actions),
+            timelock_secs: state.timelock_secs,
+            max_failures: state.max_failures,
+            failure_count: state.failure_count,
+            success_streak: state.success_streak,
+            reputation_score: state.reputation_score,
+            pending_action_hash: clone_bytes(&state.pending_action_hash),
+            pending_execute_after: state.pending_execute_after,
+            expires_at: state.expires_at,
+            cron_spec: clone_bytes(&state.cron_spec),
+            last_action_ts: state.last_action_ts,
+            last_action_hash: clone_bytes(&state.last_action_hash),
+        }
     }
 
     fun ensure_action_allowed(actions: &vector<u64>, action_id: u64) {
