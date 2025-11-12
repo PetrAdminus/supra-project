@@ -49,7 +49,7 @@
 - Реализованы функции `history::{import_legacy_summary_admin, rollback_legacy_summary_admin, update_legacy_classification_admin}`, события `LegacySummaryImported/RolledBack/ClassificationUpdated`, view `is_legacy_summary`, юнит-тесты `history_migration_tests` и CLI `history_backfill.sh`, фиксирующие подготовку к backfill и ручным сценариям отката.
 - Новый модуль `lottery_support::history_bridge` хранит зеркальные сводки (`LegacySummary`), эмитирует `LegacySummaryEvent` и предоставляет view `get_summary` для dry-run сверок.
 - Юнит `lottery_multi::history_dual_write_tests::dual_write_mirror_summary` подтверждает, что зеркальная запись создаёт хэш, совпадающий с ожидаемым, и что BCS-декод суммарного объекта соответствует исходной сводке.
-- Скрипт `supra/scripts/dual_write_control.sh` дополнен командами `enable-mirror`, `disable-mirror`, `mirror` для управления зеркальной записью и ручного повторного прогона.
+- Скрипт `SupraLottery/supra/scripts/dual_write_control.sh` дополнен командами `enable-mirror`, `disable-mirror`, `mirror` для управления зеркальной записью и ручного повторного прогона.
 - Runbook операций обновлён: описаны команды скрипта, обработка событий `ArchiveDualWriteStarted/Completed`, проверка `dual_write_status` и зеркальных записей через Supra CLI.
 
 ## Этап 5. Операционный запуск — подготовительные подэтапы
@@ -75,7 +75,7 @@
 - Для `entry`-функций явно указывать `acquires` и работать с глобальными ресурсами через `borrow_global[_mut]`.
 - Мутации переменных выполняются через повторное присваивание без `let mut`; циклы — `while` + условные блоки (без `continue`).
 - Ошибки оформлять через `assert!(условие, E_CODE)`, каталог кодов хранить в `lottery_multi::errors`.
-- Поддерживать UTF-8 без BOM для исходников и документации; перед коммитом запускать Supra CLI (`supra/scripts/build_lottery_packages.sh lottery_multi --fmt --check`) в `supra/move_workspace`.
+- Поддерживать UTF-8 без BOM для исходников и документации; перед коммитом запускать Supra CLI (`SupraLottery/supra/scripts/build_lottery_packages.sh lottery_multi --fmt --check`) в `supra/move_workspace`.
 - Сохранять контракт с `supra_vrf`: payload, `rng_count`, подписи функций должны соответствовать спецификации Supra.
 
 ## Порядок обновления документа

@@ -27,5 +27,5 @@
 - Фронтенд-клиент `supraClient.fetchLotteryMultiViewsSupra` обращается к `/lottery-multi/views`, преобразует `status_overview` в camelCase и обеспечивает единый источник данных для статусной страницы и внутренних панелей.
 
 ## Supra CLI
-- Для локальных прогонов используйте `supra/scripts/build_lottery_packages.sh` и профили testnet/mainnet.
+- Для локальных прогонов используйте `SupraLottery/supra/scripts/build_lottery_packages.sh` и профили testnet/mainnet.
 - Состояние CLI фиксируется в `docs/architecture/rfc_v1_implementation_notes.md`.

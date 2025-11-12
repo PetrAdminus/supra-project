@@ -1,4 +1,4 @@
-﻿# Key Findings from Supra documentation (Sep 2025 snapshot)
+# Key Findings from Supra documentation (Sep 2025 snapshot)
 - dVRF 3.0 introduces request retry queue (retries every 6h up to 48h).
 - Per-client and per-consumer gas controls: `maxGasPrice`/`maxGasLimit` plus contract-level `callbackGasPrice`/`callbackGasLimit`.
 - Hash of request parameters stored on-chain and verified during callbacks; we must persist the additional fields needed for validation.
@@ -51,14 +51,14 @@
 - [x] РџСЂРѕРІРµСЂРёС‚СЊ С‚СЂРµР±РѕРІР°РЅРёСЏ Supra CLI (РїСЂРѕС„РёР»Рё РІРјРµСЃС‚Рѕ `--config`, РѕС‚РєР°Р· РѕС‚ `--amount`).
 - [x] Р—Р°С„РёРєСЃРёСЂРѕРІР°С‚СЊ РёРЅСЃС‚СЂСѓРєС†РёРё РїРѕ РјРѕРЅРёС‚РѕСЂРёРЅРіСѓ СЃРѕР±С‹С‚РёР№ VRF (`docs/dvrf_event_monitoring.md`) Рё СЃСЃС‹Р»РєСѓ РЅР° РЅРёС… РІ runbook/troubleshooting.
 - [x] РЎРѕСЃС‚Р°РІРёС‚СЊ РѕС‚РґРµР»СЊРЅС‹Р№ СЃРїСЂР°РІРѕС‡РЅРёРє РїРѕ CLI-РєРѕРјР°РЅРґР°Рј РјРѕРґСѓР»СЏ `deposit` (`docs/dvrf_deposit_cli_reference.md`) Рё СЃСЃС‹Р»Р°С‚СЊСЃСЏ РЅР° РЅРµРіРѕ РІ runbook.
-- [x] РџРѕРґРіРѕС‚РѕРІРёС‚СЊ Рё РїРѕРґРґРµСЂР¶РёРІР°С‚СЊ С€Р°Р±Р»РѕРЅ РїРµСЂРµРјРµРЅРЅС‹С… РѕРєСЂСѓР¶РµРЅРёСЏ (`supra/scripts/testnet_env.example`) РґР»СЏ СЃРєСЂРёРїС‚Р° РјРёРіСЂР°С†РёРё Рё СЂСѓС‡РЅС‹С… РєРѕРјР°РЅРґ.
-- [x] Р”РѕР±Р°РІРёС‚СЊ РІСЃРїРѕРјРѕРіР°С‚РµР»СЊРЅС‹Р№ СЃРєСЂРёРїС‚ `supra/scripts/calc_min_balance.py` РґР»СЏ СЂР°СЃС‡С‘С‚Р° `min_balance`/`per_request_fee` РїРѕ РєРѕРЅС‚СЂР°РєС‚РЅРѕР№ С„РѕСЂРјСѓР»Рµ.
+- [x] РџРѕРґРіРѕС‚РѕРІРёС‚СЊ Рё РїРѕРґРґРµСЂР¶РёРІР°С‚СЊ С€Р°Р±Р»РѕРЅ РїРµСЂРµРјРµРЅРЅС‹С… РѕРєСЂСѓР¶РµРЅРёСЏ (`SupraLottery/supra/scripts/testnet_env.example`) РґР»СЏ СЃРєСЂРёРїС‚Р° РјРёРіСЂР°С†РёРё Рё СЂСѓС‡РЅС‹С… РєРѕРјР°РЅРґ.
+- [x] Р”РѕР±Р°РІРёС‚СЊ РІСЃРїРѕРјРѕРіР°С‚РµР»СЊРЅС‹Р№ СЃРєСЂРёРїС‚ `SupraLottery/supra/scripts/calc_min_balance.py` РґР»СЏ СЂР°СЃС‡С‘С‚Р° `min_balance`/`per_request_fee` РїРѕ РєРѕРЅС‚СЂР°РєС‚РЅРѕР№ С„РѕСЂРјСѓР»Рµ.
 - [x] Р’РІРµСЃС‚Рё РµРґРёРЅС‹Р№ CLI (`python -m supra.scripts <РїРѕРґРєРѕРјР°РЅРґР°>`) РґР»СЏ Р·Р°РїСѓСЃРєР° РІСЃРµС… Python-СѓС‚РёР»РёС‚ Р±РµР· СѓРєР°Р·Р°РЅРёСЏ РїСѓС‚РµР№ Рё Р·Р°РґРѕРєСѓРјРµРЅС‚РёСЂРѕРІР°С‚СЊ РµРіРѕ РІ runbook/walkthrough.
-- [x] Р”РѕР±Р°РІРёС‚СЊ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРёР№ РјРѕРЅРёС‚РѕСЂРёРЅРі РґРµРїРѕР·РёС‚Р° (`supra/scripts/testnet_monitor_check.sh`) Рё СЃСЃС‹Р»РєСѓ РЅР° РЅРµРіРѕ РІ runbook/СЃРїСЂР°РІРѕС‡РЅРёРєР°С….
-- [x] РџРѕРґРіРѕС‚РѕРІРёС‚СЊ РјР°С€РёРЅРѕС‡РёС‚Р°РµРјС‹Р№ РѕС‚С‡С‘С‚ (`supra/scripts/testnet_monitor_json.py`) Рё Р·Р°РґРѕРєСѓРјРµРЅС‚РёСЂРѕРІР°С‚СЊ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ РІ runbook/automation guide.
-- [x] Р РµР°Р»РёР·РѕРІР°С‚СЊ webhook-СѓРІРµРґРѕРјР»РµРЅРёРµ (`supra/scripts/testnet_monitor_slack.py`) Рё РѕРїРёСЃР°С‚СЊ РёРЅС‚РµРіСЂР°С†РёСЋ СЃРѕ Slack/AutoFi РІ РґРѕРєСѓРјРµРЅС‚Р°С†РёРё.
-- [x] РџРѕРґРґРµСЂР¶РёРІР°С‚СЊ СЌРєСЃРїРѕСЂС‚ РјРµС‚СЂРёРє Prometheus (`supra/scripts/testnet_monitor_prometheus.py`) Рё РїСЂРёРјРµСЂС‹ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РІ runbook/automation guide.
-- [x] Р”РѕР±Р°РІРёС‚СЊ Р°РІС‚РѕРјР°С‚РёР·РёСЂРѕРІР°РЅРЅС‹Р№ Р·Р°РїСѓСЃРє СЂРѕР·С‹РіСЂС‹С€Р° (`supra/scripts/testnet_manual_draw.py`) Рё Р·Р°РґРѕРєСѓРјРµРЅС‚РёСЂРѕРІР°С‚СЊ СЃС†РµРЅР°СЂРёР№ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ.
+- [x] Р”РѕР±Р°РІРёС‚СЊ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРёР№ РјРѕРЅРёС‚РѕСЂРёРЅРі РґРµРїРѕР·РёС‚Р° (`SupraLottery/supra/scripts/testnet_monitor_check.sh`) Рё СЃСЃС‹Р»РєСѓ РЅР° РЅРµРіРѕ РІ runbook/СЃРїСЂР°РІРѕС‡РЅРёРєР°С….
+- [x] РџРѕРґРіРѕС‚РѕРІРёС‚СЊ РјР°С€РёРЅРѕС‡РёС‚Р°РµРјС‹Р№ РѕС‚С‡С‘С‚ (`SupraLottery/supra/scripts/testnet_monitor_json.py`) Рё Р·Р°РґРѕРєСѓРјРµРЅС‚РёСЂРѕРІР°С‚СЊ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ РІ runbook/automation guide.
+- [x] Р РµР°Р»РёР·РѕРІР°С‚СЊ webhook-СѓРІРµРґРѕРјР»РµРЅРёРµ (`SupraLottery/supra/scripts/testnet_monitor_slack.py`) Рё РѕРїРёСЃР°С‚СЊ РёРЅС‚РµРіСЂР°С†РёСЋ СЃРѕ Slack/AutoFi РІ РґРѕРєСѓРјРµРЅС‚Р°С†РёРё.
+- [x] РџРѕРґРґРµСЂР¶РёРІР°С‚СЊ СЌРєСЃРїРѕСЂС‚ РјРµС‚СЂРёРє Prometheus (`SupraLottery/supra/scripts/testnet_monitor_prometheus.py`) Рё РїСЂРёРјРµСЂС‹ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РІ runbook/automation guide.
+- [x] Р”РѕР±Р°РІРёС‚СЊ Р°РІС‚РѕРјР°С‚РёР·РёСЂРѕРІР°РЅРЅС‹Р№ Р·Р°РїСѓСЃРє СЂРѕР·С‹РіСЂС‹С€Р° (`SupraLottery/supra/scripts/testnet_manual_draw.py`) Рё Р·Р°РґРѕРєСѓРјРµРЅС‚РёСЂРѕРІР°С‚СЊ СЃС†РµРЅР°СЂРёР№ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ.
 - [x] Keep sandbox/offline mode documented for demo environments until v3 is fully whitelisted (см. runbook, раздел «Оффлайн и демо режим»).
 
 ## 5. Frontend Impact

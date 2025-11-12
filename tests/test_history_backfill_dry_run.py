@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-MODULE_PATH = ROOT_DIR / "supra" / "tools" / "history_backfill_dry_run.py"
+MODULE_PATH = ROOT_DIR / "SupraLottery" / "supra" / "tools" / "history_backfill_dry_run.py"
 
 
 def _load_module():
@@ -77,7 +77,7 @@ def test_cli_generates_command(payload: bytes, tmp_path: Path) -> None:
             "--config",
             "/supra/config.yaml",
             "--script",
-            "./supra/scripts/history_backfill.sh",
+            "./SupraLottery/supra/scripts/history_backfill.sh",
         ],
         capture_output=True,
         check=True,
@@ -119,7 +119,10 @@ def test_cli_json_quiet(tmp_path: Path) -> None:
     assert payload["lottery_id"] == 11
     assert payload["summary_hex"].startswith("0x")
     assert payload["expected_hash"].startswith("0x")
-    assert payload["suggested_command"].startswith("./supra/scripts/history_backfill.sh")
+    expected_script = (
+        history_backfill.DEFAULT_HISTORY_BACKFILL_SCRIPT.relative_to(ROOT_DIR).as_posix()
+    )
+    assert payload["suggested_command"].startswith(expected_script)
 
 
 def test_cli_json_output_file(tmp_path: Path) -> None:

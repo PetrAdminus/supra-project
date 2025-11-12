@@ -5,7 +5,7 @@
 
 ## 1. Ежедневные действия (D-ops)
 - Проверить дашборд Grafana `Lottery Multi Ops` и статусную страницу: убедиться, что ключевые счётчики `status_overview` в зелёной зоне.
-- Просмотреть Alertmanager и подтверждённые алёрты; каждое отклонение фиксируется через `supra/scripts/incident_log.sh`.
+- Просмотреть Alertmanager и подтверждённые алёрты; каждое отклонение фиксируется через `SupraLottery/supra/scripts/incident_log.sh`.
 - Сверить показатели рефандов (`views::status_overview.refund_active`, `refund_batch_pending`, `refund_sla_breach`) с чек-листом [refund.md](refund.md) и убедиться, что SLA не нарушен.
 - Подтвердить свежесть прайс-фида по метрикам `price_feed_updates_total`, `price_feed_clamp_active`, `price_feed_fallback_active`.
 - Обновить раздел «Текущее состояние» на статусной странице, если выполнялись аварийные операции или релизные фиксации.
@@ -18,7 +18,7 @@
 - Подготовить краткую сводку для стейкхолдеров (Slack/Confluence) со ссылкой на журнал и статусную страницу.
 
 ## 3. Пост-инцидентные действия
-1. Зафиксировать событие в [incident_log.md](incident_log.md) (CLI `supra/scripts/incident_log.sh`).
+1. Зафиксировать событие в [incident_log.md](incident_log.md) (CLI `SupraLottery/supra/scripts/incident_log.sh`).
 2. В течение 24 часов оформить отчёт по шаблону [postmortems.md](postmortems.md) и приложить ссылку в журнале.
 3. Обновить мониторинг и статусную страницу: описать причину, масштаб и текущее состояние.
 4. Внести корректировки в runbook’и (например, `runbooks.md`, `refund.md`, `vrf_deposit.md`), если в ходе инцидента выявлены пробелы.

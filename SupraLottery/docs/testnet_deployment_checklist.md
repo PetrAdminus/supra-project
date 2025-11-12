@@ -33,6 +33,23 @@ docker compose run --rm --entrypoint bash supra_cli `
     -lc "cd /supra/SupraLottery && PYTHONPATH=/supra/SupraLottery python3 -m supra.scripts.cli move-test --workspace /supra/move_workspace --package lottery_rewards --cli /supra/supra"
   ```
 
+### Docker Compose helper (SupraLottery/compose.yaml)
+Чтобы прогнать smoke-тесты для `lottery_core`, `lottery_support`, `lottery_rewards`, используй контейнер с преднастроенным entrypoint:
+
+```powershell
+docker compose -f SupraLottery/compose.yaml run --rm supra_cli `
+  bash -lc "cd /supra/SupraLottery && \
+       PYTHONPATH=/supra/SupraLottery python3 -m supra.scripts.cli move-test \
+         --workspace supra/move_workspace \
+         --package <PACKAGE_NAME> \
+         --cli /supra/supra \
+         --report-json tmp/move-test-report.json \
+         --report-junit tmp/move-test-report.xml \
+         --report-log tmp/move-test-report.log"
+```
+
+Подставь `lottery_core`, `lottery_support` и `lottery_rewards` в `--package`, чтобы удостовериться, что все три пакета собираются и проходят тесты.
+
 ## 2. Publish
 - [x] Publish `lottery_core` (store tx hash).
 - [x] Publish `lottery_support`.

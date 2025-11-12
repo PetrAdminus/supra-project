@@ -157,7 +157,7 @@ Before pushing merged changes make sure release tooling and documentation are up
 - Run `python -m supra.scripts.cli move-test --workspace SupraLottery/supra/move_workspace --all-packages --keep-going --report-json tmp/move-test-report.json --report-junit tmp/move-test-report.xml -- --skip-fetch-latest-git-deps` and archive the reports (`tmp/`, `docs/audit/move_test_reports/`).
 - Execute `PYTHONPATH=SupraLottery python -m unittest` and retain the latest log (for example `tmp/unittest.log`).
 - Check Supra CLI configs in `SupraLottery/supra/configs/*.yaml`; profiles/keys must follow `SupraLottery/docs/testnet_runbook.md`.
-- Run monitoring helpers (`supra/scripts/testnet_monitor_json.py`, Slack/Prometheus variants) ensuring `min_balance_reached=True` and no active `pending_request`.
+- Run monitoring helpers (`SupraLottery/supra/scripts/testnet_monitor_json.py`, Slack/Prometheus variants) ensuring `min_balance_reached=True` and no active `pending_request`.
 - Update audit/alignment docs after completing the checks so they reflect the current state.
 
 

@@ -11,10 +11,10 @@ SupraLottery is a family of Move packages for running lottery draws on the Supra
 Each package lives in `SupraLottery/supra/move_workspace/<name>` and has its own tests and publish commands (see `docs/testnet_runbook.md`).
 
 ## Scripts
-- `supra/scripts/bootstrap_move_deps.sh` — downloads aptos-core and prepares the Move cache
-- `supra/scripts/build_lottery_packages.sh` — builds packages via Supra CLI (локальный бинарь, Docker Compose или Podman)
-- `supra/scripts/publish_lottery_packages.sh` — publishes core/support/rewards
-- `supra/scripts/sync_lottery_queues.sh` — syncs history and purchase queues using capabilities
+- `SupraLottery/supra/scripts/bootstrap_move_deps.sh` — downloads aptos-core and prepares the Move cache
+- `SupraLottery/supra/scripts/build_lottery_packages.sh` — builds packages via Supra CLI (локальный бинарь, Docker Compose или Podman)
+- `SupraLottery/supra/scripts/publish_lottery_packages.sh` — publishes core/support/rewards
+- `SupraLottery/supra/scripts/sync_lottery_queues.sh` — syncs history and purchase queues using capabilities
 - `SupraLottery/supra/scripts/move_tests.py` — запускает Move-тесты через Supra CLI или ванильный Move CLI
 
 ## Documentation
@@ -51,6 +51,7 @@ docker compose run --rm --entrypoint bash supra_cli \
 
 ## Quick start
 ```bash
+cd SupraLottery
 bash supra/scripts/bootstrap_move_deps.sh
 bash supra/scripts/build_lottery_packages.sh
 python -m supra.scripts.cli move-test --workspace supra/move_workspace --package lottery_core

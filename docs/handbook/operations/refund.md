@@ -1,96 +1,97 @@
-# Рефанды и отмены лотерей
+# Р РµС„Р°РЅРґС‹ Рё РѕС‚РјРµРЅС‹ Р»РѕС‚РµСЂРµР№
 
-> Документ описывает порядок действий при переводе лотереи `lottery_multi` в статус `STATUS_CANCELED` и возврате средств
-> игрокам. Используйте его совместно с [runbooks.md](runbooks.md), [monitoring.md](monitoring.md) и [incident_log.md](incident_log.md).
+> Р”РѕРєСѓРјРµРЅС‚ РѕРїРёСЃС‹РІР°РµС‚ РїРѕСЂСЏРґРѕРє РґРµР№СЃС‚РІРёР№ РїСЂРё РїРµСЂРµРІРѕРґРµ Р»РѕС‚РµСЂРµРё `lottery_multi` РІ СЃС‚Р°С‚СѓСЃ `STATUS_CANCELED` Рё РІРѕР·РІСЂР°С‚Рµ СЃСЂРµРґСЃС‚РІ
+> РёРіСЂРѕРєР°Рј. РСЃРїРѕР»СЊР·СѓР№С‚Рµ РµРіРѕ СЃРѕРІРјРµСЃС‚РЅРѕ СЃ [runbooks.md](runbooks.md), [monitoring.md](monitoring.md) Рё [incident_log.md](incident_log.md).
 
-## Когда запускать процедуру
-- **Сбой VRF или расчёта победителей.** Колбэк не приходит в пределах `MAX_VRF_ATTEMPTS`, политика `vrf_retry_policy` исчерпана (экспоненциальные окна достигли `max_delay_secs` или для ручного режима не выставлен дедлайн через `draw::schedule_manual_retry_admin`),
-  инварианты `snapshot_hash`/`checksum_after_batch` нарушены.
-  - В релизе v1 лимит `MAX_VRF_ATTEMPTS = 5` реализован ончейн: повторный вызов `draw::request_draw_admin` автоматически переводит лотерею в `STATUS_CANCELED`, очищает VRF-плейлоад и запускает `sales::begin_refund` с причиной `CANCEL_REASON_VRF_FAILURE`.
-- **Регуляторные и юридические ограничения.** Compliance-команда фиксирует нарушение условий участия, требующее остановки розыгрыша.
-- **Системные инциденты.** Утрата доступа к премиум-фиду, критический баг фронтенда, массовый DoS в продажах.
+## РљРѕРіРґР° Р·Р°РїСѓСЃРєР°С‚СЊ РїСЂРѕС†РµРґСѓСЂСѓ
+- **РЎР±РѕР№ VRF РёР»Рё СЂР°СЃС‡С‘С‚Р° РїРѕР±РµРґРёС‚РµР»РµР№.** РљРѕР»Р±СЌРє РЅРµ РїСЂРёС…РѕРґРёС‚ РІ РїСЂРµРґРµР»Р°С… `MAX_VRF_ATTEMPTS`, РїРѕР»РёС‚РёРєР° `vrf_retry_policy` РёСЃС‡РµСЂРїР°РЅР° (СЌРєСЃРїРѕРЅРµРЅС†РёР°Р»СЊРЅС‹Рµ РѕРєРЅР° РґРѕСЃС‚РёРіР»Рё `max_delay_secs` РёР»Рё РґР»СЏ СЂСѓС‡РЅРѕРіРѕ СЂРµР¶РёРјР° РЅРµ РІС‹СЃС‚Р°РІР»РµРЅ РґРµРґР»Р°Р№РЅ С‡РµСЂРµР· `draw::schedule_manual_retry_admin`),
+  РёРЅРІР°СЂРёР°РЅС‚С‹ `snapshot_hash`/`checksum_after_batch` РЅР°СЂСѓС€РµРЅС‹.
+  - Р’ СЂРµР»РёР·Рµ v1 Р»РёРјРёС‚ `MAX_VRF_ATTEMPTS = 5` СЂРµР°Р»РёР·РѕРІР°РЅ РѕРЅС‡РµР№РЅ: РїРѕРІС‚РѕСЂРЅС‹Р№ РІС‹Р·РѕРІ `draw::request_draw_admin` Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё РїРµСЂРµРІРѕРґРёС‚ Р»РѕС‚РµСЂРµСЋ РІ `STATUS_CANCELED`, РѕС‡РёС‰Р°РµС‚ VRF-РїР»РµР№Р»РѕР°Рґ Рё Р·Р°РїСѓСЃРєР°РµС‚ `sales::begin_refund` СЃ РїСЂРёС‡РёРЅРѕР№ `CANCEL_REASON_VRF_FAILURE`.
+- **Р РµРіСѓР»СЏС‚РѕСЂРЅС‹Рµ Рё СЋСЂРёРґРёС‡РµСЃРєРёРµ РѕРіСЂР°РЅРёС‡РµРЅРёСЏ.** Compliance-РєРѕРјР°РЅРґР° С„РёРєСЃРёСЂСѓРµС‚ РЅР°СЂСѓС€РµРЅРёРµ СѓСЃР»РѕРІРёР№ СѓС‡Р°СЃС‚РёСЏ, С‚СЂРµР±СѓСЋС‰РµРµ РѕСЃС‚Р°РЅРѕРІРєРё СЂРѕР·С‹РіСЂС‹С€Р°.
+- **РЎРёСЃС‚РµРјРЅС‹Рµ РёРЅС†РёРґРµРЅС‚С‹.** РЈС‚СЂР°С‚Р° РґРѕСЃС‚СѓРїР° Рє РїСЂРµРјРёСѓРј-С„РёРґСѓ, РєСЂРёС‚РёС‡РµСЃРєРёР№ Р±Р°Рі С„СЂРѕРЅС‚РµРЅРґР°, РјР°СЃСЃРѕРІС‹Р№ DoS РІ РїСЂРѕРґР°Р¶Р°С….
 
-RootAdmin принимает решение о переводе статуса и фиксирует событие в `incident_log.md` (тип `"Cancellation"`).
-Практическая работа выполняется через CLI `supra/scripts/refund_control.sh`, который оборачивает
-он-чейн вызовы и предоставляет команды `cancel`, `batch`, `progress`, `cancellation`, `status`, `summary`, `archive`.
-Скрипт поддерживает флаг `--dry-run`: он печатает итоговую команду Supra CLI и пропускает выполнение, что удобно для проверки аргументов
-в средах без установленного бинаря.
+RootAdmin РїСЂРёРЅРёРјР°РµС‚ СЂРµС€РµРЅРёРµ Рѕ РїРµСЂРµРІРѕРґРµ СЃС‚Р°С‚СѓСЃР° Рё С„РёРєСЃРёСЂСѓРµС‚ СЃРѕР±С‹С‚РёРµ РІ `incident_log.md` (С‚РёРї `"Cancellation"`).
+РџСЂР°РєС‚РёС‡РµСЃРєР°СЏ СЂР°Р±РѕС‚Р° РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ С‡РµСЂРµР· CLI `SupraLottery/supra/scripts/refund_control.sh`, РєРѕС‚РѕСЂС‹Р№ РѕР±РѕСЂР°С‡РёРІР°РµС‚
+РѕРЅ-С‡РµР№РЅ РІС‹Р·РѕРІС‹ Рё РїСЂРµРґРѕСЃС‚Р°РІР»СЏРµС‚ РєРѕРјР°РЅРґС‹ `cancel`, `batch`, `progress`, `cancellation`, `status`, `summary`, `archive`.
+РЎРєСЂРёРїС‚ РїРѕРґРґРµСЂР¶РёРІР°РµС‚ С„Р»Р°Рі `--dry-run`: РѕРЅ РїРµС‡Р°С‚Р°РµС‚ РёС‚РѕРіРѕРІСѓСЋ РєРѕРјР°РЅРґСѓ Supra CLI Рё РїСЂРѕРїСѓСЃРєР°РµС‚ РІС‹РїРѕР»РЅРµРЅРёРµ, С‡С‚Рѕ СѓРґРѕР±РЅРѕ РґР»СЏ РїСЂРѕРІРµСЂРєРё Р°СЂРіСѓРјРµРЅС‚РѕРІ
+РІ СЃСЂРµРґР°С… Р±РµР· СѓСЃС‚Р°РЅРѕРІР»РµРЅРЅРѕРіРѕ Р±РёРЅР°СЂСЏ.
 
-Справочник причин отмены:
-- `CANCEL_REASON_VRF_FAILURE (1)` — исчерпаны попытки VRF или нарушены инварианты `snapshot_hash`.
-- `CANCEL_REASON_COMPLIANCE (2)` — требования регуляторов, юридические ограничения или блокировка в партнёрском регионе.
-- `CANCEL_REASON_OPERATIONS (3)` — технические инциденты (DoS-продаж, сбой прайс-фида, аварийное обновление фронтенда).
+РЎРїСЂР°РІРѕС‡РЅРёРє РїСЂРёС‡РёРЅ РѕС‚РјРµРЅС‹:
+- `CANCEL_REASON_VRF_FAILURE (1)` вЂ” РёСЃС‡РµСЂРїР°РЅС‹ РїРѕРїС‹С‚РєРё VRF РёР»Рё РЅР°СЂСѓС€РµРЅС‹ РёРЅРІР°СЂРёР°РЅС‚С‹ `snapshot_hash`.
+- `CANCEL_REASON_COMPLIANCE (2)` вЂ” С‚СЂРµР±РѕРІР°РЅРёСЏ СЂРµРіСѓР»СЏС‚РѕСЂРѕРІ, СЋСЂРёРґРёС‡РµСЃРєРёРµ РѕРіСЂР°РЅРёС‡РµРЅРёСЏ РёР»Рё Р±Р»РѕРєРёСЂРѕРІРєР° РІ РїР°СЂС‚РЅС‘СЂСЃРєРѕРј СЂРµРіРёРѕРЅРµ.
+- `CANCEL_REASON_OPERATIONS (3)` вЂ” С‚РµС…РЅРёС‡РµСЃРєРёРµ РёРЅС†РёРґРµРЅС‚С‹ (DoS-РїСЂРѕРґР°Р¶, СЃР±РѕР№ РїСЂР°Р№СЃ-С„РёРґР°, Р°РІР°СЂРёР№РЅРѕРµ РѕР±РЅРѕРІР»РµРЅРёРµ С„СЂРѕРЅС‚РµРЅРґР°).
 
 
-## Подготовка
-1. Проверить `views::get_lottery_status(lottery_id)` — статус должен быть `STATUS_ACTIVE`, `STATUS_CLOSING`, `STATUS_DRAW_REQUESTED`
-   или `STATUS_DRAWN`. Отмена после `STATUS_PAYOUT` требует ручной оценки выплаченных сумм.
-2. Убедиться, что `sales::accounting_snapshot(lottery_id)` содержит актуальные агрегаты (`total_sales`, `total_allocated`,
-   `total_prize_paid`, `total_operations_paid`) и записать текущее значение `views::get_cancellation(lottery_id)` (ожидаем `None`).
-   Для ручной сверки можно выполнить `./supra/scripts/accounting_check.sh [--dry-run] <config> compare <lottery_id>` — команда выведет
-   совпадение `total_*` между учётом продаж и `LotterySummary`.
-3. Снять показания мониторинга: `status_overview(now_ts)`, метрики `payout_backlog`, `vrf_retry_blocked`, `purchase_rate_limit_hits`,
-   а также зафиксировать базовый `views::get_refund_progress(lottery_id)` (ожидаем `active = false`).
-4. Оповестить поддержку: создать черновик обращения по SLA (см. [support/sla.md](../support/sla.md)).
+## РџРѕРґРіРѕС‚РѕРІРєР°
+1. РџСЂРѕРІРµСЂРёС‚СЊ `views::get_lottery_status(lottery_id)` вЂ” СЃС‚Р°С‚СѓСЃ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ `STATUS_ACTIVE`, `STATUS_CLOSING`, `STATUS_DRAW_REQUESTED`
+   РёР»Рё `STATUS_DRAWN`. РћС‚РјРµРЅР° РїРѕСЃР»Рµ `STATUS_PAYOUT` С‚СЂРµР±СѓРµС‚ СЂСѓС‡РЅРѕР№ РѕС†РµРЅРєРё РІС‹РїР»Р°С‡РµРЅРЅС‹С… СЃСѓРјРј.
+2. РЈР±РµРґРёС‚СЊСЃСЏ, С‡С‚Рѕ `sales::accounting_snapshot(lottery_id)` СЃРѕРґРµСЂР¶РёС‚ Р°РєС‚СѓР°Р»СЊРЅС‹Рµ Р°РіСЂРµРіР°С‚С‹ (`total_sales`, `total_allocated`,
+   `total_prize_paid`, `total_operations_paid`) Рё Р·Р°РїРёСЃР°С‚СЊ С‚РµРєСѓС‰РµРµ Р·РЅР°С‡РµРЅРёРµ `views::get_cancellation(lottery_id)` (РѕР¶РёРґР°РµРј `None`).
+   Р”Р»СЏ СЂСѓС‡РЅРѕР№ СЃРІРµСЂРєРё РјРѕР¶РЅРѕ РІС‹РїРѕР»РЅРёС‚СЊ `./SupraLottery/supra/scripts/accounting_check.sh [--dry-run] <config> compare <lottery_id>` вЂ” РєРѕРјР°РЅРґР° РІС‹РІРµРґРµС‚
+   СЃРѕРІРїР°РґРµРЅРёРµ `total_*` РјРµР¶РґСѓ СѓС‡С‘С‚РѕРј РїСЂРѕРґР°Р¶ Рё `LotterySummary`.
+3. РЎРЅСЏС‚СЊ РїРѕРєР°Р·Р°РЅРёСЏ РјРѕРЅРёС‚РѕСЂРёРЅРіР°: `status_overview(now_ts)`, РјРµС‚СЂРёРєРё `payout_backlog`, `vrf_retry_blocked`, `purchase_rate_limit_hits`,
+   Р° С‚Р°РєР¶Рµ Р·Р°С„РёРєСЃРёСЂРѕРІР°С‚СЊ Р±Р°Р·РѕРІС‹Р№ `views::get_refund_progress(lottery_id)` (РѕР¶РёРґР°РµРј `active = false`).
+4. РћРїРѕРІРµСЃС‚РёС‚СЊ РїРѕРґРґРµСЂР¶РєСѓ: СЃРѕР·РґР°С‚СЊ С‡РµСЂРЅРѕРІРёРє РѕР±СЂР°С‰РµРЅРёСЏ РїРѕ SLA (СЃРј. [support/sla.md](../support/sla.md)).
 
-## Основная процедура
-1. **Заморозка автоматизации.** Выполнить `automation::announce_dry_run` с планом отмены и дождаться таймлока; при необходимости
-   отключить бота через `automation::ensure_action` и `rotate_bot`.
-2. **Перевод статуса.** Вызвать `registry::cancel_lottery_admin(lottery_id, reason_code, now_ts)`.
-   - Функция публикует `LotteryCanceledEvent` (категория `EVENT_CATEGORY_REFUND`), сохраняет `CancellationRecord` и автоматически замораживает снапшот. Зафиксируйте `reason_code` и `now_ts` в журнале (см. список `CANCEL_REASON_*`).
-   - Рекомендуемый CLI: `./supra/scripts/refund_control.sh [--dry-run] <config> cancel <lottery_id> <reason_code> <timestamp>`.
-   - После транзакции проверьте `views::get_cancellation(lottery_id)` — запись должна содержать `previous_status`, `reason_code`, `tickets_sold`, `proceeds_accум` и `canceled_ts`. Быстрая проверка: `./supra/scripts/refund_control.sh <config> cancellation <lottery_id>`.
-3. **Формирование реестра возвратов.**
-   - Если лотерея была на этапе продаж (`STATUS_ACTIVE`/`STATUS_CLOSING`), сформируйте список билетов через
-     `sales::ticket_chunks(lottery_id)` (CLI `supra/scripts/build_lottery_packages.sh` поддерживает экспорт).
-   - Если победители уже вычислены (`STATUS_DRAWN`), снимите `payouts::winner_progress_view(lottery_id)` для оценки объёма возврата.
-4. **Запуск батчей рефанда.**
-   - Вызывайте `payouts::force_refund_batch_admin` с капабилити `PayoutBatchCap`, последовательно увеличивая `refund_round` (начиная
-     с 1). Параметры `tickets_refunded`, `prize_refund` и `operations_refund` должны отражать фактический объём возврата. После
-     каждого вызова функция обновляет агрегаты `views::get_refund_progress(lottery_id)` и публикует событие `RefundBatchEvent` (категория
+## РћСЃРЅРѕРІРЅР°СЏ РїСЂРѕС†РµРґСѓСЂР°
+1. **Р—Р°РјРѕСЂРѕР·РєР° Р°РІС‚РѕРјР°С‚РёР·Р°С†РёРё.** Р’С‹РїРѕР»РЅРёС‚СЊ `automation::announce_dry_run` СЃ РїР»Р°РЅРѕРј РѕС‚РјРµРЅС‹ Рё РґРѕР¶РґР°С‚СЊСЃСЏ С‚Р°Р№РјР»РѕРєР°; РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё
+   РѕС‚РєР»СЋС‡РёС‚СЊ Р±РѕС‚Р° С‡РµСЂРµР· `automation::ensure_action` Рё `rotate_bot`.
+2. **РџРµСЂРµРІРѕРґ СЃС‚Р°С‚СѓСЃР°.** Р’С‹Р·РІР°С‚СЊ `registry::cancel_lottery_admin(lottery_id, reason_code, now_ts)`.
+   - Р¤СѓРЅРєС†РёСЏ РїСѓР±Р»РёРєСѓРµС‚ `LotteryCanceledEvent` (РєР°С‚РµРіРѕСЂРёСЏ `EVENT_CATEGORY_REFUND`), СЃРѕС…СЂР°РЅСЏРµС‚ `CancellationRecord` Рё Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё Р·Р°РјРѕСЂР°Р¶РёРІР°РµС‚ СЃРЅР°РїС€РѕС‚. Р—Р°С„РёРєСЃРёСЂСѓР№С‚Рµ `reason_code` Рё `now_ts` РІ Р¶СѓСЂРЅР°Р»Рµ (СЃРј. СЃРїРёСЃРѕРє `CANCEL_REASON_*`).
+   - Р РµРєРѕРјРµРЅРґСѓРµРјС‹Р№ CLI: `./SupraLottery/supra/scripts/refund_control.sh [--dry-run] <config> cancel <lottery_id> <reason_code> <timestamp>`.
+   - РџРѕСЃР»Рµ С‚СЂР°РЅР·Р°РєС†РёРё РїСЂРѕРІРµСЂСЊС‚Рµ `views::get_cancellation(lottery_id)` вЂ” Р·Р°РїРёСЃСЊ РґРѕР»Р¶РЅР° СЃРѕРґРµСЂР¶Р°С‚СЊ `previous_status`, `reason_code`, `tickets_sold`, `proceeds_accСѓРј` Рё `canceled_ts`. Р‘С‹СЃС‚СЂР°СЏ РїСЂРѕРІРµСЂРєР°: `./SupraLottery/supra/scripts/refund_control.sh <config> cancellation <lottery_id>`.
+3. **Р¤РѕСЂРјРёСЂРѕРІР°РЅРёРµ СЂРµРµСЃС‚СЂР° РІРѕР·РІСЂР°С‚РѕРІ.**
+   - Р•СЃР»Рё Р»РѕС‚РµСЂРµСЏ Р±С‹Р»Р° РЅР° СЌС‚Р°РїРµ РїСЂРѕРґР°Р¶ (`STATUS_ACTIVE`/`STATUS_CLOSING`), СЃС„РѕСЂРјРёСЂСѓР№С‚Рµ СЃРїРёСЃРѕРє Р±РёР»РµС‚РѕРІ С‡РµСЂРµР·
+     `sales::ticket_chunks(lottery_id)` (CLI `SupraLottery/supra/scripts/build_lottery_packages.sh` РїРѕРґРґРµСЂР¶РёРІР°РµС‚ СЌРєСЃРїРѕСЂС‚).
+   - Р•СЃР»Рё РїРѕР±РµРґРёС‚РµР»Рё СѓР¶Рµ РІС‹С‡РёСЃР»РµРЅС‹ (`STATUS_DRAWN`), СЃРЅРёРјРёС‚Рµ `payouts::winner_progress_view(lottery_id)` РґР»СЏ РѕС†РµРЅРєРё РѕР±СЉС‘РјР° РІРѕР·РІСЂР°С‚Р°.
+4. **Р—Р°РїСѓСЃРє Р±Р°С‚С‡РµР№ СЂРµС„Р°РЅРґР°.**
+   - Р’С‹Р·С‹РІР°Р№С‚Рµ `payouts::force_refund_batch_admin` СЃ РєР°РїР°Р±РёР»РёС‚Рё `PayoutBatchCap`, РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕ СѓРІРµР»РёС‡РёРІР°СЏ `refund_round` (РЅР°С‡РёРЅР°СЏ
+     СЃ 1). РџР°СЂР°РјРµС‚СЂС‹ `tickets_refunded`, `prize_refund` Рё `operations_refund` РґРѕР»Р¶РЅС‹ РѕС‚СЂР°Р¶Р°С‚СЊ С„Р°РєС‚РёС‡РµСЃРєРёР№ РѕР±СЉС‘Рј РІРѕР·РІСЂР°С‚Р°. РџРѕСЃР»Рµ
+     РєР°Р¶РґРѕРіРѕ РІС‹Р·РѕРІР° С„СѓРЅРєС†РёСЏ РѕР±РЅРѕРІР»СЏРµС‚ Р°РіСЂРµРіР°С‚С‹ `views::get_refund_progress(lottery_id)` Рё РїСѓР±Р»РёРєСѓРµС‚ СЃРѕР±С‹С‚РёРµ `RefundBatchEvent` (РєР°С‚РµРіРѕСЂРёСЏ
      `EVENT_CATEGORY_REFUND`).
-   - Рекомендуемый CLI: `./supra/scripts/refund_control.sh [--dry-run] <config> batch <lottery_id> <round> <tickets> <prize_refund> <operations_refund> <timestamp>`.
-   - Если on-chain батч временно недоступен, оформляйте возвраты вручную: выгрузите CSV со списком адресов и сумм, передайте его
-     казначейской команде, подпишите транзакции мультисигом и для каждой операции приложите tx hash к записи в журнале
-     инцидентов.
-5. **Контроль остатков.** После каждого батча проверяйте `sales::accounting_snapshot` и `views::get_refund_progress`: значения
-   `total_prize_paid`/`total_operations_paid` не должны превышать `total_allocated`, а суммарные возвраты — `proceeds_accum`.
-   Остаток резервов согласуйте с `TreasuryCustodian`. Для экспресс-проверки используйте `./supra/scripts/refund_control.sh <config> progress <lottery_id>`
-   и при необходимости `./supra/scripts/accounting_check.sh <config> compare <lottery_id>`.
-6. **Архивирование отмены.** После обработки всех билетов вызовите `payouts::archive_canceled_lottery_admin(lottery_id, finalized_ts)`;
-   функция проверит наличие `CancellationRecord`, завершённость рефандов (`tickets_refunded`, `last_refund_ts`, сумма возврата)
-   и запишет `LotterySummary` со статусом `STATUS_CANCELED`. Убедитесь, что транзакция опубликована в журнале. Команда CLI: `./supra/scripts/refund_control.sh [--dry-run] <config> archive <lottery_id> <finalized_ts>`.
-7. **Публикация статуса.** Обновите статусную страницу (`operations/status_page.md`) и фронтенд-баннер. Используйте
-   `views::status_overview(now_ts)` для агрегированных данных (`canceled`, `refund_in_progress`).
+   - Р РµРєРѕРјРµРЅРґСѓРµРјС‹Р№ CLI: `./SupraLottery/supra/scripts/refund_control.sh [--dry-run] <config> batch <lottery_id> <round> <tickets> <prize_refund> <operations_refund> <timestamp>`.
+   - Р•СЃР»Рё on-chain Р±Р°С‚С‡ РІСЂРµРјРµРЅРЅРѕ РЅРµРґРѕСЃС‚СѓРїРµРЅ, РѕС„РѕСЂРјР»СЏР№С‚Рµ РІРѕР·РІСЂР°С‚С‹ РІСЂСѓС‡РЅСѓСЋ: РІС‹РіСЂСѓР·РёС‚Рµ CSV СЃРѕ СЃРїРёСЃРєРѕРј Р°РґСЂРµСЃРѕРІ Рё СЃСѓРјРј, РїРµСЂРµРґР°Р№С‚Рµ РµРіРѕ
+     РєР°Р·РЅР°С‡РµР№СЃРєРѕР№ РєРѕРјР°РЅРґРµ, РїРѕРґРїРёС€РёС‚Рµ С‚СЂР°РЅР·Р°РєС†РёРё РјСѓР»СЊС‚РёСЃРёРіРѕРј Рё РґР»СЏ РєР°Р¶РґРѕР№ РѕРїРµСЂР°С†РёРё РїСЂРёР»РѕР¶РёС‚Рµ tx hash Рє Р·Р°РїРёСЃРё РІ Р¶СѓСЂРЅР°Р»Рµ
+     РёРЅС†РёРґРµРЅС‚РѕРІ.
+5. **РљРѕРЅС‚СЂРѕР»СЊ РѕСЃС‚Р°С‚РєРѕРІ.** РџРѕСЃР»Рµ РєР°Р¶РґРѕРіРѕ Р±Р°С‚С‡Р° РїСЂРѕРІРµСЂСЏР№С‚Рµ `sales::accounting_snapshot` Рё `views::get_refund_progress`: Р·РЅР°С‡РµРЅРёСЏ
+   `total_prize_paid`/`total_operations_paid` РЅРµ РґРѕР»Р¶РЅС‹ РїСЂРµРІС‹С€Р°С‚СЊ `total_allocated`, Р° СЃСѓРјРјР°СЂРЅС‹Рµ РІРѕР·РІСЂР°С‚С‹ вЂ” `proceeds_accum`.
+   РћСЃС‚Р°С‚РѕРє СЂРµР·РµСЂРІРѕРІ СЃРѕРіР»Р°СЃСѓР№С‚Рµ СЃ `TreasuryCustodian`. Р”Р»СЏ СЌРєСЃРїСЂРµСЃСЃ-РїСЂРѕРІРµСЂРєРё РёСЃРїРѕР»СЊР·СѓР№С‚Рµ `./SupraLottery/supra/scripts/refund_control.sh <config> progress <lottery_id>`
+   Рё РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё `./SupraLottery/supra/scripts/accounting_check.sh <config> compare <lottery_id>`.
+6. **РђСЂС…РёРІРёСЂРѕРІР°РЅРёРµ РѕС‚РјРµРЅС‹.** РџРѕСЃР»Рµ РѕР±СЂР°Р±РѕС‚РєРё РІСЃРµС… Р±РёР»РµС‚РѕРІ РІС‹Р·РѕРІРёС‚Рµ `payouts::archive_canceled_lottery_admin(lottery_id, finalized_ts)`;
+   С„СѓРЅРєС†РёСЏ РїСЂРѕРІРµСЂРёС‚ РЅР°Р»РёС‡РёРµ `CancellationRecord`, Р·Р°РІРµСЂС€С‘РЅРЅРѕСЃС‚СЊ СЂРµС„Р°РЅРґРѕРІ (`tickets_refunded`, `last_refund_ts`, СЃСѓРјРјР° РІРѕР·РІСЂР°С‚Р°)
+   Рё Р·Р°РїРёС€РµС‚ `LotterySummary` СЃРѕ СЃС‚Р°С‚СѓСЃРѕРј `STATUS_CANCELED`. РЈР±РµРґРёС‚РµСЃСЊ, С‡С‚Рѕ С‚СЂР°РЅР·Р°РєС†РёСЏ РѕРїСѓР±Р»РёРєРѕРІР°РЅР° РІ Р¶СѓСЂРЅР°Р»Рµ. РљРѕРјР°РЅРґР° CLI: `./SupraLottery/supra/scripts/refund_control.sh [--dry-run] <config> archive <lottery_id> <finalized_ts>`.
+7. **РџСѓР±Р»РёРєР°С†РёСЏ СЃС‚Р°С‚СѓСЃР°.** РћР±РЅРѕРІРёС‚Рµ СЃС‚Р°С‚СѓСЃРЅСѓСЋ СЃС‚СЂР°РЅРёС†Сѓ (`operations/status_page.md`) Рё С„СЂРѕРЅС‚РµРЅРґ-Р±Р°РЅРЅРµСЂ. РСЃРїРѕР»СЊР·СѓР№С‚Рµ
+   `views::status_overview(now_ts)` РґР»СЏ Р°РіСЂРµРіРёСЂРѕРІР°РЅРЅС‹С… РґР°РЅРЅС‹С… (`canceled`, `refund_in_progress`).
 
-## Завершение
-1. Все билеты должны быть обработаны (`refund_remaining = 0`). Подтвердите в журнале, указав время завершения и общее количество
-   транзакций. Для проверки используйте `./supra/scripts/refund_control.sh <config> progress <lottery_id>`.
-2. Убедитесь, что `payouts::archive_canceled_lottery_admin` успешно записал сводку: проверьте `history::get_summary(lottery_id)`
-   (статус `STATUS_CANCELED`, `payout_round = refund_round`) и при необходимости зеркалируйте запись через `legacy_bridge::mirror_summary_admin`.
-   Быстрая проверка архива: `./supra/scripts/refund_control.sh <config> summary <lottery_id>`.
-3. Обновите документацию: добавьте запись в `docs/architecture/lottery_multi_readiness_review.md` (раздел «Инциденты и уроки»)
-   и `docs/architecture/rfc_v1_implementation_notes.md`.
-4. Проведите ретроспективу: в течение 72 часов описать причины отмены, принятые решения и рекомендации в `docs/handbook/operations/incident_log.md`.
+## Р—Р°РІРµСЂС€РµРЅРёРµ
+1. Р’СЃРµ Р±РёР»РµС‚С‹ РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ РѕР±СЂР°Р±РѕС‚Р°РЅС‹ (`refund_remaining = 0`). РџРѕРґС‚РІРµСЂРґРёС‚Рµ РІ Р¶СѓСЂРЅР°Р»Рµ, СѓРєР°Р·Р°РІ РІСЂРµРјСЏ Р·Р°РІРµСЂС€РµРЅРёСЏ Рё РѕР±С‰РµРµ РєРѕР»РёС‡РµСЃС‚РІРѕ
+   С‚СЂР°РЅР·Р°РєС†РёР№. Р”Р»СЏ РїСЂРѕРІРµСЂРєРё РёСЃРїРѕР»СЊР·СѓР№С‚Рµ `./SupraLottery/supra/scripts/refund_control.sh <config> progress <lottery_id>`.
+2. РЈР±РµРґРёС‚РµСЃСЊ, С‡С‚Рѕ `payouts::archive_canceled_lottery_admin` СѓСЃРїРµС€РЅРѕ Р·Р°РїРёСЃР°Р» СЃРІРѕРґРєСѓ: РїСЂРѕРІРµСЂСЊС‚Рµ `history::get_summary(lottery_id)`
+   (СЃС‚Р°С‚СѓСЃ `STATUS_CANCELED`, `payout_round = refund_round`) Рё РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё Р·РµСЂРєР°Р»РёСЂСѓР№С‚Рµ Р·Р°РїРёСЃСЊ С‡РµСЂРµР· `legacy_bridge::mirror_summary_admin`.
+   Р‘С‹СЃС‚СЂР°СЏ РїСЂРѕРІРµСЂРєР° Р°СЂС…РёРІР°: `./SupraLottery/supra/scripts/refund_control.sh <config> summary <lottery_id>`.
+3. РћР±РЅРѕРІРёС‚Рµ РґРѕРєСѓРјРµРЅС‚Р°С†РёСЋ: РґРѕР±Р°РІСЊС‚Рµ Р·Р°РїРёСЃСЊ РІ `docs/architecture/lottery_multi_readiness_review.md` (СЂР°Р·РґРµР» В«РРЅС†РёРґРµРЅС‚С‹ Рё СѓСЂРѕРєРёВ»)
+   Рё `docs/architecture/rfc_v1_implementation_notes.md`.
+4. РџСЂРѕРІРµРґРёС‚Рµ СЂРµС‚СЂРѕСЃРїРµРєС‚РёРІСѓ: РІ С‚РµС‡РµРЅРёРµ 72 С‡Р°СЃРѕРІ РѕРїРёСЃР°С‚СЊ РїСЂРёС‡РёРЅС‹ РѕС‚РјРµРЅС‹, РїСЂРёРЅСЏС‚С‹Рµ СЂРµС€РµРЅРёСЏ Рё СЂРµРєРѕРјРµРЅРґР°С†РёРё РІ `docs/handbook/operations/incident_log.md`.
 
-## SLA и коммуникации
-| Этап | Срок | Ответственный |
+## SLA Рё РєРѕРјРјСѓРЅРёРєР°С†РёРё
+| Р­С‚Р°Рї | РЎСЂРѕРє | РћС‚РІРµС‚СЃС‚РІРµРЅРЅС‹Р№ |
 | --- | --- | --- |
-| Оповещение пользователей (push/email) | ≤ 30 минут после `LotteryCanceledEvent` | Support + Marketing |
-| Первый батч рефанда | ≤ 12 часов | RootAdmin + Treasury |
-| Полное завершение возвратов | ≤ 24 часов | Treasury |
-| Постмортем в «книге проекта» | ≤ 72 часов | RootAdmin |
+| РћРїРѕРІРµС‰РµРЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ (push/email) | в‰¤ 30 РјРёРЅСѓС‚ РїРѕСЃР»Рµ `LotteryCanceledEvent` | Support + Marketing |
+| РџРµСЂРІС‹Р№ Р±Р°С‚С‡ СЂРµС„Р°РЅРґР° | в‰¤ 12 С‡Р°СЃРѕРІ | RootAdmin + Treasury |
+| РџРѕР»РЅРѕРµ Р·Р°РІРµСЂС€РµРЅРёРµ РІРѕР·РІСЂР°С‚РѕРІ | в‰¤ 24 С‡Р°СЃРѕРІ | Treasury |
+| РџРѕСЃС‚РјРѕСЂС‚РµРј РІ В«РєРЅРёРіРµ РїСЂРѕРµРєС‚Р°В» | в‰¤ 72 С‡Р°СЃРѕРІ | RootAdmin |
 
-## Мониторинг и алерты
-- `refund_active` — количество отменённых лотерей с незавершённым рефандом (`status_overview.refund_active`).
-- `refund_batch_pending` — суммарное количество билетов в очереди (`status_overview.refund_batch_pending`). Алерт при росте > 1000.
-- `refund_sla_breach` — автоматическая метрика, если первый батч запущен позже 12 часов после отмены или завершение затянулось более чем на 24 часа.
-- `automation_failure_count` — должен оставаться 0 во время отмены; при росте задокументировать причину.
+## РњРѕРЅРёС‚РѕСЂРёРЅРі Рё Р°Р»РµСЂС‚С‹
+- `refund_active` вЂ” РєРѕР»РёС‡РµСЃС‚РІРѕ РѕС‚РјРµРЅС‘РЅРЅС‹С… Р»РѕС‚РµСЂРµР№ СЃ РЅРµР·Р°РІРµСЂС€С‘РЅРЅС‹Рј СЂРµС„Р°РЅРґРѕРј (`status_overview.refund_active`).
+- `refund_batch_pending` вЂ” СЃСѓРјРјР°СЂРЅРѕРµ РєРѕР»РёС‡РµСЃС‚РІРѕ Р±РёР»РµС‚РѕРІ РІ РѕС‡РµСЂРµРґРё (`status_overview.refund_batch_pending`). РђР»РµСЂС‚ РїСЂРё СЂРѕСЃС‚Рµ > 1000.
+- `refund_sla_breach` вЂ” Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєР°СЏ РјРµС‚СЂРёРєР°, РµСЃР»Рё РїРµСЂРІС‹Р№ Р±Р°С‚С‡ Р·Р°РїСѓС‰РµРЅ РїРѕР·Р¶Рµ 12 С‡Р°СЃРѕРІ РїРѕСЃР»Рµ РѕС‚РјРµРЅС‹ РёР»Рё Р·Р°РІРµСЂС€РµРЅРёРµ Р·Р°С‚СЏРЅСѓР»РѕСЃСЊ Р±РѕР»РµРµ С‡РµРј РЅР° 24 С‡Р°СЃР°.
+- `automation_failure_count` вЂ” РґРѕР»Р¶РµРЅ РѕСЃС‚Р°РІР°С‚СЊСЃСЏ 0 РІРѕ РІСЂРµРјСЏ РѕС‚РјРµРЅС‹; РїСЂРё СЂРѕСЃС‚Рµ Р·Р°РґРѕРєСѓРјРµРЅС‚РёСЂРѕРІР°С‚СЊ РїСЂРёС‡РёРЅСѓ.
 
-## Связанные документы и тесты
-- План этапов: [architecture/lottery_parallel_plan.md](../../architecture/lottery_parallel_plan.md) — разделы 4.P и 6.
-- Юнит-тесты: `lottery_multi::payouts_tests::{refund_batch_records_progress, refund_requires_canceled_status, refund_cannot_exceed_tickets, archive_canceled_requires_record, archive_canceled_requires_full_refund, archive_canceled_records_summary, force_cancel_refund_flow_records_history}`, `SupraLottery/tests/test_history_backfill_dry_run.py`.
-- Процедуры поддержки: [support/sla.md](../support/sla.md).
-- Программа баг-баунти: [operations/bug_bounty.md](bug_bounty.md) — содержит правила компенсаций.
+## РЎРІСЏР·Р°РЅРЅС‹Рµ РґРѕРєСѓРјРµРЅС‚С‹ Рё С‚РµСЃС‚С‹
+- РџР»Р°РЅ СЌС‚Р°РїРѕРІ: [architecture/lottery_parallel_plan.md](../../architecture/lottery_parallel_plan.md) вЂ” СЂР°Р·РґРµР»С‹ 4.P Рё 6.
+- Р®РЅРёС‚-С‚РµСЃС‚С‹: `lottery_multi::payouts_tests::{refund_batch_records_progress, refund_requires_canceled_status, refund_cannot_exceed_tickets, archive_canceled_requires_record, archive_canceled_requires_full_refund, archive_canceled_records_summary, force_cancel_refund_flow_records_history}`, `SupraLottery/tests/test_history_backfill_dry_run.py`.
+- РџСЂРѕС†РµРґСѓСЂС‹ РїРѕРґРґРµСЂР¶РєРё: [support/sla.md](../support/sla.md).
+- РџСЂРѕРіСЂР°РјРјР° Р±Р°Рі-Р±Р°СѓРЅС‚Рё: [operations/bug_bounty.md](bug_bounty.md) вЂ” СЃРѕРґРµСЂР¶РёС‚ РїСЂР°РІРёР»Р° РєРѕРјРїРµРЅСЃР°С†РёР№.
 
-Документ обновляется по мере реализации on-chain батчей рефанда и интеграции с автоматикой.
+Р”РѕРєСѓРјРµРЅС‚ РѕР±РЅРѕРІР»СЏРµС‚СЃСЏ РїРѕ РјРµСЂРµ СЂРµР°Р»РёР·Р°С†РёРё on-chain Р±Р°С‚С‡РµР№ СЂРµС„Р°РЅРґР° Рё РёРЅС‚РµРіСЂР°С†РёРё СЃ Р°РІС‚РѕРјР°С‚РёРєРѕР№.
+

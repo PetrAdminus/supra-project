@@ -20,10 +20,10 @@
 
 ## Автоматическое заполнение
 
-Предпочтительный способ добавления записей — CLI `supra/scripts/incident_log.sh`. Пример:
+Предпочтительный способ добавления записей — CLI `SupraLottery/supra/scripts/incident_log.sh`. Пример:
 
 ```bash
-supra/scripts/incident_log.sh \
+SupraLottery/supra/scripts/incident_log.sh \
   --type "Релиз" \
   --description "Выкатили lottery_multi v1.0.0" \
   --responsible "RootAdmin, DevOps" \

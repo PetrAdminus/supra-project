@@ -188,7 +188,7 @@ docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli
   PROFILE=my_new_profile \
   LOTTERY_ADDR=0xbc9595...caafe0 \
   DEPOSIT_ADDR=0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e \
-  bash supra/scripts/testnet_status_report.sh --cli /supra/supra --profile my_new_profile
+  bash SupraLottery/supra/scripts/testnet_status_report.sh --cli /supra/supra --profile my_new_profile
 '
 ```
 
@@ -468,7 +468,7 @@ docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli
 
 ```bash
 # 1. Устанавливаем Move-фреймворки Supra во внутренний кэш (~/.move).
-bash supra/scripts/bootstrap_move_deps.sh
+bash SupraLottery/supra/scripts/bootstrap_move_deps.sh
 
 # 2. Запускаем Move-тесты (пример для пакета lottery_core) внутри Docker-контейнера.
 docker compose run --rm --entrypoint bash supra_cli \

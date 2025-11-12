@@ -7,10 +7,10 @@ services:
       SUPRA_HOME: /supra/configs
     volumes:
       - type: bind
-        source: ./supra/configs
+        source: ./SupraLottery/supra/configs
         target: /supra/configs
       - type: bind
-        source: ./supra/move_workspace
+        source: ./SupraLottery/supra/move_workspace
         target: /supra/move_workspace
     tty: true
     network_mode: host
