@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import importlib.util
 import subprocess
@@ -85,3 +86,64 @@ def test_cli_generates_command(payload: bytes, tmp_path: Path) -> None:
     )
     assert "Suggested import command" in result.stdout
     assert "history_backfill.sh /supra/config.yaml import 7" in result.stdout
+
+
+def _prepare_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(filter(None, [env.get("PYTHONPATH"), str(Path.cwd())]))
+    return env
+
+
+def test_cli_json_quiet(tmp_path: Path) -> None:
+    summary_path = tmp_path / "legacy_summary.bcs"
+    summary_path.write_bytes(bytes.fromhex("00"))
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "supra.tools.history_backfill_dry_run",
+            str(summary_path),
+            "--lottery-id",
+            "11",
+            "--config",
+            "/supra/config.yaml",
+            "--json",
+            "--quiet",
+        ],
+        capture_output=True,
+        check=True,
+        env=_prepare_env(),
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+    assert payload["lottery_id"] == 11
+    assert payload["summary_hex"].startswith("0x")
+    assert payload["expected_hash"].startswith("0x")
+    assert payload["suggested_command"].startswith("./supra/scripts/history_backfill.sh")
+
+
+def test_cli_json_output_file(tmp_path: Path) -> None:
+    summary_path = tmp_path / "legacy_summary.bcs"
+    summary_path.write_bytes(bytes.fromhex("0102"))
+    json_path = tmp_path / "artifacts.json"
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "supra.tools.history_backfill_dry_run",
+            str(summary_path),
+            "--lottery-id",
+            "22",
+            "--json-output",
+            str(json_path),
+            "--json",
+            "--quiet",
+        ],
+        capture_output=True,
+        check=True,
+        env=_prepare_env(),
+        text=True,
+    )
+    saved = json.loads(json_path.read_text(encoding="utf-8"))
+    assert saved["lottery_id"] == 22
+    assert saved["summary_path"].endswith("legacy_summary.bcs")

@@ -1,21 +1,28 @@
 #!/bin/bash
 # Usage:
-#   ./refund_control.sh /supra/configs/testnet.yaml cancel <lottery_id> <reason_code> <timestamp>
-#   ./refund_control.sh /supra/configs/testnet.yaml batch <lottery_id> <refund_round> <tickets_refunded> <prize_refund> <operations_refund> <timestamp>
-#   ./refund_control.sh /supra/configs/testnet.yaml progress <lottery_id>
-#   ./refund_control.sh /supra/configs/testnet.yaml cancellation <lottery_id>
-#   ./refund_control.sh /supra/configs/testnet.yaml status <lottery_id>
-#   ./refund_control.sh /supra/configs/testnet.yaml summary <lottery_id>
-#   ./refund_control.sh /supra/configs/testnet.yaml archive <lottery_id> <finalized_at>
+#   ./refund_control.sh [--dry-run] /supra/configs/testnet.yaml cancel <lottery_id> <reason_code> <timestamp>
+#   ./refund_control.sh [--dry-run] /supra/configs/testnet.yaml batch <lottery_id> <refund_round> <tickets_refunded> <prize_refund> <operations_refund> <timestamp>
+#   ./refund_control.sh [--dry-run] /supra/configs/testnet.yaml progress <lottery_id>
+#   ./refund_control.sh [--dry-run] /supra/configs/testnet.yaml cancellation <lottery_id>
+#   ./refund_control.sh [--dry-run] /supra/configs/testnet.yaml status <lottery_id>
+#   ./refund_control.sh [--dry-run] /supra/configs/testnet.yaml summary <lottery_id>
+#   ./refund_control.sh [--dry-run] /supra/configs/testnet.yaml archive <lottery_id> <finalized_at>
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PROJECT_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"
 
+DRY_RUN=0
+
+if [[ $# -ge 1 && "$1" == "--dry-run" ]]; then
+  DRY_RUN=1
+  shift
+fi
+
 if [[ $# -lt 2 ]]; then
   cat <<USAGE >&2
-Usage: $0 <config> <command> [args...]
+Usage: $0 [--dry-run] <config> <command> [args...]
 Commands:
   cancel <lottery_id> <reason_code> <timestamp>
   batch <lottery_id> <refund_round> <tickets_refunded> <prize_refund> <operations_refund> <timestamp>
@@ -33,11 +40,23 @@ COMMAND=$2
 shift 2 || true
 
 run() {
-  docker compose run --rm --entrypoint bash supra_cli -lc "$1"
+  local command="$1"
+  echo "+ $command"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "[dry-run] skipped execution"
+    return 0
+  fi
+  docker compose run --rm --entrypoint bash supra_cli -lc "$command"
 }
 
 view() {
-  docker compose run --rm --entrypoint bash supra_cli -lc "$1"
+  local command="$1"
+  echo "+ $command"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "[dry-run] skipped execution"
+    return 0
+  fi
+  docker compose run --rm --entrypoint bash supra_cli -lc "$command"
 }
 
 case "$COMMAND" in

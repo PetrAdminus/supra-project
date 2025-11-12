@@ -21,7 +21,7 @@ module lottery_multi::draw {
     const CALLBACK_MODULE_BYTES: vector<u8> = b"draw";
     const CALLBACK_FUNCTION_BYTES: vector<u8> = b"vrf_callback";
     const VRF_EVENT_VERSION_V1: u16 = 1;
-    const RETRY_DELAY_SECS: u64 = 600;
+    const MAX_VRF_ATTEMPTS: u8 = 5;
     const MAX_CLIENT_SEED: u64 = 0xffffffffffffffff;
 
     struct PayloadV1 has drop, store {
@@ -119,7 +119,33 @@ module lottery_multi::draw {
 
         let ledger = borrow_ledger_mut();
         let state = borrow_or_create_state(&mut ledger.states, lottery_id);
+        if (state.vrf_state.attempt >= MAX_VRF_ATTEMPTS) {
+            state.vrf_state.status = types::VRF_STATUS_FAILED;
+            state.vrf_state.consumed = true;
+            state.vrf_state.retry_after_ts = 0;
+            state.vrf_state.request_id = 0;
+            state.vrf_state.payload_hash = b"";
+            state.verified_payload = b"";
+            state.payload = b"";
+            state.winners_batch_hash = b"";
+            state.checksum_after_batch = b"";
+            registry::cancel_lottery_admin(
+                admin,
+                lottery_id,
+                registry::CANCEL_REASON_VRF_FAILURE,
+                now_ts,
+            );
+            return;
+        };
         assert!(state.vrf_state.status != types::VRF_STATUS_REQUESTED, errors::E_VRF_PENDING);
+        if (state.vrf_state.attempt > 0
+            && state.vrf_state.retry_strategy == types::RETRY_STRATEGY_MANUAL)
+        {
+            assert!(
+                state.vrf_state.retry_after_ts > 0,
+                errors::E_VRF_MANUAL_SCHEDULE_REQUIRED,
+            );
+        };
         if (state.vrf_state.status == types::VRF_STATUS_FULFILLED) {
             assert!(state.vrf_state.consumed, errors::E_VRF_PENDING);
         };
@@ -162,8 +188,10 @@ module lottery_multi::draw {
         state.vrf_state.schema_version = types::DEFAULT_SCHEMA_VERSION;
         state.vrf_state.status = types::VRF_STATUS_REQUESTED;
         state.vrf_state.consumed = false;
-        state.vrf_state.retry_after_ts = now_ts + RETRY_DELAY_SECS;
-        state.vrf_state.retry_strategy = types::RETRY_STRATEGY_FIXED;
+        let policy = &config.vrf_retry_policy;
+        let (retry_after_ts, retry_strategy) = compute_retry_schedule(policy, now_ts, attempt);
+        state.vrf_state.retry_after_ts = retry_after_ts;
+        state.vrf_state.retry_strategy = retry_strategy;
         state.vrf_state.closing_block_height = closing_block_height;
         state.vrf_state.chain_id = chain_id;
         state.client_seed = client_seed;
@@ -198,6 +226,35 @@ module lottery_multi::draw {
         event::emit_event(&mut ledger.requested_events, requested);
 
         registry::mark_draw_requested(lottery_id);
+    }
+
+    public entry fun schedule_manual_retry_admin(
+        admin: &signer,
+        lottery_id: u64,
+        now_ts: u64,
+        retry_after_ts: u64,
+    ) acquires DrawLedger, registry::Registry {
+        ensure_feature_enabled(false);
+        let status = registry::get_status(lottery_id);
+        assert!(
+            status == registry::STATUS_CLOSING || status == registry::STATUS_DRAW_REQUESTED,
+            errors::E_DRAW_STATUS_INVALID,
+        );
+
+        let ledger = borrow_ledger_mut();
+        assert!(table::contains(&ledger.states, lottery_id), errors::E_VRF_NOT_REQUESTED);
+        let state = table::borrow_mut(&mut ledger.states, lottery_id);
+        assert!(
+            state.vrf_state.retry_strategy == types::RETRY_STRATEGY_MANUAL,
+            errors::E_VRF_RETRY_POLICY_INVALID,
+        );
+        assert!(retry_after_ts > 0, errors::E_VRF_MANUAL_DEADLINE);
+        assert!(retry_after_ts >= now_ts, errors::E_VRF_MANUAL_DEADLINE);
+        state.vrf_state.retry_after_ts = retry_after_ts;
+    }
+
+    pub fun max_vrf_attempts(): u8 {
+        MAX_VRF_ATTEMPTS
     }
 
     public entry fun vrf_callback(
@@ -472,6 +529,51 @@ module lottery_multi::draw {
         let next = current + 1;
         vrf_state.attempt = next;
         next
+    }
+
+    fun compute_retry_schedule(
+        policy: &types::RetryPolicy,
+        now_ts: u64,
+        attempt: u8,
+    ): (u64, u8) {
+        let strategy = policy.strategy;
+        if (strategy == types::RETRY_STRATEGY_MANUAL) {
+            (0, strategy)
+        } else {
+            let delay = compute_retry_delay(policy, attempt);
+            let deadline = now_ts + delay;
+            (deadline, strategy)
+        }
+    }
+
+    fun compute_retry_delay(policy: &types::RetryPolicy, attempt: u8): u64 {
+        let base = policy.base_delay_secs;
+        if (policy.strategy == types::RETRY_STRATEGY_FIXED || attempt <= 1) {
+            base
+        } else {
+            let mut idx = 1u8;
+            let mut delay = base;
+            while (idx < attempt) {
+                delay = saturating_double(delay, policy.max_delay_secs);
+                idx = idx + 1;
+            };
+            delay
+        }
+    }
+
+    fun saturating_double(value: u64, max_value: u64): u64 {
+        if (value >= max_value) {
+            return max_value;
+        };
+        if (value > max_value / 2) {
+            return max_value;
+        };
+        let doubled = value * 2;
+        if (doubled > max_value) {
+            max_value
+        } else {
+            doubled
+        }
     }
 
     fun encode_payload_v1(

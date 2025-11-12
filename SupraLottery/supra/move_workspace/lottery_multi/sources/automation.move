@@ -22,6 +22,9 @@ module lottery_multi::automation {
     pub const ACTION_PAYOUT_BATCH: u64 = 6;
     pub const ACTION_CANCEL: u64 = 7;
 
+    /// Минимальный таймлок (15 минут) для чувствительных действий automation.
+    pub const MIN_SENSITIVE_TIMELOCK_SECS: u64 = 900;
+
     pub struct AutomationCap has store {
         pub operator: address,
         pub cron_spec: vector<u8>,
@@ -95,6 +98,7 @@ module lottery_multi::automation {
         assert!(vector::length(&allowed_actions) > 0, errors::E_AUTOBOT_FORBIDDEN_TARGET);
         assert!(max_failures > 0, errors::E_AUTOBOT_FAILURE_LIMIT);
         assert!(expires_at > 0, errors::E_AUTOBOT_EXPIRED);
+        assert_timelock_policy(&allowed_actions, timelock_secs);
 
         let operator_addr = signer::address_of(operator);
         assert!(!exists<AutomationCap>(operator_addr), errors::E_AUTOBOT_ALREADY_REGISTERED);
@@ -137,6 +141,7 @@ module lottery_multi::automation {
         assert!(vector::length(&allowed_actions) > 0, errors::E_AUTOBOT_FORBIDDEN_TARGET);
         assert!(max_failures > 0, errors::E_AUTOBOT_FAILURE_LIMIT);
         assert!(expires_at > 0, errors::E_AUTOBOT_EXPIRED);
+        assert_timelock_policy(&allowed_actions, timelock_secs);
 
         let operator_addr = signer::address_of(operator);
         let registry = borrow_registry_mut();
@@ -292,6 +297,36 @@ module lottery_multi::automation {
         assert!(state.failure_count < state.max_failures, errors::E_AUTOBOT_FAILURE_LIMIT);
     }
 
+    public fun ensure_action_with_timelock(
+        cap: &AutomationCap,
+        action_id: u64,
+        action_hash: &vector<u8>,
+        now_ts: u64,
+    ) acquires AutomationRegistry {
+        let state = borrow_state_ref(cap.operator);
+        ensure_not_expired(state, now_ts);
+        ensure_action_allowed(&state.allowed_actions, action_id);
+        assert!(state.failure_count < state.max_failures, errors::E_AUTOBOT_FAILURE_LIMIT);
+        ensure_timelock(state, action_hash, now_ts);
+    }
+
+    fun assert_timelock_policy(allowed_actions: &vector<u64>, timelock_secs: u64) {
+        let mut idx = 0;
+        let len = vector::length(allowed_actions);
+        let mut requires_timelock = false;
+        while (idx < len) {
+            let action_id = *vector::borrow(allowed_actions, idx);
+            if (action_requires_timelock(action_id)) {
+                requires_timelock = true;
+                break;
+            };
+            idx = idx + 1;
+        };
+        if (requires_timelock) {
+            assert!(timelock_secs >= MIN_SENSITIVE_TIMELOCK_SECS, errors::E_AUTOBOT_TIMELOCK);
+        };
+    }
+
     public fun automation_status(operator: address): AutomationBotStatus acquires AutomationRegistry {
         let state = borrow_state_ref(operator);
         state_to_status(operator, state)
@@ -378,6 +413,10 @@ module lottery_multi::automation {
             expires_at,
         };
         event::emit_event(handle, event);
+    }
+
+    fun action_requires_timelock(action_id: u64): bool {
+        action_id == ACTION_UNPAUSE || action_id == ACTION_PAYOUT_BATCH || action_id == ACTION_CANCEL
     }
 
     fun ensure_timelock(state: &AutomationState, action_hash: &vector<u8>, now_ts: u64) {

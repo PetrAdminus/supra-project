@@ -1,6 +1,7 @@
 // sources/vrf_deposit.move
 module lottery_multi::vrf_deposit {
     use std::signer;
+    use std::vector;
     use supra_framework::event;
 
     use lottery_multi::automation;
@@ -91,11 +92,25 @@ module lottery_multi::vrf_deposit {
         minimum_balance: u64,
         effective_balance: u64,
         timestamp: u64,
+        action_hash: vector<u8>,
     ) acquires VrfDepositLedger, automation::AutomationRegistry {
         let caller = signer::address_of(operator);
         assert!(caller == cap.operator, errors::E_AUTOBOT_CALLER_MISMATCH);
-        automation::ensure_action(cap, automation::ACTION_TOPUP_VRF_DEPOSIT, timestamp);
+        assert!(vector::length(&action_hash) > 0, errors::E_AUTOBOT_ACTION_HASH_EMPTY);
+        automation::ensure_action_with_timelock(
+            cap,
+            automation::ACTION_TOPUP_VRF_DEPOSIT,
+            &action_hash,
+            timestamp,
+        );
         record_snapshot_internal(total_balance, minimum_balance, effective_balance, timestamp);
+        automation::record_success(
+            operator,
+            cap,
+            automation::ACTION_TOPUP_VRF_DEPOSIT,
+            action_hash,
+            timestamp,
+        );
     }
 
     public entry fun resume_requests(admin: &signer, timestamp: u64) acquires VrfDepositLedger {

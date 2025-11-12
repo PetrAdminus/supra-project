@@ -34,8 +34,8 @@
 - `init_draw` готовит ресурсы для VRF-процесса.
 - `request_draw_admin` (и внутренние проверки) формируют `PayloadV1` с `closing_block_height`, `chain_id`, `schema_version` и увеличенным `attempt`.
 - `vrf_callback` проверяет `request_id`, `attempt`, `consumed`, записывает seed, публикует `VrfFulfilled` и разблокирует вычисление победителей.
-- Юнит `lottery_multi::draw_tests` проверяет остановку запросов при паузе депозита, запрет повторных запросов до завершения VRF (`E_VRF_PENDING`), соблюдение окна повторного запроса (`E_VRF_RETRY_WINDOW`), защиту от переполнения `attempt` и обновление `finalization_snapshot`.
-- Prover-спека `spec/draw.move` доказывает, что `request_draw_admin` увеличивает `attempt` и `next_client_seed`, фиксирует `RETRY_STRATEGY_FIXED` и параметры `chain_id`/`closing_block_height`, callback устанавливает статус `VRF_STATUS_FULFILLED`, а `finalization_snapshot` возвращает неизменённые ончейн-значения.
+- Юнит `lottery_multi::draw_tests` проверяет остановку запросов при паузе депозита, запрет повторных запросов до завершения VRF (`E_VRF_PENDING`), соблюдение окна повторного запроса (`E_VRF_RETRY_WINDOW`), защиту от переполнения `attempt`, обновление `finalization_snapshot`, автоматическую отмену при достижении `MAX_VRF_ATTEMPTS = 5`, экспоненциальный рост интервалов при стратегии retry `=1` и блокировку без ручного расписания для стратегии `=2`.
+- Prover-спека `spec/draw.move` доказывает, что `request_draw_admin` увеличивает `attempt` и `next_client_seed`, применяет `registry::Config.vrf_retry_policy` (fixed/exponential/manual) к `retry_after_ts`, фиксирует параметры `chain_id`/`closing_block_height`, а при исчерпании лимита попыток переводит состояние в `VRF_STATUS_FAILED` без нового запроса; callback устанавливает статус `VRF_STATUS_FULFILLED`, а `finalization_snapshot` возвращает неизменённые ончейн-значения.
 
 ### `payouts`
 - `init_payouts` разворачивает инфраструктуру выплат.
@@ -55,8 +55,8 @@
 - `list_active`, `list_by_primary_type`, `list_by_tag_mask`, `list_by_all_tags` — пагинация по статусам и тегам.
 - `accounting_snapshot`, `get_vrf_deposit_status`, `get_lottery_summary`, `list_finalized_ids`, `status_overview` — агрегированные представления; `status_overview(now_ts)` возвращает счётчики по статусам жизненного цикла, активным/заблокированным VRF-запросам и бэклогу выплат.
 - `list_automation_bots` и `get_automation_bot` предоставляют публичный снимок AutomationBot: адрес оператора, разрешённые `action_id`, таймлок, лимит `max_failures`, счётчики `failure_count`/`success_streak`, репутацию, pending-digest и срок действия регистрации. View опираются на новые публичные хелперы `automation::automation_operators` и `automation::automation_status_option`; для оперативного доступа подготовлен CLI `supra/scripts/automation_status.sh`, оборачивающий оба вызова.
-- Тестовый модуль `views_tests` проверяет требование полного совпадения масок (`list_by_all_tags`), порядок сортировки и пагинацию по типам (`list_by_primary_type`), ограничение `E_PAGINATION_LIMIT`, агрегированную сводку (`status_overview_counts_vrf_and_statuses`), а также наличие зарегистрированного бота и корректность `option`-ответа (`automation_views_list_registered_bot`).
-- JSON Schema `docs/handbook/architecture/json/lottery_multi_views.schema.json` описывает структуры `BadgeMetadata`, `LotteryStatusView`, `VrfDepositStatusView`, `LotteryConfig`, `LotterySummary`, `StatusOverview`, `Accounting` и `AutomationBotView`; пример ответов версии `1.0.3` хранится в `docs/handbook/architecture/json/examples/lottery_multi_view_samples.json` и валидируется `pytest SupraLottery/tests/test_view_schema_examples.py`.
+- Тестовый модуль `views_tests` проверяет требование полного совпадения масок (`list_by_all_tags`), порядок сортировки и пагинацию по типам (`list_by_primary_type`), ограничение `E_PAGINATION_LIMIT`, агрегированную сводку и SLA рефандов (`status_overview_counts_vrf_and_statuses`, `status_overview_tracks_refund_metrics`), а также наличие зарегистрированного бота и корректность `option`-ответа (`automation_views_list_registered_bot`).
+- JSON Schema `docs/handbook/architecture/json/lottery_multi_views.schema.json` описывает структуры `BadgeMetadata`, `LotteryStatusView`, `VrfDepositStatusView`, `LotteryConfig`, `LotterySummary`, `StatusOverview`, `Accounting` и `AutomationBotView`; пример ответов версии `1.0.5` хранится в `docs/handbook/architecture/json/examples/lottery_multi_view_samples.json` и валидируется `pytest SupraLottery/tests/test_view_schema_examples.py`.
 - `status_overview` используется в операционной процедуре рефанда (`operations/refund.md`) для оценки очереди отмен и соблюдения SLA, а `list_automation_bots`/`get_automation_bot` применяются в runbook AutomationBot и на статусной странице для контроля pending-действий и лимитов `max_failures`.
 
 ### `feature_switch`
@@ -73,7 +73,7 @@
 
 ### `automation`
 - `init_automation` разворачивает реестр ботов и event handle’ы `Automation*` на адресе пакета.
-- `register_bot`/`rotate_bot` выпускают `AutomationCap`, настраивают `allowed_actions`, `timelock_secs`, `max_failures`, cron-спеку и эмитируют `AutomationKeyRotated`.
+- `register_bot`/`rotate_bot` выпускают `AutomationCap`, настраивают `allowed_actions`, `timelock_secs`, `max_failures`, cron-спеку и эмитируют `AutomationKeyRotated`. Для действий `ACTION_UNPAUSE`, `ACTION_PAYOUT_BATCH`, `ACTION_CANCEL` таймлок обязан быть ≥ `MIN_SENSITIVE_TIMELOCK_SECS = 900` секунд (15 минут), иначе операция завершается `E_AUTOBOT_TIMELOCK`.
 - `announce_dry_run` фиксирует `pending_action_hash`/`pending_execute_after` и требует, чтобы `executes_after_ts` превышал `now_ts + timelock_secs`.
 - `record_success` и `record_failure` проверяют совпадение digest с анонсом (при ненулевом таймлоке), обновляют `failure_count`, `success_streak`, `reputation_score`, очищают pending и публикуют `AutomationTick` (+ `AutomationError` для ошибок).
 - `report_call_rejected` и `ensure_action` используются фронтом/ботом для журналирования отказов и проверки лимитов (`max_failures`, срок действия капабилити).
@@ -87,6 +87,7 @@
 - `PayoutBatchEvent`, `PartnerPayoutEvent`, `PurchaseRateLimitHitEvent` формируют неизменяемый журнал для аудита.
 - `get_summary`, `list_finalized` обслуживают фронтенд «Истории».
 - Административные функции `import_legacy_summary_admin`, `rollback_legacy_summary_admin`, `update_legacy_classification_admin` позволяют переносить сводки из `lottery_support::History`, откатывать некорректные записи и вручную назначать классификаторы (`primary_type`, `tags_mask`). Все операции сопровождаются событиями `LegacySummaryImportedEvent`, `LegacySummaryRolledBackEvent`, `LegacySummaryClassificationUpdatedEvent`.
+- Перед импортом администратор записывает ожидаемый хэш через `legacy_bridge::set_expected_hash`; успешный вызов `import_legacy_summary_admin` зеркалирует запись в `lottery_support::history_bridge`, вызывает `legacy_bridge::notify_summary_written` и очищает pending-ожидание dual-write.
 - View `is_legacy_summary` сигнализирует индексаторам и фронтенду о происхождении записи. Набор тестов `history_migration_tests` покрывает импорт по BCS, отказ при неверном хэше, запрет отката для новых розыгрышей и переопределение тегов.
 
 ### `legacy_bridge`
@@ -98,7 +99,7 @@
 
 ### `vrf_deposit`
 - `init_vrf_deposit`, `update_config` задают пороги.
-- `record_snapshot_admin` / `record_snapshot_automation` обновляют показатели и публикуют `VrfDepositSnapshot`/`Alert`/`RequestsPaused`.
+- `record_snapshot_admin` / `record_snapshot_automation` обновляют показатели и публикуют `VrfDepositSnapshot`/`Alert`/`RequestsPaused`; автоматизированный вызов требует dry-run с `snapshot_hash` и timelock, блокируя выполнение без pending и автоматически вызывая `automation::record_success` после удачного снапшота.
 - `resume_requests` снимает блокировку, `ensure_requests_allowed` используется при новом запросе VRF.
 
 ### `roles`
@@ -106,13 +107,14 @@
 - `consume_payout_batch`/`consume_partner_payout` блокируют выплаты при нарушении лимитов (`E_PAYOUT_BATCH_TOO_LARGE`, `E_PAYOUT_OPERATIONS_BUDGET`, `E_PARTNER_PAYOUT_BUDGET_EXCEEDED`, `E_PARTNER_PAYOUT_COOLDOWN`, `E_PARTNER_PAYOUT_NONCE`, `E_PARTNER_PAYOUT_EXPIRED`); для премиальных подписок `is_premium_active` учитывает бессрочные (expires_at = 0) капабилити.
 - `cleanup_expired_admin` автоматически отзывает просроченные или исчерпанные капабилити и эмитирует `PartnerPayoutCapRevokedEvent`/`PremiumAccessRevokedEvent`, что фиксируется в операционном журнале.
 - View-функции `list_partner_caps`, `list_premium_caps`, `has_*`, `borrow_*` и `event_counters` предоставляют фронтенду и операциям актуальный список ролей, включая остатки бюджетов, таймлоки, expiry и ссылку на реферера.
-- `PartnerCreateCap` содержит белый список `allowed_primary_types` и `allowed_tags_mask`, лимиты бюджета и cooldown выплат для контроля `record_partner_payout_admin`; `ensure_primary_type_allowed`, `ensure_tags_allowed` проверяют параметры партнёров при создании лотереи.
+- `PartnerCreateCap` содержит белый список `allowed_primary_types` и `allowed_tags_mask`, лимиты бюджета и cooldown выплат для контроля `record_partner_payout_admin`; `ensure_primary_type_allowed`, `ensure_tags_allowed` проверяют параметры партнёров при создании лотереи. Конструктор `roles::new_partner_cap` дополнительно валидирует маску тегов через `tags::validate(TYPE_PARTNER, allowed_tags_mask)` и `tags::assert_tag_budget`, исключая неизвестные биты и превышение лимита активных тегов.
 - Набор тестов `roles_tests` дополнен сценариями `partner_cap_blocks_after_expiry`, `admin_can_list_and_track_partner_caps`, `cleanup_expired_removes_caps`, `premium_grant_and_revoke_updates_events`, подтверждающими события выдачи/отзыва, листинги и автоматический клинап; прежние тесты продолжают покрывать cooldown, бюджеты и корректный шаг nonce.
 - Требования комплаенса и список ограниченных юрисдикций описаны в `docs/handbook/governance/compliance.md`; при обновлении ролей партнёров необходимо сверяться с этим документом.
 
 ### Дополнительные механики
 - `economics::assert_distribution` и связанные функции проверяют распределение продаж по базис-поинтам (сумма 10_000).
 - `Accounting` отслеживает `total_sales`, `total_allocated`, `total_prize_paid`, `total_operations_paid`, `total_operations_allocated`; функции `record_prize_payout` и `record_operations_payout` защищают от перерасхода (`E_PAYOUT_ALLOC_EXCEEDED`, `E_OPERATIONS_ALLOC_EXCEEDED`).
+- Интеграционный тест `payouts_tests::accounting_aligns_with_summary_and_view` сверяет `sales::accounting_snapshot`, view `accounting_snapshot` и `history::get_summary`, подтверждая консистентность агрегатов `total_*` и рост `payout_round` после финализации. 【F:SupraLottery/supra/move_workspace/lottery_multi/tests/payouts_tests.move†L336-L372】
 - `types::prize_plan_checksum`, `types::winner_cursor` поддерживают контроль целостности слотов и батчей.
 - Move Prover спецификации (`spec/*.move`) фиксируют: неизменность `snapshot_hash`, рост `payout_round`, ограничения `jackpot_allowance_token`, монотонность `attempt`/`next_client_seed` и статус `FULFILLED` VRF, а также то, что `record_payout_batch_admin`/`record_partner_payout_admin` корректно отражают выплаты в `sales::accounting_snapshot`.
 

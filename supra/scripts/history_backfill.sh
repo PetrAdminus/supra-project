@@ -5,7 +5,7 @@
 #   ./history_backfill.sh /supra/configs/testnet.yaml classify 42 1 255
 #   ./history_backfill.sh /supra/configs/testnet.yaml status 42
 #   ./history_backfill.sh /supra/configs/testnet.yaml list [from] [limit]
-#   ./history_backfill.sh /supra/configs/testnet.yaml dry-run <summary_path> [--lottery-id <id>]
+#   ./history_backfill.sh /supra/configs/testnet.yaml dry-run <summary_path> [--lottery-id <id>] [--json] [--json-output path] [--quiet]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -73,7 +73,7 @@ Supported commands:
   classify <lottery_id> <primary_type> <tags_mask>
   status <lottery_id>
   list [from] [limit]
-  dry-run <summary_path> [--lottery-id <id>] [--hex-output path] [--hash-output path]
+  dry-run <summary_path> [--lottery-id <id>] [--hex-output path] [--hash-output path] [--json] [--json-output path] [--quiet]
 EOF
     exit 1
     ;;

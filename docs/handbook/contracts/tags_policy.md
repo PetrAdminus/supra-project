@@ -13,7 +13,7 @@
 
 ## 2. Допустимые комбинации тегов
 
-Правила валидации реализованы в `tags::validate` и `registry::ensure_tags_allowed`, а также в тестах `config_tests::cannot_update_tags_after_snapshot` и `roles_tests::tag_budget_limits_active_bits`. Дополнительные проверки для партнёров выполняет `roles::ensure_tags_allowed`.
+Правила валидации реализованы в `tags::validate` и `registry::ensure_tags_allowed`, а также в тестах `config_tests::cannot_update_tags_after_snapshot` и `roles_tests::tag_budget_limits_active_bits`. Дополнительные проверки для партнёров выполняет `roles::ensure_tags_allowed`, а конструктор `roles::new_partner_cap` блокирует неизвестные биты и превышение лимита активных тегов ещё на этапе выдачи capability.
 
 | Primary type →<br/>Tag ↓ | `TYPE_BASIC` | `TYPE_PARTNER` | `TYPE_JACKPOT` | `TYPE_VIP` | Комментарий |
 | --- | --- | --- | --- | --- | --- |

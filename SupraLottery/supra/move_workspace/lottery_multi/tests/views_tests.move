@@ -161,6 +161,9 @@ module lottery_multi::views_tests {
         assert!(overview.vrf_fulfilled_pending == 0, 0);
         assert!(overview.winners_pending == 0, 0);
         assert!(overview.payout_backlog == 0, 0);
+        assert!(overview.refund_active == 0, 0);
+        assert!(overview.refund_batch_pending == 0, 0);
+        assert!(!overview.refund_sla_breach, 0);
     }
 
     #[test(account = @lottery_multi, buyer = @0x1)]
@@ -214,6 +217,72 @@ module lottery_multi::views_tests {
         assert!(progress_after_refund.last_refund_ts == 70, 0);
     }
 
+    #[test(account = @lottery_multi, buyer1 = @0x1, buyer2 = @0x2)]
+    fun status_overview_tracks_refund_metrics(
+        account: &signer,
+        buyer1: &signer,
+        buyer2: &signer,
+    ) {
+        registry::init_registry(account);
+        sales::init_sales(account);
+        payouts::init_payouts(account);
+
+        let mut config = new_config(tags::TYPE_BASIC, 0);
+        config.run_id = 611;
+        registry::create_draft_admin(account, 611, copy config);
+        registry::advance_status(account, 611, registry::STATUS_ACTIVE);
+
+        sales::purchase_tickets_public(buyer1, 611, 1, 20, 1);
+        sales::purchase_tickets_public(buyer2, 611, 1, 21, 1);
+
+        registry::cancel_lottery_admin(
+            account,
+            611,
+            registry::CANCEL_REASON_OPERATIONS,
+            50,
+        );
+
+        let initial_overview = views::status_overview(60);
+        assert!(initial_overview.refund_active == 1, 0);
+        assert!(initial_overview.refund_batch_pending == 2, 0);
+        assert!(!initial_overview.refund_sla_breach, 0);
+
+        let breach_overview = views::status_overview(50 + views::REFUND_FIRST_BATCH_SLA_SECS + 1);
+        assert!(breach_overview.refund_sla_breach, 0);
+
+        payouts::force_refund_batch_admin(
+            account,
+            611,
+            1,
+            1,
+            70,
+            30,
+            50 + views::REFUND_FIRST_BATCH_SLA_SECS + 10,
+        );
+
+        let post_first_batch = views::status_overview(50 + views::REFUND_FIRST_BATCH_SLA_SECS + 20);
+        assert!(post_first_batch.refund_active == 1, 0);
+        assert!(post_first_batch.refund_batch_pending == 1, 0);
+        assert!(!post_first_batch.refund_sla_breach, 0);
+
+        let overdue_overview = views::status_overview(50 + views::REFUND_FULL_SLA_SECS + 1);
+        assert!(overdue_overview.refund_sla_breach, 0);
+
+        payouts::force_refund_batch_admin(
+            account,
+            611,
+            2,
+            1,
+            70,
+            30,
+            50 + views::REFUND_FULL_SLA_SECS + 10,
+        );
+
+        let final_overview = views::status_overview(50 + views::REFUND_FULL_SLA_SECS + 20);
+        assert!(final_overview.refund_batch_pending == 0, 0);
+        assert!(!final_overview.refund_sla_breach, 0);
+    }
+
     fun new_config(primary_type: u8, tags_mask: u64): registry::Config {
         let mut prize_plan = vector::empty<types::PrizeSlot>();
         vector::push_back(
@@ -236,6 +305,7 @@ module lottery_multi::views_tests {
             draw_algo: types::DRAW_ALGO_WITHOUT_REPLACEMENT,
             auto_close_policy: types::new_auto_close_policy(true, 60),
             reward_backend: types::new_reward_backend(types::BACKEND_NATIVE, b""),
+            vrf_retry_policy: types::default_retry_policy(),
         }
     }
 }

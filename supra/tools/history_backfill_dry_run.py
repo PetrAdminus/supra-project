@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from dataclasses import dataclass
@@ -101,6 +102,29 @@ def _write_optional(path: Path | None, content: str) -> None:
     path.write_text(content + "\n", encoding="utf-8")
 
 
+def _build_json_payload(
+    args: argparse.Namespace,
+    artifacts: SummaryArtifacts,
+    command: str | None,
+) -> dict[str, object]:
+    summary_path = str(Path(args.summary).resolve())
+    payload: dict[str, object] = {
+        "summary_hex": artifacts.summary_hex,
+        "expected_hash": artifacts.expected_hash,
+        "size_bytes": artifacts.size,
+        "summary_path": summary_path,
+    }
+    if args.lottery_id is not None:
+        payload["lottery_id"] = args.lottery_id
+    if args.config is not None:
+        payload["config"] = args.config
+    if args.script is not None:
+        payload["script"] = args.script
+    if command is not None:
+        payload["suggested_command"] = command
+    return payload
+
+
 def parse_args(argv: Iterable[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Рассчитать хэш и hex-строку BCS-сводки для history_backfill.sh",
@@ -142,6 +166,16 @@ def parse_args(argv: Iterable[str]) -> argparse.Namespace:
         action="store_true",
         help="Вывести только подсказку команды (для использования в скриптах)",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Вывести JSON-структуру с артефактами (для внешних скриптов)",
+    )
+    parser.add_argument(
+        "--json-output",
+        type=Path,
+        help="Сохранить JSON-структуру с артефактами в файл",
+    )
     return parser.parse_args(list(argv))
 
 
@@ -162,10 +196,24 @@ def main(argv: Iterable[str] | None = None) -> int:
     command = _build_command(args, artifacts)
     if command:
         if args.quiet:
-            print(command)
+            if not args.json:
+                print(command)
         else:
             print("Suggested import command:")
             print(f"  {command}")
+
+    if args.json or args.json_output:
+        payload = _build_json_payload(args, artifacts, command)
+        indent = None if args.quiet else 2
+        json_text = json.dumps(payload, ensure_ascii=False, indent=indent)
+        if args.json_output is not None:
+            args.json_output.write_text(json_text + "\n", encoding="utf-8")
+        if args.json:
+            if args.quiet:
+                print(json_text)
+            else:
+                print("JSON payload:")
+                print(json_text)
 
     return 0
 

@@ -7,6 +7,7 @@ module lottery_multi::roles {
     use std::vector;
 
     use lottery_multi::errors;
+    use lottery_multi::tags;
 
     const ADMIN_ADDR: address = @lottery_multi;
 
@@ -281,6 +282,8 @@ module lottery_multi::roles {
         expires_at: u64,
         payout_cooldown_secs: u64,
     ): PartnerCreateCap {
+        tags::validate(tags::TYPE_PARTNER, allowed_tags_mask);
+        tags::assert_tag_budget(allowed_tags_mask);
         PartnerCreateCap {
             allowed_event_slug,
             allowed_series_codes,

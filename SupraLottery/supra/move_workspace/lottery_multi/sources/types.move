@@ -29,6 +29,9 @@ module lottery_multi::types {
 
     pub const RETRY_STRATEGY_FIXED: u8 = 0;
     pub const RETRY_STRATEGY_EXPONENTIAL: u8 = 1;
+    pub const RETRY_STRATEGY_MANUAL: u8 = 2;
+
+    pub const DEFAULT_RETRY_DELAY_SECS: u64 = 600;
 
     pub const VRF_STATUS_IDLE: u8 = 0;
     pub const VRF_STATUS_REQUESTED: u8 = 1;
@@ -88,6 +91,12 @@ module lottery_multi::types {
         pub checksum_after_batch: vector<u8>,
     }
 
+    pub struct RetryPolicy has copy, drop, store {
+        pub strategy: u8,
+        pub base_delay_secs: u64,
+        pub max_delay_secs: u64,
+    }
+
     pub fun new_sales_window(sales_start: u64, sales_end: u64): SalesWindow {
         SalesWindow { sales_start, sales_end }
     }
@@ -127,6 +136,22 @@ module lottery_multi::types {
         }
     }
 
+    pub fun new_retry_policy(strategy: u8, base_delay_secs: u64, max_delay_secs: u64): RetryPolicy {
+        RetryPolicy {
+            strategy,
+            base_delay_secs,
+            max_delay_secs,
+        }
+    }
+
+    pub fun default_retry_policy(): RetryPolicy {
+        RetryPolicy {
+            strategy: RETRY_STRATEGY_FIXED,
+            base_delay_secs: DEFAULT_RETRY_DELAY_SECS,
+            max_delay_secs: DEFAULT_RETRY_DELAY_SECS,
+        }
+    }
+
     pub fun new_vrf_state(): VrfState {
         VrfState {
             request_id: 0,
@@ -160,6 +185,21 @@ module lottery_multi::types {
                 errors::E_TICKET_LIMIT_INVALID,
             );
         };
+    }
+
+    pub fun assert_retry_policy(policy: &RetryPolicy) {
+        let strategy = policy.strategy;
+        let valid_strategy = strategy == RETRY_STRATEGY_FIXED
+            || strategy == RETRY_STRATEGY_EXPONENTIAL
+            || strategy == RETRY_STRATEGY_MANUAL;
+        assert!(valid_strategy, errors::E_VRF_RETRY_POLICY_INVALID);
+
+        if (strategy == RETRY_STRATEGY_MANUAL) {
+            return;
+        };
+
+        assert!(policy.base_delay_secs > 0, errors::E_VRF_RETRY_POLICY_INVALID);
+        assert!(policy.max_delay_secs >= policy.base_delay_secs, errors::E_VRF_RETRY_POLICY_INVALID);
     }
 
     pub fun assert_draw_algo(draw_algo: u8) {

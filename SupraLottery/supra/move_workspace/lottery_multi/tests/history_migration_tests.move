@@ -1,11 +1,13 @@
 module lottery_multi::history_migration_tests {
     use std::bcs;
     use std::hash;
+    use std::option;
     use std::vector;
 
     use lottery_multi::errors;
     use lottery_multi::history;
     use lottery_multi::legacy_bridge;
+    use lottery_support::history_bridge;
 
     #[test(account = @lottery_multi)]
     fun import_and_rollback(account: &signer) {
@@ -60,6 +62,26 @@ module lottery_multi::history_migration_tests {
         let stored = history::get_summary(55);
         assert!(stored.primary_type == 3, 0);
         assert!(stored.tags_mask == 0xFF, 1);
+    }
+
+    #[test(account = @lottery_multi)]
+    fun import_completes_dual_write(account: &signer) {
+        history::init_history(account);
+        history_bridge::init_bridge(account);
+        legacy_bridge::enable_legacy_mirror(account);
+        legacy_bridge::init_dual_write(account, true, true);
+        let summary = sample_summary(205, 4, 0x40);
+        let summary_bytes = bcs::to_bytes(&summary);
+        let hash = hash::sha3_256(copy summary_bytes);
+        legacy_bridge::set_expected_hash(account, 205, copy hash);
+        assert!(legacy_bridge::has_expected_hash(205), 0);
+        history::import_legacy_summary_admin(account, 205, summary_bytes, copy hash);
+        assert!(!legacy_bridge::has_expected_hash(205), 1);
+        let mirrored_opt = history_bridge::get_summary(205);
+        assert!(option::is_some(&mirrored_opt), 2);
+        let mirrored = option::destroy_some(mirrored_opt);
+        assert!(mirrored.archive_hash == hash, 3);
+        assert!(mirrored.finalized_at == summary.finalized_at, 4);
     }
 
     fun sample_summary(id: u64, primary_type: u8, tags_mask: u64): history::LotterySummary {

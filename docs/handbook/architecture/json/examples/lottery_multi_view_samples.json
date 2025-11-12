@@ -1,7 +1,7 @@
 {
   "info": {
-    "version": "1.0.3",
-    "updated_at": "2025-12-07"
+    "version": "1.0.5",
+    "updated_at": "2025-12-15"
   },
   "views": {
     "get_lottery": {
@@ -49,6 +49,11 @@
       "reward_backend": {
         "backend_type": 0,
         "config_blob": "0x"
+      },
+      "vrf_retry_policy": {
+        "strategy": 2,
+        "base_delay_secs": 0,
+        "max_delay_secs": 0
       }
     },
     "get_lottery_status": {
@@ -120,7 +125,10 @@
       "vrf_fulfilled_pending": 1,
       "vrf_retry_blocked": 1,
       "winners_pending": 3,
-      "payout_backlog": 2
+      "payout_backlog": 2,
+      "refund_active": 1,
+      "refund_batch_pending": 640,
+      "refund_sla_breach": false
     },
     "list_automation_bots": [
       {
