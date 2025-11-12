@@ -241,6 +241,14 @@ module lottery_multi::legacy_bridge {
         table::contains(&control.expected_hashes, lottery_id)
     }
 
+    public fun pending_expected_hashes(): vector<u64> acquires DualWriteControl {
+        if (!exists<DualWriteControl>(@lottery_multi)) {
+            return vector::empty<u64>();
+        };
+        let control = borrow_control();
+        table::keys(&control.expected_hashes)
+    }
+
     public fun mirror_summary_to_legacy(
         lottery_id: u64,
         summary_bytes: &vector<u8>,

@@ -98,6 +98,18 @@ module lottery_multi::config_tests {
         assert!(*vector::borrow(&filtered, 1) == 1, 0);
     }
 
+    #[test(account = @lottery_multi)]
+    #[expected_failure(abort_code = lottery_multi::errors::E_TAGS_LOCKED)]
+    fun cannot_update_tags_after_snapshot(account: &signer) {
+        registry::init_registry(account);
+        let mut config = new_config(tags::TYPE_BASIC, tags::TAG_DAILY);
+        registry::create_draft_admin(account, 20, copy config);
+        registry::advance_status(account, 20, registry::STATUS_ACTIVE);
+        registry::set_tags_mask(account, 20, tags::TAG_DAILY | tags::TAG_PROMO);
+        registry::advance_status(account, 20, registry::STATUS_CLOSING);
+        registry::set_tags_mask(account, 20, tags::TAG_WEEKLY);
+    }
+
     fun new_config(primary_type: u8, tags_mask: u64): registry::Config {
         let mut prize_plan = vector::empty<types::PrizeSlot>();
         vector::push_back(

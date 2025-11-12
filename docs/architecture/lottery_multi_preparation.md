@@ -24,7 +24,7 @@
 - `economics::Accounting` контролирует лимиты через проверки в `record_prize_payout` и `record_operations_payout`, используя ошибки `E_PAYOUT_ALLOC_EXCEEDED` и `E_OPERATIONS_ALLOC_EXCEEDED`.
 - `sales::record_payouts` синхронизирует выплаты с учётом продаж и переиспользует событие `PurchaseRateLimitHitEvent` из `history`.
 - `payouts::record_payout_batch_admin` и `payouts::record_partner_payout_admin` публикуют новые события и обновляют агрегаты продаж.
-- `roles::RoleStore` хранит `PayoutBatchCap`/`PartnerPayoutCap`, функции `consume_payout_batch` и `consume_partner_payout` проверяют лимиты (размер батча, бюджет операций, cooldown, nonce) перед вызовом админских выплат.
+- `roles::RoleStore` хранит `PayoutBatchCap`/`PartnerPayoutCap`/`PremiumAccessCap`, события `RoleGranted/RoleRevoked` фиксируют выдачу/отзыв, `list_partner_caps`/`list_premium_caps` и `cleanup_expired_admin` предоставляют актуальный список и автоматический клинап; функции `consume_payout_batch` и `consume_partner_payout` проверяют лимиты (размер батча, бюджет операций, cooldown, nonce, expiry) перед вызовом админских выплат.
  - Тестовая база дополнена юнитами `lottery_multi::economics_tests` и `lottery_multi::payouts_tests`, проверяющими распределение 70/15/10/5, обновление агрегатов `Accounting`, защиту лимитов операций/партнёров и обязательность `PartnerPayoutCap`.
 - Руководство и тест-матрица обновлены: см. `docs/handbook/contracts/lottery_multi.md`, `docs/handbook/operations/runbooks.md`, `docs/handbook/qa/testing_matrix.md`.
 
@@ -46,6 +46,7 @@
 - `legacy_bridge` расширен событиями `ArchiveDualWriteStartedEvent`/`ArchiveDualWriteCompletedEvent`, функцией `notify_summary_written` и view `dual_write_status`, обеспечивающими контроль dual-write и очистку ожидаемых хэшей.
 - Добавлены ресурс-маркер `MirrorConfig`, функции `enable_legacy_mirror`/`disable_legacy_mirror` и хук `mirror_summary_to_legacy`, который пишет сводку в `lottery_support::history_bridge` при каждом `history::record_summary`.
 - View `legacy_bridge::dual_write_flags` позволяет операторам запросить глобальные переключатели dual-write (enabled/abort_on_*), а CLI-команда `dual_write_control.sh flags` теперь использует эту view без необходимости указывать `lottery_id`.
+- Реализованы функции `history::{import_legacy_summary_admin, rollback_legacy_summary_admin, update_legacy_classification_admin}`, события `LegacySummaryImported/RolledBack/ClassificationUpdated`, view `is_legacy_summary`, юнит-тесты `history_migration_tests` и CLI `history_backfill.sh`, фиксирующие подготовку к backfill и ручным сценариям отката.
 - Новый модуль `lottery_support::history_bridge` хранит зеркальные сводки (`LegacySummary`), эмитирует `LegacySummaryEvent` и предоставляет view `get_summary` для dry-run сверок.
 - Юнит `lottery_multi::history_dual_write_tests::dual_write_mirror_summary` подтверждает, что зеркальная запись создаёт хэш, совпадающий с ожидаемым, и что BCS-декод суммарного объекта соответствует исходной сводке.
 - Скрипт `supra/scripts/dual_write_control.sh` дополнен командами `enable-mirror`, `disable-mirror`, `mirror` для управления зеркальной записью и ручного повторного прогона.
@@ -64,6 +65,10 @@
 4. **Обратная связь и баг-баунти.**
    - Определить критерии отбора баг-репортов, подготовить форму отчёта и FAQ для сообщества.
    - Назначить ответственных за обработку обращений и обновление статуса задач.
+
+### Карта изменений по реализации подэтапа 5 (обновление 2025-11-26)
+- Runbook’и дополнились разделом прайс-фида, мониторинг — метриками `price_feed_updates_total`, `price_feed_clamp_active`, `price_feed_fallback_active`, а релизный чек-лист — проверкой последнего `PriceFeedClampClearedEvent`.
+- Модуль `price_feed` расширен функцией `clear_clamp`, событием `PriceFeedClampClearedEvent`, тестами `price_feed_tests`, Prover-спекой `spec/price_feed.move` и справочником [price_feeds.md](../handbook/architecture/price_feeds.md).
 
 ## Синтаксис и рекомендации Move (краткая памятка)
 - Использовать Move 1.8/1.9 без нестабильных фич, соблюдать объявленные abilities (`key`, `store`, `drop`, `copy`).

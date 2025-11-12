@@ -1,0 +1,131 @@
+{
+  "info": {
+    "version": "1.0.2",
+    "updated_at": "2025-11-27"
+  },
+  "views": {
+    "get_lottery": {
+      "event_slug": "0x6c6f7474657279",
+      "series_code": "0x6461696c79",
+      "run_id": 42,
+      "config_version": 3,
+      "primary_type": 1,
+      "tags_mask": 7,
+      "sales_window": {
+        "sales_start": 1732051200,
+        "sales_end": 1732137600
+      },
+      "ticket_price": 100000000,
+      "ticket_limits": {
+        "max_tickets_total": 50000,
+        "max_tickets_per_address": 100
+      },
+      "sales_distribution": {
+        "prize_bps": 7000,
+        "jackpot_bps": 1500,
+        "operations_bps": 1000,
+        "reserve_bps": 500
+      },
+      "prize_plan": [
+        {
+          "slot_id": 0,
+          "winners_per_slot": 1,
+          "reward_type": 0,
+          "reward_payload": "0x"
+        },
+        {
+          "slot_id": 1,
+          "winners_per_slot": 5,
+          "reward_type": 2,
+          "reward_payload": "0x70726f6d6f"
+        }
+      ],
+      "winners_dedup": true,
+      "draw_algo": 0,
+      "auto_close_policy": {
+        "enabled": true,
+        "grace_period_secs": 900
+      },
+      "reward_backend": {
+        "backend_type": 0,
+        "config_blob": "0x"
+      }
+    },
+    "get_lottery_status": {
+      "status": 1,
+      "snapshot_frozen": false,
+      "primary_type": 1,
+      "tags_mask": 7
+    },
+    "get_lottery_badges": {
+      "primary_type": 1,
+      "tags_mask": 7
+    },
+    "get_badge_metadata": {
+      "primary_label": "partner",
+      "is_experimental": true,
+      "tags_mask": 7
+    },
+    "accounting_snapshot": {
+      "total_sales": 1250000000,
+      "total_allocated": 900000000,
+      "total_prize_paid": 420000000,
+      "total_operations_paid": 95000000,
+      "total_operations_allocated": 125000000,
+      "jackpot_allowance_token": 110000000
+    },
+    "get_vrf_deposit_status": {
+      "total_balance": 7500000000,
+      "minimum_balance": 3000000000,
+      "effective_balance": 6900000000,
+      "required_minimum": 2800000000,
+      "last_update_ts": 1732055200,
+      "requests_paused": false,
+      "paused_since_ts": 0
+    },
+    "get_lottery_summary": {
+      "id": 42,
+      "status": 6,
+      "event_slug": "0x6c6f7474657279",
+      "series_code": "0x6461696c79",
+      "run_id": 42,
+      "tickets_sold": 45000,
+      "proceeds_accum": 4500000000,
+      "total_allocated": 3200000000,
+      "total_prize_paid": 2850000000,
+      "total_operations_paid": 400000000,
+      "vrf_status": 2,
+      "primary_type": 1,
+      "tags_mask": 7,
+      "snapshot_hash": "0xa4f6e2bca4f6e2bca4f6e2bca4f6e2bca4f6e2bca4f6e2bca4f6e2bca4f6e2bc",
+      "slots_checksum": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "winners_batch_hash": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "checksum_after_batch": "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "payout_round": 3,
+      "created_at": 1731964800,
+      "closed_at": 1732047600,
+      "finalized_at": 1732130400
+    },
+    "status_overview": {
+      "total": 48,
+      "draft": 5,
+      "active": 9,
+      "closing": 4,
+      "draw_requested": 2,
+      "drawn": 3,
+      "payout": 6,
+      "finalized": 17,
+      "canceled": 2,
+      "vrf_requested": 2,
+      "vrf_fulfilled_pending": 1,
+      "vrf_retry_blocked": 1,
+      "winners_pending": 3,
+      "payout_backlog": 2
+    },
+    "list_active": [201, 198, 177],
+    "list_by_primary_type": [201, 177],
+    "list_by_tag_mask": [201, 198],
+    "list_by_all_tags": [201],
+    "list_finalized_ids": [190, 188, 170]
+  }
+}

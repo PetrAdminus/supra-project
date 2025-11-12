@@ -44,6 +44,35 @@ module lottery_multi::history {
         pub tags_mask: u64,
     }
 
+    pub struct LegacySummaryImportedEvent has drop, store {
+        pub event_version: u16,
+        pub event_category: u8,
+        pub lottery_id: u64,
+        pub archive_hash: vector<u8>,
+        pub finalized_at: u64,
+        pub primary_type: u8,
+        pub tags_mask: u64,
+    }
+
+    pub struct LegacySummaryRolledBackEvent has drop, store {
+        pub event_version: u16,
+        pub event_category: u8,
+        pub lottery_id: u64,
+        pub archive_hash: vector<u8>,
+        pub finalized_at: u64,
+        pub primary_type: u8,
+        pub tags_mask: u64,
+    }
+
+    pub struct LegacySummaryClassificationUpdatedEvent has drop, store {
+        pub event_version: u16,
+        pub event_category: u8,
+        pub lottery_id: u64,
+        pub archive_hash: vector<u8>,
+        pub primary_type: u8,
+        pub tags_mask: u64,
+    }
+
     pub struct VrfRequestedEvent has drop, store {
         pub event_version: u16,
         pub event_category: u8,
@@ -227,8 +256,12 @@ module lottery_multi::history {
 
     struct ArchiveLedger has key {
         summaries: table::Table<u64, LotterySummary>,
+        imported_flags: table::Table<u64, bool>,
         ordered_ids: vector<u64>,
         finalized_events: event::EventHandle<LotteryFinalizedEvent>,
+        import_events: event::EventHandle<LegacySummaryImportedEvent>,
+        rollback_events: event::EventHandle<LegacySummaryRolledBackEvent>,
+        classification_events: event::EventHandle<LegacySummaryClassificationUpdatedEvent>,
     }
 
     pub entry fun init_history(admin: &signer) {
@@ -237,40 +270,125 @@ module lottery_multi::history {
         assert!(!exists<ArchiveLedger>(addr), errors::E_ALREADY_INITIALIZED);
         let ledger = ArchiveLedger {
             summaries: table::new(),
+            imported_flags: table::new(),
             ordered_ids: vector::empty(),
             finalized_events: event::new_event_handle<LotteryFinalizedEvent>(admin),
+            import_events: event::new_event_handle<LegacySummaryImportedEvent>(admin),
+            rollback_events: event::new_event_handle<LegacySummaryRolledBackEvent>(admin),
+            classification_events: event::new_event_handle<LegacySummaryClassificationUpdatedEvent>(admin),
         };
         move_to(admin, ledger);
     }
 
     pub fun record_summary(lottery_id: u64, summary: LotterySummary) acquires ArchiveLedger {
-        let ledger = borrow_ledger_mut();
         let summary_bytes = bcs::to_bytes(&summary);
         let archive_hash = hash::sha3_256(copy summary_bytes);
-        let primary_type = summary.primary_type;
-        let tags_mask = summary.tags_mask;
         let finalized_at = summary.finalized_at;
         legacy_bridge::mirror_summary_to_legacy(lottery_id, &summary_bytes, &archive_hash, finalized_at);
         legacy_bridge::notify_summary_written(lottery_id, &archive_hash, finalized_at);
-        if (table::contains(&ledger.summaries, lottery_id)) {
-            let existing = table::borrow_mut(&mut ledger.summaries, lottery_id);
-            let existing_bytes = bcs::to_bytes(&*existing);
-            let existing_hash = hash::sha3_256(existing_bytes);
-            assert!(existing_hash == archive_hash, errors::E_HISTORY_MISMATCH);
-            *existing = summary;
-        } else {
-            table::add(&mut ledger.summaries, lottery_id, summary);
-            vector::push_back(&mut ledger.ordered_ids, lottery_id);
-        };
-        let event = LotteryFinalizedEvent {
+        store_summary(lottery_id, summary, archive_hash, false);
+    }
+
+    public entry fun import_legacy_summary_admin(
+        admin: &signer,
+        lottery_id: u64,
+        summary_bytes: vector<u8>,
+        expected_hash: vector<u8>,
+    ) acquires ArchiveLedger {
+        let addr = signer::address_of(admin);
+        assert!(addr == @lottery_multi, errors::E_HISTORY_NOT_AUTHORIZED);
+        let mut summary: LotterySummary = bcs::from_bytes(&summary_bytes);
+        assert!(summary.id == lottery_id, errors::E_HISTORY_ID_MISMATCH);
+        let primary_type = summary.primary_type;
+        let tags_mask = summary.tags_mask;
+        let finalized_at = summary.finalized_at;
+        let computed_hash = hash::sha3_256(copy summary_bytes);
+        assert!(computed_hash == expected_hash, errors::E_HISTORY_IMPORT_HASH);
+        legacy_bridge::mirror_summary_to_legacy(lottery_id, &summary_bytes, &computed_hash, finalized_at);
+        let hash_for_store = copy computed_hash;
+        store_summary(lottery_id, summary, hash_for_store, true);
+        let ledger = borrow_ledger_mut();
+        let event = LegacySummaryImportedEvent {
             event_version: EVENT_VERSION_V1,
             event_category: EVENT_CATEGORY_ARCHIVE,
-            id: lottery_id,
-            archive_slot_hash: archive_hash,
+            lottery_id,
+            archive_hash: computed_hash,
+            finalized_at,
             primary_type,
             tags_mask,
         };
-        event::emit_event(&mut ledger.finalized_events, event);
+        event::emit_event(&mut ledger.import_events, event);
+    }
+
+    public entry fun rollback_legacy_summary_admin(admin: &signer, lottery_id: u64)
+    acquires ArchiveLedger {
+        let addr = signer::address_of(admin);
+        assert!(addr == @lottery_multi, errors::E_HISTORY_NOT_AUTHORIZED);
+        let ledger = borrow_ledger_mut();
+        if (!table::contains(&ledger.summaries, lottery_id)) {
+            abort errors::E_HISTORY_SUMMARY_MISSING;
+        };
+        let is_legacy = *table::borrow(&ledger.imported_flags, lottery_id);
+        assert!(is_legacy, errors::E_HISTORY_NOT_LEGACY);
+        let stored_copy = copy *table::borrow(&ledger.summaries, lottery_id);
+        let archive_hash = hash::sha3_256(bcs::to_bytes(&stored_copy));
+        let finalized_at = stored_copy.finalized_at;
+        let primary_type = stored_copy.primary_type;
+        let tags_mask = stored_copy.tags_mask;
+        table::remove(&mut ledger.summaries, lottery_id);
+        table::remove(&mut ledger.imported_flags, lottery_id);
+        remove_ordered_id(&mut ledger.ordered_ids, lottery_id);
+        let event = LegacySummaryRolledBackEvent {
+            event_version: EVENT_VERSION_V1,
+            event_category: EVENT_CATEGORY_ARCHIVE,
+            lottery_id,
+            archive_hash,
+            finalized_at,
+            primary_type,
+            tags_mask,
+        };
+        event::emit_event(&mut ledger.rollback_events, event);
+    }
+
+    public entry fun update_legacy_classification_admin(
+        admin: &signer,
+        lottery_id: u64,
+        primary_type: u8,
+        tags_mask: u64,
+    ) acquires ArchiveLedger {
+        let addr = signer::address_of(admin);
+        assert!(addr == @lottery_multi, errors::E_HISTORY_NOT_AUTHORIZED);
+        let ledger = borrow_ledger_mut();
+        if (!table::contains(&ledger.summaries, lottery_id)) {
+            abort errors::E_HISTORY_SUMMARY_MISSING;
+        };
+        let is_legacy = *table::borrow(&ledger.imported_flags, lottery_id);
+        assert!(is_legacy, errors::E_HISTORY_NOT_LEGACY);
+        let summary = table::borrow_mut(&mut ledger.summaries, lottery_id);
+        summary.primary_type = primary_type;
+        summary.tags_mask = tags_mask;
+        let summary_bytes = bcs::to_bytes(&*summary);
+        let archive_hash = hash::sha3_256(copy summary_bytes);
+        legacy_bridge::mirror_summary_to_legacy(lottery_id, &summary_bytes, &archive_hash, summary.finalized_at);
+        let event = LegacySummaryClassificationUpdatedEvent {
+            event_version: EVENT_VERSION_V1,
+            event_category: EVENT_CATEGORY_ARCHIVE,
+            lottery_id,
+            archive_hash,
+            primary_type,
+            tags_mask,
+        };
+        event::emit_event(&mut ledger.classification_events, event);
+    }
+
+    #[view]
+    public fun is_legacy_summary(lottery_id: u64): bool acquires ArchiveLedger {
+        let ledger = borrow_ledger_ref();
+        if (!table::contains(&ledger.imported_flags, lottery_id)) {
+            return false;
+        };
+        let flag = table::borrow(&ledger.imported_flags, lottery_id);
+        *flag
     }
 
     pub fun get_summary(id: u64): LotterySummary acquires ArchiveLedger {
@@ -301,6 +419,55 @@ module lottery_multi::history {
             taken = taken + 1;
         };
         result
+    }
+
+    fun store_summary(
+        lottery_id: u64,
+        summary: LotterySummary,
+        archive_hash: vector<u8>,
+        is_legacy: bool,
+    ) acquires ArchiveLedger {
+        let primary_type = summary.primary_type;
+        let tags_mask = summary.tags_mask;
+        let ledger = borrow_ledger_mut();
+        if (table::contains(&ledger.summaries, lottery_id)) {
+            let existing_summary = copy *table::borrow(&ledger.summaries, lottery_id);
+            let existing_hash = hash::sha3_256(bcs::to_bytes(&existing_summary));
+            let imported_flag = *table::borrow(&ledger.imported_flags, lottery_id);
+            if (imported_flag) {
+                assert!(is_legacy, errors::E_HISTORY_NOT_LEGACY);
+            } else {
+                assert!(!is_legacy, errors::E_HISTORY_NOT_LEGACY);
+                assert!(existing_hash == archive_hash, errors::E_HISTORY_MISMATCH);
+            };
+            let slot = table::borrow_mut(&mut ledger.summaries, lottery_id);
+            *slot = summary;
+        } else {
+            table::add(&mut ledger.summaries, lottery_id, summary);
+            table::add(&mut ledger.imported_flags, lottery_id, is_legacy);
+            vector::push_back(&mut ledger.ordered_ids, lottery_id);
+        };
+        let event = LotteryFinalizedEvent {
+            event_version: EVENT_VERSION_V1,
+            event_category: EVENT_CATEGORY_ARCHIVE,
+            id: lottery_id,
+            archive_slot_hash: archive_hash,
+            primary_type,
+            tags_mask,
+        };
+        event::emit_event(&mut ledger.finalized_events, event);
+    }
+
+    fun remove_ordered_id(ids: &mut vector<u64>, lottery_id: u64) {
+        let mut index = 0u64;
+        let len = vector::length(ids);
+        while (index < len) {
+            if (*vector::borrow(ids, index) == lottery_id) {
+                vector::remove(ids, index);
+                break;
+            };
+            index = index + 1;
+        };
     }
 
     fun borrow_ledger_mut(): &mut ArchiveLedger acquires ArchiveLedger {

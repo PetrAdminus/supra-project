@@ -13,6 +13,9 @@
 | `0xE_RATE_LIMIT` | `lottery_multi::sales` | Превышен лимит покупок за окно |
 | `0xE_FEATURE_DISABLED` | `lottery_multi::feature_switch` | Попытка вызвать отключённую функцию |
 | `0xE_PRICE_STALE` | `lottery_multi::price_feed` | Данные прайс-фида устарели |
+| `0xE_PRICE_FALLBACK_ACTIVE` | `lottery_multi::price_feed` | Попытка использовать цену при активном fallback |
+| `0xE_PRICE_CLAMP_ACTIVE` | `lottery_multi::price_feed` | Попытка использовать цену при активном клампе |
+| `0xE_PRICE_CLAMP_NOT_ACTIVE` | `lottery_multi::price_feed` | Попытка снять кламп, который уже отключён |
 | `0xE_AUTOMATION_LOCKED` | `lottery_multi::automation` | Нарушен таймлок или недостаточная репутация бота |
 
 Полный перечень ошибок хранится в `SupraLottery/supra/move_workspace/lottery_multi/sources/errors.move`.
