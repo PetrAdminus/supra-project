@@ -63,6 +63,16 @@ module lottery_multi::draw {
         next_client_seed: u64,
     }
 
+    pub struct VrfStateView has copy, drop, store {
+        pub status: u8,
+        pub attempt: u8,
+        pub consumed: bool,
+        pub retry_after_ts: u64,
+        pub retry_strategy: u8,
+        pub last_request_ts: u64,
+        pub request_id: u64,
+    }
+
     struct DrawLedger has key {
         states: table::Table<u64, DrawState>,
         nonce_to_lottery: table::Table<u64, u64>,
@@ -334,6 +344,22 @@ module lottery_multi::draw {
         state.checksum_after_batch = b"";
     }
 
+    #[test_only]
+    public fun test_override_vrf_state(
+        lottery_id: u64,
+        status: u8,
+        consumed: bool,
+        retry_after_ts: u64,
+        attempt: u8,
+    ) acquires DrawLedger {
+        let ledger = borrow_ledger_mut();
+        let state = table::borrow_mut(&mut ledger.states, lottery_id);
+        state.vrf_state.status = status;
+        state.vrf_state.consumed = consumed;
+        state.vrf_state.retry_after_ts = retry_after_ts;
+        state.vrf_state.attempt = attempt;
+    }
+
     pub fun finalization_snapshot(lottery_id: u64): FinalizationSnapshot acquires DrawLedger {
         let ledger = borrow_ledger_ref();
         let state = table::borrow(&ledger.states, lottery_id);
@@ -348,6 +374,52 @@ module lottery_multi::draw {
             chain_id: state.vrf_state.chain_id,
             request_ts: state.last_request_ts,
             vrf_status: state.vrf_state.status,
+        }
+    }
+
+    pub fun has_state(lottery_id: u64): bool acquires DrawLedger {
+        let addr = @lottery_multi;
+        if (!exists<DrawLedger>(addr)) {
+            return false;
+        };
+        let ledger = borrow_global<DrawLedger>(addr);
+        table::contains(&ledger.states, lottery_id)
+    }
+
+    pub fun vrf_state_view(lottery_id: u64): VrfStateView acquires DrawLedger {
+        let addr = @lottery_multi;
+        if (!exists<DrawLedger>(addr)) {
+            return VrfStateView {
+                status: types::VRF_STATUS_IDLE,
+                attempt: 0,
+                consumed: true,
+                retry_after_ts: 0,
+                retry_strategy: types::RETRY_STRATEGY_FIXED,
+                last_request_ts: 0,
+                request_id: 0,
+            };
+        };
+        let ledger = borrow_ledger_ref();
+        if (!table::contains(&ledger.states, lottery_id)) {
+            return VrfStateView {
+                status: types::VRF_STATUS_IDLE,
+                attempt: 0,
+                consumed: true,
+                retry_after_ts: 0,
+                retry_strategy: types::RETRY_STRATEGY_FIXED,
+                last_request_ts: 0,
+                request_id: 0,
+            };
+        };
+        let state = table::borrow(&ledger.states, lottery_id);
+        VrfStateView {
+            status: state.vrf_state.status,
+            attempt: state.vrf_state.attempt,
+            consumed: state.vrf_state.consumed,
+            retry_after_ts: state.vrf_state.retry_after_ts,
+            retry_strategy: state.vrf_state.retry_strategy,
+            last_request_ts: state.last_request_ts,
+            request_id: state.vrf_state.request_id,
         }
     }
 

@@ -2,6 +2,7 @@
 module lottery_multi::registry {
     use std::bcs;
     use std::hash;
+    use std::option;
     use std::signer;
     use std::table;
     use std::vector;
@@ -11,6 +12,7 @@ module lottery_multi::registry {
     use lottery_multi::economics;
     use lottery_multi::errors;
     use lottery_multi::roles;
+    use lottery_multi::sales;
     use lottery_multi::tags;
     use lottery_multi::types;
 
@@ -22,6 +24,10 @@ module lottery_multi::registry {
     pub const STATUS_PAYOUT: u8 = types::STATUS_PAYOUT;
     pub const STATUS_FINALIZED: u8 = types::STATUS_FINALIZED;
     pub const STATUS_CANCELED: u8 = types::STATUS_CANCELED;
+
+    pub const CANCEL_REASON_VRF_FAILURE: u8 = 1;
+    pub const CANCEL_REASON_COMPLIANCE: u8 = 2;
+    pub const CANCEL_REASON_OPERATIONS: u8 = 3;
 
     pub struct Config has copy, drop, store {
         pub event_slug: vector<u8>,
@@ -49,10 +55,20 @@ module lottery_multi::registry {
         slots_checksum: vector<u8>,
     }
 
+    pub struct CancellationRecord has copy, drop, store {
+        pub reason_code: u8,
+        pub canceled_ts: u64,
+        pub previous_status: u8,
+        pub tickets_sold: u64,
+        pub proceeds_accum: u64,
+    }
+
     struct Registry has key {
         lotteries: table::Table<u64, Lottery>,
         ordered_ids: vector<u64>,
         created_events: event::EventHandle<history::LotteryCreatedEvent>,
+        canceled_events: event::EventHandle<history::LotteryCanceledEvent>,
+        cancellations: table::Table<u64, CancellationRecord>,
     }
 
     public entry fun init_registry(admin: &signer) {
@@ -63,10 +79,13 @@ module lottery_multi::registry {
             errors::E_ALREADY_INITIALIZED,
         );
         let created_events = event::new_event_handle<history::LotteryCreatedEvent>(admin);
+        let canceled_events = event::new_event_handle<history::LotteryCanceledEvent>(admin);
         let registry = Registry {
             lotteries: table::new(),
             ordered_ids: vector::empty(),
             created_events,
+            canceled_events,
+            cancellations: table::new(),
         };
         move_to(admin, registry);
     }
@@ -121,6 +140,55 @@ module lottery_multi::registry {
         lottery.status = next_status;
     }
 
+    public entry fun cancel_lottery_admin(
+        admin: &signer,
+        id: u64,
+        reason_code: u8,
+        now_ts: u64,
+    ) acquires Registry, sales::SalesLedger {
+        let caller = signer::address_of(admin);
+        assert!(caller == @lottery_multi, errors::E_REGISTRY_MISSING);
+        assert!(reason_code > 0, errors::E_CANCEL_REASON_INVALID);
+        let registry = borrow_registry_mut();
+        let lottery = table::borrow_mut(&mut registry.lotteries, id);
+        let previous_status = lottery.status;
+        assert!(is_transition_allowed(previous_status, STATUS_CANCELED), errors::E_STATUS_TRANSITION_NOT_ALLOWED);
+        lottery.status = STATUS_CANCELED;
+        if (!lottery.snapshot_frozen) {
+            lottery.snapshot_frozen = true;
+        };
+
+        let mut tickets_sold = 0u64;
+        let mut proceeds_accum = 0u64;
+        if (sales::has_state(id)) {
+            let (sold, proceeds, _last_ts) = sales::sales_totals(id);
+            tickets_sold = sold;
+            proceeds_accum = proceeds;
+            sales::begin_refund(id);
+        };
+
+        let record = CancellationRecord {
+            reason_code,
+            canceled_ts: now_ts,
+            previous_status,
+            tickets_sold,
+            proceeds_accum,
+        };
+        table::add(&mut registry.cancellations, id, copy record);
+
+        let event = history::LotteryCanceledEvent {
+            event_version: history::EVENT_VERSION_V1,
+            event_category: history::EVENT_CATEGORY_REFUND,
+            lottery_id: id,
+            previous_status,
+            reason_code,
+            tickets_sold,
+            proceeds_accum,
+            timestamp: now_ts,
+        };
+        event::emit_event(&mut registry.canceled_events, event);
+    }
+
     public fun borrow_config(id: u64): &Config acquires Registry {
         let registry = borrow_registry_ref();
         let lottery = table::borrow(&registry.lotteries, id);
@@ -137,6 +205,18 @@ module lottery_multi::registry {
         let registry = borrow_registry_ref();
         let lottery = table::borrow(&registry.lotteries, id);
         lottery.snapshot_frozen
+    }
+
+    public fun get_cancellation_record(
+        id: u64,
+    ): option::Option<CancellationRecord> acquires Registry {
+        let registry = borrow_registry_ref();
+        if (!table::contains(&registry.cancellations, id)) {
+            option::none()
+        } else {
+            let record = table::borrow(&registry.cancellations, id);
+            option::some(*record)
+        }
     }
 
     fun create_lottery_internal(creator: address, id: u64, config: Config) acquires Registry {
@@ -175,6 +255,15 @@ module lottery_multi::registry {
             slots_checksum,
         };
         event::emit_event(&mut registry.created_events, event);
+    }
+
+    public fun get_cancellation_record(id: u64): option::Option<CancellationRecord> acquires Registry {
+        let registry = borrow_registry_ref();
+        if (!table::contains(&registry.cancellations, id)) {
+            return option::none();
+        };
+        let record = table::borrow(&registry.cancellations, id);
+        option::some(copy *record)
     }
 
     fun borrow_registry_mut(): &mut Registry acquires Registry {
@@ -216,6 +305,11 @@ module lottery_multi::registry {
     public fun borrow_config_from_registry(registry_ref: &Registry, id: u64): &Config {
         let lottery = table::borrow(&registry_ref.lotteries, id);
         &lottery.config
+    }
+
+    public fun get_status_from_registry(registry_ref: &Registry, id: u64): u8 {
+        let lottery = table::borrow(&registry_ref.lotteries, id);
+        lottery.status
     }
 
     public fun slots_checksum(id: u64): vector<u8> acquires Registry {

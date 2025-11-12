@@ -11,6 +11,8 @@
 - [support.md](support.md)
 - [reward.md](reward.md)
 - [lottery_multi.md](lottery_multi.md) — модули, функции и события, добавленные на этапах 1–2 RFC v1.
+- [lottery_multi_stage_playbook.md](lottery_multi_stage_playbook.md) — пошаговое описание механик этапов 3–6 и связь с тестами.
+- [tags_policy.md](tags_policy.md) — политика классификаторов, допустимые комбинации тегов и ручные исключения.
 
 ### Структура описания модуля
 Для каждого Move-модуля используйте шаблон `contracts/<module>/functions.md`:

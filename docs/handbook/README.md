@@ -6,8 +6,9 @@
 - **Архитектура** — высокоуровневое устройство пакетов Move, off-chain сервисов и жизненного цикла розыгрышей. См. [architecture/overview.md](architecture/overview.md).
 - **Управление доступом** — роли, capability и процедуры выдачи/отзыва. См. [governance/roles.md](governance/roles.md).
 - **Контракты** — описание пакетов `core`, `support`, `reward`, `lottery_multi` и их API. Стартовая страница: [contracts/README.md](contracts/README.md).
-- **Операции** — runbook для администраторов, партнёров и автоматизации. См. [operations/runbooks.md](operations/runbooks.md).
-- **Фронтенд и API** — требования к разделу «История», i18n и будущим публичным интерфейсам. См. [frontend/overview.md](frontend/overview.md).
+- **Операции** — runbook для администраторов, партнёров, пострелизная поддержка и журналирование. См. [operations/runbooks.md](operations/runbooks.md), [operations/post_release_support.md](operations/post_release_support.md), [operations/postmortems.md](operations/postmortems.md).
+- **Фронтенд и API** — требования к разделу «История», i18n и будущим публичным интерфейсам. См. [frontend/overview.md](frontend/overview.md)
+  и [frontend/a11y.md](frontend/a11y.md).
 - **Тестирование** — обязательные тесты, Move Prover и контроль качества. См. [qa/testing_matrix.md](qa/testing_matrix.md).
 - **Справочные материалы** — словарь ошибок, глоссарий, схемы данных. См. [reference/errors.md](reference/errors.md).
 

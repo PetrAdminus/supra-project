@@ -5,6 +5,8 @@
 | `0xE_TAG_PRIMARY_TYPE` | `lottery_multi::tags` | Некорректный основной тип лотереи |
 | `0xE_CONFIG_INVALID_DISTRIBUTION` | `lottery_multi::registry` | Сумма распределений продаж не равна 10_000 bps |
 | `0xE_SNAPSHOT_FROZEN` | `lottery_multi::sales` | Попытка изменить билеты после фиксации снапшота |
+| `0xE_CANCEL_REASON_INVALID` | `lottery_multi::registry` | Попытка отмены без указания причины |
+| `0xE_CANCELLATION_RECORD_MISSING` | `lottery_multi::registry` | Попытка архивировать отмену без сохранённого `CancellationRecord` |
 | `0xE_VRF_PAYLOAD_SCHEMA` | `lottery_multi::types` | Payload VRF не соответствует текущей схеме |
 | `0xE_VRF_CONSUMED` | `lottery_multi::draw` | Повторный fulfill для уже обработанного запроса |
 | `0xE_WINNER_CURSOR_STALE` | `lottery_multi::payouts` | Батч победителей запущен с устаревшей позиции |
@@ -13,6 +15,18 @@
 | `0xE_RATE_LIMIT` | `lottery_multi::sales` | Превышен лимит покупок за окно |
 | `0xE_FEATURE_DISABLED` | `lottery_multi::feature_switch` | Попытка вызвать отключённую функцию |
 | `0xE_PRICE_STALE` | `lottery_multi::price_feed` | Данные прайс-фида устарели |
+| `0xE_PRICE_FALLBACK_ACTIVE` | `lottery_multi::price_feed` | Попытка использовать цену при активном fallback |
+| `0xE_PRICE_CLAMP_ACTIVE` | `lottery_multi::price_feed` | Попытка использовать цену при активном клампе |
+| `0xE_PRICE_CLAMP_NOT_ACTIVE` | `lottery_multi::price_feed` | Попытка снять кламп, который уже отключён |
+| `0xE_REFUND_STATUS_INVALID` | `lottery_multi::payouts` | Рефанд разрешён только для тиражей со статусом `STATUS_CANCELED` |
+| `0xE_REFUND_NOT_ACTIVE` | `lottery_multi::sales` | Попытка записать батч рефанда без инициализации отмены |
+| `0xE_REFUND_ROUND_NON_MONOTONIC` | `lottery_multi::sales` | Нарушен порядок `refund_round`, ожидается последовательное увеличение |
+| `0xE_REFUND_LIMIT_TICKETS` | `lottery_multi::sales` | Количество билетов в рефанде превышает общий объём продаж |
+| `0xE_REFUND_LIMIT_FUNDS` | `lottery_multi::sales` | Сумма возвратов превышает собранную выручку |
+| `0xE_REFUND_BATCH_EMPTY` | `lottery_multi::sales` | Батч рефанда должен содержать хотя бы один билет или сумму |
+| `0xE_REFUND_TIMESTAMP` | `lottery_multi::sales` | Метка времени батча меньше предыдущей записи рефанда |
+| `0xE_REFUND_PROGRESS_INCOMPLETE` | `lottery_multi::payouts` | Архивирование отмены до завершения всех батчей рефанда |
+| `0xE_REFUND_PROGRESS_FUNDS` | `lottery_multi::payouts` | Сумма возвратов меньше собранной выручки |
 | `0xE_AUTOMATION_LOCKED` | `lottery_multi::automation` | Нарушен таймлок или недостаточная репутация бота |
 
 Полный перечень ошибок хранится в `SupraLottery/supra/move_workspace/lottery_multi/sources/errors.move`.

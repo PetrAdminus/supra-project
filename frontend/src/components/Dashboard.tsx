@@ -1,4 +1,4 @@
-import { Trophy, Wallet, Clock, TrendingUp } from "lucide-react";
+import { Trophy, Wallet, Clock } from "lucide-react";
 import { Card } from "./ui/card";
 import {
   Table,
@@ -9,7 +9,8 @@ import {
   TableRow,
 } from "./ui/table";
 import { DashboardSidebar } from "./DashboardSidebar";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useLotteryMultiViews } from "../features/dashboard/hooks/useLotteryMultiViews";
 
 const recentDraws = [
   { id: "#12345", date: "Oct 4, 2025", winner: "0x1a2b...3c4d", prize: "50,000 SUPRA", ticket: "789012" },
@@ -21,6 +22,120 @@ const recentDraws = [
 
 export function Dashboard() {
   const [activeSection, setActiveSection] = useState<"tickets" | "draws" | "history" | "profile" | "settings">("draws");
+  const viewsQuery = useLotteryMultiViews();
+  const statusOverview = viewsQuery.data?.statusOverview;
+  const info = viewsQuery.data?.info;
+
+  const numberFormatter = useMemo(() => new Intl.NumberFormat("ru-RU"), []);
+
+  const displayValue = (value?: number) => {
+    if (viewsQuery.isLoading) {
+      return "…";
+    }
+    if (value === undefined || Number.isNaN(value)) {
+      return "—";
+    }
+    return numberFormatter.format(value);
+  };
+
+  const updatedAtLabel = useMemo(() => {
+    if (!info?.updatedAt) {
+      return null;
+    }
+    const parsed = new Date(info.updatedAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return info.updatedAt;
+    }
+    return parsed.toLocaleString("ru-RU");
+  }, [info?.updatedAt]);
+
+  const metrics = useMemo(
+    () => [
+      {
+        key: "active",
+        label: "Активные розыгрыши",
+        primary: displayValue(statusOverview?.active),
+        secondary:
+          statusOverview && !viewsQuery.isLoading
+            ? `${numberFormatter.format(statusOverview.closing)} готовятся к закрытию`
+            : null,
+        cardClass: "border-cyan-500/30 glow-cyan",
+        gradientClass: "from-cyan-500 to-cyan-600",
+        Icon: Trophy,
+      },
+      {
+        key: "vrf",
+        label: "VRF ожидание",
+        primary: displayValue(statusOverview?.vrfRequested),
+        secondary:
+          statusOverview && !viewsQuery.isLoading
+            ? `${numberFormatter.format(statusOverview.vrfRetryBlocked)} заблокировано retry`
+            : null,
+        cardClass: "border-purple-500/30 glow-purple",
+        gradientClass: "from-purple-500 to-purple-600",
+        Icon: Clock,
+      },
+      {
+        key: "payout",
+        label: "Очередь выплат",
+        primary: displayValue(statusOverview?.payoutBacklog),
+        secondary:
+          statusOverview && !viewsQuery.isLoading
+            ? `${numberFormatter.format(statusOverview.winnersPending)} победителей ждут выплаты`
+            : null,
+        cardClass: "border-pink-500/30 glow-pink",
+        gradientClass: "from-pink-500 to-pink-600",
+        Icon: Wallet,
+      },
+    ], [
+      displayValue,
+      numberFormatter,
+      statusOverview?.active,
+      statusOverview?.closing,
+      statusOverview?.vrfRequested,
+      statusOverview?.vrfRetryBlocked,
+      statusOverview?.payoutBacklog,
+      statusOverview?.winnersPending,
+      viewsQuery.isLoading,
+    ]);
+
+  const lifecycleRows = useMemo(
+    () => [
+      { key: "total", label: "Всего розыгрышей", value: statusOverview?.total },
+      { key: "draft", label: "Draft", value: statusOverview?.draft },
+      { key: "active", label: "Active", value: statusOverview?.active },
+      { key: "closing", label: "Closing", value: statusOverview?.closing },
+      { key: "drawRequested", label: "DrawRequested", value: statusOverview?.drawRequested },
+      { key: "drawn", label: "WinnerComputation", value: statusOverview?.drawn },
+      { key: "payout", label: "Payout", value: statusOverview?.payout },
+      { key: "finalized", label: "Finalized", value: statusOverview?.finalized },
+      { key: "canceled", label: "Canceled", value: statusOverview?.canceled },
+    ], [
+      statusOverview?.active,
+      statusOverview?.canceled,
+      statusOverview?.closing,
+      statusOverview?.drawRequested,
+      statusOverview?.drawn,
+      statusOverview?.draft,
+      statusOverview?.finalized,
+      statusOverview?.payout,
+      statusOverview?.total,
+    ]);
+
+  const backlogRows = useMemo(
+    () => [
+      { key: "vrfRequested", label: "VRF: ожидают fulfill", value: statusOverview?.vrfRequested },
+      { key: "vrfFulfilledPending", label: "VRF: готово к вычислению", value: statusOverview?.vrfFulfilledPending },
+      { key: "vrfRetryBlocked", label: "VRF: блок retry", value: statusOverview?.vrfRetryBlocked },
+      { key: "winnersPending", label: "Победители без выплат", value: statusOverview?.winnersPending },
+      { key: "payoutBacklog", label: "Транши выплат в очереди", value: statusOverview?.payoutBacklog },
+    ], [
+      statusOverview?.payoutBacklog,
+      statusOverview?.vrfFulfilledPending,
+      statusOverview?.vrfRequested,
+      statusOverview?.vrfRetryBlocked,
+      statusOverview?.winnersPending,
+    ]);
 
   return (
     <section id="dashboard" className="py-20 relative">
@@ -45,64 +160,98 @@ export function Dashboard() {
           <div className="flex-1">
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          {/* Prize Pool */}
-          <Card className="glass-strong p-8 rounded-2xl border-cyan-500/30 glow-cyan">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center">
-                <Trophy className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-400">Current Prize Pool</p>
-                <h3 className="text-3xl text-cyan-400" style={{ fontFamily: 'Orbitron, sans-serif', fontWeight: 700 }}>
-                  125,000
-                </h3>
-                <p className="text-sm text-gray-300">SUPRA</p>
-              </div>
+              {metrics.map(({ key, label, primary, secondary, cardClass, gradientClass, Icon }) => (
+                <Card key={key} className={`glass-strong p-8 rounded-2xl ${cardClass}`}>
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${gradientClass} flex items-center justify-center`}>
+                      <Icon className="w-7 h-7 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-400">{label}</p>
+                      <h3
+                        className="text-3xl text-white"
+                        style={{ fontFamily: "Orbitron, sans-serif", fontWeight: 700 }}
+                      >
+                        {primary}
+                      </h3>
+                      {secondary ? <p className="text-sm text-gray-300">{secondary}</p> : null}
+                    </div>
+                  </div>
+                  {viewsQuery.isError ? (
+                    <p className="text-xs text-red-400">Не удалось загрузить статус. Повторите попытку позже.</p>
+                  ) : null}
+                </Card>
+              ))}
             </div>
-            <div className="flex items-center gap-2 text-sm text-green-400">
-              <TrendingUp className="w-4 h-4" />
-              <span>+12.5% from last draw</span>
-            </div>
-          </Card>
 
-          {/* User Balance */}
-          <Card className="glass-strong p-8 rounded-2xl border-purple-500/30 glow-purple">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
-                <Wallet className="w-7 h-7 text-white" />
+            <Card className="glass-strong p-8 rounded-2xl border-cyan-500/20 mb-12">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-6">
+                <div>
+                  <h3 className="text-2xl text-white" style={{ fontFamily: "Orbitron, sans-serif" }}>
+                    Сводка статусов lottery_multi
+                  </h3>
+                  <p className="text-sm text-gray-400">
+                    Карточки обновляются каждые 30 секунд с использованием `/lottery-multi/views`.
+                  </p>
+                </div>
+                <div className="text-sm text-gray-400 text-left md:text-right">
+                  {info?.version ? <div>Версия view: {info.version}</div> : null}
+                  {updatedAtLabel ? <div>Обновлено: {updatedAtLabel}</div> : null}
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-gray-400">Your Balance</p>
-                <h3 className="text-3xl text-purple-400" style={{ fontFamily: 'Orbitron, sans-serif', fontWeight: 700 }}>
-                  2,450
-                </h3>
-                <p className="text-sm text-gray-300">SUPRA</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-              <span>3 active tickets</span>
-            </div>
-          </Card>
-
-          {/* Next Draw */}
-          <Card className="glass-strong p-8 rounded-2xl border-pink-500/30 glow-pink">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-pink-500 to-pink-600 flex items-center justify-center">
-                <Clock className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-400">Next Draw In</p>
-                <h3 className="text-3xl text-pink-400" style={{ fontFamily: 'Orbitron, sans-serif', fontWeight: 700 }}>
-                  23:45:12
-                </h3>
-                <p className="text-sm text-gray-300">Hours</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-              <span>1,234 participants</span>
-            </div>
-          </Card>
-        </div>
+              {viewsQuery.isError ? (
+                <p className="text-red-400">Не удалось получить данные статуса. Проверьте подключение к Supra API.</p>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div>
+                    <h4 className="text-lg text-cyan-300 mb-2" style={{ fontFamily: "Orbitron, sans-serif" }}>
+                      Жизненный цикл
+                    </h4>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-gray-800">
+                          <TableHead className="text-cyan-400">Статус</TableHead>
+                          <TableHead className="text-cyan-400 text-right">Количество</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {lifecycleRows.map(({ key, label, value }) => (
+                          <TableRow key={key} className="border-gray-800">
+                            <TableCell className="text-gray-300">{label}</TableCell>
+                            <TableCell className="text-right text-gray-100" style={{ fontFamily: "Orbitron, sans-serif" }}>
+                              {displayValue(value)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div>
+                    <h4 className="text-lg text-purple-300 mb-2" style={{ fontFamily: "Orbitron, sans-serif" }}>
+                      Операционный бэклог
+                    </h4>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-gray-800">
+                          <TableHead className="text-purple-400">Категория</TableHead>
+                          <TableHead className="text-purple-400 text-right">Количество</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {backlogRows.map(({ key, label, value }) => (
+                          <TableRow key={key} className="border-gray-800">
+                            <TableCell className="text-gray-300">{label}</TableCell>
+                            <TableCell className="text-right text-gray-100" style={{ fontFamily: "Orbitron, sans-serif" }}>
+                              {displayValue(value)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </Card>
 
             {/* Recent Draws Table */}
             <Card className="glass-strong p-8 rounded-2xl border-cyan-500/20">

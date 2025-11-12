@@ -51,6 +51,17 @@ module lottery_multi::sales {
         pub proceeds_accum: u64,
     }
 
+    pub struct RefundProgressView has copy, drop, store {
+        pub active: bool,
+        pub refund_round: u64,
+        pub tickets_refunded: u64,
+        pub prize_refunded: u64,
+        pub operations_refunded: u64,
+        pub last_refund_ts: u64,
+        pub tickets_sold: u64,
+        pub proceeds_accum: u64,
+    }
+
     struct RateTrack has store {
         window_start: u64,
         purchase_count: u64,
@@ -69,6 +80,12 @@ module lottery_multi::sales {
         rate_track: table::Table<address, RateTrack>,
         distribution: economics::SalesDistribution,
         accounting: economics::Accounting,
+        refund_active: bool,
+        refund_round: u64,
+        refund_tickets_processed: u64,
+        refund_prize_total: u64,
+        refund_operations_total: u64,
+        last_refund_ts: u64,
     }
 
     struct SalesLedger has key {
@@ -235,6 +252,12 @@ module lottery_multi::sales {
                 rate_track: table::new(),
                 distribution: copy *distribution,
                 accounting: economics::new_accounting(),
+                refund_active: false,
+                refund_round: 0,
+                refund_tickets_processed: 0,
+                refund_prize_total: 0,
+                refund_operations_total: 0,
+                last_refund_ts: 0,
             };
             table::add(states, lottery_id, state);
         };
@@ -340,6 +363,15 @@ module lottery_multi::sales {
         };
         let state = table::borrow(&ledger.states, lottery_id);
         (state.tickets_sold, state.proceeds_accum, state.last_purchase_ts)
+    }
+
+    public fun has_state(lottery_id: u64): bool acquires SalesLedger {
+        let ledger_addr = @lottery_multi;
+        if (!exists<SalesLedger>(ledger_addr)) {
+            return false;
+        };
+        let ledger = borrow_global<SalesLedger>(ledger_addr);
+        table::contains(&ledger.states, lottery_id)
     }
 
     public fun record_payouts(
@@ -576,6 +608,105 @@ module lottery_multi::sales {
             let sum = (current as u128) + (quantity as u128);
             assert!(sum <= (per_limit as u128), errors::E_PURCHASE_ADDRESS_LIMIT);
         };
+    }
+
+    public fun begin_refund(lottery_id: u64) acquires SalesLedger {
+        let ledger = borrow_ledger_mut();
+        if (!table::contains(&ledger.states, lottery_id)) {
+            return;
+        };
+        let state = table::borrow_mut(&mut ledger.states, lottery_id);
+        if (!state.refund_active) {
+            state.refund_active = true;
+            state.refund_round = 0;
+            state.refund_tickets_processed = 0;
+            state.refund_prize_total = 0;
+            state.refund_operations_total = 0;
+            state.last_refund_ts = 0;
+        };
+    }
+
+    public fun record_refund_batch(
+        lottery_id: u64,
+        refund_round: u64,
+        tickets_refunded: u64,
+        prize_refund: u64,
+        operations_refund: u64,
+        timestamp: u64,
+    ): (u64, u64, u64) acquires SalesLedger {
+        assert!(
+            tickets_refunded > 0 || prize_refund > 0 || operations_refund > 0,
+            errors::E_REFUND_BATCH_EMPTY,
+        );
+        let ledger = borrow_ledger_mut();
+        if (!table::contains(&ledger.states, lottery_id)) {
+            abort errors::E_REFUND_STATUS_INVALID;
+        };
+        let state = table::borrow_mut(&mut ledger.states, lottery_id);
+        assert!(state.refund_active, errors::E_REFUND_NOT_ACTIVE);
+        assert!(refund_round == state.refund_round + 1, errors::E_REFUND_ROUND_NON_MONOTONIC);
+        if (state.last_refund_ts > 0) {
+            assert!(timestamp >= state.last_refund_ts, errors::E_REFUND_TIMESTAMP);
+        };
+        let processed_after = state.refund_tickets_processed + tickets_refunded;
+        assert!(processed_after <= state.tickets_sold, errors::E_REFUND_LIMIT_TICKETS);
+        let total_refund_after = state.refund_prize_total
+            + state.refund_operations_total
+            + prize_refund
+            + operations_refund;
+        assert!(total_refund_after <= state.proceeds_accum, errors::E_REFUND_LIMIT_FUNDS);
+
+        state.refund_tickets_processed = processed_after;
+        state.refund_prize_total = state.refund_prize_total + prize_refund;
+        state.refund_operations_total = state.refund_operations_total + operations_refund;
+        state.refund_round = refund_round;
+        state.last_refund_ts = timestamp;
+
+        (
+            state.refund_tickets_processed,
+            state.refund_prize_total,
+            state.refund_operations_total,
+        )
+    }
+
+    pub fun refund_progress(lottery_id: u64): RefundProgressView acquires SalesLedger {
+        let addr = @lottery_multi;
+        if (!exists<SalesLedger>(addr)) {
+            return RefundProgressView {
+                active: false,
+                refund_round: 0,
+                tickets_refunded: 0,
+                prize_refunded: 0,
+                operations_refunded: 0,
+                last_refund_ts: 0,
+                tickets_sold: 0,
+                proceeds_accum: 0,
+            };
+        };
+        let ledger = borrow_global<SalesLedger>(addr);
+        if (!table::contains(&ledger.states, lottery_id)) {
+            return RefundProgressView {
+                active: false,
+                refund_round: 0,
+                tickets_refunded: 0,
+                prize_refunded: 0,
+                operations_refunded: 0,
+                last_refund_ts: 0,
+                tickets_sold: 0,
+                proceeds_accum: 0,
+            };
+        };
+        let state = table::borrow(&ledger.states, lottery_id);
+        RefundProgressView {
+            active: state.refund_active,
+            refund_round: state.refund_round,
+            tickets_refunded: state.refund_tickets_processed,
+            prize_refunded: state.refund_prize_total,
+            operations_refunded: state.refund_operations_total,
+            last_refund_ts: state.last_refund_ts,
+            tickets_sold: state.tickets_sold,
+            proceeds_accum: state.proceeds_accum,
+        }
     }
 
     fun borrow_ledger_mut(): &mut SalesLedger acquires SalesLedger {

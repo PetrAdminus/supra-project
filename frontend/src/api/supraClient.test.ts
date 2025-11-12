@@ -11,6 +11,7 @@ import {
   fetchChecklistSupra,
   fetchLotteryVrfLogSupra,
   fetchLotteryStatusSupra,
+  fetchLotteryMultiViewsSupra,
   fetchWhitelistStatusSupra,
   fetchTreasuryBalancesSupra,
   fetchTreasuryConfigSupra,
@@ -243,6 +244,57 @@ describe("supraClient caching", () => {
     expect(log.round.snapshot?.["ticket_count"]).toBe(128);
     expect(log.round.requests).toHaveLength(1);
     expect(log.hub.fulfillments[0]?.event_type).toBe("vrf_hub::RandomnessFulfilledEvent");
+  });
+
+  it("maps lottery multi views payload and normalizes query parameters", async () => {
+    queueResponse({
+      info: {
+        version: "1.0.2",
+        updated_at: "2025-11-27T00:00:00Z",
+      },
+      views: {
+        status_overview: {
+          total: "5",
+          draft: 1,
+          active: 2,
+          closing: 0,
+          draw_requested: 1,
+          drawn: 0,
+          payout: 1,
+          finalized: 3,
+          canceled: 0,
+          vrf_requested: 1,
+          vrf_fulfilled_pending: "1",
+          vrf_retry_blocked: 1,
+          winners_pending: 2,
+          payout_backlog: 1,
+        },
+        list_active: [201, "198", null],
+        list_by_primary_type: [201, 177, 150],
+        list_by_tag_mask: [201, "not-a-number", 198],
+        list_by_all_tags: 177,
+        list_finalized_ids: [190, 188, "bad"],
+      },
+    });
+
+    const result = await fetchLotteryMultiViewsSupra({
+      nowTs: 1_730_000_000.8,
+      limit: 2,
+      primaryType: 1,
+      tagMask: 7,
+    });
+
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "http://localhost:8000/lottery-multi/views?now_ts=1730000000&limit=2&primary_type=1&tag_mask=7",
+      expect.objectContaining({ headers: expect.objectContaining({ Accept: "application/json" }) }),
+    );
+    expect(result.info.version).toBe("1.0.2");
+    expect(result.info.updatedAt).toBe("2025-11-27T00:00:00.000Z");
+    expect(result.statusOverview.total).toBe(5);
+    expect(result.statusOverview.vrfRetryBlocked).toBe(1);
+    expect(result.listActive).toEqual([201, 198]);
+    expect(result.listByTagMask).toEqual([201, 198]);
+    expect(result.listByAllTags).toEqual([177]);
   });
 
   it("clamps limit and falls back to the requested lottery id", async () => {
