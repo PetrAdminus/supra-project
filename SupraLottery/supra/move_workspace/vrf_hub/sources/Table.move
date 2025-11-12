@@ -24,11 +24,12 @@ module vrf_hub::table {
 
     public fun keys<K: copy + drop, V: store>(self: &Table<K, V>): vector<K> {
         let len = vector::length(&self.keys);
-        let mut out = vector::empty<K>();
-        let mut i = 0;
+        let out = vector::empty<K>();
+        let i = 0;
         while (i < len) {
             let key_ref = vector::borrow(&self.keys, i);
-            vector::push_back(&mut out, copy *key_ref);
+            let key_copy = *key_ref;
+            vector::push_back(&mut out, key_copy);
             i = i + 1;
         };
         out

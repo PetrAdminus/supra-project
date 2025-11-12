@@ -30,6 +30,22 @@ if [[ "${STORE_STATUS}" == *"false"* ]]; then
   supra_cli_move_run "--function-id ${LOTTERY_ADDR}::treasury_v1::register_store_for --args address:${ADMIN_ADDR} --assume-yes"
 fi
 
+if [[ -n ${AGGREGATOR_ADDR:-} ]]; then
+  supra_cli_info "Ensuring callback sender ${AGGREGATOR_ADDR} is whitelisted"
+  if ! supra_cli_move_run "--function-id ${LOTTERY_ADDR}::core_main_v2::whitelist_callback_sender --args address:${AGGREGATOR_ADDR} --assume-yes"; then
+    supra_cli_warn "whitelist_callback_sender failed (possibly already whitelisted)"
+  fi
+fi
+
+if [[ -n ${CONSUMER_ADDRS:-} ]]; then
+  for consumer in ${CONSUMER_ADDRS}; do
+    supra_cli_info "Ensuring consumer ${consumer} is whitelisted"
+    if ! supra_cli_move_run "--function-id ${LOTTERY_ADDR}::core_main_v2::whitelist_consumer --args address:${consumer} --assume-yes"; then
+      supra_cli_warn "whitelist_consumer failed for ${consumer} (possibly already whitelisted)"
+    fi
+  done
+fi
+
 supra_cli_info "Minting ${TICKET_FUND} tokens to admin"
 supra_cli_move_run "--function-id ${LOTTERY_ADDR}::treasury_v1::mint_to --args address:${ADMIN_ADDR} u64:${TICKET_FUND} --assume-yes"
 
@@ -80,3 +96,4 @@ supra_cli_info "Calling manual_draw"
 supra_cli_move_run "--function-id ${LOTTERY_ADDR}::core_main_v2::manual_draw --assume-yes"
 
 supra_cli_info "Smoke test triggered manual_draw. Monitor DrawHandledEvent via docs/dvrf_event_monitoring.md"
+

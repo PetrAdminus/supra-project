@@ -80,8 +80,8 @@ module lottery_multi::history_migration_tests {
         let mirrored_opt = history_bridge::get_summary(205);
         assert!(option::is_some(&mirrored_opt), 2);
         let mirrored = option::destroy_some(mirrored_opt);
-        assert!(mirrored.archive_hash == hash, 3);
-        assert!(mirrored.finalized_at == summary.finalized_at, 4);
+        assert!(history_bridge::legacy_summary_archive_hash(&mirrored) == hash, 3);
+        assert!(history_bridge::legacy_summary_finalized_at(&mirrored) == summary.finalized_at, 4);
     }
 
     fun sample_summary(id: u64, primary_type: u8, tags_mask: u64): history::LotterySummary {

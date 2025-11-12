@@ -2,7 +2,7 @@ name: supra_cli
 services:
   supra_cli:
     container_name: supra_cli
-    image: asia-docker.pkg.dev/supra-devnet-misc/supra-testnet/validator-node:v9.0.12
+    image: asia-docker.pkg.dev/supra-devnet-misc/supra-testnet/validator-node:v9.1.9
     environment:
       SUPRA_HOME: /supra/configs
     volumes:
@@ -14,5 +14,5 @@ services:
         target: /supra/move_workspace
     tty: true
     network_mode: host
-    entrypoint: >
-      bash -c "echo 'supra() { /supra/supra \"$$@\"; }' >> ~/.profile && echo \"alias supra='/supra/supra'\" >> ~/.bashrc && exec bash"
+    entrypoint:
+      - /supra/SupraLottery/supra/docker-entrypoint.sh

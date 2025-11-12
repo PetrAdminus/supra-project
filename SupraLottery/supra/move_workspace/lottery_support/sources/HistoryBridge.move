@@ -1,26 +1,25 @@
 // sources/HistoryBridge.move
 module lottery_support::history_bridge {
-    friend lottery_multi::legacy_bridge;
 
     use std::option;
     use std::signer;
     use std::table;
-    use std::vector;
 
+    use supra_framework::account;
     use supra_framework::event;
 
     const E_NOT_AUTHORIZED: u64 = 0x101;
 
-    pub struct LegacySummary has copy, drop, store {
-        pub summary_bcs: vector<u8>,
-        pub archive_hash: vector<u8>,
-        pub finalized_at: u64,
+    struct LegacySummary has copy, drop, store {
+        summary_bcs: vector<u8>,
+        archive_hash: vector<u8>,
+        finalized_at: u64,
     }
 
-    pub struct LegacySummaryEvent has drop, store {
-        pub lottery_id: u64,
-        pub archive_hash: vector<u8>,
-        pub finalized_at: u64,
+    struct LegacySummaryEvent has drop, store {
+        lottery_id: u64,
+        archive_hash: vector<u8>,
+        finalized_at: u64,
     }
 
     struct LegacyArchive has key {
@@ -31,26 +30,26 @@ module lottery_support::history_bridge {
     public entry fun init_bridge(admin: &signer) {
         let addr = signer::address_of(admin);
         if (addr != @lottery) {
-            abort E_NOT_AUTHORIZED;
+            abort E_NOT_AUTHORIZED
         };
         if (exists<LegacyArchive>(@lottery)) {
-            return;
+            return
         };
         let archive = LegacyArchive {
             summaries: table::new(),
-            summary_events: event::new_event_handle<LegacySummaryEvent>(admin),
+            summary_events: account::new_event_handle<LegacySummaryEvent>(admin),
         };
         move_to(admin, archive);
     }
 
-    public(friend) fun record_summary(
+    public fun record_summary(
         lottery_id: u64,
         summary_bcs: vector<u8>,
         archive_hash: vector<u8>,
         finalized_at: u64,
     ) acquires LegacyArchive {
         if (!exists<LegacyArchive>(@lottery)) {
-            return;
+            return
         };
         let archive = borrow_global_mut<LegacyArchive>(@lottery);
         if (table::contains(&archive.summaries, lottery_id)) {
@@ -76,15 +75,30 @@ module lottery_support::history_bridge {
 
     public fun get_summary(lottery_id: u64): option::Option<LegacySummary> acquires LegacyArchive {
         if (!exists<LegacyArchive>(@lottery)) {
-            return option::none<LegacySummary>();
+            return option::none<LegacySummary>()
         };
         let archive = borrow_global<LegacyArchive>(@lottery);
         if (!table::contains(&archive.summaries, lottery_id)) {
             option::none<LegacySummary>()
         } else {
             let summary = table::borrow(&archive.summaries, lottery_id);
-            option::some(copy *summary)
+            option::some(*summary)
         }
+    }
+
+    public fun legacy_summary_summary_bcs(summary: &LegacySummary): vector<u8> {
+        let bytes_ref = &summary.summary_bcs;
+        *bytes_ref
+    }
+
+    public fun legacy_summary_archive_hash(summary: &LegacySummary): vector<u8> {
+        let hash_ref = &summary.archive_hash;
+        *hash_ref
+    }
+
+    public fun legacy_summary_finalized_at(summary: &LegacySummary): u64 {
+        let ts_ref = &summary.finalized_at;
+        *ts_ref
     }
 
     public fun is_initialized(): bool {

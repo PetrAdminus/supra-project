@@ -1824,3 +1824,11 @@ Output:
 General: {
   "Error": "Move compilation failed: Unable to parse Move package manifest: TOML parse error at line 1, column 1\n  |\n1 | ../SupraLottery/supra/move_workspace/Move.toml\n  | ^\ninvalid key\n"
 }
+Local: (2025-11-12 14:36:03.510813770 +00:00)	 Utc: (2025-11-12 14:36:03.513867856 UTC)
+
+CMD:
+Compile
+Output:
+General: {
+  "Error": "Move compilation failed: Unable to parse Move package manifest: TOML parse error at line 1, column 1\n  |\n1 | ../SupraLottery/supra/move_workspace/Move.toml\n  | ^\ninvalid key\n"
+}

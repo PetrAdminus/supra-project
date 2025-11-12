@@ -7,7 +7,7 @@ services:
     #NAME OF CONTAINER
     container_name: supra_cli
     #IMAGE FOR CONTAINER
-    image: asia-docker.pkg.dev/supra-devnet-misc/supra-testnet/validator-node:v9.0.12
+    image: asia-docker.pkg.dev/supra-devnet-misc/supra-testnet/validator-node:v9.1.9
     #ENVIRONMENT VARIABLES WITHIN CONTAINER
     environment:
       SUPRA_HOME: /supra/configs 
@@ -31,5 +31,5 @@ services:
       - path: ./supra-cli.env
         required: false
     #ENTRYPOINT, SETS THE ALIAS INSIDE THE CONTAINER FOR docker exect -it CONTAINER_NAME /bin/bash or docker exect -it CONTAINER_NAME /bin/sh -l
-    entrypoint: >
-      bash -c "echo 'supra() { /supra/supra \"\$@\"; }' >> ~/.profile && echo \"alias supra='/supra/supra'\" >> ~/.bashrc && exec bash"
+    entrypoint:
+      - /supra/SupraLottery/supra/docker-entrypoint.sh

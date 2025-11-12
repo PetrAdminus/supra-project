@@ -191,6 +191,16 @@ Supra CLI РЅР°С‡РёРЅР°СЏ СЃ СЂРµР»РёР·Р° 2025.05 С
    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id lottery::core_main_v2::record_consumer_whitelist_snapshot --args u128:<CALLBACK_GAS_PRICE> u128:<CALLBACK_GAS_LIMIT>"
    ```
 
+   > Текущее состояние (обновлено 24.10.2025):
+   > - `max_gas_price = 1000`
+   > - `max_gas_limit = 200000`
+   > - `min_balance_limit = 13500000000`
+   > - `callback_gas_price = 100`
+   > - `callback_gas_limit = 50000`
+   >
+   > Формула для проверки минимального баланса: `min_balance = 30 * max_gas_price * (max_gas_limit + verification_gas_value)`
+
+
 9. **РЈРїСЂР°РІР»РµРЅРёРµ РґРµРїРѕР·РёС‚РѕРј РЅР°РїСЂСЏРјСѓСЋ (РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё).** Р’СЃРµ С„СѓРЅРєС†РёРё РїСЂРёРЅРёРјР°СЋС‚ camelCase-РёРјРµРЅР° РїСЂРё РІС‹Р·РѕРІРµ С‡РµСЂРµР· Supra CLI. РџРѕСЃР»Рµ С‚РѕРіРѕ РєР°Рє СЃРЅР°РїС€РѕС‚С‹ whitelisting Р·Р°С„РёРєСЃРёСЂРѕРІР°РЅС‹, РєРѕРЅС‚СЂР°РєС‚ СЃР°Рј СЃРёРЅС…СЂРѕРЅРёР·РёСЂСѓРµС‚ `deposit::update*` РїСЂРё РёР·РјРµРЅРµРЅРёРё РєРѕРЅС„РёРіСѓСЂР°С†РёРё, РїРѕСЌС‚РѕРјСѓ СЌС‚Рё РєРѕРјР°РЅРґС‹ РЅСѓР¶РЅС‹ С‚РѕР»СЊРєРѕ РєР°Рє СЂРµР·РµСЂРІРЅС‹Р№ СЃС†РµРЅР°СЂРёР№.
    ```bash
    docker compose run --rm --entrypoint bash supra_cli -lc "${SUPRA_CONFIG:+SUPRA_CONFIG=$SUPRA_CONFIG }/supra/supra move tool run --profile <PROFILE> --function-id 0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e::deposit::clientSettingMinimumBalance --args u128:<MIN_BALANCE> --assume-yes"

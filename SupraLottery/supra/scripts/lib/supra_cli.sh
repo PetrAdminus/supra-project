@@ -15,6 +15,9 @@ supra_cli_init() {
     SUPRA_CLI_ENV_PREFIX="SUPRA_CONFIG=${SUPRA_CONFIG} "
     printf -v SUPRA_CLI_COPY_CONFIG 'mkdir -p /supra/.aptos && cp %q /supra/.aptos/config.yaml && ' "${SUPRA_CONFIG}"
   fi
+  if [[ -n ${SUPRA_PROFILE_PASSWORD:-} ]]; then
+    SUPRA_CLI_ENV_PREFIX+="SUPRA_PROFILE_PASSWORD=${SUPRA_PROFILE_PASSWORD} "
+  fi
 }
 
 supra_cli_require_env() {
@@ -43,7 +46,7 @@ supra_cli_move_run() {
 supra_cli_move_run_profile() {
   local profile=${1:?}
   local args=${2:?}
-  supra_cli_compose "/supra/supra move tool run --profile ${profile} ${args}"
+  supra_cli_compose "/supra/supra move tool run --profile ${profile} --expiration-secs 600 ${args}"
 }
 
 supra_cli_move_view() {

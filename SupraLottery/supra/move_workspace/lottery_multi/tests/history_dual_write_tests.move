@@ -75,10 +75,11 @@ module lottery_multi::history_dual_write_tests {
         let mirrored_opt = history_bridge::get_summary(5);
         assert!(option::is_some(&mirrored_opt), 0);
         let mirrored = option::destroy_some(mirrored_opt);
-        assert!(mirrored.archive_hash == expected_hash, 1);
-        let decoded: history::LotterySummary = bcs::from_bytes(&mirrored.summary_bcs);
+        assert!(history_bridge::legacy_summary_archive_hash(&mirrored) == expected_hash, 1);
+        let mirrored_bytes = history_bridge::legacy_summary_summary_bcs(&mirrored);
+        let decoded: history::LotterySummary = bcs::from_bytes(&mirrored_bytes);
         assert!(decoded.id == 5, 2);
-        assert!(mirrored.finalized_at == summary.finalized_at, 3);
+        assert!(history_bridge::legacy_summary_finalized_at(&mirrored) == summary.finalized_at, 3);
     }
 
     #[test(account = @lottery_multi)]
