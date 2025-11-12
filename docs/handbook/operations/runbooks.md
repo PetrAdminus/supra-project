@@ -14,6 +14,7 @@
 9. При партнёрских выплатах вызвать `payouts::record_partner_payout_admin`, предварительно сверив остаток `PartnerPayoutCap` через `roles::list_partner_caps`/`roles::has_partner_payout_cap` (`roles::consume_partner_payout` защищает от перерасхода, нарушений cooldown/nonce и expiry, выбрасывая `E_PARTNER_PAYOUT_BUDGET_EXCEEDED`/`E_PARTNER_PAYOUT_COOLDOWN`/`E_PARTNER_PAYOUT_NONCE`/`E_PARTNER_PAYOUT_EXPIRED`) и остаток операций по `sales::accounting_snapshot`, затем зафиксировать событие `PartnerPayoutEvent`.
 10. После завершения партнёрских выплат проверить `roles::list_premium_caps` для премиальных подписок (актуален показатель `expires_at` и `referrer`), при необходимости вызвать `roles::cleanup_expired_admin <now>` и убедиться в публикации `PartnerPayoutCapRevokedEvent`/`PremiumAccessRevokedEvent`; результаты занести в [incident_log.md](incident_log.md).
 11. Проверить, что `history::get_summary` возвращает запись и dual-write прошёл без ошибок.
+12. Снять агрегированную сводку `views::status_overview(now_ts)` и обновить [статусную страницу](status_page.md); при наличии `vrf_retry_blocked` или `payout_backlog` зафиксировать инцидент и следовать порогам из [monitoring.md](monitoring.md).
 
 ## Прайс-фид
 1. Мониторить `price_feed::get_price_view(asset_id)` и метрики `price_feed_updates_total`, `price_feed_clamp_active`, `price_feed_fallback_active` (см. [monitoring.md](monitoring.md)).

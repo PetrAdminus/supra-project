@@ -1,7 +1,7 @@
 {
   "info": {
-    "version": "1.0.1",
-    "updated_at": "2025-11-20"
+    "version": "1.0.2",
+    "updated_at": "2025-11-27"
   },
   "views": {
     "get_lottery": {
@@ -105,6 +105,22 @@
       "created_at": 1731964800,
       "closed_at": 1732047600,
       "finalized_at": 1732130400
+    },
+    "status_overview": {
+      "total": 48,
+      "draft": 5,
+      "active": 9,
+      "closing": 4,
+      "draw_requested": 2,
+      "drawn": 3,
+      "payout": 6,
+      "finalized": 17,
+      "canceled": 2,
+      "vrf_requested": 2,
+      "vrf_fulfilled_pending": 1,
+      "vrf_retry_blocked": 1,
+      "winners_pending": 3,
+      "payout_backlog": 2
     },
     "list_active": [201, 198, 177],
     "list_by_primary_type": [201, 177],

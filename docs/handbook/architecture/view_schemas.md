@@ -46,6 +46,9 @@
 | `LotterySummary` | `snapshot_hash`, `slots_checksum`, `winners_batch_hash`, `checksum_after_batch` | `string (0x<hex>)` | Контрольные суммы архива (SHA3-256 в hex). |
 | | `tickets_sold`, `proceeds_accum`, `total_allocated`, `total_prize_paid`, `total_operations_paid` | `integer` (u64) | Агрегаты продаж и выплат. |
 | | `created_at`, `closed_at`, `finalized_at` | `integer` (u64) | Временные метки жизненного цикла. |
+| `StatusOverview` | `total`, `draft`, `active`, `closing`, `draw_requested`, `drawn`, `payout`, `finalized`, `canceled` | `integer` (u64) | Подсчёты лотерей по ключевым статусам. |
+| | `vrf_requested`, `vrf_fulfilled_pending`, `vrf_retry_blocked` | `integer` (u64) | Метрики VRF: активные запросы, выполненные, но не потреблённые, и заблокированные повторные запросы. |
+| | `winners_pending`, `payout_backlog` | `integer` (u64) | Бэклоги расчёта победителей и невыплаченных батчей. |
 
 ## Правила версионирования
 

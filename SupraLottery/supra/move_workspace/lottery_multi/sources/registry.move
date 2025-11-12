@@ -218,6 +218,11 @@ module lottery_multi::registry {
         &lottery.config
     }
 
+    public fun get_status_from_registry(registry_ref: &Registry, id: u64): u8 {
+        let lottery = table::borrow(&registry_ref.lotteries, id);
+        lottery.status
+    }
+
     public fun slots_checksum(id: u64): vector<u8> acquires Registry {
         let registry = borrow_registry_ref();
         let lottery = table::borrow(&registry.lotteries, id);

@@ -44,6 +44,7 @@
 
 ### Фронтенд и внешние интерфейсы
 - View `lottery_multi::views` покрыты тестами `views_tests`, подтверждающими фильтры, сортировку и лимит пагинации; подготовлен документ [view_schemas.md](../handbook/architecture/view_schemas.md), JSON Schema `json/lottery_multi_views.schema.json`, пример ответов `json/examples/lottery_multi_view_samples.json` и Python-валидатор `SupraLottery/tests/test_view_schema_examples.py`.
+- Добавлена агрегированная view `status_overview`, фиксирующая сводные статусы, VRF-бэклог и состояние выплат; тест `views_tests::status_overview_counts_vrf_and_statuses` и обновлённая JSON Schema (v1.0.2) покрывают новое представление.
 - Остаётся синхронизировать API с фронтендом и индексаторами, подготовить smoke-тесты для внешних сервисов и связать схему с pipeline валидации.
 
 ### Операционный запуск и наблюдаемость

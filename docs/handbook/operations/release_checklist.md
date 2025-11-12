@@ -27,6 +27,7 @@
 
 ## 4. Пост-релиз (T+1 день)
 - [ ] Провести сверку агрегатов `Accounting` и `LotterySummary` по контрольным лотереям.
+- [ ] Проверить `views::status_overview` и обновить [статусную страницу](status_page.md); при обнаружении `vrf_retry_blocked`/`payout_backlog` выполнить шаги из [monitoring.md](monitoring.md).
 - [ ] Обновить `docs/handbook/contracts/lottery_multi.md` и runbook’и, если появились новые шаги.
 - [ ] Подготовить публичную заметку в баг-баунти-программе при изменении угроз/поведения.
 - [ ] Зафиксировать результаты smoke-тестов и мониторинга в `incident_log.md`.

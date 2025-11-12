@@ -12,6 +12,8 @@
 | VRF | `vrf_requests_paused` | Флаг приостановки запросов | `true` > 5 мин |
 | Dual-write | `dual_write_mismatch` | Количество лотерей с `expected_hash` и `actual_hash` != | > 0 |
 | Dual-write | `dual_write_pending` | Лотереи в статусе ожидания более 2 часов | > 0 |
+| Status | `status_overview.vrf_retry_blocked` | Количество лотерей, заблокированных окном повторного VRF | > 0 дольше 60 мин |
+| Status | `status_overview.payout_backlog` | Невыплаченные батчи (`payout_round < next_winner_batch_no`) | > 0 дольше 60 мин |
 | Платежи | `payout_round_gap` | `next_winner_batch_no - payout_round` | > 1 |
 | Платежи | `operations_budget_remaining` | Остаток операций по `PayoutBatchCap` | < 10% |
 | Automation | `automation_failure_count` | Счётчик провалов подряд | >= `max_failures` |
@@ -27,6 +29,7 @@
 - **On-chain события:** индексатор `supra-indexer` публикует в Kafka (`topic: lottery_multi.events`).
 - **AutomationBot Exporter:** `/metrics` endpoint с `failure_count`, `pending_age`, `success_streak`.
 - **Supra CLI:** `supra monitor dual-write --json` и `supra monitor vrf`.
+- **View `status_overview`:** опрос `lottery_multi::views::status_overview` (см. [status_page.md](status_page.md)) каждые 60 секунд для внутренних панелей и публикации статусной страницы.
 
 ## 4. Алерты и реагирование
 - `VrfDepositLow`: `effective_balance < required_minimum` → уведомление DevOps, запуск runbook VRF.
@@ -39,7 +42,7 @@
 - `RoleCapExpiring`: `partner_cap_expiring` или `premium_cap_expiring` > 0 → уведомление RootAdmin, выполнить `roles::cleanup_expired_admin`/`revoke_*`, обновить `incident_log.md` и удостовериться, что события `PartnerPayoutCapRevoked`/`PremiumAccessRevoked` зафиксированы.
 
 ## 5. Процедуры обновления
-- Раз в релиз проверять соответствие метрик документации (`lottery_multi_readiness_review.md`).
+- Раз в релиз проверять соответствие метрик документации (`lottery_multi_readiness_review.md`) и обновлять [status_page.md](status_page.md).
 - При добавлении новых событий обновить схемы в `docs/handbook/architecture/json/` и алёрты.
 - Все изменения алёртов заносятся в `incident_log.md`.
 

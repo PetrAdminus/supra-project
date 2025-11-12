@@ -3,8 +3,11 @@ module lottery_multi::views_tests {
     use std::string;
     use std::vector;
 
+    use lottery_multi::draw;
     use lottery_multi::economics;
+    use lottery_multi::payouts;
     use lottery_multi::registry;
+    use lottery_multi::sales;
     use lottery_multi::tags;
     use lottery_multi::types;
     use lottery_multi::views;
@@ -73,6 +76,62 @@ module lottery_multi::views_tests {
         assert!(string::eq(&metadata.primary_label, &expected_label), 0);
         assert!(metadata.is_experimental, 0);
         assert!(metadata.tags_mask == tags::TAG_EXPERIMENTAL | tags::TAG_PROMO, 0);
+    }
+
+    #[test(account = @lottery_multi)]
+    fun status_overview_counts_vrf_and_statuses(account: &signer) {
+        registry::init_registry(account);
+        sales::init_sales(account);
+        draw::init_draw(account);
+        payouts::init_payouts(account);
+
+        let mut draft_cfg = new_config(tags::TYPE_BASIC, 0);
+        draft_cfg.run_id = 1;
+        registry::create_draft_admin(account, 500, draft_cfg);
+
+        let mut active_cfg = new_config(tags::TYPE_PARTNER, tags::TAG_DAILY);
+        active_cfg.run_id = 2;
+        registry::create_draft_admin(account, 501, active_cfg);
+        registry::advance_status(account, 501, registry::STATUS_ACTIVE);
+
+        let mut draw_cfg = new_config(tags::TYPE_BASIC, tags::TAG_WEEKLY);
+        draw_cfg.run_id = 3;
+        registry::create_draft_admin(account, 502, draw_cfg);
+        registry::advance_status(account, 502, registry::STATUS_ACTIVE);
+        registry::advance_status(account, 502, registry::STATUS_CLOSING);
+        registry::mark_draw_requested(502);
+
+        let mut numbers = vector::empty<u256>();
+        vector::push_back(&mut numbers, 0);
+        draw::test_seed_vrf_state(
+            502,
+            numbers,
+            b"0123456789abcdef0123456789abcdef",
+            b"fedcba9876543210fedcba9876543210",
+            10,
+            1,
+            1,
+            123,
+            5,
+        );
+        draw::test_override_vrf_state(
+            502,
+            types::VRF_STATUS_REQUESTED,
+            false,
+            600,
+            1,
+        );
+
+        let overview = views::status_overview(100);
+        assert!(overview.total == 3, 0);
+        assert!(overview.draft == 1, 0);
+        assert!(overview.active == 1, 0);
+        assert!(overview.draw_requested == 1, 0);
+        assert!(overview.vrf_requested == 1, 0);
+        assert!(overview.vrf_retry_blocked == 1, 0);
+        assert!(overview.vrf_fulfilled_pending == 0, 0);
+        assert!(overview.winners_pending == 0, 0);
+        assert!(overview.payout_backlog == 0, 0);
     }
 
     fun new_config(primary_type: u8, tags_mask: u64): registry::Config {

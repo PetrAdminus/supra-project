@@ -47,11 +47,11 @@
 - `validate_config` выполняет ончейн-валидацию конфигурации перед созданием.
 - `get_lottery`, `get_lottery_status`, `get_lottery_badges`, `get_badge_metadata` — основные запросы для UI.
 - `list_active`, `list_by_primary_type`, `list_by_tag_mask`, `list_by_all_tags` — пагинация по статусам и тегам.
-- `accounting_snapshot`, `get_vrf_deposit_status`, `get_lottery_summary`, `list_finalized_ids` — агрегированные представления.
+- `accounting_snapshot`, `get_vrf_deposit_status`, `get_lottery_summary`, `list_finalized_ids`, `status_overview` — агрегированные представления; `status_overview(now_ts)` возвращает счётчики по статусам жизненного цикла, активным/заблокированным VRF-запросам и бэклогу выплат.
 - Тестовый модуль `views_tests` проверяет требование полного совпадения масок (`list_by_all_tags`), порядок сортировки и пагинацию по
-  типам (`list_by_primary_type`), а также ограничение `E_PAGINATION_LIMIT` при превышении лимита выдачи.
+  типам (`list_by_primary_type`), ограничение `E_PAGINATION_LIMIT`, а также агрегированную сводку (`status_overview_counts_vrf_and_statuses`).
 - JSON Schema `docs/handbook/architecture/json/lottery_multi_views.schema.json` описывает структуры `BadgeMetadata`,
-  `LotteryStatusView`, `VrfDepositStatusView`, `LotteryConfig`, `LotterySummary` и `Accounting`; пример ответов хранится в
+  `LotteryStatusView`, `VrfDepositStatusView`, `LotteryConfig`, `LotterySummary`, `StatusOverview` и `Accounting`; пример ответов хранится в
   `docs/handbook/architecture/json/examples/lottery_multi_view_samples.json`, валидация покрыта тестом
   `SupraLottery/tests/test_view_schema_examples.py`.
 

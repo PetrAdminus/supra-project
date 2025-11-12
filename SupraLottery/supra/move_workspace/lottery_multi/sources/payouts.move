@@ -58,6 +58,15 @@ module lottery_multi::payouts {
         next_winner_batch_no: u64,
     }
 
+    pub struct WinnerProgressView has copy, drop, store {
+        pub initialized: bool,
+        pub total_required: u64,
+        pub total_assigned: u64,
+        pub payout_round: u64,
+        pub next_winner_batch_no: u64,
+        pub last_payout_ts: u64,
+    }
+
     struct PayoutLedger has key {
         states: table::Table<u64, WinnerState>,
         winner_events: event::EventHandle<history::WinnersComputedEvent>,
@@ -365,6 +374,40 @@ module lottery_multi::payouts {
         registry::mark_finalized(lottery_id);
     }
 
+    pub fun winner_progress(lottery_id: u64): WinnerProgressView acquires PayoutLedger {
+        let addr = @lottery_multi;
+        if (!exists<PayoutLedger>(addr)) {
+            return WinnerProgressView {
+                initialized: false,
+                total_required: 0,
+                total_assigned: 0,
+                payout_round: 0,
+                next_winner_batch_no: 0,
+                last_payout_ts: 0,
+            };
+        };
+        let ledger = borrow_ledger_ref();
+        if (!table::contains(&ledger.states, lottery_id)) {
+            return WinnerProgressView {
+                initialized: false,
+                total_required: 0,
+                total_assigned: 0,
+                payout_round: 0,
+                next_winner_batch_no: 0,
+                last_payout_ts: 0,
+            };
+        };
+        let state = table::borrow(&ledger.states, lottery_id);
+        WinnerProgressView {
+            initialized: state.initialized,
+            total_required: state.total_required,
+            total_assigned: state.total_assigned,
+            payout_round: state.payout_round,
+            next_winner_batch_no: state.next_winner_batch_no,
+            last_payout_ts: state.last_payout_ts,
+        }
+    }
+
     fun append_record(
         lottery_id: u64,
         state: &mut WinnerState,
@@ -436,6 +479,14 @@ module lottery_multi::payouts {
             abort errors::E_REGISTRY_MISSING;
         };
         borrow_global_mut<PayoutLedger>(addr)
+    }
+
+    fun borrow_ledger_ref(): &PayoutLedger acquires PayoutLedger {
+        let addr = @lottery_multi;
+        if (!exists<PayoutLedger>(addr)) {
+            abort errors::E_REGISTRY_MISSING;
+        };
+        borrow_global<PayoutLedger>(addr)
     }
 
     struct SlotContext has copy, drop, store {

@@ -50,6 +50,9 @@
         "get_lottery_summary": {
           "$ref": "#/$defs/LotterySummary"
         },
+        "status_overview": {
+          "$ref": "#/$defs/StatusOverview"
+        },
         "list_active": {
           "$ref": "#/$defs/LotteryIdList"
         },
@@ -111,6 +114,85 @@
         "primary_label",
         "is_experimental",
         "tags_mask"
+      ],
+      "additionalProperties": false
+    },
+    "StatusOverview": {
+      "type": "object",
+      "description": "Агрегированная сводка по статусам лотерей и операционным бэклогам.",
+      "properties": {
+        "total": {
+          "$ref": "#/$defs/U64",
+          "description": "Общее количество лотерей, присутствующих в реестре."
+        },
+        "draft": {
+          "$ref": "#/$defs/U64",
+          "description": "Количество лотерей в статусе Draft."
+        },
+        "active": {
+          "$ref": "#/$defs/U64",
+          "description": "Количество активных лотерей (продажи открыты)."
+        },
+        "closing": {
+          "$ref": "#/$defs/U64",
+          "description": "Количество лотерей, находящихся в стадии Closing."
+        },
+        "draw_requested": {
+          "$ref": "#/$defs/U64",
+          "description": "Количество лотерей с отправленным, но ещё не выполненным VRF-запросом."
+        },
+        "drawn": {
+          "$ref": "#/$defs/U64",
+          "description": "Количество лотерей со статусом Drawn (ожидают расчёта победителей)."
+        },
+        "payout": {
+          "$ref": "#/$defs/U64",
+          "description": "Количество лотерей в стадии выплат."
+        },
+        "finalized": {
+          "$ref": "#/$defs/U64",
+          "description": "Количество финализированных лотерей."
+        },
+        "canceled": {
+          "$ref": "#/$defs/U64",
+          "description": "Количество отменённых лотерей."
+        },
+        "vrf_requested": {
+          "$ref": "#/$defs/U64",
+          "description": "Число лотерей с активным VRF-запросом (VRF_STATUS_REQUESTED)."
+        },
+        "vrf_fulfilled_pending": {
+          "$ref": "#/$defs/U64",
+          "description": "Лотереи, для которых VRF выполнен, но данные ещё не потреблены (consumed=false)."
+        },
+        "vrf_retry_blocked": {
+          "$ref": "#/$defs/U64",
+          "description": "Лотереи, заблокированные окном повторного VRF (retry_after_ts в будущем)."
+        },
+        "winners_pending": {
+          "$ref": "#/$defs/U64",
+          "description": "Лотереи с незавершённым расчётом победителей (total_assigned < total_required)."
+        },
+        "payout_backlog": {
+          "$ref": "#/$defs/U64",
+          "description": "Лотереи с невыплаченными батчами (payout_round < next_winner_batch_no)."
+        }
+      },
+      "required": [
+        "total",
+        "draft",
+        "active",
+        "closing",
+        "draw_requested",
+        "drawn",
+        "payout",
+        "finalized",
+        "canceled",
+        "vrf_requested",
+        "vrf_fulfilled_pending",
+        "vrf_retry_blocked",
+        "winners_pending",
+        "payout_backlog"
       ],
       "additionalProperties": false
     },

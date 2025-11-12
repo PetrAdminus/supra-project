@@ -3,8 +3,10 @@ module lottery_multi::views {
     use std::string;
     use std::vector;
 
+    use lottery_multi::draw;
     use lottery_multi::history;
     use lottery_multi::economics;
+    use lottery_multi::payouts;
     use lottery_multi::sales;
     use lottery_multi::registry;
     use lottery_multi::errors;
@@ -33,6 +35,23 @@ module lottery_multi::views {
         pub last_update_ts: u64,
         pub requests_paused: bool,
         pub paused_since_ts: u64,
+    }
+
+    pub struct StatusOverview has drop, store {
+        pub total: u64,
+        pub draft: u64,
+        pub active: u64,
+        pub closing: u64,
+        pub draw_requested: u64,
+        pub drawn: u64,
+        pub payout: u64,
+        pub finalized: u64,
+        pub canceled: u64,
+        pub vrf_requested: u64,
+        pub vrf_fulfilled_pending: u64,
+        pub vrf_retry_blocked: u64,
+        pub winners_pending: u64,
+        pub payout_backlog: u64,
     }
 
     public fun validate_config(config: &registry::Config) {
@@ -104,6 +123,89 @@ module lottery_multi::views {
 
     public fun list_finalized_ids(from: u64, limit: u64): vector<u64> acquires history::ArchiveLedger {
         history::list_finalized(from, limit)
+    }
+
+    public fun status_overview(now_ts: u64): StatusOverview acquires registry::Registry, draw::DrawLedger, payouts::PayoutLedger {
+        let registry_ref = registry::borrow_registry_for_view();
+        let ids = registry::ordered_ids_view(registry_ref);
+        let mut total = 0u64;
+        let mut draft = 0u64;
+        let mut active = 0u64;
+        let mut closing = 0u64;
+        let mut draw_requested = 0u64;
+        let mut drawn = 0u64;
+        let mut payout = 0u64;
+        let mut finalized = 0u64;
+        let mut canceled = 0u64;
+        let mut vrf_requested = 0u64;
+        let mut vrf_fulfilled_pending = 0u64;
+        let mut vrf_retry_blocked = 0u64;
+        let mut winners_pending = 0u64;
+        let mut payout_backlog = 0u64;
+
+        let len = vector::length(ids);
+        let mut idx = 0u64;
+        while (idx < len) {
+            let lottery_id = *vector::borrow(ids, idx);
+            let status = registry::get_status_from_registry(registry_ref, lottery_id);
+            total = total + 1;
+            if (status == registry::STATUS_DRAFT) {
+                draft = draft + 1;
+            } else if (status == registry::STATUS_ACTIVE) {
+                active = active + 1;
+            } else if (status == registry::STATUS_CLOSING) {
+                closing = closing + 1;
+            } else if (status == registry::STATUS_DRAW_REQUESTED) {
+                draw_requested = draw_requested + 1;
+            } else if (status == registry::STATUS_DRAWN) {
+                drawn = drawn + 1;
+            } else if (status == registry::STATUS_PAYOUT) {
+                payout = payout + 1;
+            } else if (status == registry::STATUS_FINALIZED) {
+                finalized = finalized + 1;
+            } else if (status == registry::STATUS_CANCELED) {
+                canceled = canceled + 1;
+            };
+
+            let vrf_view = draw::vrf_state_view(lottery_id);
+            if (vrf_view.status == types::VRF_STATUS_REQUESTED) {
+                vrf_requested = vrf_requested + 1;
+                if (!vrf_view.consumed) {
+                    if (vrf_view.retry_after_ts > 0 && vrf_view.retry_after_ts > now_ts) {
+                        vrf_retry_blocked = vrf_retry_blocked + 1;
+                    };
+                };
+            } else if (vrf_view.status == types::VRF_STATUS_FULFILLED && !vrf_view.consumed) {
+                vrf_fulfilled_pending = vrf_fulfilled_pending + 1;
+            };
+
+            let progress = payouts::winner_progress(lottery_id);
+            if (progress.initialized && progress.total_required > progress.total_assigned) {
+                winners_pending = winners_pending + 1;
+            };
+            if (progress.initialized && progress.next_winner_batch_no > progress.payout_round) {
+                payout_backlog = payout_backlog + 1;
+            };
+
+            idx = idx + 1;
+        };
+
+        StatusOverview {
+            total,
+            draft,
+            active,
+            closing,
+            draw_requested,
+            drawn,
+            payout,
+            finalized,
+            canceled,
+            vrf_requested,
+            vrf_fulfilled_pending,
+            vrf_retry_blocked,
+            winners_pending,
+            payout_backlog,
+        }
     }
 
     public fun list_by_primary_type(primary_type: u8, from: u64, limit: u64): vector<u64> acquires registry::Registry {
