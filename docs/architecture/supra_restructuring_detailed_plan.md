@@ -10,7 +10,7 @@
   - `lottery_multi`
   - `lottery_rewards`
   - `lottery_support`
-  - `vrf_hub`
+  - `vrf_hub` (будущий `lottery_vrf_gateway`)
   - `lottery_factory`
 - Есть тестовые профили/боты `player1..player5` (конфиги в `configs/playerX.yaml`).
 - Сейчас всё деплоится и тестируется на **testnet Supra**, в будущем планируется **mainnet**.
@@ -59,83 +59,82 @@
 - `lottery_multi` — механика нескольких лотерей, более сложные сценарии.
 - `lottery_rewards` — распределение наград, снапшоты.
 - `lottery_support` — вспомогательные функции и проверки.
-- `vrf_hub` — взаимодействие с Supra VRF, события запросов/результатов.
+- `vrf_hub` (будущий `lottery_vrf_gateway`) — взаимодействие с Supra VRF, события запросов/результатов.
 - `lottery_factory` — создание/инициализация лотерей и связанных ресурсов.
 
 **Важно:** мы не выбрасываем эту логику, а аккуратно переносим в новую структуру.
 
-### 3.2. Новая структура пакетов (целевое состояние)
+### 3.2. Целевые Move-пакеты ядра (этап 1)
 
-1. `core_storage`
-   - Хранение всех основных on-chain структур:
-     - глобальная конфигурация платформы,
-     - настройки по лотерее,
-     - статусы розыгрышей,
-     - история раундов и пр.
-   - **Только ресурсы и простые геттеры**, минимум логики.
+> Эти шесть пакетов — непосредственный фокус текущей реорганизации. Именно их нужно разрабатывать и рефакторить в первую очередь,
+> чтобы получить устойчивое ядро перед релизом.
 
-2. `core_lottery`
-   - Бизнес‑логика для всех типов лотерей и розыгрышей:
-     - создание/обновление конфигураций,
-     - проверки параметров,
-     - запуск продажи билетов,
-     - обработка покупок,
-     - закрытие продаж,
-     - подготовка к розыгрышу и применение результатов VRF.
-   - Работает через структуры из `core_storage`.
+1. `lottery_data`
+   - Общий слой хранения: глобальные конфигурации, состояние лотерей, раунды, история, whitelists и индексы.
+   - Содержит только ресурсы, события и простые функции чтения/инициализации.
 
-3. `lottery_hub`
-   - Внешний «фасад»/реестр лотерей:
-     - entry‑функции для фронтенда и пользователей,
-     - реестр лотерей по владельцам/организаторам,
-     - агрегация статусов и конфигураций.
-   - Опирается на `core_storage` и `core_lottery`.
+2. `lottery_engine`
+   - Бизнес‑логика розыгрышей: создание конфигураций, продажи, проверки ограничений, обработка VRF и выбор победителей.
+   - Использует структуры из `lottery_data`, генерирует события для фасада и наград.
 
-4. `lottery_factory`
-   - Низкоуровневое создание сущностей (лотерей/раундов/настроек).
-   - Можно частично сохранить из старого `lottery_factory`, адаптировав под `core_storage`.
+3. `lottery_rewards_engine`
+   - Управление джекпотами, выплатами, магазинами призов, программами лояльности и сопутствующими capability.
+   - Работает поверх `lottery_data` и интегрируется с `lottery_engine`.
+   - Стартовая реализация: модуль `treasury` синхронизирует продажи с мульти-трежери (`lottery_data::treasury_multi`), проверяет доли BPS и обновляет накопления джекпота/операционного пула сразу из `lottery_engine::sales`,
+     модуль `payouts` обеспечивает выплату джекпотов, запись операций и бонусов через `lottery_data::treasury_multi`, синхронизируя статусы `PayoutLedger`,
+     модуль `jackpot` управляет VRF-джекпотом: регистрирует лотереи, выдаёт билеты, инициирует и обрабатывает запросы Supra VRF с валидацией депозитов и списанием мульти-трежери,
+     модуль `autopurchase` переносит планы автопокупки: хранит балансы игроков, управляет капами раундов/трежери, вызывает `lottery_engine::sales::record_prepaid_purchase` и публикует снапшоты для аудита миграции,
+     модуль `vip` переносит VIP-подписки: конфигурации, события, выдачу бонусных билетов и интеграцию с мульти-трежери через capability `VipAccess`,
+     модуль `store` переносит магазин призов: поддерживает каталог, остатки, события `ItemConfigured`/`ItemPurchased` и работу с мульти-трежери через `StoreAccess`.
 
-5. `lottery_rewards`
-   - Отдельный пакет для распределения наград и работы со снапшотами.
-   - Использует данные из `core_storage` и события из `core_lottery`.
+4. `lottery_utils`
+   - Общие утилиты и проверки: математические помощники, валидация конфигураций, конверторы и аудит миграций.
+   - Стартовая реализация включает `math` для безопасных расширений типов и операций с BPS, `feature_flags` с событиями изменения режимов и devnet-override, `price_feed` с регистрацией курсов, fallback/clamp событиями и настройками свежести цен, а также `history`, который хранит записи розыгрышей, управляет capability `HistoryWarden` и синхронизирует очередь `rounds::PendingHistoryQueue` через `sync_draws_from_rounds`.
+   - Модуль `metadata` переносит реестр метаданных из легаси: публикует события апдейтов, поддерживает снапшоты `MetadataSnapshotUpdatedEvent`, хранит индекс лотерей и предоставляет admin-интерфейсы без нарушения ограничений Move v1 (все обходы реализованы рекурсивно).
+   - Модуль `migration` фиксирует прогресс переноса: публикует `MigrationLedger` со снапшотами, управляет `MigrationSession` и capability (`InstancesExportCap`, `LegacyTreasuryCap`), обеспечивает события `MigrationSnapshotUpdatedEvent` и рекурсивные обходы без циклов.
+   - Переносим сюда всё полезное из старого `lottery_support`.
 
-6. `lottery_support`
-   - Общие вспомогательные функции:
-     - проверки входных параметров,
-     - безопасные операции с числами,
-     - удобные конверторы/мэппинги.
-   - Сюда переносим всё полезное из старого `lottery_support`.
+5. `lottery_gateway`
+   - Фасад/оркестратор для фронтенда (на базе текущего `lottery_hub`): entry‑функции участия, выдачи наград, реестр лотерей по владельцам и агрегированные view.
+   - Тонкий слой над `lottery_data`, `lottery_engine` и `lottery_rewards_engine`.
 
-7. `vrf_hub`
-   - Пакет взаимодействия с Supra VRF.
-   - Стремимся максимально следовать официальным примерам из `Supra-Labs`.
-   - Содержит:
-     - структуры запросов/ответов VRF,
-     - события запроса случайности и получения результата,
-     - «хук»/callback для вызова логики из `core_lottery`.
+6. `lottery_vrf_gateway`
+   - Базовый пакет Supra VRF (текущий `vrf_hub`), который уже используется и остаётся без радикальных изменений.
+   - Необходим для регистрации потребителей и обработки callback после миграции логики.
 
-8. `profiles_accounts` (или похожее имя)
-   - Структуры профилей пользователей:
-     - базовая информация,
-     - настройки отображения (например, частичная маскировка адреса),
-     - флаг «премиум» и дополнительные права/лимиты.
+### 3.3. Пакеты последующих этапов (этап 2+)
 
-9. `bots_devtools`
-   - Вспомогательные тестовые/разработческие функции.
-   - Использует заранее известные тест‑аккаунты (`player1..player5`).
-   - **Строго для тестнета и dev‑сценариев**, в mainnet — либо отключено, либо без особых привилегий.
+> Эти компоненты планируются после стабилизации ядра. Их реализация не блокирует релиз первой версии.
 
-10. `api_governance` (позже)
-    - Модули для говернанса и on-chain API для партнёров.
-    - Прорабатывается после стабилизации базовой логики лотерей.
+- `profiles_accounts` — on-chain профиль и настройки пользователя, а также флаги премиума/ограничений.
+- `bots_devtools` — вспомогательные dev-скрипты и тестовые сценарии, преимущественно off-chain.
+- `api_governance` — будущий слой админских API, голосований и партнёрского управления.
+
+### 3.4. Легаси Move-пакеты (источник для миграции)
+
+> Эти пакеты **не входят в целевую архитектуру**, но содержат проверенную логику, которую переносим. После миграции они останутся
+> только как источник исторического кода и база для тестов миграции.
+
+- `lottery_core`
+- `lottery_multi`
+- `lottery_rewards`
+- `lottery_support`
+- `lottery_factory`
+
+Для контроля уникальности модулей в `lottery_data` и последующих пакетов ведём сравнение с опубликованными на testnet модулями по
+адресу `0xbc95…caafe0`. Новые модули используют оригинальные имена (`lottery_state`, `instances`, `rounds` и т.д.) и не совпадают
+с легаси-модулями (`core_main_v2`, `core_rounds`, `core_treasury_*`), что исключает конфликты при совместном деплое во время
+миграции.
 
 ---
 
 ## 4. Миграция: что брать из старых пакетов
 
-### 4.1. `lottery_core` → `core_storage` + `core_lottery`
+> Подробная карта соответствий ресурсов и шагов переноса ведётся в `docs/architecture/move_migration_mapping.md`. При планировании конкретных транзакций и проверок используйте её как основной чек-лист.
 
-**В `core_storage` переносим:**
+### 4.1. `lottery_core` → `lottery_data` + `lottery_engine`
+
+**В `lottery_data` переносим:**
 - Структуры, описывающие:
   - лотерею/розыгрыш (id, владелец, статус, конфиг),
   - билет/участие,
@@ -143,7 +142,7 @@
   - базовые ресурсы владельца/хаба.
 - Константы ошибок, относящиеся к инвариантам данных (например, невалидный статус, дубликаты и т.п., если они привязаны к хранению).
 
-**В `core_lottery` переносим и упрощаем:**
+**В `lottery_engine` переносим и упрощаем:**
 - Логику:
   - создания раунда/лотереи,
   - покупки билетов,
@@ -162,9 +161,9 @@
   - прямые вызовы VRF.
 - Всё это должно быть разделено по модулям и пакетам.
 
-### 4.2. `lottery_multi` → `lottery_hub` + `core_lottery`
+### 4.2. `lottery_multi` → `lottery_gateway` (новый фасад на базе `lottery_hub`) + `lottery_engine`
 
-**В `lottery_hub` переносим:**
+**В `lottery_gateway` переносим:**
 - Реестр нескольких лотерей:
   - мэппинг владельцев → список лотерей,
   - функции для перечисления/фильтрации.
@@ -174,7 +173,7 @@
   - запуск розыгрыша (через VRF),
   - чтение сводного статуса.
 
-**В `core_lottery` дорабатываем:**
+**В `lottery_engine` дорабатываем:**
 - Поддержку нескольких типов лотерей (если уже есть в `lottery_multi`).
 - Общие механики, которые используются в нескольких сценариях.
 
@@ -186,7 +185,7 @@
 - события начислений.
 
 **Приводим к новой архитектуре:**
-- Используем структуры хранения из `core_storage`.
+- Используем структуры хранения из `lottery_data`.
 - Не храним дублирующую информацию, если её можно получить из ядра.
 
 ### 4.4. `lottery_support`
@@ -199,14 +198,14 @@
 **Чистим:**
 - Удаляем мёртвый код и функции, которые стали не нужны в новой архитектуре.
 
-### 4.5. `vrf_hub`
+### 4.5. `lottery_vrf_gateway` (текущий `vrf_hub`)
 
 **Используем как шаблон:**
 - Структуры запросов и результатов VRF,
 - события запроса случайности и получения ответа.
 
 **Выделяем явный интерфейс:**
-- `request_randomness(...)` — вызывается из `lottery_hub`/`core_lottery`.
+- `request_randomness(...)` — вызывается из `lottery_gateway`/`lottery_engine`.
 - `on_randomness_fulfilled(...)` — вызывается VRF‑системой, внутри которого вызывается логика выбора победителя.
 
 ### 4.6. `lottery_factory`
@@ -215,7 +214,7 @@
 - Низкоуровневые операции создания ресурсов/структур.
 
 **Меняем:**
-- Завязываем только на структуры `core_storage`, не на старые типы.
+- Завязываем только на структуры `lottery_data`, не на старые типы.
 
 ---
 
@@ -282,7 +281,7 @@
 - `CancelledNotEnoughPlayers` — отменено из‑за недостатка игроков.
 - `CancelledByAdmin` — отменено админом.
 
-Все переходы между статусами должны быть описаны в `core_lottery`, а `lottery_hub` вызывает соответствующие функции.
+Все переходы между статусами должны быть описаны в `lottery_engine`, а `lottery_gateway` вызывает соответствующие функции.
 
 ### 5.6. События
 
@@ -301,20 +300,20 @@
 
 ### 6.1. Базовый поток
 
-1. `lottery_hub` или `core_lottery` вызывает функцию `vrf_hub::request_randomness(...)` с:
+1. `lottery_gateway` или `lottery_engine` вызывает функцию `lottery_vrf_gateway::request_randomness(...)` с:
    - идентификатором лотереи/раунда,
    - параметрами запроса,
    - нужным «payload» (например, hash конфигурации и списка участников).
 
-2. `vrf_hub`:
+2. `lottery_vrf_gateway`:
    - записывает запрос в on-chain структуру (можно использовать старые структуры из текущего `vrf_hub` как шаблон),
    - эмитит событие `RandomnessRequested`.
 
-3. После выполнения VRF‑процесса вызывается callback `vrf_hub::on_randomness_fulfilled(...)`:
+3. После выполнения VRF‑процесса вызывается callback `lottery_vrf_gateway::on_randomness_fulfilled(...)`:
    - находит соответствующий запрос по id,
-   - передаёт результат (`random_value`) в `core_lottery::apply_vrf_result(...)`.
+   - передаёт результат (`random_value`) в `lottery_engine::apply_vrf_result(...)`.
 
-4. `core_lottery::apply_vrf_result(...)`:
+4. `lottery_engine::apply_vrf_result(...)`:
    - выбирает победителя(ей) по результату случайности,
    - обновляет статус лотереи на `WinnerSelected`,
    - эмитит событие `WinnerSelected`/`RewardsAssigned`.
@@ -364,7 +363,7 @@ docker compose -f SupraLottery/compose.yaml run --rm \
   "
 ```
 
-Где `<PACKAGE_NAME>` — `lottery_core`, `lottery_hub`, `lottery_rewards` и т.д.
+Где `<PACKAGE_NAME>` — `lottery_data`, `lottery_engine`, `lottery_gateway`, `lottery_rewards_engine`, `lottery_utils`, `vrf_hub` и т.д.
 
 ### 8.2. Что считается «зелёным» состоянием
 
@@ -387,11 +386,11 @@ docker compose -f SupraLottery/compose.yaml run --rm \
 ### 9.1. Ожидаемые entry‑функции
 
 Фронтенд должен использовать только ограниченный набор публичных `entry`:
-- `lottery_hub::create_lottery_with_config(...)`
-- `lottery_hub::buy_ticket(...)`
-- `lottery_hub::start_sales(...)` / `stop_sales(...)`
-- `lottery_hub::request_draw(...)` (запуск VRF)
-- `lottery_hub::claim_reward(...)` (если применимо)
+- `lottery_gateway::create_lottery_with_config(...)`
+- `lottery_gateway::enter_paid_round(...)`
+- `lottery_gateway::start_sales(...)` / `stop_sales(...)`
+- `lottery_gateway::request_draw(...)` (запуск VRF)
+- `lottery_gateway::claim_reward(...)` (если применимо)
 
 Все остальные функции — внутренние (`public`/`friend` без `entry`).
 
@@ -433,19 +432,19 @@ docker compose -f SupraLottery/compose.yaml run --rm \
 ### Этап 3. Создание каркасов новых пакетов
 
 1. Создать минимум:
-   - `core_storage` с пустыми или минимальными структурами,
-   - `core_lottery` с заглушками логики,
-   - `lottery_hub` с entry‑заглушками,
-   - при необходимости обновить/создать `lottery_rewards`, `lottery_support`, `vrf_hub` под новую архитектуру.
+   - `lottery_data` с пустыми или минимальными структурами,
+   - `lottery_engine` с заглушками логики,
+   - `lottery_gateway` с entry‑заглушками,
+   - при необходимости обновить/создать `lottery_rewards_engine`, `lottery_utils`, `lottery_vrf_gateway` под новую архитектуру.
 2. Убедиться, что новые пакеты **компилируются**, даже если функции пока пустые или просто `abort E_NOT_IMPLEMENTED`.
 
-### Этап 4. Миграция хранения (`core_storage`)
+### Этап 4. Миграция хранения (`lottery_data`)
 
-1. Перенести все ключевые ресурсы из `lottery_core`/`lottery_multi` в `core_storage`.
+1. Перенести все ключевые ресурсы из `lottery_core`/`lottery_multi` в `lottery_data`.
 2. Обновить зависимости остальных пакетов так, чтобы они использовали новые структуры.
 3. Запустить тесты для проверки, что типы согласованы.
 
-### Этап 5. Миграция бизнес‑логики (`core_lottery`)
+### Этап 5. Миграция бизнес‑логики (`lottery_engine`)
 
 1. Перенести и адаптировать функции:
    - создание лотерей и раундов,
@@ -455,17 +454,39 @@ docker compose -f SupraLottery/compose.yaml run --rm \
 2. Реализовать проверку всех инвариантов конфигурации и статусов.
 3. Обновить события, чтобы они были консистентны и удобны для фронтенда.
 
-### Этап 6. `lottery_hub` как фасад
+**Статус на 2025-11-20:** `lottery_engine::sales` теперь поддерживает батчевые покупки билетов и синхронизацию расписания розыгрыша с `lottery_data::rounds`, сохраняя события для каждого билета. В связке с `ticketing`, `draw` и `vrf_config` это закрывает минимальный цикл «продажа → авто-планирование → запрос VRF». Следующие шаги — подготовить миграцию `SalesLedger`, завершить перенос `DrawLedger` и интегрировать настройки VRF с депонированием (`vrf_deposit`) и фасадом `lottery_vrf_gateway`.
+
+**Статус на 2025-11-21:** Развёрнут модуль хранения `lottery_data::vrf_deposit` и логика `lottery_engine::vrf`, добавляющие события снапшотов, алёртов и контроль паузы VRF-запросов. `lottery_engine::draw::request_randomness` теперь проверяет состояние депозита перед запросом в Supra VRF. Следующие шаги — подготовить миграционный скрипт для `VrfDepositLedger`, сверить статусы с `lottery_vrf_gateway` и связать автозапуск снапшотов с будущим модулем `automation`.
+
+**Статус на 2025-11-22:** `lottery_data::instances` фиксирует события смены владельца и предоставляет безопасный метод `set_owner`, а модуль `lottery_engine::operators` обеспечивает управление владельцами и операторами лотерей (grant/revoke) с проверкой прав. Требуется подготовить миграцию владельцев/операторов из `core_instances`/`core_operators` и встроить новые entry-функции в будущий фасад `lottery_gateway`.
+
+**Статус на 2025-11-23:** Добавлен модуль `lottery_engine::lifecycle`, обеспечивающий административную паузу и возобновление лотерей с проверкой pending-запросов и синхронизацией событий. В `lottery_data::instances` реализован метод `set_active`, что закрывает базовую поддержку активного флага. Следующие шаги — подготовить миграцию статусов `LotteryCollection` и встроить `pause_lottery`/`resume_lottery` в фасад `lottery_gateway`.
+
+**Статус на 2025-11-24:** Добавлены `lottery_data::payouts` и `lottery_engine::payouts`, интегрированы записи победителей в `lottery_engine::draw`, обновлены карта миграции, чек-лист и инвентаризация структур.
+
+**Статус на 2025-11-25:** Реализованы `lottery_data::cancellations` и `lottery_engine::cancellation`, фиксирующие причины отмены, очищающие pending-запросы/билеты и переводящие инстансы в неактивное состояние. Следующие шаги — подготовить миграцию записей отмен из `lottery_multi::lottery_registry` и встроить административный поток в фасад `lottery_gateway`.
+
+**Статус на 2025-11-27:** Развёрнуты `lottery_data::automation` и `lottery_engine::automation`, обеспечивающие реестр ботов, cron-capability и события dry-run/тикета. Добавлены entry-функции регистрации/ротации ботов, проверки timelock и фиксации успехов/ошибок. Следующие шаги — подготовить миграционные скрипты `AutomationRegistry`/`AutomationCap`, восстановить pending-действия из легаси и связать автоматизацию с VRF/планировщиком.
+
+### Этап 6. `lottery_gateway` как фасад
 
 1. Реализовать реестр лотерей и владельцев.
-2. Реализовать простые entry‑функции для фронтенда, которые внутри вызывают `core_lottery`.
+2. Реализовать простые entry‑функции для фронтенда, которые внутри вызывают `lottery_engine`.
 3. Добавить view‑функции или просто ясные ресурсы, чтобы фронтенд мог получать нужную информацию.
 
-### Этап 7. Интеграция с VRF (`vrf_hub`)
+**Статус на 2025-11-28:** Создан пакет `lottery_gateway` с модулем `gateway`, который хранит собственный `GatewayRegistry`,
+генерирует идентификаторы лотерей и проксирует ключевые операции `lottery_engine`. Реализованы entry-функции:
+`create_lottery`, `set_owner`, `grant_operator`/`revoke_operator`, `pause_lottery`, `resume_lottery`, `cancel_lottery`,
+`schedule_draw`, `request_randomness`, `enter_paid_round`. События фасада (`LotteryCreated`, `LotteryOwnerUpdated`,
+`LotteryStatusUpdated`, `GatewaySnapshot`) синхронизированы с `lottery_data`, а индекс владельцев поддерживает миграцию из
+`lottery_multi::lottery_registry`. Следующие шаги — расширить фасад view-функциями и подготовить сценарии миграции
+`Registry`/`CancellationRecord`.
 
-1. Привести `vrf_hub` к форме, максимально близкой к официальным примерам Supra.
+### Этап 7. Интеграция с VRF (`lottery_vrf_gateway`)
+
+1. Привести `lottery_vrf_gateway` к форме, максимально близкой к официальным примерам Supra.
 2. Реализовать поток запросов/ответов, описанный в разделе 6.
-3. Связать `vrf_hub` и `core_lottery::apply_vrf_result`.
+3. Связать `lottery_vrf_gateway` и `lottery_engine::apply_vrf_result`.
 
 ### Этап 8. Профили, боты, тестовые сценарии
 
@@ -489,7 +510,7 @@ docker compose -f SupraLottery/compose.yaml run --rm \
 
 1. **Проект SupraLottery ещё не в проде.** Сейчас идёт активная разработка и рефакторинг, поэтому задача — не просто «написать с нуля», а аккуратно использовать уже наработанный, частично рабочий код.
 2. **Нельзя ломать Move‑код Unicode‑символами.** В исходниках были ошибки из‑за кириллицы и псевдографики — этого нужно избегать.
-3. **Старые пакеты — не мусор, а источник проверенных решений.** Любую новую логику нужно сверять с тем, как она была реализована в `lottery_core`, `lottery_multi`, `lottery_rewards`, `vrf_hub`.
+3. **Старые пакеты — не мусор, а источник проверенных решений.** Любую новую логику нужно сверять с тем, как она была реализована в `lottery_core`, `lottery_multi`, `lottery_rewards`, `vrf_hub` (будущий `lottery_vrf_gateway`).
 4. **Текущий фокус — ядро на тестнете.** Mainnet — следующий шаг, но архитектуру и безопасность надо закладывать уже сейчас.
 5. **Проект позиционируется как честный и прозрачный Web3 dApp.** Это значит максимум событий, понятная логика, отсутствие «магии» и скрытых правил.
 
@@ -502,10 +523,10 @@ docker compose -f SupraLottery/compose.yaml run --rm \
 - Ввести явную **roadmap** по этапам (Этап 1–Этап 7 из плана) с:
   - контрольными точками (milestones) для каждого этапа;
   - критериями готовности (*Definition of Done*) для каждого подпункта;
-  - зависимостями между задачами (например: рефакторинг `lottery_core` должен быть завершён до финального рефакторинга `lottery_hub` и интеграции VRF);
+  - зависимостями между задачами (например: рефакторинг `lottery_core` должен быть завершён до финального рефакторинга `lottery_gateway` и интеграции VRF);
   - приоритетами (что обязательно к первому тестнет-рилизу, а что можно отложить).
 - Синхронизировать эту дорожную карту с задачами фронтенда, чтобы:
-  - API-слой `lottery_hub` и форматы событий были стабилизированы **до** активной интеграции UI;
+  - API-слой `lottery_gateway` и форматы событий были стабилизированы **до** активной интеграции UI;
   - изменения в storage/структурах были заранее объявлены как breaking/non-breaking.
 
 ### 13.2. Миграция данных и стратегия отката
@@ -513,6 +534,9 @@ docker compose -f SupraLottery/compose.yaml run --rm \
   - перечислить все on-chain ресурсы, которые сейчас используются (`core_state`, состояния лотерей, балансы призов и т.п.);
   - описать, какие из них будут **переиспользованы** новыми модулями, а какие — **выведены из эксплуатации**;
   - спланировать безопасный сценарий миграции: деплой новых модулей → включение новых entry-функций → мягкое отключение старых маршрутов (через флаги/конфигурацию) → архивирование старых структур.
+- Зафиксировать рабочие артефакты:
+  - `docs/architecture/move_migration_mapping_template.md` — шаблон таблицы соответствий «старые → новые» структуры и ресурсов;
+  - `docs/architecture/migration_transaction_checklist.md` — пошаговый чек-лист миграционных транзакций, пост-валидации и отката.
 - Для mainnet-деплоя добавить:
   - чёткий чек-лист для финальной проверки на **testnet** (все сценарии, которые должны быть отыграны перед релизом);
   - описание стратегии отката: какое именно обновление можно откатить, а что потребует выпуска новой версии модулей с миграционными скриптами.
@@ -548,37 +572,73 @@ docker compose -f SupraLottery/compose.yaml run --rm \
    - В новой архитектуре базовое действие называется **«вход в раунд/лотерею»**, а не «покупка».
 
 2. **Новое базовое имя функции участия**
-   - В доменном слое (`core_lottery::ticketing`) используем нейтральную функцию:
+   - В доменном слое (`lottery_engine::ticketing`) используем нейтральную функцию:
      - `public fun enter_round(...)` — единая точка, которая регистрирует участие игрока в конкретном раунде/лотерее.
    - Внутри `enter_round` не важно, платное это участие или бесплатное — решение принимается по конфигу лотереи.
 
 3. **Разделение платных и бесплатных сценариев на уровне хаба**
-   - В `lottery_hub` вводим отдельные entry-функции для фронтенда:
+   - В `lottery_gateway` вводим отдельные entry-функции для фронтенда:
      - `public entry fun enter_paid_round(...)` — платное участие (списывает токены согласно `ticket_price`).
      - `public entry fun enter_free_round(...)` — бесплатное участие (не трогает баланс, но всё равно создаёт запись билета/участника).
-   - Обе функции внутри вызывают общий доменный метод `core_lottery::enter_round(...)`.
+   - Обе функции внутри вызывают общий доменный метод `lottery_engine::enter_round(...)`.
 
 4. **Расширение конфигурации лотереи для поддержки бесплатных розыгрышей**
-   - В `core_lottery::types::LotteryConfig` добавляем флаг режима:
+   - В `lottery_engine::types::LotteryConfig` добавляем флаг режима:
      - `is_free: bool` — если `true`, участие бесплатное;
      - `ticket_price: u64` — если `is_free == true`, **обязан быть 0**; если `is_free == false`, **обязан быть > 0**.
-   - В `core_support` добавляем проверку:
+   - В `lottery_utils` добавляем проверку:
      - `assert_valid_pricing(config: &LotteryConfig)` — гарантирует согласованность `is_free` и `ticket_price`.
    - В `create_lottery` (и других функциях создания) вызываем эту проверку как часть `is_valid_config`.
 
 5. **Правила по проверкам при входе в раунд**
-   - В `core_lottery::ticketing::enter_round` всегда проверяем:
+   - В `lottery_engine::ticketing::enter_round` всегда проверяем:
      - статус лотереи и раунда (должны быть в фазе продаж/участия);
      - окно продаж (`sales_start_ts <= now < sales_end_ts` — позже будет подключён реальный timestamp);
      - выполнение `min_players`/`max_players` с учётом уже записанных участников;
-     - корректность конфигурации цен (через `core_support::assert_valid_pricing`).
+     - корректность конфигурации цен (через `lottery_utils::assert_valid_pricing`).
    - Для платного сценария (`enter_paid_round`) дополнительно проверяем и выполняем списание средств.
 
 6. **Связь с существующим кодом**
    - Все места, где в старых модулях сейчас используется `buy_ticket`, при миграции переводим на новую схему:
-     - доменная часть логики → `core_lottery::enter_round`;
-     - интеграционная/entry-часть → `lottery_hub::enter_paid_round` или `lottery_hub::enter_free_round`.
+     - доменная часть логики → `lottery_engine::enter_round`;
+     - интеграционная/entry-часть → `lottery_gateway::enter_paid_round` или `lottery_gateway::enter_free_round`.
    - В `legacy`-модулях можно оставить старое имя `buy_ticket`, но чётко пометить их как неиспользуемые в новой архитектуре.
 
 Эти правила гарантируют, что одна и та же архитектура поддерживает как платные, так и бесплатные розыгрыши, а фронтенд всегда работает через понятные и стабильные entry-функции хаба.
+
+---
+
+## 16. Журнал работ и артефактов
+
+| Дата (UTC) | Что сделано | Артефакты |
+| --- | --- | --- |
+| 2025-11-15 | Подготовлен каркас пакета `lottery_data` (lottery_state, instances, rounds, operators, treasury_v1, treasury_multi) и обновлены статусы миграции ядра. | `SupraLottery/supra/move_workspace/lottery_data`, `docs/architecture/move_migration_mapping.md` |
+| 2025-11-15 | Автоматизирована инвентаризация текущих структур и ресурсов Move: добавлен скрипт `python docs/architecture/tools/export_move_inventory.py`, который формирует актуальный отчёт для подготовки таблиц соответствий. | `docs/architecture/move_struct_inventory.md`, `docs/architecture/tools/export_move_inventory.py` |
+| 2025-11-15 | Подготовлен шаблон таблицы сопоставления старых и новых структур и оформлен чек-лист миграционных транзакций с проверками и откатом. | `docs/architecture/move_migration_mapping_template.md`, `docs/architecture/migration_transaction_checklist.md` |
+| 2025-11-16 | Составлена заполненная карта миграции с перечнем ресурсов и шагами переноса. | `docs/architecture/move_migration_mapping.md` |
+| 2025-11-16 | Переклассифицированы пакеты на «ядро / этап 2+ / легаси» и задокументировано отсутствие конфликтов имён модулей с текущим деплоем на testnet. | Раздел 3, `docs/architecture/move_struct_inventory.md`, проверка адреса `0xbc95…caafe0` |
+| 2025-11-17 | Развёрнут пакет `lottery_engine` с модулями `ticketing` и `sales`, подключёнными к `lottery_data`; обновлены карта миграции и инвентаризация структур. | `SupraLottery/supra/move_workspace/lottery_engine`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/move_struct_inventory.md` |
+| 2025-11-18 | Добавлен модуль `lottery_engine::draw` с управлением расписанием розыгрыша и обработкой VRF; обновлены карта миграции, чек-лист транзакций и инвентаризация. | `SupraLottery/supra/move_workspace/lottery_engine/sources/Draw.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md` |
+| 2025-11-19 | Реализован `lottery_engine::vrf_config` и события VRF-конфигурации в `lottery_data`; обновлены карта миграции, чек-лист и инвентаризация. | `SupraLottery/supra/move_workspace/lottery_engine/sources/VrfConfig.move`, `SupraLottery/supra/move_workspace/lottery_data/sources/LotteryState.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md` |
+| 2025-11-20 | Обновлён `lottery_engine::sales`: поддержаны батчевые покупки и автоматическое планирование розыгрыша, синхронизированное с `lottery_data::rounds`; документация отражает прогресс и новые шаги миграции. | `SupraLottery/supra/move_workspace/lottery_engine/sources/Sales.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/supra_restructuring_detailed_plan.md` |
+| 2025-11-21 | Реализованы `lottery_data::vrf_deposit` и `lottery_engine::vrf`, добавлена проверка паузы VRF-запросов в `lottery_engine::draw` и обновлён автоматический отчёт по структурам. | `SupraLottery/supra/move_workspace/lottery_data/sources/VrfDeposit.move`, `SupraLottery/supra/move_workspace/lottery_engine/sources/Vrf.move`, `SupraLottery/supra/move_workspace/lottery_engine/sources/Draw.move`, `docs/architecture/move_struct_inventory.md`, `docs/architecture/move_migration_mapping.md` |
+| 2025-11-22 | Добавлены события смены владельца в `lottery_data::instances`, новый модуль `lottery_engine::operators` и обновления документации по миграции ролей. | `SupraLottery/supra/move_workspace/lottery_data/sources/Instances.move`, `SupraLottery/supra/move_workspace/lottery_engine/sources/Operators.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md` |
+| 2025-11-23 | Реализован административный цикл паузы/возврата (`lottery_engine::lifecycle`) и функция `instances::set_active`; обновлены карта миграции, чек-лист и план. | `SupraLottery/supra/move_workspace/lottery_engine/sources/Lifecycle.move`, `SupraLottery/supra/move_workspace/lottery_data/sources/Instances.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md` |
+| 2025-11-24 | Добавлены `lottery_data::payouts` и `lottery_engine::payouts`, интегрированы записи победителей в `lottery_engine::draw`, обновлены карта миграции, чек-лист и инвентаризация структур. | `SupraLottery/supra/move_workspace/lottery_data/sources/Payouts.move`, `SupraLottery/supra/move_workspace/lottery_engine/sources/Payouts.move`, `SupraLottery/supra/move_workspace/lottery_engine/sources/Draw.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md` |
+| 2025-11-25 | Добавлены `lottery_data::cancellations` и `lottery_engine::cancellation`, обеспечен полный цикл админской отмены с очисткой pending-запросов и событий, обновлены карта миграции, чек-лист и инвентаризация. | `SupraLottery/supra/move_workspace/lottery_data/sources/Cancellations.move`, `SupraLottery/supra/move_workspace/lottery_engine/sources/Cancellation.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md` |
+| 2025-11-26 | Приведены модули `lottery_engine` и `lottery_data` к рекурсивным хелперам вместо циклов, чтобы соответствовать требованиям Move v1 (без `let mut`), обновлён журнал для фиксации соблюдения синтаксических правил. | `SupraLottery/supra/move_workspace/lottery_engine/sources/Sales.move`, `SupraLottery/supra/move_workspace/lottery_engine/sources/VrfConfig.move`, `SupraLottery/supra/move_workspace/lottery_engine/sources/Draw.move`, `SupraLottery/supra/move_workspace/lottery_data/sources/Operators.move`, `SupraLottery/supra/move_workspace/lottery_data/sources/Payouts.move` |
+| 2025-11-27 | Развернуты `lottery_data::automation` и `lottery_engine::automation`, дополнены карта миграции и чек-лист шагами по переносу ботов и cron-capability. | `SupraLottery/supra/move_workspace/lottery_data/sources/Automation.move`, `SupraLottery/supra/move_workspace/lottery_engine/sources/Automation.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md` |
+| 2025-11-28 | Создан пакет `lottery_gateway` с модулем `gateway`, обновлены карта миграции, чек-лист и инвентаризация для фиксации нового фасада и миграции `LotteryRegistry`. | `SupraLottery/supra/move_workspace/lottery_gateway/Move.toml`, `SupraLottery/supra/move_workspace/lottery_gateway/sources/Gateway.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md` |
+| 2025-11-29 | Развёрнут пакет `lottery_rewards_engine` с модулем `treasury`, который синхронизирует продажи с мульти-трежери и проверяет доли BPS; обновлены `lottery_engine::sales`, карта миграции и чек-лист транзакций. | `SupraLottery/supra/move_workspace/lottery_rewards_engine`, `SupraLottery/supra/move_workspace/lottery_engine/sources/Sales.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md` |
+| 2025-11-30 | Добавлен модуль `lottery_rewards_engine::payouts`, связывающий `PayoutLedger` с мульти-трежери и событиями выплат: реализованы entry-функции для выдачи джекпотов, учёта операционных списаний/бонусов и синхронизации статусов; обновлены карта миграции, чек-лист и инвентаризация. | `SupraLottery/supra/move_workspace/lottery_rewards_engine/sources/Payouts.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md`, `docs/architecture/supra_restructuring_detailed_plan.md` |
+| 2025-12-01 | Реализованы `lottery_data::jackpot` и `lottery_rewards_engine::jackpot`, обновлены план, карта миграции и чек-лист миграций с dry-run VRF и проверкой мульти-трежери; `lottery_engine::ticketing::create_lottery` автоматически регистрирует джекпот. | `SupraLottery/supra/move_workspace/lottery_data/sources/Jackpot.move`, `SupraLottery/supra/move_workspace/lottery_rewards_engine/sources/Jackpot.move`, `SupraLottery/supra/move_workspace/lottery_engine/sources/Ticketing.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md`, `docs/architecture/supra_restructuring_detailed_plan.md` |
+| 2025-12-01 | Развёрнут пакет `lottery_utils` с модулями `math`, `feature_flags` и `price_feed`, обновлены карта миграции и чек-лист шагами инициализации utility-слоя и переносом devnet-конфигураций. | `SupraLottery/supra/move_workspace/lottery_utils`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md` |
+| 2025-12-02 | Добавлен модуль `lottery_rewards_engine::autopurchase`, расширены `lottery_engine::sales`, `lottery_data::treasury_v1` и `lottery_data::rounds` для предоплаченных покупок и управления capability; обновлены карта миграции, чек-лист, инвентаризация и план. | `SupraLottery/supra/move_workspace/lottery_rewards_engine/sources/Autopurchase.move`, `SupraLottery/supra/move_workspace/lottery_engine/sources/Sales.move`, `SupraLottery/supra/move_workspace/lottery_data/sources/TreasuryV1.move`, `SupraLottery/supra/move_workspace/lottery_data/sources/Rounds.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md`, `docs/architecture/supra_restructuring_detailed_plan.md` |
+| 2025-12-03 | Реализован модуль `lottery_rewards_engine::vip`, обновлены `lottery_data::treasury_multi` (capability `VipAccess`), карта миграции, чек-лист транзакций и инвентаризация; зафиксированы новые шаги миграции подписок и обновлена дорожная карта. | `SupraLottery/supra/move_workspace/lottery_rewards_engine/sources/Vip.move`, `SupraLottery/supra/move_workspace/lottery_data/sources/TreasuryMulti.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md`, `docs/architecture/supra_restructuring_detailed_plan.md` |
+| 2025-12-04 | Добавлен модуль `lottery_rewards_engine::store` с управлением каталогом и покупками, обновлены карта миграции, чек-лист и инвентаризация; зафиксированы шаги миграции `StoreState`/`StoreAccess`. | `SupraLottery/supra/move_workspace/lottery_rewards_engine/sources/Store.move`, `SupraLottery/supra/move_workspace/lottery_rewards_engine/Move.toml`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md`, `docs/architecture/supra_restructuring_detailed_plan.md` |
+| 2025-12-05 | Реализован `lottery_utils::history` с поддержкой `HistoryWarden`, синхронизацией очереди `rounds::PendingHistoryQueue` и событиями истории; обновлены карта миграции, чек-лист транзакций, план и инвентаризация. | `SupraLottery/supra/move_workspace/lottery_utils/sources/History.move`, `SupraLottery/supra/move_workspace/lottery_data/sources/Rounds.move`, `SupraLottery/supra/move_workspace/lottery_engine/sources/Draw.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md`, `docs/architecture/supra_restructuring_detailed_plan.md` |
+| 2025-12-06 | Добавлен `lottery_utils::metadata`: события апдейта и удаления метаданных, снапшоты `MetadataSnapshotUpdatedEvent`, рекурсивные обходы без циклов; обновлены карта миграции, чек-лист транзакций, план и автоматический отчёт по структурам. | `SupraLottery/supra/move_workspace/lottery_utils/sources/Metadata.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md`, `docs/architecture/supra_restructuring_detailed_plan.md` |
+| 2025-12-07 | Реализован `lottery_utils::migration`: `MigrationLedger`, `MigrationSession`, события `MigrationSnapshotUpdatedEvent` и управление capability; обновлены карта миграции, чек-лист, план и автоматическая инвентаризация. | `SupraLottery/supra/move_workspace/lottery_utils/sources/Migration.move`, `SupraLottery/supra/move_workspace/lottery_data/sources/Instances.move`, `SupraLottery/supra/move_workspace/lottery_data/sources/TreasuryV1.move`, `docs/architecture/move_migration_mapping.md`, `docs/architecture/migration_transaction_checklist.md`, `docs/architecture/move_struct_inventory.md`, `docs/architecture/supra_restructuring_detailed_plan.md` |
+
+> Журнал обновляется при каждом значимом шаге рефакторинга: сюда добавляются ссылки на документы, скрипты и отчёты, чтобы фиксировать накопленные артефакты и упростить контроль прогресса.
 

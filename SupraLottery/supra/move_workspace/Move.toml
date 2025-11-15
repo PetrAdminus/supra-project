@@ -1,6 +1,11 @@
 [workspace]
 resolver = "v2"
 members = [
+  "lottery_data",
+  "lottery_engine",
+  "lottery_utils",
+  "lottery_rewards_engine",
+  "lottery_gateway",
   "lottery_core",
   "lottery_support",
   "lottery_rewards",
