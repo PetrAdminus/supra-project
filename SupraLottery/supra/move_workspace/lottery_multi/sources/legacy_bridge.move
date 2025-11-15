@@ -1,43 +1,41 @@
 // sources/legacy_bridge.move
 module lottery_multi::legacy_bridge {
-    use std::bcs;
-    use std::hash;
     use std::option;
     use std::signer;
     use std::vector;
 
+    use supra_framework::account;
     use supra_framework::event;
 
     use lottery_multi::errors;
-    use lottery_multi::history;
 
     use lottery_support::history_bridge;
 
     use vrf_hub::table;
 
-    pub const EVENT_VERSION_V1: u16 = 1;
-    pub const EVENT_CATEGORY_MIGRATION: u8 = 8;
+    const EVENT_VERSION_V1: u16 = 1;
+    const EVENT_CATEGORY_MIGRATION: u8 = 8;
 
-    pub struct ArchiveDualWriteStartedEvent has drop, store {
-        pub event_version: u16,
-        pub event_category: u8,
-        pub lottery_id: u64,
-        pub expected_hash: vector<u8>,
+    struct ArchiveDualWriteStartedEvent has drop, store {
+        event_version: u16,
+        event_category: u8,
+        lottery_id: u64,
+        expected_hash: vector<u8>,
     }
 
-    pub struct ArchiveDualWriteCompletedEvent has drop, store {
-        pub event_version: u16,
-        pub event_category: u8,
-        pub lottery_id: u64,
-        pub archive_hash: vector<u8>,
-        pub finalized_at: u64,
+    struct ArchiveDualWriteCompletedEvent has drop, store {
+        event_version: u16,
+        event_category: u8,
+        lottery_id: u64,
+        archive_hash: vector<u8>,
+        finalized_at: u64,
     }
 
-    pub struct DualWriteStatus has copy, drop, store {
-        pub enabled: bool,
-        pub abort_on_mismatch: bool,
-        pub abort_on_missing: bool,
-        pub expected_hash: option::Option<vector<u8>>,
+    struct DualWriteStatus has copy, drop, store {
+        enabled: bool,
+        abort_on_mismatch: bool,
+        abort_on_missing: bool,
+        expected_hash: option::Option<vector<u8>>,
     }
 
     struct DualWriteControl has key {
@@ -49,7 +47,7 @@ module lottery_multi::legacy_bridge {
         completed_events: event::EventHandle<ArchiveDualWriteCompletedEvent>,
     }
 
-    struct MirrorConfig has key {}
+    struct MirrorConfig has key, drop {}
 
     public entry fun init_dual_write(
         admin: &signer,
@@ -57,35 +55,36 @@ module lottery_multi::legacy_bridge {
         abort_on_missing: bool,
     ) {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_HISTORY_NOT_AUTHORIZED);
-        assert!(!exists<DualWriteControl>(addr), errors::E_ALREADY_INITIALIZED);
+        assert!(addr == @lottery_multi, errors::err_history_not_authorized());
+        assert!(!exists<DualWriteControl>(addr), errors::err_already_initialized());
         let control = DualWriteControl {
             enabled: true,
             abort_on_mismatch,
             abort_on_missing,
             expected_hashes: table::new(),
-            started_events: event::new_event_handle<ArchiveDualWriteStartedEvent>(admin),
-            completed_events: event::new_event_handle<ArchiveDualWriteCompletedEvent>(admin),
+            started_events: account::new_event_handle<ArchiveDualWriteStartedEvent>(admin),
+            completed_events: account::new_event_handle<ArchiveDualWriteCompletedEvent>(admin),
         };
         move_to(admin, control);
     }
 
     public entry fun enable_legacy_mirror(admin: &signer) {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_HISTORY_NOT_AUTHORIZED);
+        assert!(addr == @lottery_multi, errors::err_history_not_authorized());
         if (exists<MirrorConfig>(addr)) {
-            return;
+            return
         };
         move_to(admin, MirrorConfig {});
     }
 
     public entry fun disable_legacy_mirror(admin: &signer) acquires MirrorConfig {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_HISTORY_NOT_AUTHORIZED);
+        assert!(addr == @lottery_multi, errors::err_history_not_authorized());
         if (!exists<MirrorConfig>(addr)) {
-            return;
+            return
         };
-        let _ = move_from<MirrorConfig>(addr);
+        let _config = move_from<MirrorConfig>(addr);
+        let _ = _config;
     }
 
     public entry fun update_flags(
@@ -95,11 +94,16 @@ module lottery_multi::legacy_bridge {
         abort_on_missing: bool,
     ) acquires DualWriteControl {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_HISTORY_NOT_AUTHORIZED);
-        let control = borrow_control_mut();
+        assert!(addr == @lottery_multi, errors::err_history_not_authorized());
+        let control_addr = control_addr_or_abort();
+        let control = borrow_global_mut<DualWriteControl>(control_addr);
         control.enabled = enabled;
         control.abort_on_mismatch = abort_on_mismatch;
         control.abort_on_missing = abort_on_missing;
+    }
+
+    public fun is_mirror_enabled(): bool {
+        exists<MirrorConfig>(@lottery_multi)
     }
 
     public entry fun set_expected_hash(
@@ -108,8 +112,9 @@ module lottery_multi::legacy_bridge {
         expected_hash: vector<u8>,
     ) acquires DualWriteControl {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_HISTORY_NOT_AUTHORIZED);
-        let control = borrow_control_mut();
+        assert!(addr == @lottery_multi, errors::err_history_not_authorized());
+        let control_addr = control_addr_or_abort();
+        let control = borrow_global_mut<DualWriteControl>(control_addr);
         if (table::contains(&control.expected_hashes, lottery_id)) {
             table::remove(&mut control.expected_hashes, lottery_id);
         };
@@ -126,8 +131,9 @@ module lottery_multi::legacy_bridge {
 
     public entry fun clear_expected_hash(admin: &signer, lottery_id: u64) acquires DualWriteControl {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_HISTORY_NOT_AUTHORIZED);
-        let control = borrow_control_mut();
+        assert!(addr == @lottery_multi, errors::err_history_not_authorized());
+        let control_addr = control_addr_or_abort();
+        let control = borrow_global_mut<DualWriteControl>(control_addr);
         if (table::contains(&control.expected_hashes, lottery_id)) {
             table::remove(&mut control.expected_hashes, lottery_id);
         };
@@ -139,25 +145,26 @@ module lottery_multi::legacy_bridge {
         finalized_at: u64,
     ) acquires DualWriteControl {
         if (!exists<DualWriteControl>(@lottery_multi)) {
-            return;
+            return
         };
-        let control = borrow_control_mut();
+        let control_addr = control_addr_or_abort();
+        let control = borrow_global_mut<DualWriteControl>(control_addr);
         if (!control.enabled) {
-            return;
+            return
         };
         if (!table::contains(&control.expected_hashes, lottery_id)) {
             if (control.abort_on_missing) {
-                abort errors::E_HISTORY_EXPECTED_MISSING;
+                abort errors::err_history_expected_missing()
             };
-            return;
+            return
         };
         let expected = table::borrow(&control.expected_hashes, lottery_id);
-        let archive_hash_copy = copy *archive_hash;
+        let archive_hash_copy = clone_bytes(archive_hash);
         if (*expected != *archive_hash) {
             if (control.abort_on_mismatch) {
-                abort errors::E_HISTORY_MISMATCH;
+                abort errors::err_history_mismatch()
             };
-            return;
+            return
         };
         table::remove(&mut control.expected_hashes, lottery_id);
         let completed = ArchiveDualWriteCompletedEvent {
@@ -170,24 +177,11 @@ module lottery_multi::legacy_bridge {
         event::emit_event(&mut control.completed_events, completed);
     }
 
-    public entry fun mirror_summary_admin(admin: &signer, lottery_id: u64)
-    acquires history::ArchiveLedger, MirrorConfig {
-        let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_HISTORY_NOT_AUTHORIZED);
-        if (!exists<MirrorConfig>(addr)) {
-            return;
-        };
-        let summary = history::get_summary(lottery_id);
-        let summary_bytes = bcs::to_bytes(&summary);
-        let archive_hash = hash::sha3_256(copy summary_bytes);
-        mirror_summary_internal(lottery_id, &summary_bytes, &archive_hash, summary.finalized_at);
-    }
-
     public fun is_enabled(): bool acquires DualWriteControl {
         if (!exists<DualWriteControl>(@lottery_multi)) {
-            return false;
+            return false
         };
-        let control = borrow_control();
+        let control = borrow_global<DualWriteControl>(@lottery_multi);
         control.enabled
     }
 
@@ -198,12 +192,12 @@ module lottery_multi::legacy_bridge {
                 abort_on_mismatch: false,
                 abort_on_missing: false,
                 expected_hash: option::none<vector<u8>>(),
-            };
+            }
         };
-        let control = borrow_control();
+        let control = borrow_global<DualWriteControl>(@lottery_multi);
         let expected_opt = if (table::contains(&control.expected_hashes, lottery_id)) {
             let hash_ref = table::borrow(&control.expected_hashes, lottery_id);
-            option::some(copy *hash_ref)
+            option::some(clone_bytes(hash_ref))
         } else {
             option::none<vector<u8>>()
         };
@@ -222,9 +216,9 @@ module lottery_multi::legacy_bridge {
                 abort_on_mismatch: false,
                 abort_on_missing: false,
                 expected_hash: option::none<vector<u8>>(),
-            };
+            }
         };
-        let control = borrow_control();
+        let control = borrow_global<DualWriteControl>(@lottery_multi);
         DualWriteStatus {
             enabled: control.enabled,
             abort_on_mismatch: control.abort_on_mismatch,
@@ -235,17 +229,17 @@ module lottery_multi::legacy_bridge {
 
     public fun has_expected_hash(lottery_id: u64): bool acquires DualWriteControl {
         if (!exists<DualWriteControl>(@lottery_multi)) {
-            return false;
+            return false
         };
-        let control = borrow_control();
+        let control = borrow_global<DualWriteControl>(@lottery_multi);
         table::contains(&control.expected_hashes, lottery_id)
     }
 
     public fun pending_expected_hashes(): vector<u64> acquires DualWriteControl {
         if (!exists<DualWriteControl>(@lottery_multi)) {
-            return vector::empty<u64>();
+            return vector::empty<u64>()
         };
-        let control = borrow_control();
+        let control = borrow_global<DualWriteControl>(@lottery_multi);
         table::keys(&control.expected_hashes)
     }
 
@@ -254,39 +248,44 @@ module lottery_multi::legacy_bridge {
         summary_bytes: &vector<u8>,
         archive_hash: &vector<u8>,
         finalized_at: u64,
-    ) acquires MirrorConfig {
+    ) {
         if (!exists<MirrorConfig>(@lottery_multi)) {
-            return;
+            return
         };
         if (!history_bridge::is_initialized()) {
-            return;
+            return
         };
-        let summary_copy = copy *summary_bytes;
-        let hash_copy = copy *archive_hash;
+        let summary_copy = clone_bytes(summary_bytes);
+        let hash_copy = clone_bytes(archive_hash);
         history_bridge::record_summary(lottery_id, summary_copy, hash_copy, finalized_at);
     }
 
-    fun borrow_control_mut(): &mut DualWriteControl acquires DualWriteControl {
-        if (!exists<DualWriteControl>(@lottery_multi)) {
-            abort errors::E_HISTORY_CONTROL_MISSING;
+    fun control_addr_or_abort(): address {
+        let addr = @lottery_multi;
+        if (!exists<DualWriteControl>(addr)) {
+            abort errors::err_history_control_missing()
         };
-        borrow_global_mut<DualWriteControl>(@lottery_multi)
+        addr
     }
 
-    fun borrow_control(): &DualWriteControl acquires DualWriteControl {
-        if (!exists<DualWriteControl>(@lottery_multi)) {
-            abort errors::E_HISTORY_CONTROL_MISSING;
+    fun clone_bytes(source: &vector<u8>): vector<u8> {
+        let len = vector::length(source);
+        let result = vector::empty<u8>();
+        let i = 0u64;
+        while (i < len) {
+            let byte = *vector::borrow(source, i);
+            vector::push_back(&mut result, byte);
+            i = i + 1;
         };
-        borrow_global<DualWriteControl>(@lottery_multi)
+        result
     }
 
-    fun mirror_summary_internal(
-        lottery_id: u64,
-        summary_bytes: &vector<u8>,
-        archive_hash: &vector<u8>,
-        finalized_at: u64,
-    ) acquires MirrorConfig {
-        mirror_summary_to_legacy(lottery_id, summary_bytes, archive_hash, finalized_at);
+    public fun dual_write_status_enabled(status: &DualWriteStatus): bool {
+        status.enabled
+    }
+
+    public fun dual_write_status_has_expected_hash(status: &DualWriteStatus): bool {
+        option::is_some(&status.expected_hash)
     }
 }
 

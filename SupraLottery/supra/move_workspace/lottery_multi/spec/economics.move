@@ -2,11 +2,7 @@ spec module lottery_multi::economics {
     use lottery_multi::economics::{Accounting, SalesDistribution, BASIS_POINTS_MAX};
 
     spec struct SalesDistribution {
-        invariant (prize_bps as u64)
-            + (jackpot_bps as u64)
-            + (operations_bps as u64)
-            + (reserve_bps as u64)
-            == BASIS_POINTS_MAX;
+        invariant prize_bps + jackpot_bps + operations_bps + reserve_bps == BASIS_POINTS_MAX;
     }
 
     spec struct Accounting {

@@ -323,7 +323,7 @@ case "$COMMAND" in
       echo "[dual_write_control] Требуется 1 аргумент: lottery_id" >&2
       exit 1
     fi
-    run_move "lottery_multi::legacy_bridge::mirror_summary_admin" "u64:$1"
+    run_move "lottery_multi::history::mirror_summary_admin" "u64:$1"
     ;;
   status)
     if [[ $# -ne 1 ]]; then
@@ -344,3 +344,4 @@ case "$COMMAND" in
     exit 1
     ;;
 esac
+

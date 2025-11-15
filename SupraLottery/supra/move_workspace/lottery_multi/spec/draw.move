@@ -1,24 +1,23 @@
 spec module lottery_multi::draw {
-    use std::bcs;
     use std::table;
 
     use supra_addr::supra_vrf;
 
     use lottery_multi::draw::{DrawLedger, DrawState};
-    use lottery_multi::registry;
+    use lottery_multi::lottery_registry;
     use lottery_multi::types;
 
     const MAX_VRF_ATTEMPTS: u8 = 5;
 
     spec struct DrawState {
         invariant len(snapshot_hash) == 0 || len(snapshot_hash) == 32;
-        invariant vrf_state.status == types::VRF_STATUS_REQUESTED ==> len(snapshot_hash) == 32;
-        invariant vrf_state.status == types::VRF_STATUS_FULFILLED ==> len(snapshot_hash) == 32;
+        invariant vrf_state.status == types::vrf_status_requested() ==> len(snapshot_hash) == 32;
+        invariant vrf_state.status == types::vrf_status_fulfilled() ==> len(snapshot_hash) == 32;
         invariant vrf_state.retry_after_ts == 0
-            ==> vrf_state.status == types::VRF_STATUS_IDLE
-                || vrf_state.status == types::VRF_STATUS_FULFILLED
-                || vrf_state.retry_strategy == types::RETRY_STRATEGY_MANUAL;
-        invariant vrf_state.status == types::VRF_STATUS_FULFILLED ==> !vrf_state.consumed || len(verified_payload) > 0;
+            ==> vrf_state.status == types::vrf_status_idle()
+                || vrf_state.status == types::vrf_status_fulfilled()
+                || vrf_state.retry_strategy == types::retry_strategy_manual();
+        invariant vrf_state.status == types::vrf_status_fulfilled() ==> !vrf_state.consumed || len(verified_numbers) > 0;
         invariant len(winners_batch_hash) == 0 || len(winners_batch_hash) == 32;
         invariant len(checksum_after_batch) == 0 || len(checksum_after_batch) == 32;
     }
@@ -50,30 +49,30 @@ spec module lottery_multi::draw {
                 total_tickets: 0,
                 winners_batch_hash: b"",
                 checksum_after_batch: b"",
-                verified_payload: b"",
+                verified_numbers: vector[],
                 payload: b"",
                 next_client_seed: 0,
             }
         };
         ensures has_state(@lottery_multi, lottery_id);
         ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS
-            ==> new_state.vrf_state.status == types::VRF_STATUS_REQUESTED;
+            ==> new_state.vrf_state.status == types::vrf_status_requested();
         ensures old_state.vrf_state.attempt >= MAX_VRF_ATTEMPTS
-            ==> new_state.vrf_state.status == types::VRF_STATUS_FAILED;
-        let config = registry::borrow_config_from_registry(&global<registry::Registry>(@lottery_multi), lottery_id);
+            ==> new_state.vrf_state.status == types::vrf_status_failed();
+        let config = lottery_registry::borrow_config_from_registry(&global<lottery_registry::Registry>(@lottery_multi), lottery_id);
         ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS
             ==> new_state.vrf_state.retry_strategy == config.vrf_retry_policy.strategy;
-        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS && config.vrf_retry_policy.strategy == types::RETRY_STRATEGY_MANUAL
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS && config.vrf_retry_policy.strategy == types::retry_strategy_manual()
             ==> new_state.vrf_state.retry_after_ts == 0;
-        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS && config.vrf_retry_policy.strategy != types::RETRY_STRATEGY_MANUAL
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS && config.vrf_retry_policy.strategy != types::retry_strategy_manual()
             ==> new_state.vrf_state.retry_after_ts >= now_ts;
-        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS && config.vrf_retry_policy.strategy != types::RETRY_STRATEGY_MANUAL
+        ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS && config.vrf_retry_policy.strategy != types::retry_strategy_manual()
             ==> new_state.vrf_state.retry_after_ts <= now_ts + config.vrf_retry_policy.max_delay_secs;
         ensures old_state.vrf_state.attempt >= MAX_VRF_ATTEMPTS ==> new_state.vrf_state.retry_after_ts == 0;
         ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS ==> new_state.vrf_state.consumed == false;
         ensures old_state.vrf_state.attempt >= MAX_VRF_ATTEMPTS ==> new_state.vrf_state.consumed == true;
         ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS
-            ==> new_state.vrf_state.schema_version == types::DEFAULT_SCHEMA_VERSION;
+            ==> new_state.vrf_state.schema_version == types::vrf_default_schema_version();
         ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS
             ==> new_state.vrf_state.retry_strategy == config.vrf_retry_policy.strategy;
         ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS
@@ -82,7 +81,7 @@ spec module lottery_multi::draw {
             ==> new_state.vrf_state.closing_block_height == closing_block_height;
         ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS ==> new_state.last_request_ts == now_ts;
         ensures old_state.vrf_state.attempt >= MAX_VRF_ATTEMPTS ==> new_state.last_request_ts == old_state.last_request_ts;
-        ensures new_state.verified_payload == b"";
+        ensures len(new_state.verified_numbers) == 0;
         ensures new_state.winners_batch_hash == b"";
         ensures new_state.checksum_after_batch == b"";
         ensures old_state.vrf_state.attempt < MAX_VRF_ATTEMPTS ==> new_state.client_seed < new_state.next_client_seed;
@@ -102,23 +101,23 @@ spec module lottery_multi::draw {
     spec vrf_callback {
         let lottery_id = old(lottery_for_nonce(@lottery_multi, nonce));
         let new_state = draw_state(@lottery_multi, lottery_id);
-        ensures new_state.vrf_state.status == types::VRF_STATUS_FULFILLED;
+        ensures new_state.vrf_state.status == types::vrf_status_fulfilled();
         ensures new_state.vrf_state.consumed == false;
         ensures new_state.vrf_state.retry_after_ts == 0;
-        ensures new_state.verified_payload == bcs::to_bytes(&supra_vrf::verify_callback(
+        ensures new_state.verified_numbers == supra_vrf::verify_callback(
             nonce,
             message,
             signature,
             caller_address,
             rng_count,
             client_seed,
-        ));
+        );
     }
 
     spec prepare_for_winner_computation {
         let old_state = old(draw_state(@lottery_multi, lottery_id));
         let new_state = draw_state(@lottery_multi, lottery_id);
-        ensures old_state.vrf_state.status == types::VRF_STATUS_FULFILLED;
+        ensures old_state.vrf_state.status == types::vrf_status_fulfilled();
         ensures !old_state.vrf_state.consumed;
         ensures new_state.vrf_state.consumed;
         ensures new_state.vrf_state.status == old_state.vrf_state.status;

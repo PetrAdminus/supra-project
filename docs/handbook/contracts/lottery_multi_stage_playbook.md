@@ -147,3 +147,4 @@
   [../operations/status_page.md](../operations/status_page.md), [../operations/post_release_support.md](../operations/post_release_support.md), [../operations/postmortems.md](../operations/postmortems.md)
 - РРЅСЃС‚СЂСѓРјРµРЅС‚С‹ CLI: `SupraLottery/supra/scripts/history_backfill.sh`, `SupraLottery/supra/scripts/dual_write_control.sh`, `SupraLottery/supra/scripts/incident_log.sh`, `SupraLottery/supra/scripts/refund_control.sh`
 
+

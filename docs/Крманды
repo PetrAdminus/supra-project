@@ -1,0 +1,19 @@
+запустить контйнер:
+docker compose run --rm --entrypoint bash supra_cli
+
+посмотреть список аккаунтов из контйнера:
+/supra/supra profile list
+
+узнать приватный ключ из контйнера:
+docker compose run --rm --entrypoint bash supra_cli -lc "/supra/supra profile -l -r"
+
+запустить тесты без контйнера:
+
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  -lc "cd /supra/SupraLottery && PYTHONPATH=/supra/SupraLottery python3 -m supra.scripts.cli move-test --workspace /supra/move_workspace --package lottery_core --cli /supra/supra"
+
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  -lc "cd /supra/SupraLottery && PYTHONPATH=/supra/SupraLottery python3 -m supra.scripts.cli move-test --workspace /supra/move_workspace --package lottery_support --cli /supra/supra"
+
+docker compose -f SupraLottery/compose.yaml run --rm --entrypoint bash supra_cli `
+  -lc "cd /supra/SupraLottery && PYTHONPATH=/supra/SupraLottery python3 -m supra.scripts.cli move-test --workspace /supra/move_workspace --package lottery_rewards --cli /supra/supra"

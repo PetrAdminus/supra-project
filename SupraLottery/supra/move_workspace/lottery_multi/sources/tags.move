@@ -17,12 +17,12 @@ module lottery_multi::tags {
     const TAG_PROMO: u64 = 1u64 << 4;
     const TAG_EXPERIMENTAL: u64 = 0x8000000000000000;
 
-    const KNOWN_TAG_BITS: u64 = TAG_NFT
-        | TAG_DAILY
-        | TAG_WEEKLY
-        | TAG_SPLIT_PRIZE
-        | TAG_PROMO
-        | TAG_EXPERIMENTAL;
+    const KNOWN_TAG_BITS: u64 = (1u64 << 0)
+        | (1u64 << 1)
+        | (1u64 << 2)
+        | (1u64 << 3)
+        | (1u64 << 4)
+        | 0x8000000000000000;
 
     public fun validate(primary_type: u8, tags_mask: u64) {
         assert!(
@@ -30,28 +30,72 @@ module lottery_multi::tags {
                 primary_type == TYPE_PARTNER ||
                 primary_type == TYPE_JACKPOT ||
                 primary_type == TYPE_VIP,
-            errors::E_TAG_PRIMARY_TYPE,
+            errors::err_tag_primary_type(),
         );
-        // Ensure the mask does not contain unknown (reserved) bits.
-        let unknown_bits = tags_mask & !KNOWN_TAG_BITS;
-        assert!(unknown_bits == 0, errors::E_TAG_UNKNOWN_BIT);
+        assert!(
+            (tags_mask & KNOWN_TAG_BITS) == tags_mask,
+            errors::err_tag_unknown_bit(),
+        );
     }
 
     public fun count_active_tags(tags_mask: u64): u8 {
-        let mut count = 0u8;
-        let mut mask = tags_mask;
-        while (mask > 0) {
-            if ((mask & 1) == 1) {
-                count = count + 1;
-            };
-            mask = mask >> 1;
-        };
-        count
+        count_bits_recursive(tags_mask, 0)
     }
 
     public fun assert_tag_budget(tags_mask: u64) {
         let active = count_active_tags(tags_mask);
-        assert!(active <= MAX_ACTIVE_TAGS, errors::E_TAG_BUDGET_EXCEEDED);
+        assert!(active <= MAX_ACTIVE_TAGS, errors::err_tag_budget_exceeded());
+    }
+    fun count_bits_recursive(mask: u64, acc: u8): u8 {
+        if (mask == 0) {
+            return acc
+        };
+        let increment = if ((mask & 1) == 1) { 1u8 } else { 0u8 };
+        count_bits_recursive(mask >> 1, acc + increment)
+    }
+
+    //
+    // Constant helpers (Move v1 compatibility)
+    //
+
+    public fun type_basic(): u8 {
+        TYPE_BASIC
+    }
+
+    public fun type_partner(): u8 {
+        TYPE_PARTNER
+    }
+
+    public fun type_jackpot(): u8 {
+        TYPE_JACKPOT
+    }
+
+    public fun type_vip(): u8 {
+        TYPE_VIP
+    }
+
+    public fun tag_nft(): u64 {
+        TAG_NFT
+    }
+
+    public fun tag_daily(): u64 {
+        TAG_DAILY
+    }
+
+    public fun tag_weekly(): u64 {
+        TAG_WEEKLY
+    }
+
+    public fun tag_split_prize(): u64 {
+        TAG_SPLIT_PRIZE
+    }
+
+    public fun tag_promo(): u64 {
+        TAG_PROMO
+    }
+
+    public fun tag_experimental(): u64 {
+        TAG_EXPERIMENTAL
     }
 }
 

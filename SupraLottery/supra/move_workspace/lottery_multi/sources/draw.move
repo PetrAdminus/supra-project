@@ -8,16 +8,19 @@ module lottery_multi::draw {
     use std::vector;
 
     use supra_addr::supra_vrf;
+    use supra_framework::account;
     use supra_framework::event;
 
+    use lottery_multi::cancellation;
     use lottery_multi::errors;
     use lottery_multi::feature_switch;
     use lottery_multi::history;
-    use lottery_multi::registry;
+    use lottery_multi::lottery_registry;
     use lottery_multi::sales;
     use lottery_multi::types;
     use lottery_multi::vrf_deposit;
 
+    const EVENT_CATEGORY_DRAW: u8 = 4;
     const CALLBACK_MODULE_BYTES: vector<u8> = b"draw";
     const CALLBACK_FUNCTION_BYTES: vector<u8> = b"vrf_callback";
     const VRF_EVENT_VERSION_V1: u16 = 1;
@@ -36,17 +39,17 @@ module lottery_multi::draw {
         chain_id: u8,
     }
 
-    pub struct FinalizationSnapshot has copy, drop, store {
-        pub snapshot_hash: vector<u8>,
-        pub payload_hash: vector<u8>,
-        pub winners_batch_hash: vector<u8>,
-        pub checksum_after_batch: vector<u8>,
-        pub schema_version: u16,
-        pub attempt: u8,
-        pub closing_block_height: u64,
-        pub chain_id: u8,
-        pub request_ts: u64,
-        pub vrf_status: u8,
+    struct FinalizationSnapshot has copy, drop, store {
+        snapshot_hash: vector<u8>,
+        payload_hash: vector<u8>,
+        winners_batch_hash: vector<u8>,
+        checksum_after_batch: vector<u8>,
+        schema_version: u16,
+        attempt: u8,
+        closing_block_height: u64,
+        chain_id: u8,
+        request_ts: u64,
+        vrf_status: u8,
     }
 
     struct DrawState has store {
@@ -58,19 +61,19 @@ module lottery_multi::draw {
         total_tickets: u64,
         winners_batch_hash: vector<u8>,
         checksum_after_batch: vector<u8>,
-        verified_payload: vector<u8>,
+        verified_numbers: vector<u256>,
         payload: vector<u8>,
         next_client_seed: u64,
     }
 
-    pub struct VrfStateView has copy, drop, store {
-        pub status: u8,
-        pub attempt: u8,
-        pub consumed: bool,
-        pub retry_after_ts: u64,
-        pub retry_strategy: u8,
-        pub last_request_ts: u64,
-        pub request_id: u64,
+    struct VrfStateView has copy, drop, store {
+        status: u8,
+        attempt: u8,
+        consumed: bool,
+        retry_after_ts: u64,
+        retry_strategy: u8,
+        last_request_ts: u64,
+        request_id: u64,
     }
 
     struct DrawLedger has key {
@@ -82,13 +85,13 @@ module lottery_multi::draw {
 
     public entry fun init_draw(admin: &signer) {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_REGISTRY_MISSING);
-        assert!(!exists<DrawLedger>(addr), errors::E_ALREADY_INITIALIZED);
+        assert!(addr == @lottery_multi, errors::err_registry_missing());
+        assert!(!exists<DrawLedger>(addr), errors::err_already_initialized());
         let ledger = DrawLedger {
             states: table::new(),
             nonce_to_lottery: table::new(),
-            requested_events: event::new_event_handle<history::VrfRequestedEvent>(admin),
-            fulfilled_events: event::new_event_handle<history::VrfFulfilledEvent>(admin),
+            requested_events: account::new_event_handle<history::VrfRequestedEvent>(admin),
+            fulfilled_events: account::new_event_handle<history::VrfFulfilledEvent>(admin),
         };
         move_to(admin, ledger);
     }
@@ -100,66 +103,72 @@ module lottery_multi::draw {
         closing_block_height: u64,
         chain_id: u8,
         num_confirmations: u64,
-    ) acquires DrawLedger, registry::Registry, sales::SalesLedger {
+    ) acquires DrawLedger {
         ensure_feature_enabled(false);
         vrf_deposit::ensure_requests_allowed();
-        let status = registry::get_status(lottery_id);
+        let status = lottery_registry::get_status(lottery_id);
         assert!(
-            status == registry::STATUS_CLOSING || status == registry::STATUS_DRAW_REQUESTED,
-            errors::E_DRAW_STATUS_INVALID,
+            status == types::status_closing() || status == types::status_draw_requested(),
+            errors::err_draw_status_invalid(),
         );
 
-        let config = registry::borrow_config(lottery_id);
-        let prize_slots_len = vector::length(&config.prize_plan);
+        let prize_plan = lottery_registry::clone_prize_plan(lottery_id);
+        let prize_slots_len = vector::length(&prize_plan);
         types::assert_rng_count(prize_slots_len);
         let rng_count = types::as_u8(prize_slots_len);
 
         let (snapshot_hash, tickets_sold, _) = sales::snapshot_for_draw(lottery_id);
-        assert!(tickets_sold > 0, errors::E_VRF_SNAPSHOT_EMPTY);
+        assert!(tickets_sold > 0, errors::err_vrf_snapshot_empty());
 
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<DrawLedger>(ledger_addr);
         let state = borrow_or_create_state(&mut ledger.states, lottery_id);
-        if (state.vrf_state.attempt >= MAX_VRF_ATTEMPTS) {
-            state.vrf_state.status = types::VRF_STATUS_FAILED;
-            state.vrf_state.consumed = true;
-            state.vrf_state.retry_after_ts = 0;
-            state.vrf_state.request_id = 0;
-            state.vrf_state.payload_hash = b"";
-            state.verified_payload = b"";
+        let current_attempt = types::vrf_state_attempt(&state.vrf_state);
+        if (current_attempt >= MAX_VRF_ATTEMPTS) {
+            types::vrf_state_set_status(&mut state.vrf_state, types::vrf_status_failed());
+            types::vrf_state_set_consumed(&mut state.vrf_state, true);
+            types::vrf_state_set_retry_after_ts(&mut state.vrf_state, 0);
+            types::vrf_state_set_request_id(&mut state.vrf_state, 0);
+            types::vrf_state_clear_payload_hash(&mut state.vrf_state);
+            state.verified_numbers = vector::empty();
             state.payload = b"";
             state.winners_batch_hash = b"";
             state.checksum_after_batch = b"";
-            registry::cancel_lottery_admin(
+            cancellation::cancel_lottery_admin(
                 admin,
                 lottery_id,
-                registry::CANCEL_REASON_VRF_FAILURE,
+                lottery_registry::cancel_reason_vrf_failure(),
                 now_ts,
             );
-            return;
+            return
         };
-        assert!(state.vrf_state.status != types::VRF_STATUS_REQUESTED, errors::E_VRF_PENDING);
-        if (state.vrf_state.attempt > 0
-            && state.vrf_state.retry_strategy == types::RETRY_STRATEGY_MANUAL)
+        assert!(
+            types::vrf_state_status(&state.vrf_state) != types::vrf_status_requested(),
+            errors::err_vrf_pending(),
+        );
+        if (current_attempt > 0
+            && types::vrf_state_retry_strategy(&state.vrf_state) == types::retry_strategy_manual())
         {
             assert!(
-                state.vrf_state.retry_after_ts > 0,
-                errors::E_VRF_MANUAL_SCHEDULE_REQUIRED,
+                types::vrf_state_retry_after_ts(&state.vrf_state) > 0,
+                errors::err_vrf_manual_schedule_required(),
             );
         };
-        if (state.vrf_state.status == types::VRF_STATUS_FULFILLED) {
-            assert!(state.vrf_state.consumed, errors::E_VRF_PENDING);
+        if (types::vrf_state_status(&state.vrf_state) == types::vrf_status_fulfilled()) {
+            assert!(types::vrf_state_consumed(&state.vrf_state), errors::err_vrf_pending());
         };
-        if (state.vrf_state.retry_after_ts > 0 && now_ts < state.vrf_state.retry_after_ts) {
-            abort errors::E_VRF_RETRY_WINDOW;
+        let retry_after_ts = types::vrf_state_retry_after_ts(&state.vrf_state);
+        if (retry_after_ts > 0 && now_ts < retry_after_ts) {
+            abort errors::err_vrf_retry_window()
         };
 
         let attempt = increment_attempt(&mut state.vrf_state);
         state.rng_count = rng_count;
         let client_seed = next_client_seed(state);
-        let slots_checksum = registry::slots_checksum(lottery_id);
+        let slots_checksum = lottery_registry::slots_checksum(lottery_id);
         let payload = encode_payload_v1(
             lottery_id,
-            config.config_version,
+            lottery_registry::config_version(lottery_id),
             &snapshot_hash,
             &slots_checksum,
             rng_count,
@@ -183,49 +192,51 @@ module lottery_multi::draw {
             num_confirmations,
         );
 
-        state.vrf_state.request_id = nonce;
-        state.vrf_state.payload_hash = copy payload_hash;
-        state.vrf_state.schema_version = types::DEFAULT_SCHEMA_VERSION;
-        state.vrf_state.status = types::VRF_STATUS_REQUESTED;
-        state.vrf_state.consumed = false;
-        let policy = &config.vrf_retry_policy;
+        types::vrf_state_set_request_id(&mut state.vrf_state, nonce);
+        types::vrf_state_set_payload_hash(&mut state.vrf_state, &payload_hash);
+        types::vrf_state_set_schema_version(
+            &mut state.vrf_state,
+            types::vrf_default_schema_version(),
+        );
+        types::vrf_state_set_status(&mut state.vrf_state, types::vrf_status_requested());
+        types::vrf_state_set_consumed(&mut state.vrf_state, false);
+        let retry_policy = lottery_registry::vrf_retry_policy(lottery_id);
+        let policy = &retry_policy;
         let (retry_after_ts, retry_strategy) = compute_retry_schedule(policy, now_ts, attempt);
-        state.vrf_state.retry_after_ts = retry_after_ts;
-        state.vrf_state.retry_strategy = retry_strategy;
-        state.vrf_state.closing_block_height = closing_block_height;
-        state.vrf_state.chain_id = chain_id;
+        types::vrf_state_set_retry_after_ts(&mut state.vrf_state, retry_after_ts);
+        types::vrf_state_set_retry_strategy(&mut state.vrf_state, retry_strategy);
+        types::vrf_state_set_closing_block_height(&mut state.vrf_state, closing_block_height);
+        types::vrf_state_set_chain_id(&mut state.vrf_state, chain_id);
         state.client_seed = client_seed;
         state.last_request_ts = now_ts;
         state.snapshot_hash = copy snapshot_hash;
         state.total_tickets = tickets_sold;
         state.payload = copy payload;
-        state.verified_payload = b"";
+        state.verified_numbers = vector::empty();
         state.winners_batch_hash = b"";
         state.checksum_after_batch = b"";
 
         if (table::contains(&ledger.nonce_to_lottery, nonce)) {
-            abort errors::E_VRF_NONCE_UNKNOWN;
+            abort errors::err_vrf_nonce_unknown()
         };
         table::add(&mut ledger.nonce_to_lottery, nonce, lottery_id);
 
-        let requested = history::VrfRequestedEvent {
-            event_version: VRF_EVENT_VERSION_V1,
-            event_category: history::EVENT_CATEGORY_DRAW,
+        let requested = history::new_vrf_requested_event(
             lottery_id,
-            request_id: nonce,
+            nonce,
             attempt,
             rng_count,
             client_seed,
-            payload_hash: copy payload_hash,
-            snapshot_hash: copy snapshot_hash,
+            copy payload_hash,
+            copy snapshot_hash,
             tickets_sold,
             closing_block_height,
             chain_id,
-            request_ts: now_ts,
-        };
+            now_ts,
+        );
         event::emit_event(&mut ledger.requested_events, requested);
 
-        registry::mark_draw_requested(lottery_id);
+        lottery_registry::mark_draw_requested(lottery_id);
     }
 
     public entry fun schedule_manual_retry_admin(
@@ -233,27 +244,29 @@ module lottery_multi::draw {
         lottery_id: u64,
         now_ts: u64,
         retry_after_ts: u64,
-    ) acquires DrawLedger, registry::Registry {
+    ) acquires DrawLedger {
+        assert_admin(admin);
         ensure_feature_enabled(false);
-        let status = registry::get_status(lottery_id);
+        let status = lottery_registry::get_status(lottery_id);
         assert!(
-            status == registry::STATUS_CLOSING || status == registry::STATUS_DRAW_REQUESTED,
-            errors::E_DRAW_STATUS_INVALID,
+            status == types::status_closing() || status == types::status_draw_requested(),
+            errors::err_draw_status_invalid(),
         );
 
-        let ledger = borrow_ledger_mut();
-        assert!(table::contains(&ledger.states, lottery_id), errors::E_VRF_NOT_REQUESTED);
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<DrawLedger>(ledger_addr);
+        assert!(table::contains(&ledger.states, lottery_id), errors::err_vrf_not_requested());
         let state = table::borrow_mut(&mut ledger.states, lottery_id);
         assert!(
-            state.vrf_state.retry_strategy == types::RETRY_STRATEGY_MANUAL,
-            errors::E_VRF_RETRY_POLICY_INVALID,
+            types::vrf_state_retry_strategy(&state.vrf_state) == types::retry_strategy_manual(),
+            errors::err_vrf_retry_policy_invalid(),
         );
-        assert!(retry_after_ts > 0, errors::E_VRF_MANUAL_DEADLINE);
-        assert!(retry_after_ts >= now_ts, errors::E_VRF_MANUAL_DEADLINE);
-        state.vrf_state.retry_after_ts = retry_after_ts;
+        assert!(retry_after_ts > 0, errors::err_vrf_manual_deadline());
+        assert!(retry_after_ts >= now_ts, errors::err_vrf_manual_deadline());
+        types::vrf_state_set_retry_after_ts(&mut state.vrf_state, retry_after_ts);
     }
 
-    pub fun max_vrf_attempts(): u8 {
+    public fun max_vrf_attempts(): u8 {
         MAX_VRF_ATTEMPTS
     }
 
@@ -264,21 +277,28 @@ module lottery_multi::draw {
         caller_address: address,
         rng_count: u8,
         client_seed: u64,
-    ) acquires DrawLedger, registry::Registry {
-        let ledger = borrow_ledger_mut();
+    ) acquires DrawLedger {
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<DrawLedger>(ledger_addr);
         if (!table::contains(&ledger.nonce_to_lottery, nonce)) {
-            abort errors::E_VRF_NONCE_UNKNOWN;
+            abort errors::err_vrf_nonce_unknown()
         };
         let lottery_id = table::remove(&mut ledger.nonce_to_lottery, nonce);
         let state = table::borrow_mut(&mut ledger.states, lottery_id);
-        assert!(state.vrf_state.request_id == nonce, errors::E_VRF_NONCE_UNKNOWN);
-        assert!(state.vrf_state.status == types::VRF_STATUS_REQUESTED, errors::E_VRF_NOT_REQUESTED);
-        assert!(!state.vrf_state.consumed, errors::E_VRF_CONSUMED);
-        assert!(state.rng_count == rng_count, errors::E_VRF_RNG_COUNT_INVALID);
-        assert!(state.client_seed == client_seed, errors::E_VRF_PAYLOAD_MISMATCH);
+        assert!(types::vrf_state_request_id(&state.vrf_state) == nonce, errors::err_vrf_nonce_unknown());
+        assert!(
+            types::vrf_state_status(&state.vrf_state) == types::vrf_status_requested(),
+            errors::err_vrf_not_requested(),
+        );
+        assert!(!types::vrf_state_consumed(&state.vrf_state), errors::err_vrf_consumed());
+        assert!(state.rng_count == rng_count, errors::err_vrf_rng_count_invalid());
+        assert!(state.client_seed == client_seed, errors::err_vrf_payload_mismatch());
 
         let message_hash = hash::sha3_256(copy message);
-        assert!(message_hash == state.vrf_state.payload_hash, errors::E_VRF_PAYLOAD_MISMATCH);
+        assert!(
+            message_hash == *types::vrf_state_payload_hash_ref(&state.vrf_state),
+            errors::err_vrf_payload_mismatch(),
+        );
 
         let verified_nums: vector<u256> = supra_vrf::verify_callback(
             nonce,
@@ -291,35 +311,33 @@ module lottery_multi::draw {
         let verified_bytes = bcs::to_bytes(&verified_nums);
         let verified_seed_hash = hash::sha3_256(copy verified_bytes);
 
-        state.verified_payload = verified_bytes;
-        state.vrf_state.status = types::VRF_STATUS_FULFILLED;
-        state.vrf_state.consumed = false;
-        state.vrf_state.retry_after_ts = 0;
+        state.verified_numbers = clone_numbers(&verified_nums);
+        types::vrf_state_set_status(&mut state.vrf_state, types::vrf_status_fulfilled());
+        types::vrf_state_set_consumed(&mut state.vrf_state, false);
+        types::vrf_state_set_retry_after_ts(&mut state.vrf_state, 0);
 
-        let fulfilled = history::VrfFulfilledEvent {
-            event_version: VRF_EVENT_VERSION_V1,
-            event_category: history::EVENT_CATEGORY_DRAW,
+        let fulfilled = history::new_vrf_fulfilled_event(
             lottery_id,
-            request_id: nonce,
-            attempt: state.vrf_state.attempt,
-            payload_hash: copy state.vrf_state.payload_hash,
+            nonce,
+            types::vrf_state_attempt(&state.vrf_state),
+            clone_bytes(types::vrf_state_payload_hash_ref(&state.vrf_state)),
             message_hash,
             rng_count,
             client_seed,
             verified_seed_hash,
-            closing_block_height: state.vrf_state.closing_block_height,
-            chain_id: state.vrf_state.chain_id,
-            fulfilled_ts: state.last_request_ts,
-        };
+            types::vrf_state_closing_block_height(&state.vrf_state),
+            types::vrf_state_chain_id(&state.vrf_state),
+            state.last_request_ts,
+        );
         event::emit_event(&mut ledger.fulfilled_events, fulfilled);
 
-        registry::mark_drawn(lottery_id);
+        lottery_registry::mark_drawn(lottery_id);
     }
 
     fun ensure_feature_enabled(has_premium: bool) {
         if (feature_switch::is_initialized()) {
-            let enabled = feature_switch::is_enabled(feature_switch::FEATURE_DRAW, has_premium);
-            assert!(enabled, errors::E_FEATURE_DISABLED);
+            let enabled = feature_switch::is_enabled(feature_switch::feature_draw_id(), has_premium);
+            assert!(enabled, errors::err_feature_disabled());
         };
     }
 
@@ -333,22 +351,23 @@ module lottery_multi::draw {
         u16,
         u8,
     ) acquires DrawLedger {
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<DrawLedger>(ledger_addr);
         let state = table::borrow_mut(&mut ledger.states, lottery_id);
         assert!(
-            state.vrf_state.status == types::VRF_STATUS_FULFILLED,
-            errors::E_WINNER_VRF_NOT_READY,
+            types::vrf_state_status(&state.vrf_state) == types::vrf_status_fulfilled(),
+            errors::err_winner_vrf_not_ready(),
         );
-        assert!(!state.vrf_state.consumed, errors::E_VRF_CONSUMED);
-        let numbers: vector<u256> = bcs::from_bytes(&state.verified_payload);
-        state.vrf_state.consumed = true;
+        assert!(!types::vrf_state_consumed(&state.vrf_state), errors::err_vrf_consumed());
+        let numbers = clone_numbers(&state.verified_numbers);
+        types::vrf_state_set_consumed(&mut state.vrf_state, true);
         (
             numbers,
-            copy state.snapshot_hash,
-            copy state.vrf_state.payload_hash,
+            clone_bytes(&state.snapshot_hash),
+            clone_bytes(types::vrf_state_payload_hash_ref(&state.vrf_state)),
             state.total_tickets,
-            state.vrf_state.schema_version,
-            state.vrf_state.attempt,
+            types::vrf_state_schema_version(&state.vrf_state),
+            types::vrf_state_attempt(&state.vrf_state),
         )
     }
 
@@ -357,13 +376,13 @@ module lottery_multi::draw {
         winners_batch_hash: &vector<u8>,
         checksum_after_batch: &vector<u8>,
     ) acquires DrawLedger {
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<DrawLedger>(ledger_addr);
         let state = table::borrow_mut(&mut ledger.states, lottery_id);
-        state.winners_batch_hash = copy *winners_batch_hash;
-        state.checksum_after_batch = copy *checksum_after_batch;
+        state.winners_batch_hash = clone_bytes(winners_batch_hash);
+        state.checksum_after_batch = clone_bytes(checksum_after_batch);
     }
 
-    #[test_only]
     public fun test_seed_vrf_state(
         lottery_id: u64,
         numbers: vector<u256>,
@@ -375,28 +394,28 @@ module lottery_multi::draw {
         closing_block_height: u64,
         chain_id: u8,
     ) acquires DrawLedger {
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<DrawLedger>(ledger_addr);
         let state = borrow_or_create_state(&mut ledger.states, lottery_id);
         let rng_len = vector::length(&numbers);
         let rng_count = types::as_u8(rng_len);
         state.rng_count = rng_count;
         state.total_tickets = total_tickets;
         state.snapshot_hash = copy snapshot_hash;
-        state.vrf_state.status = types::VRF_STATUS_FULFILLED;
-        state.vrf_state.consumed = false;
-        state.vrf_state.schema_version = schema_version;
-        state.vrf_state.attempt = attempt;
-        state.vrf_state.retry_after_ts = 0;
-        state.vrf_state.retry_strategy = types::RETRY_STRATEGY_FIXED;
-        state.vrf_state.closing_block_height = closing_block_height;
-        state.vrf_state.chain_id = chain_id;
-        state.vrf_state.payload_hash = copy payload_hash;
-        state.vrf_state.request_id = 0;
+        types::vrf_state_set_status(&mut state.vrf_state, types::vrf_status_fulfilled());
+        types::vrf_state_set_consumed(&mut state.vrf_state, false);
+        types::vrf_state_set_schema_version(&mut state.vrf_state, schema_version);
+        types::vrf_state_set_attempt(&mut state.vrf_state, attempt);
+        types::vrf_state_set_retry_after_ts(&mut state.vrf_state, 0);
+        types::vrf_state_set_retry_strategy(&mut state.vrf_state, types::retry_strategy_fixed());
+        types::vrf_state_set_closing_block_height(&mut state.vrf_state, closing_block_height);
+        types::vrf_state_set_chain_id(&mut state.vrf_state, chain_id);
+        types::vrf_state_set_payload_hash(&mut state.vrf_state, &payload_hash);
+        types::vrf_state_set_request_id(&mut state.vrf_state, 0);
         state.client_seed = 0;
         state.last_request_ts = 0;
-        state.payload = b"";
-        let verified = bcs::to_bytes(&numbers);
-        state.verified_payload = verified;
+        state.payload = bcs::to_bytes(&numbers);
+        state.verified_numbers = clone_numbers(&numbers);
         state.winners_batch_hash = b"";
         state.checksum_after_batch = b"";
     }
@@ -409,91 +428,175 @@ module lottery_multi::draw {
         retry_after_ts: u64,
         attempt: u8,
     ) acquires DrawLedger {
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<DrawLedger>(ledger_addr);
         let state = table::borrow_mut(&mut ledger.states, lottery_id);
-        state.vrf_state.status = status;
-        state.vrf_state.consumed = consumed;
-        state.vrf_state.retry_after_ts = retry_after_ts;
-        state.vrf_state.attempt = attempt;
+        types::vrf_state_set_status(&mut state.vrf_state, status);
+        types::vrf_state_set_consumed(&mut state.vrf_state, consumed);
+        types::vrf_state_set_retry_after_ts(&mut state.vrf_state, retry_after_ts);
+        types::vrf_state_set_attempt(&mut state.vrf_state, attempt);
     }
 
-    pub fun finalization_snapshot(lottery_id: u64): FinalizationSnapshot acquires DrawLedger {
-        let ledger = borrow_ledger_ref();
+    public fun finalization_snapshot(lottery_id: u64): FinalizationSnapshot acquires DrawLedger {
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global<DrawLedger>(ledger_addr);
         let state = table::borrow(&ledger.states, lottery_id);
         FinalizationSnapshot {
-            snapshot_hash: copy state.snapshot_hash,
-            payload_hash: copy state.vrf_state.payload_hash,
-            winners_batch_hash: copy state.winners_batch_hash,
-            checksum_after_batch: copy state.checksum_after_batch,
-            schema_version: state.vrf_state.schema_version,
-            attempt: state.vrf_state.attempt,
-            closing_block_height: state.vrf_state.closing_block_height,
-            chain_id: state.vrf_state.chain_id,
+            snapshot_hash: clone_bytes(&state.snapshot_hash),
+            payload_hash: clone_bytes(types::vrf_state_payload_hash_ref(&state.vrf_state)),
+            winners_batch_hash: clone_bytes(&state.winners_batch_hash),
+            checksum_after_batch: clone_bytes(&state.checksum_after_batch),
+            schema_version: types::vrf_state_schema_version(&state.vrf_state),
+            attempt: types::vrf_state_attempt(&state.vrf_state),
+            closing_block_height: types::vrf_state_closing_block_height(&state.vrf_state),
+            chain_id: types::vrf_state_chain_id(&state.vrf_state),
             request_ts: state.last_request_ts,
-            vrf_status: state.vrf_state.status,
+            vrf_status: types::vrf_state_status(&state.vrf_state),
         }
     }
 
-    pub fun has_state(lottery_id: u64): bool acquires DrawLedger {
+    public fun has_state(lottery_id: u64): bool acquires DrawLedger {
         let addr = @lottery_multi;
         if (!exists<DrawLedger>(addr)) {
-            return false;
+            return false
         };
         let ledger = borrow_global<DrawLedger>(addr);
         table::contains(&ledger.states, lottery_id)
     }
 
-    pub fun vrf_state_view(lottery_id: u64): VrfStateView acquires DrawLedger {
+    public fun vrf_state_view(lottery_id: u64): VrfStateView acquires DrawLedger {
         let addr = @lottery_multi;
         if (!exists<DrawLedger>(addr)) {
             return VrfStateView {
-                status: types::VRF_STATUS_IDLE,
+                status: types::vrf_status_idle(),
                 attempt: 0,
                 consumed: true,
                 retry_after_ts: 0,
-                retry_strategy: types::RETRY_STRATEGY_FIXED,
+                retry_strategy: types::retry_strategy_fixed(),
                 last_request_ts: 0,
                 request_id: 0,
-            };
+            }
         };
-        let ledger = borrow_ledger_ref();
+        let ledger = borrow_global<DrawLedger>(addr);
         if (!table::contains(&ledger.states, lottery_id)) {
             return VrfStateView {
-                status: types::VRF_STATUS_IDLE,
+                status: types::vrf_status_idle(),
                 attempt: 0,
                 consumed: true,
                 retry_after_ts: 0,
-                retry_strategy: types::RETRY_STRATEGY_FIXED,
+                retry_strategy: types::retry_strategy_fixed(),
                 last_request_ts: 0,
                 request_id: 0,
-            };
+            }
         };
         let state = table::borrow(&ledger.states, lottery_id);
         VrfStateView {
-            status: state.vrf_state.status,
-            attempt: state.vrf_state.attempt,
-            consumed: state.vrf_state.consumed,
-            retry_after_ts: state.vrf_state.retry_after_ts,
-            retry_strategy: state.vrf_state.retry_strategy,
+            status: types::vrf_state_status(&state.vrf_state),
+            attempt: types::vrf_state_attempt(&state.vrf_state),
+            consumed: types::vrf_state_consumed(&state.vrf_state),
+            retry_after_ts: types::vrf_state_retry_after_ts(&state.vrf_state),
+            retry_strategy: types::vrf_state_retry_strategy(&state.vrf_state),
             last_request_ts: state.last_request_ts,
-            request_id: state.vrf_state.request_id,
+            request_id: types::vrf_state_request_id(&state.vrf_state),
         }
     }
 
-    fun borrow_ledger_mut(): &mut DrawLedger acquires DrawLedger {
+    fun ledger_addr_or_abort(): address {
         let addr = @lottery_multi;
         if (!exists<DrawLedger>(addr)) {
-            abort errors::E_REGISTRY_MISSING;
+            abort errors::err_registry_missing()
         };
-        borrow_global_mut<DrawLedger>(addr)
+        addr
     }
 
-    fun borrow_ledger_ref(): &DrawLedger acquires DrawLedger {
-        let addr = @lottery_multi;
-        if (!exists<DrawLedger>(addr)) {
-            abort errors::E_REGISTRY_MISSING;
-        };
-        borrow_global<DrawLedger>(addr)
+    //
+    // View helpers (Move v1 compatibility)
+    //
+
+    public fun finalization_snapshot_snapshot_hash(snapshot: &FinalizationSnapshot): vector<u8> {
+
+        clone_bytes(&snapshot.snapshot_hash)
+
+    }
+
+
+
+    public fun finalization_snapshot_winners_batch_hash(snapshot: &FinalizationSnapshot): vector<u8> {
+
+        clone_bytes(&snapshot.winners_batch_hash)
+
+    }
+
+
+
+    public fun finalization_snapshot_checksum_after_batch(snapshot: &FinalizationSnapshot): vector<u8> {
+
+        clone_bytes(&snapshot.checksum_after_batch)
+
+    }
+
+
+
+    public fun finalization_snapshot_closing_block(snapshot: &FinalizationSnapshot): u64 {
+
+        snapshot.closing_block_height
+
+    }
+
+
+
+    public fun finalization_snapshot_chain_id(snapshot: &FinalizationSnapshot): u8 {
+
+        snapshot.chain_id
+
+    }
+
+
+
+    public fun finalization_snapshot_attempt(snapshot: &FinalizationSnapshot): u8 {
+
+        snapshot.attempt
+
+    }
+
+
+
+    public fun finalization_snapshot_vrf_status(snapshot: &FinalizationSnapshot): u8 {
+
+        snapshot.vrf_status
+
+    }
+
+
+
+    public fun finalization_snapshot_request_ts(snapshot: &FinalizationSnapshot): u64 {
+
+        snapshot.request_ts
+
+    }
+
+
+
+    public fun vrf_state_view_attempt(view: &VrfStateView): u8 {
+        view.attempt
+    }
+
+    public fun vrf_state_view_retry_strategy(view: &VrfStateView): u8 {
+        view.retry_strategy
+    }
+
+    public fun vrf_state_view_retry_after_ts(view: &VrfStateView): u64 {
+        view.retry_after_ts
+    }
+
+    public fun vrf_state_view_status(view: &VrfStateView): u8 {
+        view.status
+    }
+
+
+    fun assert_admin(admin: &signer) {
+        let addr = signer::address_of(admin);
+        assert!(addr == @lottery_multi, errors::err_registry_missing());
     }
 
     fun borrow_or_create_state(states: &mut table::Table<u64, DrawState>, id: u64): &mut DrawState {
@@ -507,7 +610,7 @@ module lottery_multi::draw {
                 total_tickets: 0,
                 winners_batch_hash: b"",
                 checksum_after_batch: b"",
-                verified_payload: b"",
+                verified_numbers: vector::empty(),
                 payload: b"",
                 next_client_seed: 0,
             };
@@ -518,16 +621,16 @@ module lottery_multi::draw {
 
     fun next_client_seed(state: &mut DrawState): u64 {
         let current = state.next_client_seed;
-        assert!(current < MAX_CLIENT_SEED, errors::E_VRF_CLIENT_SEED_OVERFLOW);
+        assert!(current < MAX_CLIENT_SEED, errors::err_vrf_client_seed_overflow());
         state.next_client_seed = current + 1;
         current
     }
 
     fun increment_attempt(vrf_state: &mut types::VrfState): u8 {
-        let current = vrf_state.attempt;
-        assert!(current < 255, errors::E_VRF_ATTEMPT_OUT_OF_ORDER);
+        let current = types::vrf_state_attempt(vrf_state);
+        assert!(current < 255, errors::err_vrf_attempt_out_of_order());
         let next = current + 1;
-        vrf_state.attempt = next;
+        types::vrf_state_set_attempt(vrf_state, next);
         next
     }
 
@@ -536,8 +639,8 @@ module lottery_multi::draw {
         now_ts: u64,
         attempt: u8,
     ): (u64, u8) {
-        let strategy = policy.strategy;
-        if (strategy == types::RETRY_STRATEGY_MANUAL) {
+        let strategy = types::retry_policy_strategy(policy);
+        if (strategy == types::retry_strategy_manual()) {
             (0, strategy)
         } else {
             let delay = compute_retry_delay(policy, attempt);
@@ -547,14 +650,16 @@ module lottery_multi::draw {
     }
 
     fun compute_retry_delay(policy: &types::RetryPolicy, attempt: u8): u64 {
-        let base = policy.base_delay_secs;
-        if (policy.strategy == types::RETRY_STRATEGY_FIXED || attempt <= 1) {
+        let base = types::retry_policy_base_delay(policy);
+        let strategy = types::retry_policy_strategy(policy);
+        if (strategy == types::retry_strategy_fixed() || attempt <= 1) {
             base
         } else {
-            let mut idx = 1u8;
-            let mut delay = base;
+            let idx = 1u8;
+            let delay = base;
+            let max_delay = types::retry_policy_max_delay(policy);
             while (idx < attempt) {
-                delay = saturating_double(delay, policy.max_delay_secs);
+                delay = saturating_double(delay, max_delay);
                 idx = idx + 1;
             };
             delay
@@ -563,10 +668,10 @@ module lottery_multi::draw {
 
     fun saturating_double(value: u64, max_value: u64): u64 {
         if (value >= max_value) {
-            return max_value;
+            return max_value
         };
         if (value > max_value / 2) {
-            return max_value;
+            return max_value
         };
         let doubled = value * 2;
         if (doubled > max_value) {
@@ -590,8 +695,8 @@ module lottery_multi::draw {
         let payload = PayloadV1 {
             lottery_id,
             config_version,
-            snapshot_hash: copy *snapshot_hash,
-            slots_checksum: copy *slots_checksum,
+            snapshot_hash: clone_bytes(snapshot_hash),
+            slots_checksum: clone_bytes(slots_checksum),
             rng_count,
             client_seed,
             attempt,
@@ -602,10 +707,74 @@ module lottery_multi::draw {
     }
 
     fun callback_module_bytes(): vector<u8> {
-        copy CALLBACK_MODULE_BYTES
+        CALLBACK_MODULE_BYTES
     }
 
     fun callback_function_bytes(): vector<u8> {
-        copy CALLBACK_FUNCTION_BYTES
+        CALLBACK_FUNCTION_BYTES
+    }
+
+    fun clone_bytes(source: &vector<u8>): vector<u8> {
+        let len = vector::length(source);
+        let result = vector::empty<u8>();
+        let i = 0u64;
+        while (i < len) {
+            let byte = *vector::borrow(source, i);
+            vector::push_back(&mut result, byte);
+            i = i + 1;
+        };
+        result
+    }
+
+    fun clone_numbers(source: &vector<u256>): vector<u256> {
+        let len = vector::length(source);
+        let result = vector::empty<u256>();
+        let i = 0u64;
+        while (i < len) {
+            let value = *vector::borrow(source, i);
+            vector::push_back(&mut result, value);
+            i = i + 1;
+        };
+        result
+    }
+
+    public fun finalization_snapshot_placeholder(
+        snapshot_hash: vector<u8>,
+        request_ts: u64,
+    ): FinalizationSnapshot {
+        FinalizationSnapshot {
+            snapshot_hash,
+            payload_hash: b"",
+            winners_batch_hash: b"",
+            checksum_after_batch: b"",
+            schema_version: types::vrf_default_schema_version(),
+            attempt: 0,
+            closing_block_height: 0,
+            chain_id: 0,
+            request_ts,
+            vrf_status: types::vrf_status_idle(),
+        }
+    }
+
+  
+
+    //
+
+    // VRF state view helpers (Move v1 compatibility)
+
+    //
+
+
+
+    public fun vrf_view_status(view: &VrfStateView): u8 {
+        view.status
+    }
+
+    public fun vrf_view_consumed(view: &VrfStateView): bool {
+        view.consumed
+    }
+
+    public fun vrf_view_retry_after_ts(view: &VrfStateView): u64 {
+        view.retry_after_ts
     }
 }

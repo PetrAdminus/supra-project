@@ -64,7 +64,7 @@ case "$COMMAND" in
     LOTTERY_ID=${1:?"lottery id is required"}
     REASON_CODE=${2:?"reason code (u8) is required"}
     TIMESTAMP=${3:?"timestamp (u64) is required"}
-    run "supra move run --config $CONFIG --function lottery_multi::registry::cancel_lottery_admin --args u64:$LOTTERY_ID u8:$REASON_CODE u64:$TIMESTAMP"
+    run "supra move run --config $CONFIG --function lottery_multi::lottery_registry::cancel_lottery_admin --args u64:$LOTTERY_ID u8:$REASON_CODE u64:$TIMESTAMP"
     ;;
   batch)
     LOTTERY_ID=${1:?"lottery id is required"}
@@ -111,3 +111,4 @@ EOF
     exit 1
     ;;
 esac
+

@@ -7,26 +7,27 @@ module lottery_multi::payouts {
     use std::table;
     use std::vector;
 
+    use supra_framework::account;
     use supra_framework::event;
 
     use lottery_multi::draw;
     use lottery_multi::economics;
     use lottery_multi::errors;
     use lottery_multi::history;
-    use lottery_multi::registry;
+    use lottery_multi::lottery_registry;
+    use lottery_multi::math;
     use lottery_multi::roles;
     use lottery_multi::sales;
     use lottery_multi::types;
 
-    const EVENT_CATEGORY_PAYOUT: u8 = history::EVENT_CATEGORY_PAYOUT;
-    const EVENT_CATEGORY_REFUND: u8 = history::EVENT_CATEGORY_REFUND;
+    const EVENT_CATEGORY_PAYOUT: u8 = 5;
+    const EVENT_CATEGORY_REFUND: u8 = 8;
     const WINNER_EVENT_VERSION_V1: u16 = 1;
     const PAYOUT_EVENT_VERSION_V1: u16 = 1;
     const PARTNER_EVENT_VERSION_V1: u16 = 1;
     const REFUND_EVENT_VERSION_V1: u16 = 1;
     const WINNER_CHUNK_CAPACITY: u64 = 64;
     const MAX_REHASH_ATTEMPTS: u8 = 16;
-    const WINNER_HASH_SEED: vector<u8> = b"lottery_multi::winner_seed";
 
     struct WinnerRecord has copy, drop, store {
         slot_id: u64,
@@ -62,13 +63,13 @@ module lottery_multi::payouts {
         next_winner_batch_no: u64,
     }
 
-    pub struct WinnerProgressView has copy, drop, store {
-        pub initialized: bool,
-        pub total_required: u64,
-        pub total_assigned: u64,
-        pub payout_round: u64,
-        pub next_winner_batch_no: u64,
-        pub last_payout_ts: u64,
+    struct WinnerProgressView has copy, drop, store {
+        initialized: bool,
+        total_required: u64,
+        total_assigned: u64,
+        payout_round: u64,
+        next_winner_batch_no: u64,
+        last_payout_ts: u64,
     }
 
     struct PayoutLedger has key {
@@ -81,14 +82,14 @@ module lottery_multi::payouts {
 
     public entry fun init_payouts(admin: &signer) {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_REGISTRY_MISSING);
-        assert!(!exists<PayoutLedger>(addr), errors::E_ALREADY_INITIALIZED);
+        assert!(addr == @lottery_multi, errors::err_registry_missing());
+        assert!(!exists<PayoutLedger>(addr), errors::err_already_initialized());
         let ledger = PayoutLedger {
             states: table::new(),
-            winner_events: event::new_event_handle<history::WinnersComputedEvent>(admin),
-            payout_events: event::new_event_handle<history::PayoutBatchEvent>(admin),
-            partner_events: event::new_event_handle<history::PartnerPayoutEvent>(admin),
-            refund_events: event::new_event_handle<history::RefundBatchEvent>(admin),
+            winner_events: account::new_event_handle<history::WinnersComputedEvent>(admin),
+            payout_events: account::new_event_handle<history::PayoutBatchEvent>(admin),
+            partner_events: account::new_event_handle<history::PartnerPayoutEvent>(admin),
+            refund_events: account::new_event_handle<history::RefundBatchEvent>(admin),
         };
         move_to(admin, ledger);
     }
@@ -97,20 +98,22 @@ module lottery_multi::payouts {
         admin: &signer,
         lottery_id: u64,
         batch_limit: u64,
-    ) acquires PayoutLedger, registry::Registry, sales::SalesLedger, draw::DrawLedger {
+    ) acquires PayoutLedger {
         let admin_addr = signer::address_of(admin);
-        assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
-        assert!(batch_limit > 0, errors::E_PAGINATION_LIMIT);
+        assert!(admin_addr == @lottery_multi, errors::err_registry_missing());
+        assert!(batch_limit > 0, errors::err_pagination_limit());
 
-        let status = registry::get_status(lottery_id);
+        let status = lottery_registry::get_status(lottery_id);
         assert!(
-            status == types::STATUS_DRAWN || status == types::STATUS_PAYOUT,
-            errors::E_DRAW_STATUS_INVALID,
+            status == types::status_drawn() || status == types::status_payout(),
+            errors::err_draw_status_invalid(),
         );
-        let config = registry::borrow_config(lottery_id);
-        let total_required = total_winners(&config.prize_plan);
+        let prize_plan = lottery_registry::clone_prize_plan(lottery_id);
+        let winners_dedup = lottery_registry::winners_dedup_enabled(lottery_id);
+        let total_required = total_winners(&prize_plan);
 
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<PayoutLedger>(ledger_addr);
         let state = borrow_or_create_state(&mut ledger.states, lottery_id);
         if (!state.initialized) {
             let (
@@ -128,54 +131,53 @@ module lottery_multi::payouts {
             state.random_numbers = numbers;
             state.schema_version = schema_version;
             state.attempt = attempt;
-            state.cursor.checksum_after_batch = hash::sha3_256(copy WINNER_HASH_SEED);
+            let seed = winner_hash_seed();
+            let initial_checksum = hash::sha3_256(seed);
+            types::winner_cursor_set_checksum(&mut state.cursor, &initial_checksum);
             state.winners_batch_hash = hash::sha3_256(b"lottery_multi::winner_batch_seed");
         };
 
         if (state.total_required == 0) {
             state.total_required = total_required;
         };
-        assert!(state.total_required == total_required, errors::E_DRAW_STATUS_INVALID);
+        assert!(state.total_required == total_required, errors::err_draw_status_invalid());
 
         if (state.total_assigned >= state.total_required) {
-            abort errors::E_WINNER_ALL_ASSIGNED;
+            abort errors::err_winner_all_assigned()
         };
 
         let remaining = state.total_required - state.total_assigned;
-        let mut to_assign = if (batch_limit < remaining) { batch_limit } else { remaining };
+        let to_assign = if (batch_limit < remaining) { batch_limit } else { remaining };
         if (to_assign == 0) {
-            abort errors::E_WINNER_ALL_ASSIGNED;
+            abort errors::err_winner_all_assigned()
         };
 
-        let mut assigned_in_batch = 0u64;
+        let assigned_in_batch = 0u64;
         let batch_no = state.next_winner_batch_no;
-        let mut batch_hash = copy state.winners_batch_hash;
-        let mut checksum = copy state.cursor.checksum_after_batch;
-        let mut ordinal = state.total_assigned;
+        let batch_hash = clone_bytes(&state.winners_batch_hash);
+        let checksum = types::winner_cursor_checksum(&state.cursor);
+        let ordinal = state.total_assigned;
         while (assigned_in_batch < to_assign) {
-            let slot_ctx = slot_context(&config.prize_plan, ordinal);
+            let slot_ctx = slot_context(&prize_plan, ordinal);
             let slot_pos = slot_ctx.slot_position;
             let base_number = *vector::borrow(&state.random_numbers, slot_pos);
             let base_bytes = bcs::to_bytes(&base_number);
-            let mut digest = derive_seed(
+            let digest = derive_seed(
                 &base_bytes,
                 lottery_id,
                 ordinal,
                 slot_ctx.local_index,
                 state,
             );
-            let mut attempts = 0u8;
-            let ticket_index = loop {
-                let candidate = reduce_digest(&digest, state.total_tickets);
-                if (!config.winners_dedup || !is_already_assigned(&state.assigned_indices, candidate)) {
-                    break candidate;
-                };
-                attempts = attempts + 1;
-                assert!(attempts < MAX_REHASH_ATTEMPTS, errors::E_WINNER_DEDUP_EXHAUSTED);
-                digest = hash::sha3_256(copy digest);
-            };
-            assert!(ticket_index < state.total_tickets, errors::E_WINNER_INDEX_OUT_OF_RANGE);
-            if (config.winners_dedup) {
+            let (ticket_index, updated_digest) = select_ticket_candidate(
+                winners_dedup,
+                state.total_tickets,
+                &state.assigned_indices,
+                digest,
+            );
+            digest = updated_digest;
+            assert!(ticket_index < state.total_tickets, errors::err_winner_index_out_of_range());
+            if (winners_dedup) {
                 table::add(&mut state.assigned_indices, ticket_index, true);
             };
             let winner = sales::ticket_owner(lottery_id, ticket_index);
@@ -193,43 +195,43 @@ module lottery_multi::payouts {
         };
 
         state.total_assigned = state.total_assigned + assigned_in_batch;
-        state.cursor.last_processed_index = state.total_assigned;
-        state.cursor.checksum_after_batch = copy checksum;
-        state.winners_batch_hash = copy batch_hash;
+        types::winner_cursor_set_last_index(&mut state.cursor, state.total_assigned);
+        types::winner_cursor_set_checksum(&mut state.cursor, &checksum);
+        state.winners_batch_hash = clone_bytes(&batch_hash);
 
-        draw::record_winner_hashes(lottery_id, &state.winners_batch_hash, &state.cursor.checksum_after_batch);
+        let cursor_checksum_for_record = types::winner_cursor_checksum(&state.cursor);
+        draw::record_winner_hashes(lottery_id, &state.winners_batch_hash, &cursor_checksum_for_record);
 
-        let event = history::WinnersComputedEvent {
-            event_version: WINNER_EVENT_VERSION_V1,
-            event_category: EVENT_CATEGORY_PAYOUT,
+        let event = history::new_winners_computed_event(
             lottery_id,
             batch_no,
             assigned_in_batch,
-            total_assigned: state.total_assigned,
-            winners_batch_hash: copy state.winners_batch_hash,
-            checksum_after_batch: copy state.cursor.checksum_after_batch,
-        };
+            state.total_assigned,
+            clone_bytes(&state.winners_batch_hash),
+            types::winner_cursor_checksum(&state.cursor),
+        );
         event::emit_event(&mut ledger.winner_events, event);
         state.next_winner_batch_no = state.next_winner_batch_no + 1;
 
-        if (state.total_assigned == state.total_required && status == types::STATUS_DRAWN) {
-            registry::mark_payout(lottery_id);
+        if (state.total_assigned == state.total_required && status == types::status_drawn()) {
+            lottery_registry::mark_payout(lottery_id);
         };
     }
 
     #[test_only]
     public fun test_read_winner_indices(lottery_id: u64): vector<u64> acquires PayoutLedger {
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<PayoutLedger>(ledger_addr);
         if (!table::contains(&ledger.states, lottery_id)) {
-            return vector::empty();
+            return vector::empty()
         };
         let state = table::borrow(&ledger.states, lottery_id);
-        let mut winners = vector::empty<u64>();
-        let mut seq = 0u64;
+        let winners = vector::empty<u64>();
+        let seq = 0u64;
         while (seq <= state.next_chunk_seq) {
             if (table::contains(&state.winner_chunks, seq)) {
                 let chunk = table::borrow(&state.winner_chunks, seq);
-                let mut idx = 0;
+                let idx = 0;
                 let len = vector::length(&chunk.records);
                 while (idx < len) {
                     let record = vector::borrow(&chunk.records, idx);
@@ -250,40 +252,43 @@ module lottery_multi::payouts {
         prize_paid: u64,
         operations_paid: u64,
         timestamp: u64,
-    ) acquires PayoutLedger, registry::Registry, sales::SalesLedger, roles::RoleStore {
+    ) acquires PayoutLedger {
         let admin_addr = signer::address_of(admin);
-        assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
+        assert!(admin_addr == @lottery_multi, errors::err_registry_missing());
 
-        let status = registry::get_status(lottery_id);
-        assert!(status == types::STATUS_PAYOUT, errors::E_DRAW_STATUS_INVALID);
+        let status = lottery_registry::get_status(lottery_id);
+        assert!(status == types::status_payout(), errors::err_draw_status_invalid());
 
-        let batch_cap = roles::borrow_payout_batch_cap_mut();
-        roles::consume_payout_batch(batch_cap, winners_paid, operations_paid, timestamp, payout_round);
+        roles::consume_payout_batch_from_store(
+            winners_paid,
+            operations_paid,
+            timestamp,
+            payout_round,
+        );
 
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<PayoutLedger>(ledger_addr);
         if (!table::contains(&ledger.states, lottery_id)) {
-            abort errors::E_PAYOUT_STATE_MISSING;
+            abort errors::err_payout_state_missing()
         };
         let state = table::borrow_mut(&mut ledger.states, lottery_id);
-        assert!(payout_round == state.payout_round + 1, errors::E_PAYOUT_ROUND_NON_MONOTONIC);
+        assert!(payout_round == state.payout_round + 1, errors::err_payout_round_non_monotonic());
         if (state.last_payout_ts > 0) {
-            assert!(timestamp >= state.last_payout_ts, errors::E_PAYOUT_COOLDOWN);
+            assert!(timestamp >= state.last_payout_ts, errors::err_payout_cooldown());
         };
         state.payout_round = payout_round;
         state.last_payout_ts = timestamp;
 
         sales::record_payouts(lottery_id, prize_paid, operations_paid);
 
-        let event = history::PayoutBatchEvent {
-            event_version: PAYOUT_EVENT_VERSION_V1,
-            event_category: EVENT_CATEGORY_PAYOUT,
+        let event = history::new_payout_batch_event(
             lottery_id,
             payout_round,
             winners_paid,
             prize_paid,
             operations_paid,
             timestamp,
-        };
+        );
         event::emit_event(&mut ledger.payout_events, event);
     }
 
@@ -294,34 +299,32 @@ module lottery_multi::payouts {
         amount: u64,
         payout_round: u64,
         timestamp: u64,
-    ) acquires PayoutLedger, registry::Registry, sales::SalesLedger, roles::RoleStore {
+    ) acquires PayoutLedger {
         let admin_addr = signer::address_of(admin);
-        assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
+        assert!(admin_addr == @lottery_multi, errors::err_registry_missing());
 
-        let status = registry::get_status(lottery_id);
-        assert!(status == types::STATUS_PAYOUT, errors::E_DRAW_STATUS_INVALID);
+        let status = lottery_registry::get_status(lottery_id);
+        assert!(status == types::status_payout(), errors::err_draw_status_invalid());
 
-        let partner_cap = roles::borrow_partner_payout_cap_mut(partner);
-        roles::consume_partner_payout(partner_cap, amount, timestamp, payout_round);
+        roles::consume_partner_payout_from_store(partner, amount, timestamp, payout_round);
 
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<PayoutLedger>(ledger_addr);
         if (!table::contains(&ledger.states, lottery_id)) {
-            abort errors::E_PAYOUT_STATE_MISSING;
+            abort errors::err_payout_state_missing()
         };
         let state = table::borrow_mut(&mut ledger.states, lottery_id);
-        assert!(payout_round >= state.payout_round, errors::E_PAYOUT_ROUND_NON_MONOTONIC);
+        assert!(payout_round >= state.payout_round, errors::err_payout_round_non_monotonic());
 
         sales::record_payouts(lottery_id, 0, amount);
 
-        let event = history::PartnerPayoutEvent {
-            event_version: PARTNER_EVENT_VERSION_V1,
-            event_category: EVENT_CATEGORY_PAYOUT,
+        let event = history::new_partner_payout_event(
             lottery_id,
             partner,
             amount,
             payout_round,
             timestamp,
-        };
+        );
         event::emit_event(&mut ledger.partner_events, event);
     }
 
@@ -333,15 +336,19 @@ module lottery_multi::payouts {
         prize_refund: u64,
         operations_refund: u64,
         timestamp: u64,
-    ) acquires PayoutLedger, registry::Registry, sales::SalesLedger, roles::RoleStore {
+    ) acquires PayoutLedger {
         let admin_addr = signer::address_of(admin);
-        assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
+        assert!(admin_addr == @lottery_multi, errors::err_registry_missing());
 
-        let status = registry::get_status(lottery_id);
-        assert!(status == types::STATUS_CANCELED, errors::E_REFUND_STATUS_INVALID);
+        let status = lottery_registry::get_status(lottery_id);
+        assert!(status == types::status_canceled(), errors::err_refund_status_invalid());
 
-        let batch_cap = roles::borrow_payout_batch_cap_mut();
-        roles::consume_payout_batch(batch_cap, tickets_refunded, operations_refund, timestamp, refund_round);
+        roles::consume_payout_batch_from_store(
+            tickets_refunded,
+            operations_refund,
+            timestamp,
+            refund_round,
+        );
 
         let (
             total_tickets_refunded,
@@ -357,19 +364,18 @@ module lottery_multi::payouts {
         );
         let total_amount_refunded = total_prize_refunded + total_operations_refunded;
 
-        let ledger = borrow_ledger_mut();
-        let event = history::RefundBatchEvent {
-            event_version: REFUND_EVENT_VERSION_V1,
-            event_category: EVENT_CATEGORY_REFUND,
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<PayoutLedger>(ledger_addr);
+        let event = history::new_refund_batch_event(
             lottery_id,
             refund_round,
             tickets_refunded,
-            prize_refunded: prize_refund,
-            operations_refunded: operations_refund,
+            prize_refund,
+            operations_refund,
             total_tickets_refunded,
             total_amount_refunded,
             timestamp,
-        };
+        );
         event::emit_event(&mut ledger.refund_events, event);
     }
 
@@ -377,19 +383,21 @@ module lottery_multi::payouts {
         admin: &signer,
         lottery_id: u64,
         finalized_at: u64,
-    ) acquires registry::Registry, sales::SalesLedger, draw::DrawLedger, history::ArchiveLedger {
+    ) {
         let admin_addr = signer::address_of(admin);
-        assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
+        assert!(admin_addr == @lottery_multi, errors::err_registry_missing());
 
-        let status = registry::get_status(lottery_id);
-        assert!(status == types::STATUS_CANCELED, errors::E_DRAW_STATUS_INVALID);
+        let status = lottery_registry::get_status(lottery_id);
+        assert!(status == types::status_canceled(), errors::err_draw_status_invalid());
 
-        let cancel_record_opt = registry::get_cancellation_record(lottery_id);
+        let cancel_record_opt = lottery_registry::get_cancellation_record(lottery_id);
         if (!option::is_some(&cancel_record_opt)) {
-            abort errors::E_CANCELLATION_RECORD_MISSING;
+            abort errors::err_cancellation_record_missing()
         };
         let cancel_record = option::destroy_some(cancel_record_opt);
-        assert!(finalized_at >= cancel_record.canceled_ts, errors::E_REFUND_TIMESTAMP);
+        let canceled_ts = lottery_registry::cancellation_record_canceled_ts(&cancel_record);
+        assert!(finalized_at >= canceled_ts, errors::err_refund_timestamp());
+        let _unused = cancel_record;
 
         let has_sales = sales::has_state(lottery_id);
         let (tickets_sold, proceeds_accum, last_purchase_ts) = if (has_sales) {
@@ -405,63 +413,63 @@ module lottery_multi::payouts {
         };
 
         let refund_view = sales::refund_progress(lottery_id);
+        let tickets_refunded = sales::refund_view_tickets_refunded(&refund_view);
+        let refund_round = sales::refund_view_refund_round(&refund_view);
+        let last_refund_ts = sales::refund_view_last_refund_ts(&refund_view);
+        let prize_refunded = sales::refund_view_prize_refunded(&refund_view);
+        let operations_refunded = sales::refund_view_operations_refunded(&refund_view);
+
         if (tickets_sold > 0) {
-            assert!(refund_view.tickets_refunded == tickets_sold, errors::E_REFUND_PROGRESS_INCOMPLETE);
-            assert!(refund_view.refund_round > 0, errors::E_REFUND_PROGRESS_INCOMPLETE);
-            assert!(refund_view.last_refund_ts > 0, errors::E_REFUND_PROGRESS_INCOMPLETE);
-            let total_refunded = refund_view.prize_refunded + refund_view.operations_refunded;
-            assert!(total_refunded >= proceeds_accum, errors::E_REFUND_PROGRESS_FUNDS);
+            assert!(tickets_refunded == tickets_sold, errors::err_refund_progress_incomplete());
+            assert!(refund_round > 0, errors::err_refund_progress_incomplete());
+            assert!(last_refund_ts > 0, errors::err_refund_progress_incomplete());
+            let total_refunded = prize_refunded + operations_refunded;
+            assert!(total_refunded >= proceeds_accum, errors::err_refund_progress_funds());
         };
 
-        let slots_checksum = registry::slots_checksum(lottery_id);
+        let slots_checksum = lottery_registry::slots_checksum(lottery_id);
         let draw_snapshot = if (draw::has_state(lottery_id)) {
             draw::finalization_snapshot(lottery_id)
         } else {
             let (snapshot_hash, _, _) = sales::snapshot_for_draw(lottery_id);
-            draw::FinalizationSnapshot {
-                snapshot_hash,
-                payload_hash: b"",
-                winners_batch_hash: b"",
-                checksum_after_batch: b"",
-                schema_version: types::DEFAULT_SCHEMA_VERSION,
-                attempt: 0,
-                closing_block_height: 0,
-                chain_id: 0,
-                request_ts: cancel_record.canceled_ts,
-                vrf_status: types::VRF_STATUS_IDLE,
-            }
+            draw::finalization_snapshot_placeholder(snapshot_hash, canceled_ts)
         };
 
-        let config = registry::borrow_config(lottery_id);
+        let event_slug = lottery_registry::event_slug(lottery_id);
+        let series_code = lottery_registry::series_code(lottery_id);
+        let run_id = lottery_registry::run_id(lottery_id);
+        let primary_type = lottery_registry::primary_type(lottery_id);
+        let tags_mask = lottery_registry::tags_mask(lottery_id);
+        let created_at = lottery_registry::sales_start(lottery_id);
         let closed_ts = if (last_purchase_ts > 0) {
             last_purchase_ts
         } else {
-            cancel_record.canceled_ts
+            canceled_ts
         };
 
-        let summary = history::LotterySummary {
-            id: lottery_id,
-            status: types::STATUS_CANCELED,
-            event_slug: copy config.event_slug,
-            series_code: copy config.series_code,
-            run_id: config.run_id,
+        let summary = history::new_summary(
+            lottery_id,
+            types::status_canceled(),
+            event_slug,
+            series_code,
+            run_id,
             tickets_sold,
             proceeds_accum,
-            total_allocated: accounting.total_allocated,
-            total_prize_paid: accounting.total_prize_paid,
-            total_operations_paid: accounting.total_operations_paid,
-            vrf_status: draw_snapshot.vrf_status,
-            primary_type: config.primary_type,
-            tags_mask: config.tags_mask,
-            snapshot_hash: copy draw_snapshot.snapshot_hash,
+            economics::accounting_total_allocated(&accounting),
+            economics::accounting_total_prize_paid(&accounting),
+            economics::accounting_total_operations_paid(&accounting),
+            draw::finalization_snapshot_vrf_status(&draw_snapshot),
+            primary_type,
+            tags_mask,
+            draw::finalization_snapshot_snapshot_hash(&draw_snapshot),
             slots_checksum,
-            winners_batch_hash: copy draw_snapshot.winners_batch_hash,
-            checksum_after_batch: copy draw_snapshot.checksum_after_batch,
-            payout_round: refund_view.refund_round,
-            created_at: config.sales_window.sales_start,
-            closed_at: closed_ts,
+            draw::finalization_snapshot_winners_batch_hash(&draw_snapshot),
+            draw::finalization_snapshot_checksum_after_batch(&draw_snapshot),
+            refund_round,
+            created_at,
+            closed_ts,
             finalized_at,
-        };
+        );
         history::record_summary(lottery_id, summary);
     }
 
@@ -469,58 +477,68 @@ module lottery_multi::payouts {
         admin: &signer,
         lottery_id: u64,
         finalized_at: u64,
-    ) acquires PayoutLedger, registry::Registry, sales::SalesLedger, draw::DrawLedger, history::ArchiveLedger {
+    ) acquires PayoutLedger {
         let admin_addr = signer::address_of(admin);
-        assert!(admin_addr == @lottery_multi, errors::E_REGISTRY_MISSING);
+        assert!(admin_addr == @lottery_multi, errors::err_registry_missing());
 
-        let status = registry::get_status(lottery_id);
-        assert!(status == types::STATUS_PAYOUT, errors::E_DRAW_STATUS_INVALID);
+        let status = lottery_registry::get_status(lottery_id);
+        assert!(status == types::status_payout(), errors::err_draw_status_invalid());
 
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<PayoutLedger>(ledger_addr);
         if (!table::contains(&ledger.states, lottery_id)) {
-            abort errors::E_PAYOUT_STATE_MISSING;
+            abort errors::err_payout_state_missing()
         };
         let state = table::borrow_mut(&mut ledger.states, lottery_id);
-        assert!(state.total_required > 0, errors::E_FINALIZATION_INCOMPLETE);
-        assert!(state.total_assigned == state.total_required, errors::E_FINALIZATION_INCOMPLETE);
+        assert!(state.total_required > 0, errors::err_finalization_incomplete());
+        assert!(state.total_assigned == state.total_required, errors::err_finalization_incomplete());
 
         let (tickets_sold, proceeds_accum, last_purchase_ts) = sales::sales_totals(lottery_id);
-        let config = registry::borrow_config(lottery_id);
         let draw_snapshot = draw::finalization_snapshot(lottery_id);
-        let slots_checksum = registry::slots_checksum(lottery_id);
+        let slots_checksum = lottery_registry::slots_checksum(lottery_id);
+        let event_slug = lottery_registry::event_slug(lottery_id);
+        let series_code = lottery_registry::series_code(lottery_id);
+        let run_id = lottery_registry::run_id(lottery_id);
+        let primary_type = lottery_registry::primary_type(lottery_id);
+        let tags_mask = lottery_registry::tags_mask(lottery_id);
+        let created_at = lottery_registry::sales_start(lottery_id);
 
-        let closed_ts = if (last_purchase_ts > 0) { last_purchase_ts } else { draw_snapshot.request_ts };
+        let closed_ts = if (last_purchase_ts > 0) {
+            last_purchase_ts
+        } else {
+            draw::finalization_snapshot_request_ts(&draw_snapshot)
+        };
 
         let accounting = sales::accounting_snapshot(lottery_id);
 
-        let summary = history::LotterySummary {
-            id: lottery_id,
-            status: types::STATUS_FINALIZED,
-            event_slug: copy config.event_slug,
-            series_code: copy config.series_code,
-            run_id: config.run_id,
+        let summary = history::new_summary(
+            lottery_id,
+            types::status_finalized(),
+            event_slug,
+            series_code,
+            run_id,
             tickets_sold,
             proceeds_accum,
-            total_allocated: accounting.total_allocated,
-            total_prize_paid: accounting.total_prize_paid,
-            total_operations_paid: accounting.total_operations_paid,
-            vrf_status: draw_snapshot.vrf_status,
-            primary_type: config.primary_type,
-            tags_mask: config.tags_mask,
-            snapshot_hash: copy draw_snapshot.snapshot_hash,
+            economics::accounting_total_allocated(&accounting),
+            economics::accounting_total_prize_paid(&accounting),
+            economics::accounting_total_operations_paid(&accounting),
+            draw::finalization_snapshot_vrf_status(&draw_snapshot),
+            primary_type,
+            tags_mask,
+            draw::finalization_snapshot_snapshot_hash(&draw_snapshot),
             slots_checksum,
-            winners_batch_hash: copy draw_snapshot.winners_batch_hash,
-            checksum_after_batch: copy draw_snapshot.checksum_after_batch,
-            payout_round: state.payout_round,
-            created_at: config.sales_window.sales_start,
-            closed_at: closed_ts,
+            draw::finalization_snapshot_winners_batch_hash(&draw_snapshot),
+            draw::finalization_snapshot_checksum_after_batch(&draw_snapshot),
+            state.payout_round,
+            created_at,
+            closed_ts,
             finalized_at,
-        };
+        );
         history::record_summary(lottery_id, summary);
-        registry::mark_finalized(lottery_id);
+        lottery_registry::mark_finalized(lottery_id);
     }
 
-    pub fun winner_progress(lottery_id: u64): WinnerProgressView acquires PayoutLedger {
+    public fun winner_progress(lottery_id: u64): WinnerProgressView acquires PayoutLedger {
         let addr = @lottery_multi;
         if (!exists<PayoutLedger>(addr)) {
             return WinnerProgressView {
@@ -530,9 +548,9 @@ module lottery_multi::payouts {
                 payout_round: 0,
                 next_winner_batch_no: 0,
                 last_payout_ts: 0,
-            };
+            }
         };
-        let ledger = borrow_ledger_ref();
+        let ledger = borrow_global<PayoutLedger>(@lottery_multi);
         if (!table::contains(&ledger.states, lottery_id)) {
             return WinnerProgressView {
                 initialized: false,
@@ -541,7 +559,7 @@ module lottery_multi::payouts {
                 payout_round: 0,
                 next_winner_batch_no: 0,
                 last_payout_ts: 0,
-            };
+            }
         };
         let state = table::borrow(&ledger.states, lottery_id);
         WinnerProgressView {
@@ -554,13 +572,56 @@ module lottery_multi::payouts {
         }
     }
 
+    //
+    // Winner progress helpers (Move v1 compatibility)
+    //
+
+    public fun winner_progress_initialized(view: &WinnerProgressView): bool {
+        view.initialized
+    }
+
+    public fun winner_progress_total_required(view: &WinnerProgressView): u64 {
+        view.total_required
+    }
+
+    public fun winner_progress_total_assigned(view: &WinnerProgressView): u64 {
+        view.total_assigned
+    }
+
+    public fun winner_progress_payout_round(view: &WinnerProgressView): u64 {
+        view.payout_round
+    }
+
+    public fun winner_progress_next_batch(view: &WinnerProgressView): u64 {
+        view.next_winner_batch_no
+    }
+
+    fun select_ticket_candidate(
+        winners_dedup: bool,
+        total_tickets: u64,
+        assigned_indices: &table::Table<u64, bool>,
+        digest_in: vector<u8>,
+    ): (u64, vector<u8>) {
+        let digest = digest_in;
+        let attempts = 0u8;
+        loop {
+            let candidate = reduce_digest(&digest, total_tickets);
+            if (!winners_dedup || !is_already_assigned(assigned_indices, candidate)) {
+                return (candidate, digest)
+            };
+            attempts = attempts + 1;
+            assert!(attempts < MAX_REHASH_ATTEMPTS, errors::err_winner_dedup_exhausted());
+            digest = hash::sha3_256(copy digest);
+        }
+    }
+
     fun append_record(
         lottery_id: u64,
         state: &mut WinnerState,
         record: WinnerRecord,
         ordinal: u64,
     ) {
-        let mut chunk_seq = state.next_chunk_seq;
+        let chunk_seq = state.next_chunk_seq;
         if (!table::contains(&state.winner_chunks, chunk_seq)) {
             let chunk = WinnerChunk {
                 lottery_id,
@@ -570,7 +631,7 @@ module lottery_multi::payouts {
             };
             table::add(&mut state.winner_chunks, chunk_seq, chunk);
         };
-        let mut advance = false;
+        let advance = false;
         {
             let chunk = table::borrow_mut(&mut state.winner_chunks, chunk_seq);
             if (vector::length(&chunk.records) == WINNER_CHUNK_CAPACITY) {
@@ -592,6 +653,7 @@ module lottery_multi::payouts {
         lottery_id: u64,
     ): &mut WinnerState {
         if (!table::contains(states, lottery_id)) {
+            let cursor = default_cursor();
             let state = WinnerState {
                 initialized: false,
                 total_required: 0,
@@ -603,10 +665,7 @@ module lottery_multi::payouts {
                 attempt: 0,
                 random_numbers: vector::empty(),
                 winners_batch_hash: hash::sha3_256(b"lottery_multi::winner_batch_seed"),
-                cursor: types::WinnerCursor {
-                    last_processed_index: 0,
-                    checksum_after_batch: hash::sha3_256(copy WINNER_HASH_SEED),
-                },
+                cursor,
                 next_chunk_seq: 0,
                 winner_chunks: table::new(),
                 assigned_indices: table::new(),
@@ -619,20 +678,12 @@ module lottery_multi::payouts {
         table::borrow_mut(states, lottery_id)
     }
 
-    fun borrow_ledger_mut(): &mut PayoutLedger acquires PayoutLedger {
+    fun ledger_addr_or_abort(): address {
         let addr = @lottery_multi;
         if (!exists<PayoutLedger>(addr)) {
-            abort errors::E_REGISTRY_MISSING;
+            abort errors::err_registry_missing()
         };
-        borrow_global_mut<PayoutLedger>(addr)
-    }
-
-    fun borrow_ledger_ref(): &PayoutLedger acquires PayoutLedger {
-        let addr = @lottery_multi;
-        if (!exists<PayoutLedger>(addr)) {
-            abort errors::E_REGISTRY_MISSING;
-        };
-        borrow_global<PayoutLedger>(addr)
+        addr
     }
 
     struct SlotContext has copy, drop, store {
@@ -642,32 +693,32 @@ module lottery_multi::payouts {
     }
 
     fun slot_context(prize_plan: &vector<types::PrizeSlot>, ordinal: u64): SlotContext {
-        let mut accumulated = 0u64;
+        let accumulated = 0u64;
         let len = vector::length(prize_plan);
-        let mut idx = 0u64;
-        while (idx < (len as u64)) {
+        let idx = 0u64;
+        while (idx < len) {
             let slot = vector::borrow(prize_plan, idx);
-            let winners_per_slot = slot.winners_per_slot as u64;
+            let winners_per_slot = math::widen_u64_from_u16(types::prize_slot_winners(slot));
             if (ordinal < accumulated + winners_per_slot) {
                 return SlotContext {
-                    slot_id: slot.slot_id,
+                    slot_id: types::prize_slot_slot_id(slot),
                     slot_position: idx,
                     local_index: ordinal - accumulated,
-                };
+                }
             };
             accumulated = accumulated + winners_per_slot;
             idx = idx + 1;
         };
-        abort errors::E_WINNER_INDEX_OUT_OF_RANGE;
+        abort errors::err_winner_index_out_of_range()
     }
 
     fun total_winners(prize_plan: &vector<types::PrizeSlot>): u64 {
         let len = vector::length(prize_plan);
-        let mut idx = 0;
-        let mut total = 0u64;
+        let idx = 0;
+        let total = 0u64;
         while (idx < len) {
             let slot = vector::borrow(prize_plan, idx);
-            total = total + (slot.winners_per_slot as u64);
+            total = total + math::widen_u64_from_u16(types::prize_slot_winners(slot));
             idx = idx + 1;
         };
         total
@@ -680,23 +731,27 @@ module lottery_multi::payouts {
         local_index: u64,
         state: &WinnerState,
     ): vector<u8> {
-        let mut data = copy *base_seed;
-        vector::append(&mut data, state.snapshot_hash);
-        vector::append(&mut data, state.payload_hash);
+        let data = clone_bytes(base_seed);
+        vector::append(&mut data, clone_bytes(&state.snapshot_hash));
+        vector::append(&mut data, clone_bytes(&state.payload_hash));
         vector::append(&mut data, bcs::to_bytes(&lottery_id));
         vector::append(&mut data, bcs::to_bytes(&ordinal));
         vector::append(&mut data, bcs::to_bytes(&local_index));
-        vector::append(&mut data, bcs::to_bytes(&(state.schema_version as u64)));
-        vector::append(&mut data, bcs::to_bytes(&(state.attempt as u64)));
+        let schema_version_u64 = math::widen_u64_from_u16(state.schema_version);
+        vector::append(&mut data, bcs::to_bytes(&schema_version_u64));
+        let attempt_u64 = math::widen_u64_from_u8(state.attempt);
+        vector::append(&mut data, bcs::to_bytes(&attempt_u64));
         hash::sha3_256(data)
     }
 
     fun reduce_digest(digest: &vector<u8>, total_tickets: u64): u64 {
-        let mut value = 0u64;
-        let mut i = 0u64;
+        let value = 0u64;
+        let i = 0u64;
         while (i < 8) {
             let byte = *vector::borrow(digest, i);
-            value = value | ((byte as u64) << (i * 8));
+            let shift =
+                math::narrow_u8_from_u64(i * 8u64, errors::err_winner_index_out_of_range());
+            value = value | (math::widen_u64_from_u8(byte) << shift);
             i = i + 1;
         };
         value % total_tickets
@@ -714,9 +769,9 @@ module lottery_multi::payouts {
         ticket_index: u64,
         digest: &vector<u8>,
     ): vector<u8> {
-        let mut data = copy *current;
+        let data = clone_bytes(current);
         vector::append(&mut data, bcs::to_bytes(&ticket_index));
-        vector::append(&mut data, copy *digest);
+        vector::append(&mut data, clone_bytes(digest));
         hash::sha3_256(data)
     }
 
@@ -726,10 +781,34 @@ module lottery_multi::payouts {
         ticket_index: u64,
         digest: &vector<u8>,
     ): vector<u8> {
-        let mut data = copy *current;
+        let data = clone_bytes(current);
         vector::append(&mut data, bcs::to_bytes(&slot_id));
         vector::append(&mut data, bcs::to_bytes(&ticket_index));
-        vector::append(&mut data, copy *digest);
+        vector::append(&mut data, clone_bytes(digest));
         hash::sha3_256(data)
+    }
+
+    fun default_cursor(): types::WinnerCursor {
+        let cursor = types::winner_cursor_new();
+        let seed = winner_hash_seed();
+        let checksum = hash::sha3_256(seed);
+        types::winner_cursor_set_checksum(&mut cursor, &checksum);
+        cursor
+    }
+
+    fun winner_hash_seed(): vector<u8> {
+        b"lottery_multi::winner_seed"
+    }
+
+    fun clone_bytes(source: &vector<u8>): vector<u8> {
+        let len = vector::length(source);
+        let result = vector::empty<u8>();
+        let i = 0u64;
+        while (i < len) {
+            let byte = *vector::borrow(source, i);
+            vector::push_back(&mut result, byte);
+            i = i + 1;
+        };
+        result
     }
 }

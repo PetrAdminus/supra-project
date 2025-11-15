@@ -2,28 +2,30 @@
 module lottery_multi::vrf_deposit {
     use std::signer;
     use std::vector;
+    use supra_framework::account;
     use supra_framework::event;
 
     use lottery_multi::automation;
     use lottery_multi::errors;
     use lottery_multi::history;
+    use lottery_multi::math;
 
-    const EVENT_VERSION_V1: u16 = history::EVENT_VERSION_V1;
-    const EVENT_CATEGORY_INFRA: u8 = history::EVENT_CATEGORY_INFRA;
+    const EVENT_VERSION_V1: u16 = 1;
+    const EVENT_CATEGORY_INFRA: u8 = 7;
 
-    pub struct VrfDepositConfig has store {
-        pub min_balance_multiplier_bps: u64,
-        pub effective_floor: u64,
+    struct VrfDepositConfig has store {
+        min_balance_multiplier_bps: u64,
+        effective_floor: u64,
     }
 
-    pub struct VrfDepositStatus has copy, drop, store {
-        pub total_balance: u64,
-        pub minimum_balance: u64,
-        pub effective_balance: u64,
-        pub required_minimum: u64,
-        pub last_update_ts: u64,
-        pub requests_paused: bool,
-        pub paused_since_ts: u64,
+    struct VrfDepositStatus has copy, drop, store {
+        total_balance: u64,
+        minimum_balance: u64,
+        effective_balance: u64,
+        required_minimum: u64,
+        last_update_ts: u64,
+        requests_paused: bool,
+        paused_since_ts: u64,
     }
 
     struct VrfDepositLedger has key {
@@ -37,9 +39,9 @@ module lottery_multi::vrf_deposit {
 
     public entry fun init_vrf_deposit(admin: &signer, min_balance_multiplier_bps: u64, effective_floor: u64) {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_REGISTRY_MISSING);
-        assert!(!exists<VrfDepositLedger>(addr), errors::E_ALREADY_INITIALIZED);
-        assert!(min_balance_multiplier_bps >= 10_000, errors::E_VRF_DEPOSIT_CONFIG);
+        assert!(addr == @lottery_multi, errors::err_registry_missing());
+        assert!(!exists<VrfDepositLedger>(addr), errors::err_already_initialized());
+        assert!(min_balance_multiplier_bps >= 10_000, errors::err_vrf_deposit_config());
         let config = VrfDepositConfig {
             min_balance_multiplier_bps,
             effective_floor,
@@ -56,19 +58,20 @@ module lottery_multi::vrf_deposit {
         let ledger = VrfDepositLedger {
             config,
             status,
-            snapshots: event::new_event_handle<history::VrfDepositSnapshotEvent>(admin),
-            alerts: event::new_event_handle<history::VrfDepositAlertEvent>(admin),
-            paused_events: event::new_event_handle<history::VrfRequestsPausedEvent>(admin),
-            resumed_events: event::new_event_handle<history::VrfRequestsResumedEvent>(admin),
+            snapshots: account::new_event_handle<history::VrfDepositSnapshotEvent>(admin),
+            alerts: account::new_event_handle<history::VrfDepositAlertEvent>(admin),
+            paused_events: account::new_event_handle<history::VrfRequestsPausedEvent>(admin),
+            resumed_events: account::new_event_handle<history::VrfRequestsResumedEvent>(admin),
         };
         move_to(admin, ledger);
     }
 
     public entry fun update_config(admin: &signer, min_balance_multiplier_bps: u64, effective_floor: u64) acquires VrfDepositLedger {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_REGISTRY_MISSING);
-        assert!(min_balance_multiplier_bps >= 10_000, errors::E_VRF_DEPOSIT_CONFIG);
-        let ledger = borrow_ledger_mut();
+        assert!(addr == @lottery_multi, errors::err_registry_missing());
+        assert!(min_balance_multiplier_bps >= 10_000, errors::err_vrf_deposit_config());
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<VrfDepositLedger>(ledger_addr);
         ledger.config.min_balance_multiplier_bps = min_balance_multiplier_bps;
         ledger.config.effective_floor = effective_floor;
     }
@@ -81,11 +84,11 @@ module lottery_multi::vrf_deposit {
         timestamp: u64,
     ) acquires VrfDepositLedger {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_REGISTRY_MISSING);
+        assert!(addr == @lottery_multi, errors::err_registry_missing());
         record_snapshot_internal(total_balance, minimum_balance, effective_balance, timestamp);
     }
 
-    public entry fun record_snapshot_automation(
+    public fun record_snapshot_automation(
         operator: &signer,
         cap: &automation::AutomationCap,
         total_balance: u64,
@@ -93,50 +96,49 @@ module lottery_multi::vrf_deposit {
         effective_balance: u64,
         timestamp: u64,
         action_hash: vector<u8>,
-    ) acquires VrfDepositLedger, automation::AutomationRegistry {
+    ) acquires VrfDepositLedger {
         let caller = signer::address_of(operator);
-        assert!(caller == cap.operator, errors::E_AUTOBOT_CALLER_MISMATCH);
-        assert!(vector::length(&action_hash) > 0, errors::E_AUTOBOT_ACTION_HASH_EMPTY);
+        let cap_operator = automation::automation_cap_operator(cap);
+        assert!(caller == cap_operator, errors::err_autobot_caller_mismatch());
+        assert!(vector::length(&action_hash) > 0, errors::err_autobot_action_hash_empty());
         automation::ensure_action_with_timelock(
             cap,
-            automation::ACTION_TOPUP_VRF_DEPOSIT,
+            automation::action_topup_vrf_deposit(),
             &action_hash,
             timestamp,
         );
         record_snapshot_internal(total_balance, minimum_balance, effective_balance, timestamp);
-        automation::record_success(
+        automation::record_success_internal(
             operator,
             cap,
-            automation::ACTION_TOPUP_VRF_DEPOSIT,
+            automation::action_topup_vrf_deposit(),
             action_hash,
             timestamp,
         );
     }
 
+
     public entry fun resume_requests(admin: &signer, timestamp: u64) acquires VrfDepositLedger {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_REGISTRY_MISSING);
-        let ledger = borrow_ledger_mut();
+        assert!(addr == @lottery_multi, errors::err_registry_missing());
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<VrfDepositLedger>(ledger_addr);
         if (!ledger.status.requests_paused) {
-            return;
+            return
         };
         ledger.status.requests_paused = false;
         ledger.status.paused_since_ts = 0;
-        let event = history::VrfRequestsResumedEvent {
-            event_version: EVENT_VERSION_V1,
-            event_category: EVENT_CATEGORY_INFRA,
-            resumed_ts: timestamp,
-        };
+        let event = history::new_vrf_requests_resumed_event(timestamp);
         event::emit_event(&mut ledger.resumed_events, event);
     }
 
     public fun ensure_requests_allowed() acquires VrfDepositLedger {
         if (!exists<VrfDepositLedger>(@lottery_multi)) {
-            return;
+            return
         };
         let ledger = borrow_global<VrfDepositLedger>(@lottery_multi);
         if (ledger.status.requests_paused) {
-            abort errors::E_VRF_REQUESTS_PAUSED;
+            abort errors::err_vrf_requests_paused()
         };
     }
 
@@ -150,7 +152,7 @@ module lottery_multi::vrf_deposit {
                 last_update_ts: 0,
                 requests_paused: false,
                 paused_since_ts: 0,
-            };
+            }
         };
         let ledger = borrow_global<VrfDepositLedger>(@lottery_multi);
         let status_ref = &ledger.status;
@@ -163,9 +165,10 @@ module lottery_multi::vrf_deposit {
         effective_balance: u64,
         timestamp: u64,
     ) acquires VrfDepositLedger {
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<VrfDepositLedger>(ledger_addr);
         let required_minimum = compute_required_minimum(minimum_balance, ledger.config.min_balance_multiplier_bps);
-        let mut should_pause = false;
+        let should_pause = false;
         if (effective_balance < ledger.config.effective_floor) {
             should_pause = true;
         };
@@ -197,12 +200,13 @@ module lottery_multi::vrf_deposit {
 
     fun compute_required_minimum(minimum_balance: u64, multiplier_bps: u64): u64 {
         if (minimum_balance == 0) {
-            return 0;
+            return 0
         };
-        let numerator = (minimum_balance as u128) * (multiplier_bps as u128);
+        let numerator =
+            math::widen_u128_from_u64(minimum_balance) * math::widen_u128_from_u64(multiplier_bps);
         let required = numerator / 10_000;
-        assert!(required <= 0xffffffffffffffffu128, errors::E_AMOUNT_OVERFLOW);
-        required as u64
+        assert!(required <= 0xffffffffffffffffu128, errors::err_amount_overflow());
+        math::checked_u64_from_u128(required, errors::err_amount_overflow())
     }
 
     fun emit_snapshot(
@@ -214,16 +218,14 @@ module lottery_multi::vrf_deposit {
         effective_floor: u64,
         timestamp: u64,
     ) {
-        let event = history::VrfDepositSnapshotEvent {
-            event_version: EVENT_VERSION_V1,
-            event_category: EVENT_CATEGORY_INFRA,
+        let event = history::new_vrf_deposit_snapshot_event(
             total_balance,
             minimum_balance,
             effective_balance,
             required_minimum,
             effective_floor,
             timestamp,
-        };
+        );
         event::emit_event(handle, event);
     }
 
@@ -236,42 +238,64 @@ module lottery_multi::vrf_deposit {
         effective_floor: u64,
         timestamp: u64,
     ) {
-        let event = history::VrfDepositAlertEvent {
-            event_version: EVENT_VERSION_V1,
-            event_category: EVENT_CATEGORY_INFRA,
+        let event = history::new_vrf_deposit_alert_event(
             total_balance,
             minimum_balance,
             effective_balance,
             required_minimum,
             effective_floor,
             timestamp,
-        };
+        );
         event::emit_event(handle, event);
     }
 
     fun emit_paused(handle: &mut event::EventHandle<history::VrfRequestsPausedEvent>, timestamp: u64) {
-        let event = history::VrfRequestsPausedEvent {
-            event_version: EVENT_VERSION_V1,
-            event_category: EVENT_CATEGORY_INFRA,
-            paused_since_ts: timestamp,
-        };
+        let event = history::new_vrf_requests_paused_event(timestamp);
         event::emit_event(handle, event);
     }
 
     fun emit_resumed(handle: &mut event::EventHandle<history::VrfRequestsResumedEvent>, timestamp: u64) {
-        let event = history::VrfRequestsResumedEvent {
-            event_version: EVENT_VERSION_V1,
-            event_category: EVENT_CATEGORY_INFRA,
-            resumed_ts: timestamp,
-        };
+        let event = history::new_vrf_requests_resumed_event(timestamp);
         event::emit_event(handle, event);
     }
 
-    fun borrow_ledger_mut(): &mut VrfDepositLedger acquires VrfDepositLedger {
+    //
+    // Status helpers (Move v1 compatibility)
+    //
+
+    public fun status_total_balance(status: &VrfDepositStatus): u64 {
+        status.total_balance
+    }
+
+    public fun status_minimum_balance(status: &VrfDepositStatus): u64 {
+        status.minimum_balance
+    }
+
+    public fun status_effective_balance(status: &VrfDepositStatus): u64 {
+        status.effective_balance
+    }
+
+    public fun status_required_minimum(status: &VrfDepositStatus): u64 {
+        status.required_minimum
+    }
+
+    public fun status_last_update_ts(status: &VrfDepositStatus): u64 {
+        status.last_update_ts
+    }
+
+    public fun status_requests_paused(status: &VrfDepositStatus): bool {
+        status.requests_paused
+    }
+
+    public fun status_paused_since_ts(status: &VrfDepositStatus): u64 {
+        status.paused_since_ts
+    }
+
+    fun ledger_addr_or_abort(): address {
         let addr = @lottery_multi;
         if (!exists<VrfDepositLedger>(addr)) {
-            abort errors::E_VRF_DEPOSIT_NOT_INITIALIZED;
+            abort errors::err_vrf_deposit_not_initialized()
         };
-        borrow_global_mut<VrfDepositLedger>(addr)
+        addr
     }
 }

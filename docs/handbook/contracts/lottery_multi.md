@@ -123,3 +123,4 @@
 - Для пошагового описания этапов и связки механик с тестами см. [lottery_multi_stage_playbook.md](lottery_multi_stage_playbook.md).
 - Операционные заметки и программа безопасности доступны в [../operations/incident_log.md](../operations/incident_log.md), [../operations/post_release_support.md](../operations/post_release_support.md), [../operations/postmortems.md](../operations/postmortems.md) и [../operations/bug_bounty.md](../operations/bug_bounty.md).
 - При обновлении модулей необходимо синхронно править этот файл и карточку этапа в `architecture/rfc_status.md`.
+

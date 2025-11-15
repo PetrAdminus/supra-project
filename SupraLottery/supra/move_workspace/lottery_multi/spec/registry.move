@@ -1,17 +1,17 @@
-spec module lottery_multi::registry {
-    use lottery_multi::registry::Lottery;
+spec module lottery_multi::lottery_registry {
+    use lottery_multi::lottery_lottery_registry::Lottery;
     use lottery_multi::types;
 
     spec struct Lottery {
-        invariant status == types::STATUS_DRAFT
-            || status == types::STATUS_ACTIVE
-            || status == types::STATUS_CLOSING
-            || status == types::STATUS_DRAW_REQUESTED
-            || status == types::STATUS_DRAWN
-            || status == types::STATUS_PAYOUT
-            || status == types::STATUS_FINALIZED
-            || status == types::STATUS_CANCELED;
-        invariant snapshot_frozen ==> status >= types::STATUS_CLOSING;
+        invariant status == types::status_draft()
+            || status == types::status_active()
+            || status == types::status_closing()
+            || status == types::status_draw_requested()
+            || status == types::status_drawn()
+            || status == types::status_payout()
+            || status == types::status_finalized()
+            || status == types::status_canceled();
+        invariant snapshot_frozen ==> status >= types::status_closing();
         invariant len(slots_checksum) == 32;
     }
 }

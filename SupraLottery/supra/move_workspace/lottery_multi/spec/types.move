@@ -2,16 +2,16 @@ spec module lottery_multi::types {
     use lottery_multi::types::{
         VrfState,
         WinnerCursor,
-        VRF_STATUS_IDLE,
-        VRF_STATUS_REQUESTED,
-        VRF_STATUS_FULFILLED,
+
+
+
     };
 
     spec struct VrfState {
         invariant attempt <= 255;
-        invariant status == VRF_STATUS_IDLE ==> !consumed;
-        invariant status == VRF_STATUS_REQUESTED ==> !consumed;
-        invariant consumed ==> status == VRF_STATUS_FULFILLED;
+        invariant status == lottery_multi::types::vrf_status_idle() ==> !consumed;
+        invariant status == lottery_multi::types::vrf_status_requested() ==> !consumed;
+        invariant consumed ==> status == lottery_multi::types::vrf_status_fulfilled();
         invariant schema_version >= 1;
         invariant retry_strategy == 0 || retry_strategy == 1 || retry_strategy == 2;
         invariant closing_block_height >= 0;

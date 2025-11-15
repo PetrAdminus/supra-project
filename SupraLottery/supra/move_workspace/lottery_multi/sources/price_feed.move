@@ -4,18 +4,20 @@ module lottery_multi::price_feed {
     use std::signer;
     use std::table;
 
+    use supra_framework::account;
     use supra_framework::event;
 
     use lottery_multi::errors;
+    use lottery_multi::math;
 
     const EVENT_VERSION_V1: u16 = 1;
     const EVENT_CATEGORY_PRICE: u8 = 6;
 
-    pub const ASSET_SUPRA_USD: u64 = 1;
-    pub const ASSET_USDT_USD: u64 = 2;
+    const ASSET_SUPRA_USD: u64 = 1;
+    const ASSET_USDT_USD: u64 = 2;
 
-    pub const DEFAULT_STALENESS_WINDOW: u64 = 300;
-    pub const DEFAULT_CLAMP_THRESHOLD_BPS: u64 = 2_000; // 20%
+    const DEFAULT_STALENESS_WINDOW: u64 = 300;
+    const DEFAULT_CLAMP_THRESHOLD_BPS: u64 = 2_000; // 20%
 
     struct PriceFeedRecord has store {
         asset_id: u64,
@@ -29,49 +31,77 @@ module lottery_multi::price_feed {
         clamp_active: bool,
     }
 
-    pub struct PriceFeedUpdatedEvent has drop, store {
-        pub event_version: u16,
-        pub event_category: u8,
-        pub asset_id: u64,
-        pub price: u64,
-        pub decimals: u8,
-        pub updated_ts: u64,
+    struct PriceFeedUpdatedEvent has drop, store {
+        event_version: u16,
+        event_category: u8,
+        asset_id: u64,
+        price: u64,
+        decimals: u8,
+        updated_ts: u64,
     }
 
-    pub struct PriceFeedFallbackEvent has drop, store {
-        pub event_version: u16,
-        pub event_category: u8,
-        pub asset_id: u64,
-        pub fallback_active: bool,
-        pub reason: u8,
+    struct PriceFeedFallbackEvent has drop, store {
+        event_version: u16,
+        event_category: u8,
+        asset_id: u64,
+        fallback_active: bool,
+        reason: u8,
     }
 
-    pub struct PriceFeedClampEvent has drop, store {
-        pub event_version: u16,
-        pub event_category: u8,
-        pub asset_id: u64,
-        pub old_price: u64,
-        pub new_price: u64,
-        pub threshold_bps: u64,
+    struct PriceFeedClampEvent has drop, store {
+        event_version: u16,
+        event_category: u8,
+        asset_id: u64,
+        old_price: u64,
+        new_price: u64,
+        threshold_bps: u64,
     }
 
-    pub struct PriceFeedClampClearedEvent has drop, store {
-        pub event_version: u16,
-        pub event_category: u8,
-        pub asset_id: u64,
-        pub cleared_ts: u64,
+    struct PriceFeedClampClearedEvent has drop, store {
+        event_version: u16,
+        event_category: u8,
+        asset_id: u64,
+        cleared_ts: u64,
     }
 
-    pub struct PriceFeedView has drop, store {
-        pub asset_id: u64,
-        pub price: u64,
-        pub decimals: u8,
-        pub last_updated_ts: u64,
-        pub staleness_window: u64,
-        pub clamp_threshold_bps: u64,
-        pub fallback_active: bool,
-        pub fallback_reason: u8,
-        pub clamp_active: bool,
+    struct PriceFeedView has drop, store {
+        asset_id: u64,
+        price: u64,
+        decimals: u8,
+        last_updated_ts: u64,
+        staleness_window: u64,
+        clamp_threshold_bps: u64,
+        fallback_active: bool,
+        fallback_reason: u8,
+        clamp_active: bool,
+    }
+
+    //
+    // Helpers (Move v1 compatibility)
+    //
+
+    public fun asset_supra_usd_id(): u64 {
+        ASSET_SUPRA_USD
+    }
+
+    public fun price_view_price(view: &PriceFeedView): u64 {
+        view.price
+    }
+
+    public fun price_view_decimals(view: &PriceFeedView): u8 {
+        view.decimals
+    }
+
+    public fun price_view_last_updated(view: &PriceFeedView): u64 {
+        view.last_updated_ts
+    }
+
+    public fun price_view_clamp_active(view: &PriceFeedView): bool {
+        view.clamp_active
+    }
+
+    public fun price_view_asset_id(view: &PriceFeedView): u64 {
+        view.asset_id
     }
 
     struct PriceFeedRegistry has key {
@@ -85,15 +115,15 @@ module lottery_multi::price_feed {
 
     public entry fun init_price_feed(admin: &signer, version: u16) {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_REGISTRY_MISSING);
-        assert!(!exists<PriceFeedRegistry>(addr), errors::E_ALREADY_INITIALIZED);
+        assert!(addr == @lottery_multi, errors::err_registry_missing());
+        assert!(!exists<PriceFeedRegistry>(addr), errors::err_already_initialized());
         let registry = PriceFeedRegistry {
             version,
             feeds: table::new(),
-            updates: event::new_event_handle<PriceFeedUpdatedEvent>(admin),
-            fallbacks: event::new_event_handle<PriceFeedFallbackEvent>(admin),
-            clamps: event::new_event_handle<PriceFeedClampEvent>(admin),
-            clamp_clears: event::new_event_handle<PriceFeedClampClearedEvent>(admin),
+            updates: account::new_event_handle<PriceFeedUpdatedEvent>(admin),
+            fallbacks: account::new_event_handle<PriceFeedFallbackEvent>(admin),
+            clamps: account::new_event_handle<PriceFeedClampEvent>(admin),
+            clamp_clears: account::new_event_handle<PriceFeedClampClearedEvent>(admin),
         };
         move_to(admin, registry);
     }
@@ -107,11 +137,13 @@ module lottery_multi::price_feed {
         clamp_threshold_bps: option::Option<u64>,
         updated_ts: u64,
     ) acquires PriceFeedRegistry {
-        assert!(decimals <= 18, errors::E_PRICE_DECIMALS_INVALID);
+        assert_admin(admin);
+        assert!(decimals <= 18, errors::err_price_decimals_invalid());
         let staleness = unwrap_or(staleness_window, DEFAULT_STALENESS_WINDOW);
         let clamp_threshold = unwrap_or(clamp_threshold_bps, DEFAULT_CLAMP_THRESHOLD_BPS);
-        let registry = borrow_registry_mut();
-        assert!(!table::contains(&registry.feeds, asset_id), errors::E_PRICE_FEED_EXISTS);
+        let registry_addr = registry_addr_or_abort();
+        let registry = borrow_global_mut<PriceFeedRegistry>(registry_addr);
+        assert!(!table::contains(&registry.feeds, asset_id), errors::err_price_feed_exists());
         let record = PriceFeedRecord {
             asset_id,
             price,
@@ -133,11 +165,13 @@ module lottery_multi::price_feed {
         price: u64,
         updated_ts: u64,
     ) acquires PriceFeedRegistry {
-        let registry = borrow_registry_mut();
+        assert_admin(admin);
+        let registry_addr = registry_addr_or_abort();
+        let registry = borrow_global_mut<PriceFeedRegistry>(registry_addr);
         let record = borrow_record_mut(&mut registry.feeds, asset_id);
         let clamped = check_clamp(record, price, &mut registry.clamps);
         if (clamped) {
-            return;
+            return
         };
         record.price = price;
         record.last_updated_ts = updated_ts;
@@ -152,7 +186,9 @@ module lottery_multi::price_feed {
         active: bool,
         reason: u8,
     ) acquires PriceFeedRegistry {
-        let registry = borrow_registry_mut();
+        assert_admin(admin);
+        let registry_addr = registry_addr_or_abort();
+        let registry = borrow_global_mut<PriceFeedRegistry>(registry_addr);
         let record = borrow_record_mut(&mut registry.feeds, asset_id);
         record.fallback_active = active;
         record.fallback_reason = reason;
@@ -167,25 +203,27 @@ module lottery_multi::price_feed {
         asset_id: u64,
         cleared_ts: u64,
     ) acquires PriceFeedRegistry {
-        let registry = borrow_registry_mut();
+        assert_admin(admin);
+        let registry_addr = registry_addr_or_abort();
+        let registry = borrow_global_mut<PriceFeedRegistry>(registry_addr);
         let record = borrow_record_mut(&mut registry.feeds, asset_id);
-        assert!(record.clamp_active, errors::E_PRICE_CLAMP_NOT_ACTIVE);
+        assert!(record.clamp_active, errors::err_price_clamp_not_active());
         record.clamp_active = false;
         record.last_updated_ts = cleared_ts;
         emit_clamp_cleared(&mut registry.clamp_clears, asset_id, cleared_ts);
     }
 
     public fun latest_price(asset_id: u64, now_ts: u64): (u64, u8) acquires PriceFeedRegistry {
-        let registry = borrow_registry_ref();
+        let registry = borrow_global<PriceFeedRegistry>(@lottery_multi);
         let record = borrow_record_ref(&registry.feeds, asset_id);
-        assert!(!record.fallback_active, errors::E_PRICE_FALLBACK_ACTIVE);
-        assert!(!record.clamp_active, errors::E_PRICE_CLAMP_ACTIVE);
-        assert!(is_fresh(record, now_ts), errors::E_PRICE_STALE);
+        assert!(!record.fallback_active, errors::err_price_fallback_active());
+        assert!(!record.clamp_active, errors::err_price_clamp_active());
+        assert!(is_fresh(record, now_ts), errors::err_price_stale());
         (record.price, record.decimals)
     }
 
     public fun get_price_view(asset_id: u64): PriceFeedView acquires PriceFeedRegistry {
-        let registry = borrow_registry_ref();
+        let registry = borrow_global<PriceFeedRegistry>(@lottery_multi);
         let record = borrow_record_ref(&registry.feeds, asset_id);
         PriceFeedView {
             asset_id,
@@ -206,8 +244,9 @@ module lottery_multi::price_feed {
     }
 
     fun unwrap_or(opt: option::Option<u64>, default: u64): u64 {
-        if (option::is_some(&opt)) {
-            option::extract(opt)
+        let temp = opt;
+        if (option::is_some(&temp)) {
+            option::extract(&mut temp)
         } else {
             default
         }
@@ -220,7 +259,7 @@ module lottery_multi::price_feed {
         decimals: u8,
         updated_ts: u64,
     ) {
-        event::emit(handle, PriceFeedUpdatedEvent {
+        event::emit_event(handle, PriceFeedUpdatedEvent {
             event_version: EVENT_VERSION_V1,
             event_category: EVENT_CATEGORY_PRICE,
             asset_id,
@@ -236,7 +275,7 @@ module lottery_multi::price_feed {
         active: bool,
         reason: u8,
     ) {
-        event::emit(handle, PriceFeedFallbackEvent {
+        event::emit_event(handle, PriceFeedFallbackEvent {
             event_version: EVENT_VERSION_V1,
             event_category: EVENT_CATEGORY_PRICE,
             asset_id,
@@ -252,7 +291,7 @@ module lottery_multi::price_feed {
         new_price: u64,
         threshold_bps: u64,
     ) {
-        event::emit(handle, PriceFeedClampEvent {
+        event::emit_event(handle, PriceFeedClampEvent {
             event_version: EVENT_VERSION_V1,
             event_category: EVENT_CATEGORY_PRICE,
             asset_id,
@@ -267,7 +306,7 @@ module lottery_multi::price_feed {
         asset_id: u64,
         cleared_ts: u64,
     ) {
-        event::emit(handle, PriceFeedClampClearedEvent {
+        event::emit_event(handle, PriceFeedClampClearedEvent {
             event_version: EVENT_VERSION_V1,
             event_category: EVENT_CATEGORY_PRICE,
             asset_id,
@@ -282,7 +321,7 @@ module lottery_multi::price_feed {
     ): bool {
         let old_price = record.price;
         if (old_price == 0) {
-            return false;
+            return false
         };
         let threshold = record.clamp_threshold_bps;
         let diff = if (new_price > old_price) {
@@ -290,35 +329,33 @@ module lottery_multi::price_feed {
         } else {
             old_price - new_price
         };
-        let diff_scaled = (diff as u128) * 10_000u128;
-        let base = (old_price as u128) * (threshold as u128);
+        let diff_scaled = math::widen_u128_from_u64(diff) * 10_000u128;
+        let base =
+            math::widen_u128_from_u64(old_price) * math::widen_u128_from_u64(threshold);
         if (diff_scaled > base) {
             record.clamp_active = true;
             emit_clamp(clamp_handle, record.asset_id, old_price, new_price, threshold);
             true
         } else {
             false
-        };
+        }
     }
 
     fun is_fresh(record: &PriceFeedRecord, now_ts: u64): bool {
         now_ts - record.last_updated_ts <= record.staleness_window
     }
 
-    fun borrow_registry_mut(): &mut PriceFeedRegistry acquires PriceFeedRegistry {
+    fun registry_addr_or_abort(): address {
         let addr = @lottery_multi;
         if (!exists<PriceFeedRegistry>(addr)) {
-            abort errors::E_REGISTRY_MISSING;
+            abort errors::err_registry_missing()
         };
-        borrow_global_mut<PriceFeedRegistry>(addr)
+        addr
     }
 
-    fun borrow_registry_ref(): &PriceFeedRegistry acquires PriceFeedRegistry {
-        let addr = @lottery_multi;
-        if (!exists<PriceFeedRegistry>(addr)) {
-            abort errors::E_REGISTRY_MISSING;
-        };
-        borrow_global<PriceFeedRegistry>(addr)
+    fun assert_admin(admin: &signer) {
+        let addr = signer::address_of(admin);
+        assert!(addr == @lottery_multi, errors::err_registry_missing());
     }
 
     fun borrow_record_mut(
@@ -326,7 +363,7 @@ module lottery_multi::price_feed {
         asset_id: u64,
     ): &mut PriceFeedRecord {
         if (!table::contains(feeds, asset_id)) {
-            abort errors::E_PRICE_FEED_NOT_FOUND;
+            abort errors::err_price_feed_not_found()
         };
         table::borrow_mut(feeds, asset_id)
     }
@@ -336,7 +373,7 @@ module lottery_multi::price_feed {
         asset_id: u64,
     ): &PriceFeedRecord {
         if (!table::contains(feeds, asset_id)) {
-            abort errors::E_PRICE_FEED_NOT_FOUND;
+            abort errors::err_price_feed_not_found()
         };
         table::borrow(feeds, asset_id)
     }

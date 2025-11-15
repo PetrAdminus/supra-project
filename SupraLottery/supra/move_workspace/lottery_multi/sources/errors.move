@@ -1,4 +1,4 @@
-﻿// sources/errors.move
+// sources/errors.move
 module lottery_multi::errors {
     /// Common tag errors
     const E_TAG_PRIMARY_TYPE: u64 = 0x1001;
@@ -49,6 +49,9 @@ module lottery_multi::errors {
     /// Validation and view errors
     const E_PAGINATION_LIMIT: u64 = 0x1501;
 
+    /// Serialization errors
+    const E_BCS_DECODE: u64 = 0x1A01;
+
     /// Ticket purchase errors
     const E_PURCHASE_QTY_ZERO: u64 = 0x1601;
     const E_PURCHASE_QTY_LIMIT: u64 = 0x1602;
@@ -56,7 +59,6 @@ module lottery_multi::errors {
     const E_PURCHASE_ADDRESS_LIMIT: u64 = 0x1604;
     const E_AMOUNT_OVERFLOW: u64 = 0x1605;
     const E_PREMIUM_CAP_MISMATCH: u64 = 0x1606;
-    const E_PREMIUM_CAP_EXPIRED: u64 = 0x1607;
     const E_PURCHASE_RATE_LIMIT_BLOCK: u64 = 0x1608;
     const E_PURCHASE_RATE_LIMIT_WINDOW: u64 = 0x1609;
     const E_PURCHASE_GRACE_RESTRICTED: u64 = 0x160A;
@@ -130,7 +132,7 @@ module lottery_multi::errors {
     const E_AUTOBOT_ACTION_HASH_EMPTY: u64 = 0x1A0B;
     const E_AUTOBOT_CALLER_MISMATCH: u64 = 0x1A0C;
 
-    /// История и финализация
+    /// History import / archive errors
     const E_HISTORY_MISSING: u64 = 0x1B01;
     const E_HISTORY_MISMATCH: u64 = 0x1B02;
     const E_FINALIZATION_INCOMPLETE: u64 = 0x1B03;
@@ -141,5 +143,125 @@ module lottery_multi::errors {
     const E_HISTORY_ID_MISMATCH: u64 = 0x1B08;
     const E_HISTORY_NOT_LEGACY: u64 = 0x1B09;
     const E_HISTORY_SUMMARY_MISSING: u64 = 0x1B0A;
+    const E_HISTORY_DECODE: u64 = 0x1B0B;
+    /// Error code accessors generated for Move v1 compatibility
+    public fun err_tag_primary_type(): u64 { E_TAG_PRIMARY_TYPE }
+    public fun err_tag_unknown_bit(): u64 { E_TAG_UNKNOWN_BIT }
+    public fun err_tag_budget_exceeded(): u64 { E_TAG_BUDGET_EXCEEDED }
+    public fun err_primary_type_not_allowed(): u64 { E_PRIMARY_TYPE_NOT_ALLOWED }
+    public fun err_tag_mask_not_allowed(): u64 { E_TAG_MASK_NOT_ALLOWED }
+    public fun err_roles_not_initialized(): u64 { E_ROLES_NOT_INITIALIZED }
+    public fun err_payout_batch_cap_missing(): u64 { E_PAYOUT_BATCH_CAP_MISSING }
+    public fun err_partner_payout_cap_missing(): u64 { E_PARTNER_PAYOUT_CAP_MISSING }
+    public fun err_premium_cap_missing(): u64 { E_PREMIUM_CAP_MISSING }
+    public fun err_premium_cap_expired(): u64 { E_PREMIUM_CAP_EXPIRED }
+    public fun err_already_initialized(): u64 { E_ALREADY_INITIALIZED }
+    public fun err_registry_missing(): u64 { E_REGISTRY_MISSING }
+    public fun err_lottery_exists(): u64 { E_LOTTERY_EXISTS }
+    public fun err_status_transition_not_allowed(): u64 { E_STATUS_TRANSITION_NOT_ALLOWED }
+    public fun err_primary_type_locked(): u64 { E_PRIMARY_TYPE_LOCKED }
+    public fun err_tags_locked(): u64 { E_TAGS_LOCKED }
+    public fun err_snapshot_frozen(): u64 { E_SNAPSHOT_FROZEN }
+    public fun err_sales_window_invalid(): u64 { E_SALES_WINDOW_INVALID }
+    public fun err_ticket_price_zero(): u64 { E_TICKET_PRICE_ZERO }
+    public fun err_ticket_limit_invalid(): u64 { E_TICKET_LIMIT_INVALID }
+    public fun err_prize_plan_empty(): u64 { E_PRIZE_PLAN_EMPTY }
+    public fun err_prize_slot_invalid(): u64 { E_PRIZE_SLOT_INVALID }
+    public fun err_draw_algo_unsupported(): u64 { E_DRAW_ALGO_UNSUPPORTED }
+    public fun err_sales_window_closed(): u64 { E_SALES_WINDOW_CLOSED }
+    public fun err_lottery_not_active(): u64 { E_LOTTERY_NOT_ACTIVE }
+    public fun err_draw_status_invalid(): u64 { E_DRAW_STATUS_INVALID }
+    public fun err_cancel_reason_invalid(): u64 { E_CANCEL_REASON_INVALID }
+    public fun err_cancellation_record_missing(): u64 { E_CANCELLATION_RECORD_MISSING }
+    public fun err_distribution_bps_invalid(): u64 { E_DISTRIBUTION_BPS_INVALID }
+    public fun err_jackpot_allowance_underflow(): u64 { E_JACKPOT_ALLOWANCE_UNDERFLOW }
+    public fun err_jackpot_allowance_increase(): u64 { E_JACKPOT_ALLOWANCE_INCREASE }
+    public fun err_payout_alloc_exceeded(): u64 { E_PAYOUT_ALLOC_EXCEEDED }
+    public fun err_operations_alloc_exceeded(): u64 { E_OPERATIONS_ALLOC_EXCEEDED }
+    public fun err_feature_unknown(): u64 { E_FEATURE_UNKNOWN }
+    public fun err_feature_mode_invalid(): u64 { E_FEATURE_MODE_INVALID }
+    public fun err_feature_disabled(): u64 { E_FEATURE_DISABLED }
+    public fun err_pagination_limit(): u64 { E_PAGINATION_LIMIT }
+    public fun err_purchase_qty_zero(): u64 { E_PURCHASE_QTY_ZERO }
+    public fun err_purchase_qty_limit(): u64 { E_PURCHASE_QTY_LIMIT }
+    public fun err_purchase_total_limit(): u64 { E_PURCHASE_TOTAL_LIMIT }
+    public fun err_purchase_address_limit(): u64 { E_PURCHASE_ADDRESS_LIMIT }
+    public fun err_amount_overflow(): u64 { E_AMOUNT_OVERFLOW }
+    public fun err_premium_cap_mismatch(): u64 { E_PREMIUM_CAP_MISMATCH }
+    public fun err_purchase_rate_limit_block(): u64 { E_PURCHASE_RATE_LIMIT_BLOCK }
+    public fun err_purchase_rate_limit_window(): u64 { E_PURCHASE_RATE_LIMIT_WINDOW }
+    public fun err_purchase_grace_restricted(): u64 { E_PURCHASE_GRACE_RESTRICTED }
+    public fun err_vrf_pending(): u64 { E_VRF_PENDING }
+    public fun err_vrf_not_requested(): u64 { E_VRF_NOT_REQUESTED }
+    public fun err_vrf_nonce_unknown(): u64 { E_VRF_NONCE_UNKNOWN }
+    public fun err_vrf_payload_mismatch(): u64 { E_VRF_PAYLOAD_MISMATCH }
+    public fun err_vrf_attempt_out_of_order(): u64 { E_VRF_ATTEMPT_OUT_OF_ORDER }
+    public fun err_vrf_rng_count_invalid(): u64 { E_VRF_RNG_COUNT_INVALID }
+    public fun err_vrf_snapshot_empty(): u64 { E_VRF_SNAPSHOT_EMPTY }
+    public fun err_vrf_consumed(): u64 { E_VRF_CONSUMED }
+    public fun err_vrf_retry_window(): u64 { E_VRF_RETRY_WINDOW }
+    public fun err_vrf_client_seed_overflow(): u64 { E_VRF_CLIENT_SEED_OVERFLOW }
+    public fun err_vrf_deposit_not_initialized(): u64 { E_VRF_DEPOSIT_NOT_INITIALIZED }
+    public fun err_vrf_deposit_config(): u64 { E_VRF_DEPOSIT_CONFIG }
+    public fun err_vrf_requests_paused(): u64 { E_VRF_REQUESTS_PAUSED }
+    public fun err_vrf_retry_policy_invalid(): u64 { E_VRF_RETRY_POLICY_INVALID }
+    public fun err_vrf_manual_schedule_required(): u64 { E_VRF_MANUAL_SCHEDULE_REQUIRED }
+    public fun err_vrf_manual_deadline(): u64 { E_VRF_MANUAL_DEADLINE }
+    public fun err_winner_vrf_not_ready(): u64 { E_WINNER_VRF_NOT_READY }
+    public fun err_winner_all_assigned(): u64 { E_WINNER_ALL_ASSIGNED }
+    public fun err_winner_index_out_of_range(): u64 { E_WINNER_INDEX_OUT_OF_RANGE }
+    public fun err_winner_dedup_exhausted(): u64 { E_WINNER_DEDUP_EXHAUSTED }
+    public fun err_payout_state_missing(): u64 { E_PAYOUT_STATE_MISSING }
+    public fun err_payout_round_non_monotonic(): u64 { E_PAYOUT_ROUND_NON_MONOTONIC }
+    public fun err_payout_cooldown(): u64 { E_PAYOUT_COOLDOWN }
+    public fun err_payout_batch_too_large(): u64 { E_PAYOUT_BATCH_TOO_LARGE }
+    public fun err_payout_batch_cooldown(): u64 { E_PAYOUT_BATCH_COOLDOWN }
+    public fun err_payout_batch_nonce(): u64 { E_PAYOUT_BATCH_NONCE }
+    public fun err_payout_operations_budget(): u64 { E_PAYOUT_OPERATIONS_BUDGET }
+    public fun err_partner_payout_budget_exceeded(): u64 { E_PARTNER_PAYOUT_BUDGET_EXCEEDED }
+    public fun err_partner_payout_cooldown(): u64 { E_PARTNER_PAYOUT_COOLDOWN }
+    public fun err_partner_payout_nonce(): u64 { E_PARTNER_PAYOUT_NONCE }
+    public fun err_partner_payout_holder_mismatch(): u64 { E_PARTNER_PAYOUT_HOLDER_MISMATCH }
+    public fun err_partner_payout_expired(): u64 { E_PARTNER_PAYOUT_EXPIRED }
+    public fun err_refund_not_active(): u64 { E_REFUND_NOT_ACTIVE }
+    public fun err_refund_round_non_monotonic(): u64 { E_REFUND_ROUND_NON_MONOTONIC }
+    public fun err_refund_limit_tickets(): u64 { E_REFUND_LIMIT_TICKETS }
+    public fun err_refund_limit_funds(): u64 { E_REFUND_LIMIT_FUNDS }
+    public fun err_refund_status_invalid(): u64 { E_REFUND_STATUS_INVALID }
+    public fun err_refund_batch_empty(): u64 { E_REFUND_BATCH_EMPTY }
+    public fun err_refund_timestamp(): u64 { E_REFUND_TIMESTAMP }
+    public fun err_refund_progress_incomplete(): u64 { E_REFUND_PROGRESS_INCOMPLETE }
+    public fun err_refund_progress_funds(): u64 { E_REFUND_PROGRESS_FUNDS }
+    public fun err_price_feed_exists(): u64 { E_PRICE_FEED_EXISTS }
+    public fun err_price_feed_not_found(): u64 { E_PRICE_FEED_NOT_FOUND }
+    public fun err_price_decimals_invalid(): u64 { E_PRICE_DECIMALS_INVALID }
+    public fun err_price_stale(): u64 { E_PRICE_STALE }
+    public fun err_price_fallback_active(): u64 { E_PRICE_FALLBACK_ACTIVE }
+    public fun err_price_clamp_triggered(): u64 { E_PRICE_CLAMP_TRIGGERED }
+    public fun err_price_clamp_active(): u64 { E_PRICE_CLAMP_ACTIVE }
+    public fun err_price_clamp_not_active(): u64 { E_PRICE_CLAMP_NOT_ACTIVE }
+    public fun err_bcs_decode(): u64 { E_BCS_DECODE }
+    public fun err_autobot_registry_missing(): u64 { E_AUTOBOT_REGISTRY_MISSING }
+    public fun err_autobot_already_registered(): u64 { E_AUTOBOT_ALREADY_REGISTERED }
+    public fun err_autobot_not_registered(): u64 { E_AUTOBOT_NOT_REGISTERED }
+    public fun err_autobot_expired(): u64 { E_AUTOBOT_EXPIRED }
+    public fun err_autobot_forbidden_target(): u64 { E_AUTOBOT_FORBIDDEN_TARGET }
+    public fun err_autobot_failure_limit(): u64 { E_AUTOBOT_FAILURE_LIMIT }
+    public fun err_autobot_timelock(): u64 { E_AUTOBOT_TIMELOCK }
+    public fun err_autobot_pending_exists(): u64 { E_AUTOBOT_PENDING_EXISTS }
+    public fun err_autobot_pending_mismatch(): u64 { E_AUTOBOT_PENDING_MISMATCH }
+    public fun err_autobot_pending_required(): u64 { E_AUTOBOT_PENDING_REQUIRED }
+    public fun err_autobot_action_hash_empty(): u64 { E_AUTOBOT_ACTION_HASH_EMPTY }
+    public fun err_autobot_caller_mismatch(): u64 { E_AUTOBOT_CALLER_MISMATCH }
+    public fun err_history_missing(): u64 { E_HISTORY_MISSING }
+    public fun err_history_mismatch(): u64 { E_HISTORY_MISMATCH }
+    public fun err_finalization_incomplete(): u64 { E_FINALIZATION_INCOMPLETE }
+    public fun err_history_not_authorized(): u64 { E_HISTORY_NOT_AUTHORIZED }
+    public fun err_history_expected_missing(): u64 { E_HISTORY_EXPECTED_MISSING }
+    public fun err_history_control_missing(): u64 { E_HISTORY_CONTROL_MISSING }
+    public fun err_history_import_hash(): u64 { E_HISTORY_IMPORT_HASH }
+    public fun err_history_id_mismatch(): u64 { E_HISTORY_ID_MISMATCH }
+    public fun err_history_not_legacy(): u64 { E_HISTORY_NOT_LEGACY }
+    public fun err_history_summary_missing(): u64 { E_HISTORY_SUMMARY_MISSING }
+    public fun err_history_decode(): u64 { E_HISTORY_DECODE }
 }
-

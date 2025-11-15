@@ -5,17 +5,17 @@ module lottery_multi::feature_switch {
 
     use lottery_multi::errors;
 
-    pub const FEATURE_MODE_DISABLED: u8 = 0;
-    pub const FEATURE_MODE_ENABLED_ALL: u8 = 1;
-    pub const FEATURE_MODE_PREMIUM_ONLY: u8 = 2;
+    const FEATURE_MODE_DISABLED: u8 = 0;
+    const FEATURE_MODE_ENABLED_ALL: u8 = 1;
+    const FEATURE_MODE_PREMIUM_ONLY: u8 = 2;
 
     /// Reserved feature identifiers.
-    pub const FEATURE_PURCHASE: u64 = 1;
-    pub const FEATURE_CLOSE: u64 = 2;
-    pub const FEATURE_DRAW: u64 = 3;
-    pub const FEATURE_PAYOUT: u64 = 4;
+    const FEATURE_PURCHASE: u64 = 1;
+    const FEATURE_CLOSE: u64 = 2;
+    const FEATURE_DRAW: u64 = 3;
+    const FEATURE_PAYOUT: u64 = 4;
 
-    pub struct FeatureSwitchAdminCap has store {}
+    struct FeatureSwitchAdminCap has key {}
 
     struct FeatureRecord has store {
         mode: u8,
@@ -28,9 +28,9 @@ module lottery_multi::feature_switch {
 
     public entry fun init_feature_switch(admin: &signer, force_enable_devnet: bool) {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_REGISTRY_MISSING);
-        assert!(!exists<FeatureSwitchRegistry>(addr), errors::E_ALREADY_INITIALIZED);
-        assert!(!exists<FeatureSwitchAdminCap>(addr), errors::E_ALREADY_INITIALIZED);
+        assert!(addr == @lottery_multi, errors::err_registry_missing());
+        assert!(!exists<FeatureSwitchRegistry>(addr), errors::err_already_initialized());
+        assert!(!exists<FeatureSwitchAdminCap>(addr), errors::err_already_initialized());
         let registry = FeatureSwitchRegistry {
             force_enable_devnet,
             entries: table::new(),
@@ -41,12 +41,14 @@ module lottery_multi::feature_switch {
 
     public entry fun set_mode(
         admin: &signer,
-        _cap: &FeatureSwitchAdminCap,
         feature_id: u64,
         mode: u8,
     ) acquires FeatureSwitchRegistry {
-        assert!(is_mode_supported(mode), errors::E_FEATURE_MODE_INVALID);
-        let registry = borrow_registry_mut();
+        let caller = signer::address_of(admin);
+        assert!(caller == @lottery_multi, errors::err_registry_missing());
+        assert!(is_mode_supported(mode), errors::err_feature_mode_invalid());
+        let registry_addr = registry_addr_or_abort();
+        let registry = borrow_global_mut<FeatureSwitchRegistry>(registry_addr);
         if (table::contains(&registry.entries, feature_id)) {
             let record = table::borrow_mut(&mut registry.entries, feature_id);
             record.mode = mode;
@@ -57,24 +59,25 @@ module lottery_multi::feature_switch {
     }
 
     public fun is_enabled(feature_id: u64, has_premium: bool): bool acquires FeatureSwitchRegistry {
-        let registry = borrow_registry_ref();
+        let registry_addr = registry_addr_or_abort();
+        let registry = borrow_global<FeatureSwitchRegistry>(registry_addr);
         if (registry.force_enable_devnet) {
-            return true;
+            return true
         };
         if (!table::contains(&registry.entries, feature_id)) {
-            abort errors::E_FEATURE_UNKNOWN;
+            abort errors::err_feature_unknown()
         };
         let record = table::borrow(&registry.entries, feature_id);
         if (record.mode == FEATURE_MODE_DISABLED) {
-            return false;
+            return false
         };
         if (record.mode == FEATURE_MODE_ENABLED_ALL) {
-            return true;
+            return true
         };
         if (record.mode == FEATURE_MODE_PREMIUM_ONLY) {
-            return has_premium;
+            return has_premium
         };
-        abort errors::E_FEATURE_MODE_INVALID;
+        abort errors::err_feature_mode_invalid()
     }
 
     fun is_mode_supported(mode: u8): bool {
@@ -83,24 +86,37 @@ module lottery_multi::feature_switch {
             || mode == FEATURE_MODE_PREMIUM_ONLY
     }
 
-    fun borrow_registry_mut(): &mut FeatureSwitchRegistry acquires FeatureSwitchRegistry {
+    fun registry_addr_or_abort(): address {
         let addr = @lottery_multi;
         if (!exists<FeatureSwitchRegistry>(addr)) {
-            abort errors::E_REGISTRY_MISSING;
+            abort errors::err_registry_missing()
         };
-        borrow_global_mut<FeatureSwitchRegistry>(addr)
-    }
-
-    fun borrow_registry_ref(): &FeatureSwitchRegistry acquires FeatureSwitchRegistry {
-        let addr = @lottery_multi;
-        if (!exists<FeatureSwitchRegistry>(addr)) {
-            abort errors::E_REGISTRY_MISSING;
-        };
-        borrow_global<FeatureSwitchRegistry>(addr)
+        addr
     }
 
     public fun is_initialized(): bool {
         let addr = @lottery_multi;
         exists<FeatureSwitchRegistry>(addr)
     }
+
+    //
+    // Feature identifiers (Move v1 compatibility)
+    //
+
+    public fun feature_purchase_id(): u64 {
+        FEATURE_PURCHASE
+    }
+
+    public fun feature_close_id(): u64 {
+        FEATURE_CLOSE
+    }
+
+    public fun feature_draw_id(): u64 {
+        FEATURE_DRAW
+    }
+
+    public fun feature_payout_id(): u64 {
+        FEATURE_PAYOUT
+    }
 }
+

@@ -5,19 +5,21 @@ module lottery_multi::sales {
     use std::signer;
     use std::table;
     use std::vector;
+    use supra_framework::account;
     use supra_framework::event;
 
     use lottery_multi::economics;
     use lottery_multi::errors;
     use lottery_multi::history;
     use lottery_multi::feature_switch;
-    use lottery_multi::registry;
+    use lottery_multi::lottery_registry;
+    use lottery_multi::math;
     use lottery_multi::roles;
     use lottery_multi::types;
 
     const PURCHASE_EVENT_VERSION_V1: u16 = 1;
     const RATE_LIMIT_EVENT_VERSION_V1: u16 = 1;
-    const EVENT_CATEGORY_SALES: u8 = history::EVENT_CATEGORY_SALES;
+    const EVENT_CATEGORY_SALES: u8 = 3;
     const CHUNK_CAPACITY: u64 = 256;
     const MAX_TICKETS_PER_TX: u64 = 128;
     const MAX_PURCHASES_PER_BLOCK: u64 = 64;
@@ -36,30 +38,36 @@ module lottery_multi::sales {
         buyers: vector<address>,
     }
 
-    pub struct TicketPurchaseEvent has drop, store {
-        pub event_version: u16,
-        pub event_category: u8,
-        pub lottery_id: u64,
-        pub buyer: address,
-        pub quantity: u64,
-        pub sale_amount: u64,
-        pub prize_allocation: u64,
-        pub jackpot_allocation: u64,
-        pub operations_allocation: u64,
-        pub reserve_allocation: u64,
-        pub tickets_sold: u64,
-        pub proceeds_accum: u64,
+    struct ChunkSnapshot has copy, drop, store {
+        chunk_seq: u64,
+        start_index: u64,
+        buyers: vector<address>,
     }
 
-    pub struct RefundProgressView has copy, drop, store {
-        pub active: bool,
-        pub refund_round: u64,
-        pub tickets_refunded: u64,
-        pub prize_refunded: u64,
-        pub operations_refunded: u64,
-        pub last_refund_ts: u64,
-        pub tickets_sold: u64,
-        pub proceeds_accum: u64,
+    struct TicketPurchaseEvent has drop, store {
+        event_version: u16,
+        event_category: u8,
+        lottery_id: u64,
+        buyer: address,
+        quantity: u64,
+        sale_amount: u64,
+        prize_allocation: u64,
+        jackpot_allocation: u64,
+        operations_allocation: u64,
+        reserve_allocation: u64,
+        tickets_sold: u64,
+        proceeds_accum: u64,
+    }
+
+    struct RefundProgressView has copy, drop, store {
+        active: bool,
+        refund_round: u64,
+        tickets_refunded: u64,
+        prize_refunded: u64,
+        operations_refunded: u64,
+        last_refund_ts: u64,
+        tickets_sold: u64,
+        proceeds_accum: u64,
     }
 
     struct RateTrack has store {
@@ -96,12 +104,12 @@ module lottery_multi::sales {
 
     public entry fun init_sales(admin: &signer) {
         let addr = signer::address_of(admin);
-        assert!(addr == @lottery_multi, errors::E_REGISTRY_MISSING);
-        assert!(!exists<SalesLedger>(addr), errors::E_ALREADY_INITIALIZED);
+        assert!(addr == @lottery_multi, errors::err_registry_missing());
+        assert!(!exists<SalesLedger>(addr), errors::err_already_initialized());
         let ledger = SalesLedger {
             states: table::new(),
-            purchase_events: event::new_event_handle<TicketPurchaseEvent>(admin),
-            rate_limit_events: event::new_event_handle<PurchaseRateLimitHitEvent>(admin),
+            purchase_events: account::new_event_handle<TicketPurchaseEvent>(admin),
+            rate_limit_events: account::new_event_handle<history::PurchaseRateLimitHitEvent>(admin),
         };
         move_to(admin, ledger);
     }
@@ -112,7 +120,7 @@ module lottery_multi::sales {
         quantity: u64,
         now_ts: u64,
         current_block: u64,
-    ) acquires SalesLedger, registry::Registry {
+    ) acquires SalesLedger {
         purchase_internal(buyer, lottery_id, quantity, now_ts, current_block, false);
     }
 
@@ -121,13 +129,11 @@ module lottery_multi::sales {
         lottery_id: u64,
         quantity: u64,
         now_ts: u64,
-        premium_cap: &roles::PremiumAccessCap,
         current_block: u64,
-    ) acquires SalesLedger, registry::Registry {
+    ) acquires SalesLedger {
         let buyer_addr = signer::address_of(buyer);
-        assert!(premium_cap.holder == buyer_addr, errors::E_PREMIUM_CAP_MISMATCH);
-        let active = roles::is_premium_active(premium_cap, now_ts);
-        assert!(active, errors::E_PREMIUM_CAP_EXPIRED);
+        assert!(roles::has_premium_cap(buyer_addr), errors::err_premium_cap_missing());
+        roles::assert_premium_active(buyer_addr, now_ts);
         purchase_internal(buyer, lottery_id, quantity, now_ts, current_block, true);
     }
 
@@ -138,38 +144,41 @@ module lottery_multi::sales {
         now_ts: u64,
         current_block: u64,
         has_premium: bool,
-    ) acquires SalesLedger, registry::Registry {
-        assert!(quantity > 0, errors::E_PURCHASE_QTY_ZERO);
-        assert!(quantity <= MAX_TICKETS_PER_TX, errors::E_PURCHASE_QTY_LIMIT);
+    ) acquires SalesLedger {
+        assert!(quantity > 0, errors::err_purchase_qty_zero());
+        assert!(quantity <= MAX_TICKETS_PER_TX, errors::err_purchase_qty_limit());
 
         if (feature_switch::is_initialized()) {
-            let enabled = feature_switch::is_enabled(feature_switch::FEATURE_PURCHASE, has_premium);
-            assert!(enabled, errors::E_FEATURE_DISABLED);
+            let enabled = feature_switch::is_enabled(feature_switch::feature_purchase_id(), has_premium);
+            assert!(enabled, errors::err_feature_disabled());
         };
 
-        let status = registry::get_status(lottery_id);
-        assert!(status == types::STATUS_ACTIVE, errors::E_LOTTERY_NOT_ACTIVE);
-        let config = registry::borrow_config(lottery_id);
-        assert!(
-            now_ts >= config.sales_window.sales_start && now_ts <= config.sales_window.sales_end,
-            errors::E_SALES_WINDOW_CLOSED,
-        );
+        let status = lottery_registry::get_status(lottery_id);
+        assert!(status == types::status_active(), errors::err_lottery_not_active());
+        let sales_window = lottery_registry::sales_window_view(lottery_id);
+        let sales_start = types::sales_window_start(&sales_window);
+        let sales_end = types::sales_window_end(&sales_window);
+        assert!(now_ts >= sales_start && now_ts <= sales_end, errors::err_sales_window_closed());
+        let ticket_price = lottery_registry::ticket_price(lottery_id);
+        let ticket_limits = lottery_registry::ticket_limits(lottery_id);
+        let distribution = lottery_registry::sales_distribution_view(lottery_id);
 
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<SalesLedger>(ledger_addr);
         let purchase_events_ref = &mut ledger.purchase_events;
         let rate_limit_events_ref = &mut ledger.rate_limit_events;
         let states_ref = &mut ledger.states;
         let state = borrow_or_create_state(
             states_ref,
             lottery_id,
-            config.ticket_price,
-            &config.sales_distribution,
+            ticket_price,
+            &distribution,
         );
 
         let buyer_addr = signer::address_of(buyer);
         let existing = per_address_count(state, buyer_addr);
 
-        let grace_reason = check_grace_window(existing, now_ts, config.sales_window.sales_end, has_premium);
+        let grace_reason = check_grace_window(existing, now_ts, sales_end, has_premium);
         if (grace_reason != 0) {
             emit_rate_limit_event(
                 rate_limit_events_ref,
@@ -179,7 +188,7 @@ module lottery_multi::sales {
                 current_block,
                 grace_reason,
             );
-            abort errors::E_PURCHASE_GRACE_RESTRICTED;
+            abort errors::err_purchase_grace_restricted()
         };
 
         let rate_reason = check_and_update_rate_limits(state, buyer_addr, now_ts, current_block);
@@ -193,14 +202,14 @@ module lottery_multi::sales {
                 rate_reason,
             );
             if (rate_reason == RATE_LIMIT_REASON_BLOCK) {
-                abort errors::E_PURCHASE_RATE_LIMIT_BLOCK;
+                abort errors::err_purchase_rate_limit_block()
             } else {
-                abort errors::E_PURCHASE_RATE_LIMIT_WINDOW;
-            };
+                abort errors::err_purchase_rate_limit_window()
+            }
         };
 
-        assert_total_limit(state, &config.ticket_limits, quantity);
-        assert_address_limit(&config.ticket_limits, existing, quantity);
+        assert_total_limit(state, &ticket_limits, quantity);
+        assert_address_limit(&ticket_limits, existing, quantity);
         update_per_address(state, buyer_addr, existing, quantity);
 
         append_tickets(state, lottery_id, buyer_addr, quantity);
@@ -213,8 +222,8 @@ module lottery_multi::sales {
         ) = apply_sale(
             state,
             quantity,
-            config.ticket_price,
-            &config.sales_distribution,
+            ticket_price,
+            &distribution,
             now_ts,
         );
 
@@ -250,7 +259,7 @@ module lottery_multi::sales {
                 tickets_per_address: table::new(),
                 ticket_chunks: table::new(),
                 rate_track: table::new(),
-                distribution: copy *distribution,
+                distribution: economics::clone_sales_distribution(distribution),
                 accounting: economics::new_accounting(),
                 refund_active: false,
                 refund_round: 0,
@@ -285,8 +294,8 @@ module lottery_multi::sales {
     }
 
     fun append_tickets(state: &mut SalesState, lottery_id: u64, buyer: address, quantity: u64) {
-        let mut remaining = quantity;
-        let mut inserted = 0u64;
+        let remaining = quantity;
+        let inserted = 0u64;
         while (remaining > 0) {
             let chunk_seq = state.next_chunk_seq;
             if (!table::contains(&state.ticket_chunks, chunk_seq)) {
@@ -298,7 +307,7 @@ module lottery_multi::sales {
                 };
                 table::add(&mut state.ticket_chunks, chunk_seq, chunk);
             };
-            let mut advance_seq = false;
+            let advance_seq = false;
             {
                 let chunk_ref = table::borrow_mut(&mut state.ticket_chunks, chunk_seq);
                 let current_len = vector::length(&chunk_ref.buyers);
@@ -307,7 +316,7 @@ module lottery_multi::sales {
                 } else {
                     let capacity = CHUNK_CAPACITY - current_len;
                     let take = if (remaining < capacity) { remaining } else { capacity };
-                    let mut idx = 0u64;
+                    let idx = 0u64;
                     while (idx < take) {
                         vector::push_back(&mut chunk_ref.buyers, buyer);
                         idx = idx + 1;
@@ -328,11 +337,11 @@ module lottery_multi::sales {
     public fun snapshot_for_draw(lottery_id: u64): (vector<u8>, u64, u64) acquires SalesLedger {
         let ledger_addr = @lottery_multi;
         if (!exists<SalesLedger>(ledger_addr)) {
-            return (hash::sha3_256(b"lottery_multi::snapshot_empty"), 0, 0);
+            return (hash::sha3_256(b"lottery_multi::snapshot_empty"), 0, 0)
         };
         let ledger = borrow_global<SalesLedger>(ledger_addr);
         if (!table::contains(&ledger.states, lottery_id)) {
-            return (hash::sha3_256(b"lottery_multi::snapshot_empty"), 0, 0);
+            return (hash::sha3_256(b"lottery_multi::snapshot_empty"), 0, 0)
         };
         let state = table::borrow(&ledger.states, lottery_id);
         let snapshot_hash = compute_snapshot_hash(state);
@@ -342,24 +351,24 @@ module lottery_multi::sales {
     public fun accounting_snapshot(lottery_id: u64): economics::Accounting acquires SalesLedger {
         let ledger_addr = @lottery_multi;
         if (!exists<SalesLedger>(ledger_addr)) {
-            abort errors::E_REGISTRY_MISSING;
+            abort errors::err_registry_missing()
         };
         let ledger = borrow_global<SalesLedger>(ledger_addr);
         if (!table::contains(&ledger.states, lottery_id)) {
-            abort errors::E_REGISTRY_MISSING;
+            abort errors::err_registry_missing()
         };
         let state = table::borrow(&ledger.states, lottery_id);
-        copy state.accounting
+        economics::clone_accounting(&state.accounting)
     }
 
     public fun sales_totals(lottery_id: u64): (u64, u64, u64) acquires SalesLedger {
         let ledger_addr = @lottery_multi;
         if (!exists<SalesLedger>(ledger_addr)) {
-            abort errors::E_REGISTRY_MISSING;
+            abort errors::err_registry_missing()
         };
         let ledger = borrow_global<SalesLedger>(ledger_addr);
         if (!table::contains(&ledger.states, lottery_id)) {
-            abort errors::E_REGISTRY_MISSING;
+            abort errors::err_registry_missing()
         };
         let state = table::borrow(&ledger.states, lottery_id);
         (state.tickets_sold, state.proceeds_accum, state.last_purchase_ts)
@@ -368,7 +377,7 @@ module lottery_multi::sales {
     public fun has_state(lottery_id: u64): bool acquires SalesLedger {
         let ledger_addr = @lottery_multi;
         if (!exists<SalesLedger>(ledger_addr)) {
-            return false;
+            return false
         };
         let ledger = borrow_global<SalesLedger>(ledger_addr);
         table::contains(&ledger.states, lottery_id)
@@ -379,9 +388,10 @@ module lottery_multi::sales {
         prize_paid: u64,
         operations_paid: u64,
     ) acquires SalesLedger {
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<SalesLedger>(ledger_addr);
         if (!table::contains(&ledger.states, lottery_id)) {
-            abort errors::E_REGISTRY_MISSING;
+            abort errors::err_registry_missing()
         };
         let state = table::borrow_mut(&mut ledger.states, lottery_id);
         if (prize_paid > 0) {
@@ -395,17 +405,17 @@ module lottery_multi::sales {
     public fun ticket_owner(lottery_id: u64, ticket_index: u64): address acquires SalesLedger {
         let ledger_addr = @lottery_multi;
         if (!exists<SalesLedger>(ledger_addr)) {
-            abort errors::E_WINNER_INDEX_OUT_OF_RANGE;
+            abort errors::err_winner_index_out_of_range()
         };
         let ledger = borrow_global<SalesLedger>(ledger_addr);
         if (!table::contains(&ledger.states, lottery_id)) {
-            abort errors::E_WINNER_INDEX_OUT_OF_RANGE;
+            abort errors::err_winner_index_out_of_range()
         };
         let state = table::borrow(&ledger.states, lottery_id);
         if (ticket_index >= state.tickets_sold) {
-            abort errors::E_WINNER_INDEX_OUT_OF_RANGE;
+            abort errors::err_winner_index_out_of_range()
         };
-        let mut seq = 0u64;
+        let seq = 0u64;
         while (seq <= state.next_chunk_seq) {
             if (table::contains(&state.ticket_chunks, seq)) {
                 let chunk = table::borrow(&state.ticket_chunks, seq);
@@ -414,29 +424,33 @@ module lottery_multi::sales {
                 if (ticket_index >= start && ticket_index < start + len) {
                     let offset = ticket_index - start;
                     let buyer = *vector::borrow(&chunk.buyers, offset);
-                    return buyer;
+                    return buyer
                 };
             };
             seq = seq + 1;
         };
-        abort errors::E_WINNER_INDEX_OUT_OF_RANGE;
+        abort errors::err_winner_index_out_of_range()
     }
 
     fun compute_snapshot_hash(state: &SalesState): vector<u8> {
-        let mut digest = hash::sha3_256(b"lottery_multi::snapshot_seed");
-        let mut seq = 0u64;
+        let digest = hash::sha3_256(b"lottery_multi::snapshot_seed");
+        let seq = 0u64;
         while (seq < state.next_chunk_seq) {
             if (table::contains(&state.ticket_chunks, seq)) {
                 let chunk = table::borrow(&state.ticket_chunks, seq);
-                let tuple = (chunk.chunk_seq, chunk.start_index, copy chunk.buyers);
-                let chunk_bytes = bcs::to_bytes(&tuple);
-                let mut combined = copy digest;
+                let chunk_view = ChunkSnapshot {
+                    chunk_seq: chunk.chunk_seq,
+                    start_index: chunk.start_index,
+                    buyers: clone_address_vector(&chunk.buyers),
+                };
+                let chunk_bytes = bcs::to_bytes(&chunk_view);
+                let combined = copy digest;
                 vector::append(&mut combined, chunk_bytes);
                 digest = hash::sha3_256(combined);
             };
             seq = seq + 1;
         };
-        let mut combined_totals = copy digest;
+        let combined_totals = copy digest;
         let tickets_bytes = bcs::to_bytes(&state.tickets_sold);
         vector::append(&mut combined_totals, tickets_bytes);
         let proceeds_bytes = bcs::to_bytes(&state.proceeds_accum);
@@ -457,9 +471,11 @@ module lottery_multi::sales {
     ): (u64, u64, u64, u64, u64) {
         let total_after = state.tickets_sold + quantity;
         state.tickets_sold = total_after;
-        let sale_amount_u128 = (quantity as u128) * (ticket_price as u128);
-        assert!(sale_amount_u128 <= 0xFFFFFFFFFFFFFFFF, errors::E_AMOUNT_OVERFLOW);
-        let sale_amount = sale_amount_u128 as u64;
+        let sale_amount_u128 =
+            math::widen_u128_from_u64(quantity) * math::widen_u128_from_u64(ticket_price);
+        assert!(sale_amount_u128 <= 0xFFFFFFFFFFFFFFFF, errors::err_amount_overflow());
+        let sale_amount =
+            math::checked_u64_from_u128(sale_amount_u128, errors::err_amount_overflow());
         state.proceeds_accum = state.proceeds_accum + sale_amount;
         state.last_purchase_ts = now_ts;
         let (prize, jackpot, operations, reserve) =
@@ -510,15 +526,13 @@ module lottery_multi::sales {
         current_block: u64,
         reason: u8,
     ) {
-        let event = history::PurchaseRateLimitHitEvent {
-            event_version: RATE_LIMIT_EVENT_VERSION_V1,
-            event_category: EVENT_CATEGORY_SALES,
+        let event = history::new_purchase_rate_limit_hit_event(
             lottery_id,
             buyer,
-            timestamp: now_ts,
+            now_ts,
             current_block,
-            reason_code: reason,
-        };
+            reason,
+        );
         event::emit_event(rate_limit_events, event);
     }
 
@@ -528,20 +542,20 @@ module lottery_multi::sales {
         now_ts: u64,
         current_block: u64,
     ): u8 {
-        let mut block_count = state.block_purchase_count;
-        let mut last_block = state.last_purchase_block;
+        let block_count = state.block_purchase_count;
+        let last_block = state.last_purchase_block;
         if (last_block != current_block) {
             last_block = current_block;
             block_count = 0;
         };
         if (block_count + 1 > MAX_PURCHASES_PER_BLOCK) {
-            return RATE_LIMIT_REASON_BLOCK;
+            return RATE_LIMIT_REASON_BLOCK
         };
         block_count = block_count + 1;
 
-        let mut window_start = now_ts;
-        let mut purchase_count = 0u64;
-        let mut has_track = false;
+        let window_start = now_ts;
+        let purchase_count = 0u64;
+        let has_track = false;
         if (table::contains(&state.rate_track, buyer)) {
             {
                 let track_ref = table::borrow(&state.rate_track, buyer);
@@ -555,7 +569,7 @@ module lottery_multi::sales {
             purchase_count = 0;
         };
         if (purchase_count + 1 > MAX_PURCHASES_PER_WINDOW) {
-            return RATE_LIMIT_REASON_WINDOW;
+            return RATE_LIMIT_REASON_WINDOW
         };
         purchase_count = purchase_count + 1;
 
@@ -583,37 +597,42 @@ module lottery_multi::sales {
         has_premium: bool,
     ): u8 {
         if (has_premium) {
-            return 0;
+            return 0
         };
         if (sales_end <= GRACE_WINDOW_SECS) {
-            return 0;
+            return 0
         };
         if (now_ts + GRACE_WINDOW_SECS >= sales_end && existing == 0) {
-            return RATE_LIMIT_REASON_GRACE;
+            return RATE_LIMIT_REASON_GRACE
         };
         0
     }
 
     fun assert_total_limit(state: &SalesState, limits: &types::TicketLimits, quantity: u64) {
-        let total_limit = limits.max_tickets_total;
+        let total_limit = types::ticket_limits_total(limits);
         if (total_limit > 0) {
             let total_after = state.tickets_sold + quantity;
-            assert!(total_after <= total_limit, errors::E_PURCHASE_TOTAL_LIMIT);
+            assert!(total_after <= total_limit, errors::err_purchase_total_limit());
         };
     }
 
     fun assert_address_limit(limits: &types::TicketLimits, current: u64, quantity: u64) {
-        let per_limit = limits.max_tickets_per_address;
+        let per_limit = types::ticket_limits_per_address(limits);
         if (per_limit > 0) {
-            let sum = (current as u128) + (quantity as u128);
-            assert!(sum <= (per_limit as u128), errors::E_PURCHASE_ADDRESS_LIMIT);
+            let sum =
+                math::widen_u128_from_u64(current) + math::widen_u128_from_u64(quantity);
+            assert!(
+                sum <= math::widen_u128_from_u64(per_limit),
+                errors::err_purchase_address_limit(),
+            );
         };
     }
 
     public fun begin_refund(lottery_id: u64) acquires SalesLedger {
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<SalesLedger>(ledger_addr);
         if (!table::contains(&ledger.states, lottery_id)) {
-            return;
+            return
         };
         let state = table::borrow_mut(&mut ledger.states, lottery_id);
         if (!state.refund_active) {
@@ -636,25 +655,26 @@ module lottery_multi::sales {
     ): (u64, u64, u64) acquires SalesLedger {
         assert!(
             tickets_refunded > 0 || prize_refund > 0 || operations_refund > 0,
-            errors::E_REFUND_BATCH_EMPTY,
+            errors::err_refund_batch_empty(),
         );
-        let ledger = borrow_ledger_mut();
+        let ledger_addr = ledger_addr_or_abort();
+        let ledger = borrow_global_mut<SalesLedger>(ledger_addr);
         if (!table::contains(&ledger.states, lottery_id)) {
-            abort errors::E_REFUND_STATUS_INVALID;
+            abort errors::err_refund_status_invalid()
         };
         let state = table::borrow_mut(&mut ledger.states, lottery_id);
-        assert!(state.refund_active, errors::E_REFUND_NOT_ACTIVE);
-        assert!(refund_round == state.refund_round + 1, errors::E_REFUND_ROUND_NON_MONOTONIC);
+        assert!(state.refund_active, errors::err_refund_not_active());
+        assert!(refund_round == state.refund_round + 1, errors::err_refund_round_non_monotonic());
         if (state.last_refund_ts > 0) {
-            assert!(timestamp >= state.last_refund_ts, errors::E_REFUND_TIMESTAMP);
+            assert!(timestamp >= state.last_refund_ts, errors::err_refund_timestamp());
         };
         let processed_after = state.refund_tickets_processed + tickets_refunded;
-        assert!(processed_after <= state.tickets_sold, errors::E_REFUND_LIMIT_TICKETS);
+        assert!(processed_after <= state.tickets_sold, errors::err_refund_limit_tickets());
         let total_refund_after = state.refund_prize_total
             + state.refund_operations_total
             + prize_refund
             + operations_refund;
-        assert!(total_refund_after <= state.proceeds_accum, errors::E_REFUND_LIMIT_FUNDS);
+        assert!(total_refund_after <= state.proceeds_accum, errors::err_refund_limit_funds());
 
         state.refund_tickets_processed = processed_after;
         state.refund_prize_total = state.refund_prize_total + prize_refund;
@@ -669,7 +689,7 @@ module lottery_multi::sales {
         )
     }
 
-    pub fun refund_progress(lottery_id: u64): RefundProgressView acquires SalesLedger {
+    public fun refund_progress(lottery_id: u64): RefundProgressView acquires SalesLedger {
         let addr = @lottery_multi;
         if (!exists<SalesLedger>(addr)) {
             return RefundProgressView {
@@ -681,7 +701,7 @@ module lottery_multi::sales {
                 last_refund_ts: 0,
                 tickets_sold: 0,
                 proceeds_accum: 0,
-            };
+            }
         };
         let ledger = borrow_global<SalesLedger>(addr);
         if (!table::contains(&ledger.states, lottery_id)) {
@@ -694,7 +714,7 @@ module lottery_multi::sales {
                 last_refund_ts: 0,
                 tickets_sold: 0,
                 proceeds_accum: 0,
-            };
+            }
         };
         let state = table::borrow(&ledger.states, lottery_id);
         RefundProgressView {
@@ -709,11 +729,59 @@ module lottery_multi::sales {
         }
     }
 
-    fun borrow_ledger_mut(): &mut SalesLedger acquires SalesLedger {
+    //
+    // Refund progress helpers (Move v1 compatibility)
+    //
+
+    public fun refund_view_active(view: &RefundProgressView): bool {
+        view.active
+    }
+
+    public fun refund_view_tickets_sold(view: &RefundProgressView): u64 {
+        view.tickets_sold
+    }
+
+    public fun refund_view_tickets_refunded(view: &RefundProgressView): u64 {
+        view.tickets_refunded
+    }
+
+    public fun refund_view_proceeds_accum(view: &RefundProgressView): u64 {
+        view.proceeds_accum
+    }
+
+    public fun refund_view_refund_round(view: &RefundProgressView): u64 {
+        view.refund_round
+    }
+
+    public fun refund_view_last_refund_ts(view: &RefundProgressView): u64 {
+        view.last_refund_ts
+    }
+
+    public fun refund_view_prize_refunded(view: &RefundProgressView): u64 {
+        view.prize_refunded
+    }
+
+    public fun refund_view_operations_refunded(view: &RefundProgressView): u64 {
+        view.operations_refunded
+    }
+
+    fun ledger_addr_or_abort(): address {
         let addr = @lottery_multi;
         if (!exists<SalesLedger>(addr)) {
-            abort errors::E_REGISTRY_MISSING;
+            abort errors::err_registry_missing()
         };
-        borrow_global_mut<SalesLedger>(addr)
+        addr
+    }
+
+    fun clone_address_vector(source: &vector<address>): vector<address> {
+        let len = vector::length(source);
+        let result = vector::empty<address>();
+        let i = 0u64;
+        while (i < len) {
+            let addr = *vector::borrow(source, i);
+            vector::push_back(&mut result, addr);
+            i = i + 1;
+        };
+        result
     }
 }

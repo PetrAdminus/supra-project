@@ -3,10 +3,10 @@
 | Код | Модуль | Описание |
 | --- | --- | --- |
 | `0xE_TAG_PRIMARY_TYPE` | `lottery_multi::tags` | Некорректный основной тип лотереи |
-| `0xE_CONFIG_INVALID_DISTRIBUTION` | `lottery_multi::registry` | Сумма распределений продаж не равна 10_000 bps |
+| `0xE_CONFIG_INVALID_DISTRIBUTION` | `lottery_multi::lottery_registry` | Сумма распределений продаж не равна 10_000 bps |
 | `0xE_SNAPSHOT_FROZEN` | `lottery_multi::sales` | Попытка изменить билеты после фиксации снапшота |
-| `0xE_CANCEL_REASON_INVALID` | `lottery_multi::registry` | Попытка отмены без указания причины |
-| `0xE_CANCELLATION_RECORD_MISSING` | `lottery_multi::registry` | Попытка архивировать отмену без сохранённого `CancellationRecord` |
+| `0xE_CANCEL_REASON_INVALID` | `lottery_multi::lottery_registry` | Попытка отмены без указания причины |
+| `0xE_CANCELLATION_RECORD_MISSING` | `lottery_multi::lottery_registry` | Попытка архивировать отмену без сохранённого `CancellationRecord` |
 | `0xE_VRF_PAYLOAD_SCHEMA` | `lottery_multi::types` | Payload VRF не соответствует текущей схеме |
 | `0xE_VRF_CONSUMED` | `lottery_multi::draw` | Повторный fulfill для уже обработанного запроса |
 | `0xE_WINNER_CURSOR_STALE` | `lottery_multi::payouts` | Батч победителей запущен с устаревшей позиции |
@@ -30,3 +30,4 @@
 | `0xE_AUTOMATION_LOCKED` | `lottery_multi::automation` | Нарушен таймлок или недостаточная репутация бота |
 
 Полный перечень ошибок хранится в `SupraLottery/supra/move_workspace/lottery_multi/sources/errors.move`.
+
