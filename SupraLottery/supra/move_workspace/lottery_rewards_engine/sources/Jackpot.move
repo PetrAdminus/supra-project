@@ -22,6 +22,14 @@ module lottery_rewards_engine::jackpot {
 
     const RANDOMNESS_WINDOW: u64 = 8;
 
+    public struct LegacyJackpotRuntime has drop, store {
+        lottery_id: u64,
+        tickets: vector<address>,
+        draw_scheduled: bool,
+        pending_request_id: option::Option<u64>,
+        pending_payload: option::Option<vector<u8>>,
+    }
+
     public entry fun register_lottery(caller: &signer, lottery_id: u64)
     acquires instances::InstanceRegistry, jackpot::JackpotRegistry {
         ensure_admin(caller);
@@ -111,6 +119,20 @@ module lottery_rewards_engine::jackpot {
         );
 
         vrf_hub::record_fulfillment(request_id, lottery_id, randomness);
+    }
+
+    public entry fun import_existing_jackpot(caller: &signer, payload: LegacyJackpotRuntime)
+    acquires instances::InstanceRegistry, jackpot::JackpotRegistry {
+        ensure_admin(caller);
+        upsert_legacy_jackpot(payload);
+    }
+
+    public entry fun import_existing_jackpots(
+        caller: &signer,
+        mut payloads: vector<LegacyJackpotRuntime>,
+    ) acquires instances::InstanceRegistry, jackpot::JackpotRegistry {
+        ensure_admin(caller);
+        import_existing_jackpots_recursive(&mut payloads);
     }
 
     fun ensure_admin(caller: &signer) acquires instances::InstanceRegistry {
@@ -261,5 +283,39 @@ module lottery_rewards_engine::jackpot {
         vector::push_back(buffer, byte);
         let next_index = index + 1;
         clone_into(buffer, data, next_index, len);
+    }
+
+    fun import_existing_jackpots_recursive(payloads: &mut vector<LegacyJackpotRuntime>)
+    acquires instances::InstanceRegistry, jackpot::JackpotRegistry {
+        if (vector::is_empty(payloads)) {
+            return;
+        };
+        let payload = vector::pop_back(payloads);
+        import_existing_jackpots_recursive(payloads);
+        upsert_legacy_jackpot(payload);
+    }
+
+    fun upsert_legacy_jackpot(payload: LegacyJackpotRuntime)
+    acquires instances::InstanceRegistry, jackpot::JackpotRegistry {
+        let LegacyJackpotRuntime {
+            lottery_id,
+            tickets,
+            draw_scheduled,
+            pending_request_id,
+            pending_payload,
+        } = payload;
+        ensure_lottery_exists(lottery_id);
+        let registry = jackpot::borrow_registry_mut(@lottery);
+        if (!jackpot::is_registered(registry, lottery_id)) {
+            jackpot::register_jackpot(registry, lottery_id);
+        };
+        jackpot::restore_runtime(
+            registry,
+            lottery_id,
+            tickets,
+            draw_scheduled,
+            pending_request_id,
+            pending_payload,
+        );
     }
 }

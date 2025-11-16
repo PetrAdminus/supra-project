@@ -20,6 +20,11 @@ module lottery_utils::metadata {
         rules_uri: vector<u8>,
     }
 
+    struct LegacyMetadataImport has copy, drop, store {
+        lottery_id: u64,
+        metadata: LotteryMetadata,
+    }
+
     struct MetadataRegistry has key {
         admin: address,
         entries: table::Table<u64, LotteryMetadata>,
@@ -192,6 +197,36 @@ module lottery_utils::metadata {
             },
         );
         emit_snapshot_with_previous(registry, previous_snapshot);
+    }
+
+    public entry fun import_existing_metadata(
+        caller: &signer,
+        entry: LegacyMetadataImport,
+    ) acquires MetadataRegistry {
+        ensure_admin(caller);
+        upsert_metadata_struct(caller, entry.lottery_id, entry.metadata);
+    }
+
+    public entry fun import_existing_metadata_batch(
+        caller: &signer,
+        entries: vector<LegacyMetadataImport>,
+    ) acquires MetadataRegistry {
+        ensure_admin(caller);
+        import_existing_batch_recursive(caller, &entries, vector::length(&entries));
+    }
+
+    fun import_existing_batch_recursive(
+        caller: &signer,
+        entries: &vector<LegacyMetadataImport>,
+        remaining: u64,
+    ) acquires MetadataRegistry {
+        if (remaining == 0) {
+            return;
+        };
+        let next_remaining = remaining - 1;
+        import_existing_batch_recursive(caller, entries, next_remaining);
+        let entry = *vector::borrow(entries, next_remaining);
+        upsert_metadata_struct(caller, entry.lottery_id, entry.metadata);
     }
 
     public entry fun remove_metadata(caller: &signer, lottery_id: u64) acquires MetadataRegistry {

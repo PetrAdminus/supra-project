@@ -12,6 +12,10 @@ module lottery_data::payouts {
     const E_PAYOUT_UNKNOWN: u64 = 3;
     const E_STATUS_MISMATCH: u64 = 4;
     const E_NO_PENDING: u64 = 5;
+    const E_UNAUTHORIZED: u64 = 6;
+    const E_PAYOUT_ALREADY_EXISTS: u64 = 7;
+    const E_INVALID_STATUS: u64 = 8;
+    const E_INVALID_REFUND: u64 = 9;
 
     const STATUS_PENDING: u8 = 1;
     const STATUS_PAID: u8 = 2;
@@ -36,6 +40,20 @@ module lottery_data::payouts {
         refunded_count: u64,
         payouts: table::Table<u64, PayoutRecord>,
         payout_ids: vector<u64>,
+    }
+
+    public struct LegacyPayoutRecord has drop, store {
+        payout_id: u64,
+        lottery_id: u64,
+        round_number: u64,
+        winner: address,
+        ticket_index: u64,
+        amount: u64,
+        status: u8,
+        randomness_hash: vector<u8>,
+        payload_hash: vector<u8>,
+        refund_recipient: address,
+        refund_amount: u64,
     }
 
     #[event]
@@ -123,6 +141,20 @@ module lottery_data::payouts {
         STATUS_REFUNDED
     }
 
+    public entry fun import_existing_payout(caller: &signer, record: LegacyPayoutRecord)
+    acquires PayoutLedger {
+        ensure_admin(caller);
+        upsert_legacy_payout(record);
+    }
+
+    public entry fun import_existing_payouts(
+        caller: &signer,
+        mut records: vector<LegacyPayoutRecord>,
+    ) acquires PayoutLedger {
+        ensure_admin(caller);
+        import_existing_payouts_recursive(&mut records);
+    }
+
     public fun record_draw_winner(
         lottery_id: u64,
         winner: address,
@@ -194,6 +226,12 @@ module lottery_data::payouts {
         let state_ref = table::borrow(&ledger.states, lottery_id);
         let record_ref = table::borrow(&state_ref.payouts, payout_id);
         *record_ref
+    }
+
+    fun ensure_admin(caller: &signer) acquires PayoutLedger {
+        let addr = signer::address_of(caller);
+        let ledger = borrow(@lottery);
+        assert!(addr == ledger.admin, E_UNAUTHORIZED);
     }
 
     fun ensure_state(ledger: &mut PayoutLedger, lottery_id: u64): &mut LotteryPayoutState {
@@ -307,5 +345,118 @@ module lottery_data::payouts {
         vector::push_back(copy, *vector::borrow(source, index));
         let next_index = index + 1;
         clone_bytes_into(copy, source, next_index, len);
+    }
+
+    fun import_existing_payouts_recursive(records: &mut vector<LegacyPayoutRecord>)
+    acquires PayoutLedger {
+        if (vector::is_empty(records)) {
+            return;
+        };
+        let record = vector::pop_back(records);
+        import_existing_payouts_recursive(records);
+        upsert_legacy_payout(record);
+    }
+
+    fun upsert_legacy_payout(record: LegacyPayoutRecord) acquires PayoutLedger {
+        assert!(exists<PayoutLedger>(@lottery), E_NOT_PUBLISHED);
+        let LegacyPayoutRecord {
+            payout_id,
+            lottery_id,
+            round_number,
+            winner,
+            ticket_index,
+            amount,
+            status,
+            randomness_hash,
+            payload_hash,
+            refund_recipient,
+            refund_amount,
+        } = record;
+        assert!(status == STATUS_PENDING || status == STATUS_PAID || status == STATUS_REFUNDED, E_INVALID_STATUS);
+        let ledger = borrow_mut(@lottery);
+        assert!(
+            !table::contains(&ledger.payout_index, payout_id),
+            E_PAYOUT_ALREADY_EXISTS
+        );
+
+        let randomness_for_record = randomness_hash;
+        let payload_for_record = payload_hash;
+        let randomness_event = clone_bytes(&randomness_for_record);
+        let payload_event = clone_bytes(&payload_for_record);
+
+        let state = ensure_state(ledger, lottery_id);
+        if (round_number > state.round_number) {
+            state.round_number = round_number;
+        };
+
+        let new_record = PayoutRecord {
+            payout_id,
+            lottery_id,
+            round_number,
+            winner,
+            ticket_index,
+            amount,
+            status,
+            randomness_hash: randomness_for_record,
+            payload_hash: payload_for_record,
+        };
+
+        table::add(&mut state.payouts, payout_id, new_record);
+        vector::push_back(&mut state.payout_ids, payout_id);
+        if (status == STATUS_PENDING) {
+            state.pending_count = state.pending_count + 1;
+        } else if (status == STATUS_PAID) {
+            state.paid_count = state.paid_count + 1;
+        } else {
+            state.refunded_count = state.refunded_count + 1;
+        };
+
+        table::add(&mut ledger.payout_index, payout_id, lottery_id);
+        if (payout_id >= ledger.next_payout_id) {
+            ledger.next_payout_id = payout_id + 1;
+        };
+
+        event::emit_event(
+            &mut ledger.winner_events,
+            WinnerRecordedEvent {
+                payout_id,
+                lottery_id,
+                round_number,
+                winner,
+                ticket_index,
+                amount,
+                randomness_hash: randomness_event,
+                payload_hash: payload_event,
+            },
+        );
+
+        if (status != STATUS_PENDING) {
+            event::emit_event(
+                &mut ledger.payout_events,
+                PayoutStatusUpdatedEvent {
+                    payout_id,
+                    lottery_id,
+                    round_number,
+                    previous_status: STATUS_PENDING,
+                    next_status: status,
+                },
+            );
+        };
+
+        if (status == STATUS_REFUNDED) {
+            assert!(refund_amount > 0, E_INVALID_REFUND);
+            event::emit_event(
+                &mut ledger.refund_events,
+                RefundIssuedEvent {
+                    payout_id,
+                    lottery_id,
+                    round_number,
+                    recipient: refund_recipient,
+                    amount: refund_amount,
+                },
+            );
+        } else {
+            assert!(refund_amount == 0, E_INVALID_REFUND);
+        };
     }
 }

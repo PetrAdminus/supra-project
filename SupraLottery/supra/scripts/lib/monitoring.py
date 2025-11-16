@@ -92,7 +92,7 @@ class MonitorConfig:
 
     @property
     def treasury_fa_prefix(self) -> str:
-        return f"{self.lottery_addr}::treasury_v1"
+        return f"{self.lottery_addr}::treasury"
 
     @property
     def autopurchase_prefix(self) -> str:

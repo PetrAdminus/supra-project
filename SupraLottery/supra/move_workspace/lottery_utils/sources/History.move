@@ -43,6 +43,17 @@ module lottery_utils::history {
         timestamp_seconds: u64,
     }
 
+    struct LegacyHistoryRecord has drop, store {
+        lottery_id: u64,
+        request_id: u64,
+        winner: address,
+        ticket_index: u64,
+        prize_amount: u64,
+        random_bytes: vector<u8>,
+        payload: vector<u8>,
+        timestamp_seconds: u64,
+    }
+
     struct LotteryHistorySnapshot has copy, drop, store {
         lottery_id: u64,
         records: vector<DrawRecord>,
@@ -180,6 +191,22 @@ module lottery_utils::history {
         replay_pending_records(cap_ref, &mut pending);
     }
 
+    public entry fun import_existing_history_record(
+        caller: &signer,
+        record: LegacyHistoryRecord,
+    ) acquires HistoryCollection {
+        ensure_admin(caller);
+        append_imported_history_record(record);
+    }
+
+    public entry fun import_existing_history_batch(
+        caller: &signer,
+        mut records: vector<LegacyHistoryRecord>,
+    ) acquires HistoryCollection {
+        ensure_admin(caller);
+        import_history_batch_recursive(&mut records);
+    }
+
     #[view]
     public fun has_history(lottery_id: u64): bool acquires HistoryCollection {
         if (!exists<HistoryCollection>(@lottery)) {
@@ -305,10 +332,9 @@ module lottery_utils::history {
             return;
         };
         let state = borrow_global_mut<HistoryCollection>(@lottery);
-        let previous = option::some(build_snapshot_from_mut(state));
-        let history = borrow_or_create_history(state, lottery_id);
         let timestamp_seconds = timestamp::now_seconds();
-        let record = DrawRecord {
+        append_history_record(
+            state,
             lottery_id,
             request_id,
             winner,
@@ -317,21 +343,7 @@ module lottery_utils::history {
             random_bytes,
             payload,
             timestamp_seconds,
-        };
-        vector::push_back(&mut history.records, record);
-        trim_history(&mut history.records);
-        event::emit_event(
-            &mut state.record_events,
-            DrawRecordedEvent {
-                lottery_id,
-                request_id,
-                winner,
-                ticket_index,
-                prize_amount,
-                timestamp_seconds,
-            },
         );
-        emit_history_snapshot_with_previous(state, previous);
     }
 
     fun replay_pending_records(
@@ -362,6 +374,80 @@ module lottery_utils::history {
             payload,
         );
         replay_pending_records(cap, pending);
+    }
+
+    fun append_imported_history_record(record: LegacyHistoryRecord) acquires HistoryCollection {
+        let LegacyHistoryRecord {
+            lottery_id,
+            request_id,
+            winner,
+            ticket_index,
+            prize_amount,
+            random_bytes,
+            payload,
+            timestamp_seconds,
+        } = record;
+        let state = borrow_global_mut<HistoryCollection>(@lottery);
+        append_history_record(
+            state,
+            lottery_id,
+            request_id,
+            winner,
+            ticket_index,
+            prize_amount,
+            random_bytes,
+            payload,
+            timestamp_seconds,
+        );
+    }
+
+    fun import_history_batch_recursive(records: &mut vector<LegacyHistoryRecord>)
+    acquires HistoryCollection {
+        if (vector::is_empty(records)) {
+            return;
+        };
+        let record = vector::pop_back(records);
+        import_history_batch_recursive(records);
+        append_imported_history_record(record);
+    }
+
+    fun append_history_record(
+        state: &mut HistoryCollection,
+        lottery_id: u64,
+        request_id: u64,
+        winner: address,
+        ticket_index: u64,
+        prize_amount: u64,
+        random_bytes: vector<u8>,
+        payload: vector<u8>,
+        timestamp_seconds: u64,
+    ) {
+        let previous = option::some(build_snapshot_from_mut(state));
+        let history = borrow_or_create_history(state, lottery_id);
+        let record = DrawRecord {
+            lottery_id,
+            request_id,
+            winner,
+            ticket_index,
+            prize_amount,
+            random_bytes,
+            payload,
+            timestamp_seconds,
+        };
+        vector::push_back(&mut history.records, record);
+        trim_history(&mut history.records);
+        event::emit_event(
+            &mut state.record_events,
+            DrawRecordedEvent {
+                lottery_id,
+                request_id,
+                winner,
+                ticket_index,
+                prize_amount,
+                timestamp_seconds,
+            },
+        );
+        emit_history_snapshot_with_previous(state, previous);
     }
 
     fun borrow_or_create_history(

@@ -119,6 +119,10 @@ module lottery_data::jackpot {
         emit_snapshot(registry, lottery_id);
     }
 
+    public fun is_registered(registry: &JackpotRegistry, lottery_id: u64): bool {
+        table::contains(&registry.jackpots, lottery_id)
+    }
+
     public fun jackpot(registry: &JackpotRegistry, lottery_id: u64): &JackpotRuntime {
         assert!(table::contains(&registry.jackpots, lottery_id), E_JACKPOT_UNKNOWN);
         table::borrow(&registry.jackpots, lottery_id)
@@ -215,6 +219,22 @@ module lottery_data::jackpot {
                 payload: clone_bytes(payload),
             },
         );
+        emit_snapshot(registry, lottery_id);
+    }
+
+    public fun restore_runtime(
+        registry: &mut JackpotRegistry,
+        lottery_id: u64,
+        tickets: vector<address>,
+        draw_scheduled: bool,
+        pending_request: option::Option<u64>,
+        pending_payload: option::Option<vector<u8>>,
+    ) {
+        let runtime = jackpot_mut(registry, lottery_id);
+        runtime.tickets = tickets;
+        runtime.draw_scheduled = draw_scheduled;
+        runtime.pending_request = pending_request;
+        runtime.pending_payload = pending_payload;
         emit_snapshot(registry, lottery_id);
     }
 

@@ -16,6 +16,7 @@ module lottery_engine::sales {
     const E_LOTTERY_INACTIVE: u64 = 4;
     const E_TICKET_OVERFLOW: u64 = 5;
     const E_JACKPOT_OVERFLOW: u64 = 6;
+    const E_NOT_AUTHORIZED: u64 = 7;
 
     const MAX_SUPPORTED_TICKETS_PER_PURCHASE: u64 = 128;
     const BPS_DENOMINATOR: u128 = 10_000;
@@ -28,6 +29,7 @@ module lottery_engine::sales {
     ) acquires
         instances::InstanceRegistry,
         lottery_state::LotteryState,
+        rounds::PendingPurchaseQueue,
         rounds::RoundRegistry,
         treasury_multi::TreasuryState
     {
@@ -67,6 +69,8 @@ module lottery_engine::sales {
             schedule_now,
         );
         rounds::emit_snapshot(rounds_registry, lottery_id);
+
+        record_purchase_for_rewards(lottery_id, buyer, ticket_count, payment_amount);
     }
 
     fun update_instance_on_purchase(
@@ -166,6 +170,7 @@ module lottery_engine::sales {
     acquires
         instances::InstanceRegistry,
         lottery_state::LotteryState,
+        rounds::PendingPurchaseQueue,
         rounds::RoundRegistry,
         treasury_multi::TreasuryState
     {
@@ -207,7 +212,19 @@ module lottery_engine::sales {
         );
         rounds::emit_snapshot(rounds_registry, lottery_id);
 
+        record_purchase_for_rewards(lottery_id, buyer, ticket_count, payment_amount);
+
         (ticket_price, payment_amount)
+    }
+
+    public entry fun grant_bonus_tickets_admin(
+        caller: &signer,
+        lottery_id: u64,
+        player: address,
+        bonus_tickets: u64,
+    ) acquires instances::InstanceRegistry, lottery_state::LotteryState, rounds::RoundRegistry {
+        ensure_admin(caller);
+        grant_bonus_tickets_internal(lottery_id, player, bonus_tickets);
     }
 
     fun multiply(value: u64, count: u64): u64 {
@@ -302,5 +319,80 @@ module lottery_engine::sales {
                 rounds::DrawScheduleUpdatedEvent { lottery_id, draw_scheduled: true },
             );
         }
+    }
+
+    fun record_purchase_for_rewards(
+        lottery_id: u64,
+        buyer: address,
+        ticket_count: u64,
+        payment_amount: u64,
+    ) acquires rounds::PendingPurchaseQueue {
+        let queue = rounds::borrow_purchase_queue_mut(@lottery);
+        rounds::enqueue_purchase_record(queue, lottery_id, buyer, ticket_count, payment_amount);
+    }
+
+    fun grant_bonus_tickets_internal(
+        lottery_id: u64,
+        player: address,
+        remaining: u64,
+    ) acquires instances::InstanceRegistry, lottery_state::LotteryState, rounds::RoundRegistry {
+        if (remaining == 0) {
+            return;
+        };
+        let chunk = select_chunk(remaining);
+        grant_bonus_chunk(lottery_id, player, chunk);
+        let next_remaining = remaining - chunk;
+        grant_bonus_tickets_internal(lottery_id, player, next_remaining);
+    }
+
+    fun grant_bonus_chunk(
+        lottery_id: u64,
+        player: address,
+        ticket_count: u64,
+    ) acquires instances::InstanceRegistry, lottery_state::LotteryState, rounds::RoundRegistry {
+        if (ticket_count == 0) {
+            return;
+        };
+        {
+            let registry = instances::borrow_registry_mut(@lottery);
+            let record = instances::instance_mut(registry, lottery_id);
+            let new_total = add_u64(record.tickets_sold, ticket_count, E_TICKET_OVERFLOW);
+            record.tickets_sold = new_total;
+            instances::emit_snapshot(registry, lottery_id);
+        };
+        let state = lottery_state::borrow_mut(@lottery);
+        let (start_ticket_id, schedule_now) = update_lottery_runtime(
+            state,
+            lottery_id,
+            player,
+            ticket_count,
+            0,
+        );
+        lottery_state::emit_snapshot(state, lottery_id);
+        let rounds_registry = rounds::borrow_registry_mut(@lottery);
+        update_round_runtime(
+            rounds_registry,
+            lottery_id,
+            player,
+            0,
+            start_ticket_id,
+            ticket_count,
+            schedule_now,
+        );
+        rounds::emit_snapshot(rounds_registry, lottery_id);
+    }
+
+    fun select_chunk(remaining: u64): u64 {
+        if (remaining > MAX_SUPPORTED_TICKETS_PER_PURCHASE) {
+            MAX_SUPPORTED_TICKETS_PER_PURCHASE
+        } else {
+            remaining
+        }
+    }
+
+    fun ensure_admin(caller: &signer) acquires instances::InstanceRegistry {
+        let registry = instances::borrow_registry(@lottery);
+        let caller_address = signer::address_of(caller);
+        assert!(caller_address == registry.admin, E_NOT_AUTHORIZED);
     }
 }

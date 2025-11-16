@@ -13,8 +13,25 @@ module lottery_data::automation {
     const E_BOT_UNKNOWN: u64 = 4;
     const E_CAP_EXISTS: u64 = 5;
     const E_CAP_MISSING: u64 = 6;
+    const E_NOT_INITIALIZED: u64 = 7;
 
     public struct AutomationState has store {
+        allowed_actions: vector<u64>,
+        timelock_secs: u64,
+        max_failures: u64,
+        failure_count: u64,
+        success_streak: u64,
+        reputation_score: u64,
+        pending_action_hash: vector<u8>,
+        pending_execute_after: u64,
+        expires_at: u64,
+        cron_spec: vector<u8>,
+        last_action_ts: u64,
+        last_action_hash: vector<u8>,
+    }
+
+    public struct LegacyAutomationBot has drop, store {
+        operator: address,
         allowed_actions: vector<u64>,
         timelock_secs: u64,
         max_failures: u64,
@@ -143,6 +160,22 @@ module lottery_data::automation {
                 error_events: account::new_event_handle<AutomationErrorEvent>(caller),
             },
         );
+    }
+
+    public entry fun import_existing_bot(
+        caller: &signer,
+        bot: LegacyAutomationBot,
+    ) acquires AutomationRegistry {
+        ensure_registry_admin(caller);
+        upsert_legacy_bot(bot);
+    }
+
+    public entry fun import_existing_bots(
+        caller: &signer,
+        bots: vector<LegacyAutomationBot>,
+    ) acquires AutomationRegistry {
+        ensure_registry_admin(caller);
+        import_existing_bots_recursive(&bots, vector::length(&bots));
     }
 
     public fun borrow_registry(addr: address): &AutomationRegistry acquires AutomationRegistry {
@@ -382,6 +415,109 @@ module lottery_data::automation {
         };
         let registry = borrow_registry(@lottery);
         table::keys(&registry.bots)
+    }
+
+    fun import_existing_bots_recursive(
+        bots: &vector<LegacyAutomationBot>,
+        remaining: u64,
+    ) acquires AutomationRegistry {
+        if (remaining == 0) {
+            return;
+        };
+        let next_remaining = remaining - 1;
+        import_existing_bots_recursive(bots, next_remaining);
+        let bot_ref = vector::borrow(bots, next_remaining);
+        let cloned = clone_legacy_bot(bot_ref);
+        upsert_legacy_bot(cloned);
+    }
+
+    fun upsert_legacy_bot(bot: LegacyAutomationBot) acquires AutomationRegistry {
+        ensure_registry_initialized();
+        let LegacyAutomationBot {
+            operator,
+            allowed_actions,
+            timelock_secs,
+            max_failures,
+            failure_count,
+            success_streak,
+            reputation_score,
+            pending_action_hash,
+            pending_execute_after,
+            expires_at,
+            cron_spec,
+            last_action_ts,
+            last_action_hash,
+        } = bot;
+        let registry = borrow_registry_mut(@lottery);
+        let allowed_for_event = clone_u64s(&allowed_actions);
+        let cron_for_event = clone_bytes(&cron_spec);
+        let state = AutomationState {
+            allowed_actions,
+            timelock_secs,
+            max_failures,
+            failure_count,
+            success_streak,
+            reputation_score,
+            pending_action_hash,
+            pending_execute_after,
+            expires_at,
+            cron_spec,
+            last_action_ts,
+            last_action_hash,
+        };
+        if (table::contains(&registry.bots, operator)) {
+            let existing = table::borrow_mut(&mut registry.bots, operator);
+            *existing = state;
+            emit_rotated(
+                registry,
+                operator,
+                &allowed_for_event,
+                timelock_secs,
+                max_failures,
+                expires_at,
+                &cron_for_event,
+            );
+        } else {
+            table::add(&mut registry.bots, operator, state);
+            emit_registered(
+                registry,
+                operator,
+                &allowed_for_event,
+                timelock_secs,
+                max_failures,
+                expires_at,
+                &cron_for_event,
+            );
+        };
+    }
+
+    fun ensure_registry_admin(caller: &signer) acquires AutomationRegistry {
+        ensure_registry_initialized();
+        let registry = borrow_registry(@lottery);
+        let caller_addr = signer::address_of(caller);
+        assert!(caller_addr == registry.admin, E_UNAUTHORIZED);
+    }
+
+    fun ensure_registry_initialized() {
+        assert!(exists<AutomationRegistry>(@lottery), E_NOT_INITIALIZED);
+    }
+
+    fun clone_legacy_bot(bot: &LegacyAutomationBot): LegacyAutomationBot {
+        LegacyAutomationBot {
+            operator: bot.operator,
+            allowed_actions: clone_u64s(&bot.allowed_actions),
+            timelock_secs: bot.timelock_secs,
+            max_failures: bot.max_failures,
+            failure_count: bot.failure_count,
+            success_streak: bot.success_streak,
+            reputation_score: bot.reputation_score,
+            pending_action_hash: clone_bytes(&bot.pending_action_hash),
+            pending_execute_after: bot.pending_execute_after,
+            expires_at: bot.expires_at,
+            cron_spec: clone_bytes(&bot.cron_spec),
+            last_action_ts: bot.last_action_ts,
+            last_action_hash: clone_bytes(&bot.last_action_hash),
+        }
     }
 
     public fun clone_bytes(source: &vector<u8>): vector<u8> {

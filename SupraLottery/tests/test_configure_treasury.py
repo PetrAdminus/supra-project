@@ -54,7 +54,7 @@ class ConfigureTreasuryDistributionTests(TestCase):
         exec_mock.assert_called_once_with(
             supra_cli_bin="/supra/supra",
             profile="testnet",
-            function_id="0xlottery::treasury_v1::set_config",
+            function_id="0xlottery::treasury::set_config",
             args=["u64:2000", "u64:3000", "u64:2500", "u64:2500", "u64:0", "u64:0", "u64:0"],
             supra_config=None,
             assume_yes=True,

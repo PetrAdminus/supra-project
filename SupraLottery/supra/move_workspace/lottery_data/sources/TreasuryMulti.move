@@ -22,6 +22,21 @@ module lottery_data::treasury_multi {
     const SCOPE_STORE: u64 = 22;
     const SCOPE_VIP: u64 = 23;
 
+    public struct LegacyMultiTreasuryState has drop, store {
+        jackpot_recipient: address,
+        operations_recipient: address,
+        jackpot_balance: u64,
+    }
+
+    public struct LegacyMultiTreasuryLottery has drop, store {
+        lottery_id: u64,
+        prize_bps: u64,
+        jackpot_bps: u64,
+        operations_bps: u64,
+        prize_balance: u64,
+        operations_balance: u64,
+    }
+
     struct LotteryShareConfig has copy, drop, store {
         prize_bps: u64,
         jackpot_bps: u64,
@@ -135,6 +150,26 @@ module lottery_data::treasury_multi {
         referrals_cap: option::Option<MultiTreasuryCap>,
         store_cap: option::Option<MultiTreasuryCap>,
         vip_cap: option::Option<MultiTreasuryCap>,
+    }
+
+    public entry fun import_existing_state(caller: &signer, payload: LegacyMultiTreasuryState)
+    acquires TreasuryState {
+        ensure_admin_signer(caller);
+        apply_legacy_state(payload);
+    }
+
+    public entry fun import_existing_lottery(caller: &signer, record: LegacyMultiTreasuryLottery)
+    acquires TreasuryState {
+        ensure_admin_signer(caller);
+        upsert_legacy_lottery(record);
+    }
+
+    public entry fun import_existing_lotteries(
+        caller: &signer,
+        mut records: vector<LegacyMultiTreasuryLottery>,
+    ) acquires TreasuryState {
+        ensure_admin_signer(caller);
+        import_existing_lotteries_recursive(&mut records);
     }
 
     public entry fun init_state(
@@ -361,6 +396,12 @@ module lottery_data::treasury_multi {
         table::borrow_mut(&mut state.pools, lottery_id)
     }
 
+    #[view]
+    public fun operations_balance(state: &TreasuryState, lottery_id: u64): u64 {
+        let record = pool(state, lottery_id);
+        record.operations_balance
+    }
+
     public fun share_config(state: &TreasuryState, lottery_id: u64): (u64, u64, u64) {
         let record = config(state, lottery_id);
         (record.prize_bps, record.jackpot_bps, record.operations_bps)
@@ -531,6 +572,60 @@ module lottery_data::treasury_multi {
         } else {
             abort E_CAP_MISSING
         }
+    }
+
+    fun import_existing_lotteries_recursive(records: &mut vector<LegacyMultiTreasuryLottery>)
+    acquires TreasuryState {
+        if (vector::is_empty(records)) {
+            return;
+        };
+        let record = vector::pop_back(records);
+        import_existing_lotteries_recursive(records);
+        upsert_legacy_lottery(record);
+    }
+
+    fun upsert_legacy_lottery(record: LegacyMultiTreasuryLottery) acquires TreasuryState {
+        let LegacyMultiTreasuryLottery {
+            lottery_id,
+            prize_bps,
+            jackpot_bps,
+            operations_bps,
+            prize_balance,
+            operations_balance,
+        } = record;
+        let state = borrow_state_mut(@lottery);
+        update_config(state, lottery_id, prize_bps, jackpot_bps, operations_bps);
+        let pool_record = pool_mut(state, lottery_id);
+        pool_record.prize_balance = prize_balance;
+        pool_record.operations_balance = operations_balance;
+        event::emit_event(
+            &mut state.allocation_events,
+            AllocationRecordedEvent {
+                lottery_id,
+                total_amount: add(prize_balance, operations_balance),
+                prize_amount: prize_balance,
+                jackpot_amount: 0,
+                operations_amount: operations_balance,
+            },
+        );
+    }
+
+    fun apply_legacy_state(payload: LegacyMultiTreasuryState) acquires TreasuryState {
+        let LegacyMultiTreasuryState {
+            jackpot_recipient,
+            operations_recipient,
+            jackpot_balance,
+        } = payload;
+        let state = borrow_state_mut(@lottery);
+        set_recipients(state, jackpot_recipient, operations_recipient);
+        state.jackpot_balance = jackpot_balance;
+    }
+
+    fun ensure_admin_signer(caller: &signer) acquires TreasuryState {
+        let state = borrow_state(@lottery);
+        if (signer::address_of(caller) != state.admin) {
+            abort E_UNAUTHORIZED;
+        };
     }
 
     fun add(current: u64, amount: u64): u64 {

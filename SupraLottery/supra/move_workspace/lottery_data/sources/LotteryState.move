@@ -11,6 +11,24 @@ module lottery_data::lottery_state {
     const E_NOT_PUBLISHED: u64 = 2;
     const E_DUPLICATE_LOTTERY: u64 = 3;
     const E_UNKNOWN_LOTTERY: u64 = 4;
+    const E_UNAUTHORIZED: u64 = 5;
+
+    public struct LegacyLotteryRuntime has drop, store {
+        lottery_id: u64,
+        ticket_price: u64,
+        jackpot_amount: u64,
+        participants: vector<address>,
+        next_ticket_id: u64,
+        draw_scheduled: bool,
+        auto_draw_threshold: u64,
+        pending_request_id: option::Option<u64>,
+        last_request_payload_hash: option::Option<vector<u8>>,
+        last_requester: option::Option<address>,
+        gas: GasBudget,
+        vrf_stats: VrfStats,
+        whitelist: WhitelistState,
+        request_config: option::Option<VrfRequestConfig>,
+    }
 
     struct ClientWhitelistSnapshot has copy, drop, store {
         max_gas_price: u128,
@@ -128,6 +146,18 @@ module lottery_data::lottery_state {
         vrf_gas_events: event::EventHandle<VrfGasBudgetUpdatedEvent>,
         vrf_whitelist_events: event::EventHandle<VrfWhitelistUpdatedEvent>,
         vrf_request_events: event::EventHandle<VrfRequestConfigUpdatedEvent>,
+    }
+
+    public entry fun import_existing_lottery(caller: &signer, record: LegacyLotteryRuntime)
+    acquires LotteryState {
+        ensure_admin(caller);
+        upsert_legacy_lottery(record);
+    }
+
+    public entry fun import_existing_lotteries(caller: &signer, mut records: vector<LegacyLotteryRuntime>)
+    acquires LotteryState {
+        ensure_admin(caller);
+        import_existing_lotteries_recursive(&mut records);
     }
 
     public entry fun init(caller: &signer) {
@@ -297,5 +327,77 @@ module lottery_data::lottery_state {
             },
             request_config: option::none<VrfRequestConfig>(),
         }
+    }
+
+    fun import_existing_lotteries_recursive(records: &mut vector<LegacyLotteryRuntime>)
+    acquires LotteryState {
+        if (vector::is_empty(records)) {
+            return;
+        };
+        let record = vector::pop_back(records);
+        import_existing_lotteries_recursive(records);
+        upsert_legacy_lottery(record);
+    }
+
+    fun upsert_legacy_lottery(record: LegacyLotteryRuntime) acquires LotteryState {
+        let LegacyLotteryRuntime {
+            lottery_id,
+            ticket_price,
+            jackpot_amount,
+            participants,
+            next_ticket_id,
+            draw_scheduled,
+            auto_draw_threshold,
+            pending_request_id,
+            last_request_payload_hash,
+            last_requester,
+            gas,
+            vrf_stats,
+            whitelist,
+            request_config,
+        } = record;
+
+        let runtime = LotteryRuntime {
+            ticket_price,
+            jackpot_amount,
+            tickets: TicketLedger { participants, next_ticket_id },
+            draw: DrawSettings { draw_scheduled, auto_draw_threshold },
+            pending_request: PendingRequest {
+                request_id: pending_request_id,
+                last_request_payload_hash,
+                last_requester,
+            },
+            gas,
+            vrf_stats,
+            whitelist,
+            request_config,
+        };
+
+        let state_addr = state_address();
+        let state_ref = borrow_global_mut<LotteryState>(state_addr);
+        if (table::contains(&state_ref.lotteries, lottery_id)) {
+            let entry = table::borrow_mut(&mut state_ref.lotteries, lottery_id);
+            *entry = runtime;
+        } else {
+            table::add(&mut state_ref.lotteries, lottery_id, runtime);
+            vector::push_back(&mut state_ref.lottery_ids, lottery_id);
+        };
+
+        emit_snapshot(state_ref, lottery_id);
+        emit_vrf_gas_budget(state_ref, lottery_id);
+        emit_vrf_whitelist(state_ref, lottery_id);
+        emit_vrf_request_config(state_ref, lottery_id);
+    }
+
+    fun ensure_admin(caller: &signer) acquires LotteryState {
+        let state_addr = state_address();
+        assert!(exists<LotteryState>(state_addr), E_NOT_PUBLISHED);
+        let state_ref = borrow_global<LotteryState>(state_addr);
+        let caller_address = signer::address_of(caller);
+        assert!(caller_address == state_ref.admin, E_UNAUTHORIZED);
+    }
+
+    fun state_address(): address {
+        @lottery
     }
 }

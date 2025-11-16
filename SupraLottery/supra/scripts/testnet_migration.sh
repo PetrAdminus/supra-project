@@ -58,10 +58,10 @@ supra_cli_info "Gas config: max_gas_price=${MAX_GAS_PRICE}, max_gas_limit=${MAX_
 supra_cli_info "Calculated min balance: ${MIN_BALANCE_LIMIT}"
 
 supra_cli_info "Checking fungible asset initialization"
-TREASURY_STATUS=$(supra_cli_move_view "--function-id ${LOTTERY_ADDR}::treasury_v1::is_initialized" | tr -d '\r')
+TREASURY_STATUS=$(supra_cli_move_view "--function-id ${LOTTERY_ADDR}::treasury::is_initialized" | tr -d '\r')
 if [[ "${TREASURY_STATUS}" == *"false"* ]]; then
   supra_cli_info "Initializing treasury token"
-  supra_cli_move_run "--function-id ${LOTTERY_ADDR}::treasury_v1::init_token --args hex:${FA_SEED_HEX:-0x6c6f74746572795f66615f73656564} hex:${FA_NAME_HEX:-0x4c6f7474657279205469636b6574} hex:${FA_SYMBOL_HEX:-0x4c4f54} u8:${FA_DECIMALS:-9} hex:${FA_ICON_HEX:-0x} hex:${FA_PROJECT_HEX:-0x} --assume-yes"
+  supra_cli_move_run "--function-id ${LOTTERY_ADDR}::treasury::init_token --args hex:${FA_SEED_HEX:-0x6c6f74746572795f66615f73656564} hex:${FA_NAME_HEX:-0x4c6f7474657279205469636b6574} hex:${FA_SYMBOL_HEX:-0x4c4f54} u8:${FA_DECIMALS:-9} hex:${FA_ICON_HEX:-0x} hex:${FA_PROJECT_HEX:-0x} --assume-yes"
 else
   supra_cli_info "Treasury already initialized"
 fi
@@ -75,15 +75,15 @@ if [[ -n "${PLAYER_MINTS:-}" ]]; then
       supra_cli_warn "Skip malformed mint target '${target}'"
       continue
     fi
-    STATUS=$(supra_cli_move_view "--function-id ${LOTTERY_ADDR}::treasury_v1::store_registered --args address:${addr}" | tr -d '\r' || true)
+    STATUS=$(supra_cli_move_view "--function-id ${LOTTERY_ADDR}::treasury::store_registered --args address:${addr}" | tr -d '\r' || true)
     if [[ "${STATUS}" == *"true"* ]]; then
       supra_cli_info "Store already registered for ${addr}"
     else
       supra_cli_info "Registering primary store for ${addr}"
-      supra_cli_move_run "--function-id ${LOTTERY_ADDR}::treasury_v1::register_store_for --args address:${addr} --assume-yes"
+      supra_cli_move_run "--function-id ${LOTTERY_ADDR}::treasury::register_store_for --args address:${addr} --assume-yes"
     fi
     supra_cli_info "Minting ${amount} tokens to ${addr}"
-    supra_cli_move_run "--function-id ${LOTTERY_ADDR}::treasury_v1::mint_to --args address:${addr} u64:${amount} --assume-yes"
+    supra_cli_move_run "--function-id ${LOTTERY_ADDR}::treasury::mint_to --args address:${addr} u64:${amount} --assume-yes"
   done
 fi
 
