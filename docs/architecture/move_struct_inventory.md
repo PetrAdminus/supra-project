@@ -1,6 +1,6 @@
 # Инвентаризация структур Move
 
-> Последнее обновление: 2025-12-07 (UTC)
+> Последнее обновление: 2025-12-26 (UTC)
 
 Документ автоматически собирает все структуры, ресурсы и события из текущего Move-workspace SupraLottery. Данные используются как исходная точка для планирования миграции в новую архитектуру.
 
@@ -153,6 +153,7 @@
 | Категория | Структура | Способности | Поля |
 | --- | --- | --- | --- |
 | Структура | `AutomationState` | store | `allowed_actions`: vector<u64><br>`timelock_secs`: u64<br>`max_failures`: u64<br>`failure_count`: u64<br>`success_streak`: u64<br>`reputation_score`: u64<br>`pending_action_hash`: vector<u8><br>`pending_execute_after`: u64<br>`expires_at`: u64<br>`cron_spec`: vector<u8><br>`last_action_ts`: u64<br>`last_action_hash`: vector<u8> |
+| Структура | `LegacyAutomationBot` | drop, store | `operator`: address<br>`allowed_actions`: vector<u64><br>`timelock_secs`: u64<br>`max_failures`: u64<br>`failure_count`: u64<br>`success_streak`: u64<br>`reputation_score`: u64<br>`pending_action_hash`: vector<u8><br>`pending_execute_after`: u64<br>`expires_at`: u64<br>`cron_spec`: vector<u8><br>`last_action_ts`: u64<br>`last_action_hash`: vector<u8> |
 | Ресурс | `AutomationRegistry` | key | `admin`: address<br>`bots`: table::Table<address, AutomationState><br>`register_events`: event::EventHandle<AutomationBotRegisteredEvent><br>`rotate_events`: event::EventHandle<AutomationBotRotatedEvent><br>`remove_events`: event::EventHandle<AutomationBotRemovedEvent><br>`dry_run_events`: event::EventHandle<AutomationActionPlannedEvent><br>`tick_events`: event::EventHandle<AutomationActionTickEvent><br>`rejected_events`: event::EventHandle<AutomationActionRejectedEvent><br>`error_events`: event::EventHandle<AutomationErrorEvent> |
 | Ресурс | `AutomationCap` | key | `operator`: address<br>`cron_spec`: vector<u8> |
 | Структура | `AutomationBotStatus` | drop, store | `operator`: address<br>`allowed_actions`: vector<u64><br>`timelock_secs`: u64<br>`max_failures`: u64<br>`failure_count`: u64<br>`success_streak`: u64<br>`reputation_score`: u64<br>`pending_action_hash`: vector<u8><br>`pending_execute_after`: u64<br>`expires_at`: u64<br>`cron_spec`: vector<u8><br>`last_action_ts`: u64<br>`last_action_hash`: vector<u8> |
@@ -168,6 +169,7 @@
 
 | Категория | Структура | Способности | Поля |
 | --- | --- | --- | --- |
+| Структура | `LegacyCancellationRecord` | drop, store | `lottery_id`: u64<br>`reason_code`: u8<br>`canceled_ts`: u64<br>`previous_status`: u8<br>`tickets_sold`: u64<br>`proceeds_accum`: u64<br>`jackpot_locked`: u64<br>`pending_tickets_cleared`: u64 |
 | Структура | `CancellationRecord` | copy, drop, store | `reason_code`: u8<br>`canceled_ts`: u64<br>`previous_status`: u8<br>`tickets_sold`: u64<br>`proceeds_accum`: u64<br>`jackpot_locked`: u64<br>`pending_tickets_cleared`: u64 |
 | Событие | `LotteryCanceledEvent` | drop, store, copy | `lottery_id`: u64<br>`reason_code`: u8<br>`canceled_ts`: u64<br>`previous_status`: u8<br>`tickets_sold`: u64<br>`proceeds_accum`: u64<br>`jackpot_locked`: u64<br>`pending_tickets_cleared`: u64 |
 | Ресурс | `CancellationLedger` | key | `admin`: address<br>`records`: table::Table<u64, CancellationRecord><br>`events`: event::EventHandle<LotteryCanceledEvent> |
@@ -176,6 +178,7 @@
 
 | Категория | Структура | Способности | Поля |
 | --- | --- | --- | --- |
+| Структура | `LegacyInstanceRecord` | drop, store | `lottery_id`: u64<br>`owner`: address<br>`lottery_address`: address<br>`ticket_price`: u64<br>`jackpot_share_bps`: u16<br>`tickets_sold`: u64<br>`jackpot_accumulated`: u64<br>`active`: bool |
 | Структура | `InstanceRecord` | store | `owner`: address<br>`lottery_address`: address<br>`ticket_price`: u64<br>`jackpot_share_bps`: u16<br>`tickets_sold`: u64<br>`jackpot_accumulated`: u64<br>`active`: bool |
 | Структура | `InstanceSnapshot` | copy, drop, store | `lottery_id`: u64<br>`owner`: address<br>`lottery_address`: address<br>`ticket_price`: u64<br>`jackpot_share_bps`: u16<br>`tickets_sold`: u64<br>`jackpot_accumulated`: u64<br>`active`: bool |
 | Ресурс | `InstanceControl` | key | `admin`: address<br>`export_cap`: option::Option<InstancesExportCap> |
@@ -216,6 +219,7 @@
 | Структура | `VrfStats` | copy, drop, store | `request_count`: u64<br>`response_count`: u64<br>`next_client_seed`: u64 |
 | Структура | `WhitelistState` | copy, drop, store | `callback_sender`: option::Option<address><br>`consumers`: vector<address><br>`client_snapshot`: option::Option<ClientWhitelistSnapshot><br>`consumer_snapshot`: option::Option<ConsumerWhitelistSnapshot> |
 | Структура | `LotteryRuntime` | copy, drop, store | `ticket_price`: u64<br>`jackpot_amount`: u64<br>`tickets`: TicketLedger<br>`draw`: DrawSettings<br>`pending_request`: PendingRequest<br>`gas`: GasBudget<br>`vrf_stats`: VrfStats<br>`whitelist`: WhitelistState<br>`request_config`: option::Option<VrfRequestConfig> |
+| Структура | `LegacyLotteryRuntime` | drop, store | `lottery_id`: u64<br>`ticket_price`: u64<br>`jackpot_amount`: u64<br>`participants`: vector<address><br>`next_ticket_id`: u64<br>`draw_scheduled`: bool<br>`auto_draw_threshold`: u64<br>`pending_request_id`: option::Option<u64><br>`last_request_payload_hash`: option::Option<vector<u8>><br>`last_requester`: option::Option<address><br>`gas`: GasBudget<br>`vrf_stats`: VrfStats<br>`whitelist`: WhitelistState<br>`request_config`: option::Option<VrfRequestConfig> |
 | Событие | `LotterySnapshotUpdatedEvent` | drop, store, copy | `lottery_id`: u64<br>`ticket_price`: u64<br>`jackpot_amount`: u64<br>`draw_scheduled`: bool<br>`auto_draw_threshold`: u64<br>`ticket_count`: u64<br>`pending_request`: bool |
 | Событие | `VrfGasBudgetUpdatedEvent` | drop, store, copy | `lottery_id`: u64<br>`max_fee`: u64<br>`max_gas_price`: u128<br>`max_gas_limit`: u128<br>`callback_gas_price`: u128<br>`callback_gas_limit`: u128<br>`verification_gas_value`: u128 |
 | Событие | `VrfWhitelistUpdatedEvent` | drop, store, copy | `lottery_id`: u64<br>`callback_sender`: option::Option<address><br>`consumer_count`: u64<br>`client_snapshot_recorded`: bool<br>`consumer_snapshot_recorded`: bool |
@@ -226,6 +230,7 @@
 
 | Категория | Структура | Способности | Поля |
 | --- | --- | --- | --- |
+| Структура | `LegacyOperatorRecord` | drop, store | `lottery_id`: u64<br>`owner`: option::Option<address><br>`operators`: vector<address> |
 | Структура | `LotteryOperatorEntry` | store | `owner`: option::Option<address><br>`operators`: table::Table<address, bool><br>`operator_list`: vector<address> |
 | Структура | `OperatorSnapshot` | copy, drop, store | `owner`: option::Option<address><br>`operators`: vector<address> |
 | Ресурс | `OperatorRegistry` | key | `admin`: address<br>`entries`: table::Table<u64, LotteryOperatorEntry><br>`lottery_ids`: vector<u64><br>`admin_events`: event::EventHandle<AdminUpdatedEvent><br>`owner_events`: event::EventHandle<OwnerUpdatedEvent><br>`grant_events`: event::EventHandle<OperatorGrantedEvent><br>`revoke_events`: event::EventHandle<OperatorRevokedEvent><br>`snapshot_events`: event::EventHandle<OperatorSnapshotUpdatedEvent> |
@@ -241,6 +246,7 @@
 | --- | --- | --- | --- |
 | Структура | `PayoutRecord` | copy, drop, store | `payout_id`: u64<br>`lottery_id`: u64<br>`round_number`: u64<br>`winner`: address<br>`ticket_index`: u64<br>`amount`: u64<br>`status`: u8<br>`randomness_hash`: vector<u8><br>`payload_hash`: vector<u8> |
 | Структура | `LotteryPayoutState` | store | `round_number`: u64<br>`pending_count`: u64<br>`paid_count`: u64<br>`refunded_count`: u64<br>`payouts`: table::Table<u64, PayoutRecord><br>`payout_ids`: vector<u64> |
+| Структура | `LegacyPayoutRecord` | drop, store | `payout_id`: u64<br>`lottery_id`: u64<br>`round_number`: u64<br>`winner`: address<br>`ticket_index`: u64<br>`amount`: u64<br>`status`: u8<br>`randomness_hash`: vector<u8><br>`payload_hash`: vector<u8><br>`refund_recipient`: address<br>`refund_amount`: u64 |
 | Событие | `WinnerRecordedEvent` | drop, store, copy | `payout_id`: u64<br>`lottery_id`: u64<br>`round_number`: u64<br>`winner`: address<br>`ticket_index`: u64<br>`amount`: u64<br>`randomness_hash`: vector<u8><br>`payload_hash`: vector<u8> |
 | Событие | `PayoutStatusUpdatedEvent` | drop, store, copy | `payout_id`: u64<br>`lottery_id`: u64<br>`round_number`: u64<br>`previous_status`: u8<br>`next_status`: u8 |
 | Событие | `RefundIssuedEvent` | drop, store, copy | `payout_id`: u64<br>`lottery_id`: u64<br>`round_number`: u64<br>`recipient`: address<br>`amount`: u64 |
@@ -251,6 +257,7 @@
 | Категория | Структура | Способности | Поля |
 | --- | --- | --- | --- |
 | Структура | `RoundRuntime` | copy, drop, store | `tickets`: vector<address><br>`draw_scheduled`: bool<br>`next_ticket_id`: u64<br>`pending_request`: option::Option<u64> |
+| Структура | `LegacyRoundRecord` | drop, store | `lottery_id`: u64<br>`tickets`: vector<address><br>`draw_scheduled`: bool<br>`next_ticket_id`: u64<br>`pending_request`: option::Option<u64> |
 | Структура | `RoundSnapshot` | copy, drop, store | `lottery_id`: u64<br>`ticket_count`: u64<br>`draw_scheduled`: bool<br>`has_pending_request`: bool<br>`next_ticket_id`: u64<br>`pending_request_id`: option::Option<u64> |
 | Событие | `TicketPurchasedEvent` | drop, store, copy | `lottery_id`: u64<br>`ticket_id`: u64<br>`buyer`: address<br>`amount`: u64 |
 | Событие | `DrawScheduleUpdatedEvent` | drop, store, copy | `lottery_id`: u64<br>`draw_scheduled`: bool |
@@ -274,6 +281,8 @@
 | Структура | `LotteryShareConfig` | copy, drop, store | `prize_bps`: u64<br>`jackpot_bps`: u64<br>`operations_bps`: u64 |
 | Структура | `LotteryPool` | copy, drop, store | `prize_balance`: u64<br>`operations_balance`: u64 |
 | Структура | `RecipientStatus` | copy, drop, store | `recipient`: address<br>`registered`: bool<br>`frozen`: bool<br>`store`: option::Option<address><br>`balance`: u64 |
+| Структура | `LegacyMultiTreasuryState` | drop, store | `jackpot_recipient`: address<br>`operations_recipient`: address<br>`jackpot_balance`: u64 |
+| Структура | `LegacyMultiTreasuryLottery` | drop, store | `lottery_id`: u64<br>`prize_bps`: u64<br>`jackpot_bps`: u64<br>`operations_bps`: u64<br>`prize_balance`: u64<br>`operations_balance`: u64 |
 | Событие | `LotteryConfigUpdatedEvent` | drop, store, copy | `lottery_id`: u64<br>`prize_bps`: u64<br>`jackpot_bps`: u64<br>`operations_bps`: u64 |
 | Событие | `AllocationRecordedEvent` | drop, store, copy | `lottery_id`: u64<br>`total_amount`: u64<br>`prize_amount`: u64<br>`jackpot_amount`: u64<br>`operations_amount`: u64 |
 | Событие | `AdminUpdatedEvent` | drop, store, copy | `previous`: address<br>`next`: address |
@@ -287,14 +296,17 @@
 | Структура | `MultiTreasuryCap` | store | `scope`: u64 |
 | Ресурс | `TreasuryMultiControl` | key | `admin`: address<br>`jackpot_cap`: option::Option<MultiTreasuryCap><br>`referrals_cap`: option::Option<MultiTreasuryCap><br>`store_cap`: option::Option<MultiTreasuryCap><br>`vip_cap`: option::Option<MultiTreasuryCap> |
 
-### Модуль `lottery_data::treasury_v1` (`SupraLottery/supra/move_workspace/lottery_data/sources/TreasuryV1.move`)
+### Модуль `lottery_data::treasury` (`SupraLottery/supra/move_workspace/lottery_data/sources/Treasury.move`)
 
 | Категория | Структура | Способности | Поля |
 | --- | --- | --- | --- |
 | Структура | `VaultConfig` | copy, drop, store | `bp_jackpot`: u64<br>`bp_prize`: u64<br>`bp_treasury`: u64<br>`bp_marketing`: u64<br>`bp_community`: u64<br>`bp_team`: u64<br>`bp_partners`: u64 |
+| Структура | `LegacyVaultConfig` | copy, drop, store | `bp_jackpot`: u64<br>`bp_prize`: u64<br>`bp_treasury`: u64<br>`bp_marketing`: u64<br>`bp_community`: u64<br>`bp_team`: u64<br>`bp_partners`: u64 |
 | Структура | `VaultRecipients` | copy, drop, store | `treasury`: address<br>`marketing`: address<br>`community`: address<br>`team`: address<br>`partners`: address |
+| Структура | `LegacyVaultRecipients` | copy, drop, store | `treasury`: address<br>`marketing`: address<br>`community`: address<br>`team`: address<br>`partners`: address |
 | Структура | `VaultRecipientStatus` | copy, drop, store | `account`: address<br>`registered`: bool<br>`frozen`: bool<br>`store`: option::Option<address><br>`balance`: u64 |
 | Структура | `VaultRecipientsSnapshot` | copy, drop, store | `treasury`: VaultRecipientStatus<br>`marketing`: VaultRecipientStatus<br>`community`: VaultRecipientStatus<br>`team`: VaultRecipientStatus<br>`partners`: VaultRecipientStatus |
+| Структура | `LegacyVaultState` | drop, store | `config`: LegacyVaultConfig<br>`recipients`: LegacyVaultRecipients |
 | Событие | `ConfigUpdatedEvent` | drop, store, copy | `bp_jackpot`: u64<br>`bp_prize`: u64<br>`bp_treasury`: u64<br>`bp_marketing`: u64<br>`bp_community`: u64<br>`bp_team`: u64<br>`bp_partners`: u64 |
 | Событие | `RecipientsUpdatedEvent` | drop, store, copy | `previous`: option::Option<VaultRecipientsSnapshot><br>`next`: VaultRecipientsSnapshot |
 | Событие | `JackpotDistributedEvent` | drop, store, copy | `winner`: address<br>`total_amount`: u64<br>`winner_share`: u64<br>`jackpot_share`: u64<br>`prize_share`: u64<br>`treasury_share`: u64<br>`marketing_share`: u64<br>`community_share`: u64<br>`team_share`: u64<br>`partners_share`: u64 |
@@ -315,6 +327,7 @@
 | Событие | `VrfRequestsPausedEvent` | drop, store, copy | `timestamp`: u64 |
 | Событие | `VrfRequestsResumedEvent` | drop, store, copy | `timestamp`: u64 |
 | Ресурс | `VrfDepositLedger` | key | `admin`: address<br>`config`: VrfDepositConfig<br>`status`: VrfDepositStatus<br>`snapshot_events`: event::EventHandle<VrfDepositSnapshotEvent><br>`alert_events`: event::EventHandle<VrfDepositAlertEvent><br>`paused_events`: event::EventHandle<VrfRequestsPausedEvent><br>`resumed_events`: event::EventHandle<VrfRequestsResumedEvent> |
+| Структура | `LegacyVrfDepositLedger` | drop, store | `admin`: address<br>`config`: VrfDepositConfig<br>`status`: VrfDepositStatus<br>`snapshot_timestamp`: u64 |
 
 
 ## Пакет `lottery_engine`
@@ -389,6 +402,17 @@
 | Событие | `LotteryStatusUpdatedEvent` | drop, store, copy | `lottery_id`: u64<br>`active`: bool |
 | Событие | `GatewaySnapshotEvent` | drop, store, copy | `admin`: address<br>`next_lottery_id`: u64<br>`total_lotteries`: u64 |
 | Ресурс | `GatewayRegistry` | key | `admin`: address<br>`next_lottery_id`: u64<br>`lotteries`: table::Table<u64, GatewayLottery><br>`owner_index`: table::Table<address, OwnerLotteries><br>`lottery_ids`: vector<u64><br>`creation_events`: event::EventHandle<LotteryCreatedEvent><br>`owner_events`: event::EventHandle<LotteryOwnerUpdatedEvent><br>`status_events`: event::EventHandle<LotteryStatusUpdatedEvent><br>`snapshot_events`: event::EventHandle<GatewaySnapshotEvent> |
+
+### Модуль `lottery_gateway::registry` (`SupraLottery/supra/move_workspace/lottery_gateway/sources/Registry.move`)
+
+| Категория | Структура | Способности | Поля |
+| --- | --- | --- | --- |
+| Структура | `LotteryCancellationSummary` | copy, drop, store | `reason_code`: u8<br>`canceled_ts`: u64 |
+| Структура | `LegacyCancellationImport` | copy, drop, store | `lottery_id`: u64<br>`reason_code`: u8<br>`canceled_ts`: u64 |
+| Структура | `LotteryRegistryEntry` | copy, drop, store | `lottery_id`: u64<br>`owner`: address<br>`lottery_address`: address<br>`ticket_price`: u64<br>`jackpot_share_bps`: u16<br>`active`: bool<br>`cancellation`: option::Option<LotteryCancellationSummary> |
+| Структура | `LotteryRegistrySnapshot` | copy, drop, store | `admin`: address<br>`total_lotteries`: u64<br>`entries`: vector<LotteryRegistryEntry> |
+| Событие | `LotteryRegistrySnapshotUpdatedEvent` | drop, store, copy | `previous`: option::Option<LotteryRegistrySnapshot><br>`current`: LotteryRegistrySnapshot |
+| Ресурс | `LotteryRegistry` | key | `admin`: address<br>`entries`: table::Table<u64, LotteryRegistryEntry><br>`lottery_ids`: vector<u64><br>`snapshot_events`: event::EventHandle<LotteryRegistrySnapshotUpdatedEvent> |
 
 
 ## Пакет `lottery_hub`
@@ -599,6 +623,7 @@
 | Категория | Структура | Способности | Поля |
 | --- | --- | --- | --- |
 | Структура | `AutopurchasePlan` | copy, drop, store | `balance`: u64<br>`tickets_per_draw`: u64<br>`active`: bool |
+| Структура | `LegacyAutopurchasePlan` | drop, store | `lottery_id`: u64<br>`player`: address<br>`balance`: u64<br>`tickets_per_draw`: u64<br>`active`: bool |
 | Структура | `LotteryPlans` | store | `plans`: table::Table<address, AutopurchasePlan><br>`players`: vector<address><br>`total_balance`: u64 |
 | Ресурс | `AutopurchaseState` | key | `admin`: address<br>`lotteries`: table::Table<u64, LotteryPlans><br>`lottery_ids`: vector<u64><br>`deposit_events`: event::EventHandle<AutopurchaseDepositEvent><br>`config_events`: event::EventHandle<AutopurchaseConfigUpdatedEvent><br>`executed_events`: event::EventHandle<AutopurchaseExecutedEvent><br>`refund_events`: event::EventHandle<AutopurchaseRefundedEvent><br>`snapshot_events`: event::EventHandle<AutopurchaseSnapshotUpdatedEvent> |
 | Ресурс | `AutopurchaseAccess` | key | `rounds`: AutopurchaseRoundCap<br>`treasury`: AutopurchaseTreasuryCap |
@@ -676,6 +701,7 @@
 | Структура | `StoreSnapshot` | copy, drop, store | `admin`: address<br>`lotteries`: vector<StoreLotterySnapshot> |
 | Событие | `StoreSnapshotUpdatedEvent` | drop, store, copy | `admin`: address<br>`snapshot`: StoreLotterySnapshot |
 | Структура | `ItemWithStats` | copy, drop, store | `item`: StoreItem<br>`sold`: u64 |
+| Структура | `LegacyStoreItem` | drop, store | `lottery_id`: u64<br>`item_id`: u64<br>`price`: u64<br>`metadata`: vector<u8><br>`available`: bool<br>`stock`: option::Option<u64><br>`sold`: u64 |
 
 ### Модуль `lottery_rewards::rewards_vip` (`SupraLottery/supra/move_workspace/lottery_rewards/sources/Vip.move`)
 
@@ -684,6 +710,8 @@
 | Структура | `VipConfig` | copy, drop, store | `price`: u64<br>`duration_secs`: u64<br>`bonus_tickets`: u64 |
 | Структура | `VipSubscription` | copy, drop, store | `expiry_ts`: u64<br>`bonus_tickets`: u64 |
 | Структура | `VipLottery` | store | `config`: VipConfig<br>`subscriptions`: table::Table<address, VipSubscription><br>`members`: vector<address><br>`total_revenue`: u64<br>`bonus_tickets_issued`: u64 |
+| Структура | `LegacyVipSubscription` | drop, store | `player`: address<br>`expiry_ts`: u64<br>`bonus_tickets`: u64 |
+| Структура | `LegacyVipLottery` | drop, store | `lottery_id`: u64<br>`config`: VipConfig<br>`total_revenue`: u64<br>`bonus_tickets_issued`: u64<br>`members`: vector<address><br>`subscriptions`: vector<LegacyVipSubscription> |
 | Ресурс | `VipState` | key | `admin`: address<br>`lotteries`: table::Table<u64, VipLottery><br>`lottery_ids`: vector<u64><br>`config_events`: event::EventHandle<VipConfigUpdatedEvent><br>`subscribed_events`: event::EventHandle<VipSubscribedEvent><br>`cancelled_events`: event::EventHandle<VipCancelledEvent><br>`bonus_events`: event::EventHandle<VipBonusIssuedEvent><br>`snapshot_events`: event::EventHandle<VipSnapshotUpdatedEvent> |
 | Ресурс | `VipAccess` | key | `cap`: MultiTreasuryCap |
 | Событие | `VipConfigUpdatedEvent` | drop, store, copy | `lottery_id`: u64<br>`price`: u64<br>`duration_secs`: u64<br>`bonus_tickets`: u64 |
@@ -706,7 +734,7 @@
 | Структура | `AutopurchasePlan` | copy, drop, store | `balance`: u64<br>`tickets_per_draw`: u64<br>`active`: bool |
 | Структура | `LotteryPlans` | store | `plans`: table::Table<address, AutopurchasePlan><br>`players`: vector<address><br>`total_balance`: u64 |
 | Ресурс | `AutopurchaseState` | key | `admin`: address<br>`lotteries`: table::Table<u64, LotteryPlans><br>`lottery_ids`: vector<u64><br>`deposit_events`: event::EventHandle<AutopurchaseDepositEvent><br>`config_events`: event::EventHandle<AutopurchaseConfigUpdatedEvent><br>`executed_events`: event::EventHandle<AutopurchaseExecutedEvent><br>`refund_events`: event::EventHandle<AutopurchaseRefundedEvent><br>`snapshot_events`: event::EventHandle<AutopurchaseSnapshotUpdatedEvent> |
-| Ресурс | `AutopurchaseAccess` | key | `rounds`: rounds::AutopurchaseRoundCap<br>`treasury`: treasury_v1::AutopurchaseTreasuryCap |
+| Ресурс | `AutopurchaseAccess` | key | `rounds`: rounds::AutopurchaseRoundCap<br>`treasury`: treasury::AutopurchaseTreasuryCap |
 | Структура | `AutopurchaseLotterySummary` | copy, drop, store | `total_balance`: u64<br>`total_players`: u64<br>`active_players`: u64 |
 | Структура | `AutopurchasePlayerSnapshot` | copy, drop, store | `player`: address<br>`balance`: u64<br>`tickets_per_draw`: u64<br>`active`: bool |
 | Структура | `AutopurchaseLotterySnapshot` | copy, drop, store | `lottery_id`: u64<br>`total_balance`: u64<br>`total_players`: u64<br>`active_players`: u64<br>`players`: vector<AutopurchasePlayerSnapshot> |
@@ -717,9 +745,29 @@
 | Событие | `AutopurchaseRefundedEvent` | drop, store, copy | `lottery_id`: u64<br>`player`: address<br>`amount`: u64<br>`remaining_balance`: u64 |
 | Событие | `AutopurchaseSnapshotUpdatedEvent` | drop, store, copy | `admin`: address<br>`snapshot`: AutopurchaseLotterySnapshot |
 
+### Модуль `lottery_rewards_engine::referrals` (`SupraLottery/supra/move_workspace/lottery_rewards_engine/sources/Referrals.move`)
+
+| Категория | Структура | Способности | Поля |
+| --- | --- | --- | --- |
+| Структура | `ReferralConfig` | copy, drop, store | `referrer_bps`: u64<br>`referee_bps`: u64 |
+| Структура | `ReferralStats` | copy, drop, store | `rewarded_purchases`: u64<br>`total_referrer_rewards`: u64<br>`total_referee_rewards`: u64 |
+| Ресурс | `ReferralState` | key | `admin`: address<br>`configs`: table::Table<u64, ReferralConfig><br>`stats`: table::Table<u64, ReferralStats><br>`referrers`: table::Table<address, address><br>`lottery_ids`: vector<u64><br>`total_registered`: u64<br>`config_events`: event::EventHandle<ReferralConfigUpdatedEvent><br>`register_events`: event::EventHandle<ReferralRegisteredEvent><br>`cleared_events`: event::EventHandle<ReferralClearedEvent><br>`reward_events`: event::EventHandle<ReferralRewardPaidEvent><br>`snapshot_events`: event::EventHandle<ReferralSnapshotUpdatedEvent> |
+| Ресурс | `ReferralsControl` | key | `treasury_cap`: treasury_multi::MultiTreasuryCap |
+| Структура | `LotteryReferralSnapshot` | copy, drop, store | `lottery_id`: u64<br>`referrer_bps`: u64<br>`referee_bps`: u64<br>`rewarded_purchases`: u64<br>`total_referrer_rewards`: u64<br>`total_referee_rewards`: u64 |
+| Структура | `ReferralSnapshot` | copy, drop, store | `admin`: address<br>`total_registered`: u64<br>`lotteries`: vector<LotteryReferralSnapshot> |
+| Структура | `LegacyReferralLottery` | drop, store | `lottery_id`: u64<br>`referrer_bps`: u64<br>`referee_bps`: u64<br>`rewarded_purchases`: u64<br>`total_referrer_rewards`: u64<br>`total_referee_rewards`: u64 |
+| Структура | `LegacyReferralRegistration` | drop, store | `player`: address<br>`referrer`: address |
+| Событие | `ReferralSnapshotUpdatedEvent` | drop, store, copy | `previous`: option::Option<ReferralSnapshot><br>`current`: ReferralSnapshot |
+| Событие | `ReferralConfigUpdatedEvent` | drop, store, copy | `lottery_id`: u64<br>`referrer_bps`: u64<br>`referee_bps`: u64 |
+| Событие | `ReferralRegisteredEvent` | drop, store, copy | `player`: address<br>`referrer`: address<br>`by_admin`: bool |
+| Событие | `ReferralClearedEvent` | drop, store, copy | `player`: address<br>`by_admin`: bool |
+| Событие | `ReferralRewardPaidEvent` | drop, store, copy | `lottery_id`: u64<br>`buyer`: address<br>`referrer`: address<br>`referrer_amount`: u64<br>`referee_amount`: u64<br>`total_amount`: u64 |
+
 ### Модуль `lottery_rewards_engine::jackpot` (`SupraLottery/supra/move_workspace/lottery_rewards_engine/sources/Jackpot.move`)
 
-> В этом модуле структур с `struct ... has ...` не найдено.
+| Категория | Структура | Способности | Поля |
+| --- | --- | --- | --- |
+| Структура | `LegacyJackpotRuntime` | drop, store | `lottery_id`: u64<br>`tickets`: vector<address><br>`draw_scheduled`: bool<br>`pending_request_id`: option::Option<u64><br>`pending_payload`: option::Option<vector<u8>> |
 
 ### Модуль `lottery_rewards_engine::payouts` (`SupraLottery/supra/move_workspace/lottery_rewards_engine/sources/Payouts.move`)
 
@@ -742,6 +790,7 @@
 | Структура | `StoreSnapshot` | copy, drop, store | `admin`: address<br>`lotteries`: vector<StoreLotterySnapshot> |
 | Событие | `StoreSnapshotUpdatedEvent` | drop, store, copy | `admin`: address<br>`snapshot`: StoreLotterySnapshot |
 | Структура | `ItemWithStats` | copy, drop, store | `item`: StoreItem<br>`sold`: u64 |
+| Структура | `LegacyStoreItem` | drop, store | `lottery_id`: u64<br>`item_id`: u64<br>`price`: u64<br>`metadata`: vector<u8><br>`available`: bool<br>`stock`: option::Option<u64><br>`sold`: u64 |
 
 ### Модуль `lottery_rewards_engine::treasury` (`SupraLottery/supra/move_workspace/lottery_rewards_engine/sources/Treasury.move`)
 
@@ -810,7 +859,7 @@
 | Ресурс | `MigrationLedger` | key | `snapshots`: table::Table<u64, MigrationSnapshot><br>`lottery_ids`: vector<u64><br>`snapshot_events`: event::EventHandle<MigrationSnapshotUpdatedEvent> |
 | Структура | `MigrationSnapshot` | copy, drop, store | `lottery_id`: u64<br>`ticket_count`: u64<br>`legacy_next_ticket_id`: u64<br>`migrated_next_ticket_id`: u64<br>`legacy_draw_scheduled`: bool<br>`migrated_draw_scheduled`: bool<br>`legacy_pending_request`: bool<br>`jackpot_amount_migrated`: u64<br>`prize_bps`: u64<br>`jackpot_bps`: u64<br>`operations_bps`: u64 |
 | Событие | `MigrationSnapshotUpdatedEvent` | drop, store, copy | `lottery_id`: u64<br>`snapshot`: MigrationSnapshot |
-| Ресурс | `MigrationSession` | key | `instances_cap`: option::Option<instances::InstancesExportCap><br>`legacy_cap`: option::Option<treasury_v1::LegacyTreasuryCap> |
+| Ресурс | `MigrationSession` | key | `instances_cap`: option::Option<instances::InstancesExportCap><br>`legacy_cap`: option::Option<treasury::LegacyTreasuryCap> |
 
 
 ## Пакет `lottery_utils`
@@ -831,6 +880,7 @@
 | Ресурс | `HistoryCollection` | key | `admin`: address<br>`histories`: table::Table<u64, LotteryHistory><br>`lottery_ids`: vector<u64><br>`record_events`: event::EventHandle<DrawRecordedEvent><br>`snapshot_events`: event::EventHandle<HistorySnapshotUpdatedEvent> |
 | Ресурс | `HistoryWarden` | key | `writer`: rounds::HistoryWriterCap |
 | Структура | `DrawRecord` | copy, drop, store | `lottery_id`: u64<br>`request_id`: u64<br>`winner`: address<br>`ticket_index`: u64<br>`prize_amount`: u64<br>`random_bytes`: vector<u8><br>`payload`: vector<u8><br>`timestamp_seconds`: u64 |
+| Структура | `LegacyHistoryRecord` | drop, store | `lottery_id`: u64<br>`request_id`: u64<br>`winner`: address<br>`ticket_index`: u64<br>`prize_amount`: u64<br>`random_bytes`: vector<u8><br>`payload`: vector<u8><br>`timestamp_seconds`: u64 |
 | Структура | `LotteryHistorySnapshot` | copy, drop, store | `lottery_id`: u64<br>`records`: vector<DrawRecord> |
 | Структура | `HistorySnapshot` | copy, drop, store | `admin`: address<br>`lottery_ids`: vector<u64><br>`histories`: vector<LotteryHistorySnapshot> |
 | Событие | `DrawRecordedEvent` | drop, store, copy | `lottery_id`: u64<br>`request_id`: u64<br>`winner`: address<br>`ticket_index`: u64<br>`prize_amount`: u64<br>`timestamp_seconds`: u64 |
@@ -845,6 +895,7 @@
 | Категория | Структура | Способности | Поля |
 | --- | --- | --- | --- |
 | Структура | `LotteryMetadata` | copy, drop, store | `title`: vector<u8><br>`description`: vector<u8><br>`image_uri`: vector<u8><br>`website_uri`: vector<u8><br>`rules_uri`: vector<u8> |
+| Структура | `LegacyMetadataImport` | copy, drop, store | `lottery_id`: u64<br>`metadata`: LotteryMetadata |
 | Ресурс | `MetadataRegistry` | key | `admin`: address<br>`entries`: table::Table<u64, LotteryMetadata><br>`lottery_ids`: vector<u64><br>`upsert_events`: event::EventHandle<LotteryMetadataUpsertedEvent><br>`remove_events`: event::EventHandle<LotteryMetadataRemovedEvent><br>`admin_events`: event::EventHandle<MetadataAdminUpdatedEvent><br>`snapshot_events`: event::EventHandle<MetadataSnapshotUpdatedEvent> |
 | Событие | `LotteryMetadataUpsertedEvent` | drop, store, copy | `lottery_id`: u64<br>`created`: bool<br>`metadata`: LotteryMetadata |
 | Событие | `LotteryMetadataRemovedEvent` | drop, store, copy | `lottery_id`: u64 |
@@ -860,7 +911,7 @@
 | Ресурс | `MigrationLedger` | key | `snapshots`: table::Table<u64, MigrationSnapshot><br>`lottery_ids`: vector<u64><br>`snapshot_events`: event::EventHandle<MigrationSnapshotUpdatedEvent> |
 | Структура | `MigrationSnapshot` | copy, drop, store | `lottery_id`: u64<br>`ticket_count`: u64<br>`legacy_next_ticket_id`: u64<br>`migrated_next_ticket_id`: u64<br>`legacy_draw_scheduled`: bool<br>`migrated_draw_scheduled`: bool<br>`legacy_pending_request`: bool<br>`jackpot_amount_migrated`: u64<br>`prize_bps`: u64<br>`jackpot_bps`: u64<br>`operations_bps`: u64 |
 | Событие | `MigrationSnapshotUpdatedEvent` | drop, store, copy | `lottery_id`: u64<br>`snapshot`: MigrationSnapshot |
-| Ресурс | `MigrationSession` | key | `instances_cap`: option::Option<instances::InstancesExportCap><br>`legacy_cap`: option::Option<treasury_v1::LegacyTreasuryCap> |
+| Ресурс | `MigrationSession` | key | `instances_cap`: option::Option<instances::InstancesExportCap><br>`legacy_cap`: option::Option<treasury::LegacyTreasuryCap> |
 
 ### Модуль `lottery_utils::price_feed` (`SupraLottery/supra/move_workspace/lottery_utils/sources/PriceFeed.move`)
 

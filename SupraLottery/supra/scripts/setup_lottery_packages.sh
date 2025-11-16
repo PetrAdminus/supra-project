@@ -371,7 +371,7 @@ MOVE
     lottery_core:core_treasury_v1)
       cat <<'MOVE' >"${target}"
 /// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° РјРѕРґСѓР»СЏ `lottery_core::core_treasury_v1`.
-/// TODO: РїРµСЂРµРЅРµСЃС‚Рё СЂРµР°Р»РёР·Р°С†РёСЋ РёР· `lottery::treasury_v1` СЃ СѓС‡С‘С‚РѕРј РЅРѕРІРѕР№ РјРѕРґРµР»Рё capability.
+/// TODO: РїРµСЂРµРЅРµСЃС‚Рё СЂРµР°Р»РёР·Р°С†РёСЋ РёР· `lottery::treasury` СЃ СѓС‡С‘С‚РѕРј РЅРѕРІРѕР№ РјРѕРґРµР»Рё capability.
 module lottery_core::core_treasury_v1 {
     /// Р—Р°РіР»СѓС€РєР° РґР»СЏ РїРѕРґРґРµСЂР¶Р°РЅРёСЏ СЃР±РѕСЂРєРё.
     const TODO_PLACEHOLDER: bool = false;
@@ -442,7 +442,7 @@ MOVE
     lottery_rewards:rewards_autopurchase)
       cat <<'MOVE' >"${target}"
 /// Р’СЂРµРјРµРЅРЅР°СЏ Р·Р°РіР»СѓС€РєР° `lottery_rewards::rewards_autopurchase`.
-/// TODO: РїРµСЂРµРЅРµСЃС‚Рё С„СѓРЅРєС†РёРѕРЅР°Р» Р°РІС‚РѕРїРѕРєСѓРїРѕРє Рё Р·Р°РїСЂРѕСЃ capability Сѓ `lottery_core::core_rounds` Рё `treasury_v1`.
+/// TODO: РїРµСЂРµРЅРµСЃС‚Рё С„СѓРЅРєС†РёРѕРЅР°Р» Р°РІС‚РѕРїРѕРєСѓРїРѕРє Рё Р·Р°РїСЂРѕСЃ capability Сѓ `lottery_core::core_rounds` Рё `treasury`.
 module lottery_rewards::rewards_autopurchase {
     use std::signer;
 

@@ -8,6 +8,13 @@ module lottery_data::vrf_deposit {
     const E_NOT_PUBLISHED: u64 = 2;
     const E_UNAUTHORIZED: u64 = 3;
 
+    public struct LegacyVrfDepositLedger has drop, store {
+        admin: address,
+        config: VrfDepositConfig,
+        status: VrfDepositStatus,
+        snapshot_timestamp: u64,
+    }
+
     struct VrfDepositConfig has copy, drop, store {
         min_balance_multiplier_bps: u64,
         effective_floor: u64,
@@ -61,6 +68,12 @@ module lottery_data::vrf_deposit {
         alert_events: event::EventHandle<VrfDepositAlertEvent>,
         paused_events: event::EventHandle<VrfRequestsPausedEvent>,
         resumed_events: event::EventHandle<VrfRequestsResumedEvent>,
+    }
+
+    public entry fun import_existing_ledger(caller: &signer, record: LegacyVrfDepositLedger)
+    acquires VrfDepositLedger {
+        ensure_admin(caller);
+        restore_ledger_from_legacy(record);
     }
 
     public entry fun init_ledger(
@@ -163,5 +176,39 @@ module lottery_data::vrf_deposit {
             &mut ledger.resumed_events,
             VrfRequestsResumedEvent { timestamp },
         );
+    }
+
+    fun ensure_admin(caller: &signer) acquires VrfDepositLedger {
+        let ledger = ledger(@lottery);
+        if (signer::address_of(caller) != ledger.admin) {
+            abort E_UNAUTHORIZED;
+        };
+    }
+
+    fun restore_ledger_from_legacy(record: LegacyVrfDepositLedger) acquires VrfDepositLedger {
+        let LegacyVrfDepositLedger {
+            admin,
+            config,
+            status,
+            snapshot_timestamp,
+        } = record;
+        let ledger = ledger_mut(@lottery);
+        ledger.admin = admin;
+        ledger.config = config;
+        ledger.status = status;
+        emit_snapshot(
+            ledger,
+            status.total_balance,
+            status.minimum_balance,
+            status.effective_balance,
+            status.required_minimum,
+            config.effective_floor,
+            snapshot_timestamp,
+        );
+        if (status.requests_paused) {
+            emit_paused(ledger, status.paused_since_ts);
+        } else {
+            emit_resumed(ledger, status.last_update_ts);
+        };
     }
 }

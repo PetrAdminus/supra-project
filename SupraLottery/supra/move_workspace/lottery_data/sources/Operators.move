@@ -11,6 +11,12 @@ module lottery_data::operators {
     const E_UNAUTHORIZED: u64 = 2;
     const E_UNKNOWN_LOTTERY: u64 = 3;
 
+    public struct LegacyOperatorRecord has drop, store {
+        lottery_id: u64,
+        owner: option::Option<address>,
+        operators: vector<address>,
+    }
+
     struct LotteryOperatorEntry has store {
         owner: option::Option<address>,
         operators: table::Table<address, bool>,
@@ -65,6 +71,20 @@ module lottery_data::operators {
         lottery_id: u64,
         owner: option::Option<address>,
         operators: vector<address>,
+    }
+
+    public entry fun import_existing_operator_record(caller: &signer, record: LegacyOperatorRecord)
+    acquires OperatorRegistry {
+        ensure_admin(caller);
+        upsert_legacy_operator_record(record);
+    }
+
+    public entry fun import_existing_operator_records(
+        caller: &signer,
+        mut records: vector<LegacyOperatorRecord>,
+    ) acquires OperatorRegistry {
+        ensure_admin(caller);
+        import_existing_operator_records_recursive(&mut records);
     }
 
     public entry fun init_registry(caller: &signer) {
@@ -198,5 +218,75 @@ module lottery_data::operators {
                 operators: entry.operator_list,
             },
         );
+    }
+
+    fun import_existing_operator_records_recursive(records: &mut vector<LegacyOperatorRecord>)
+    acquires OperatorRegistry {
+        if (vector::is_empty(records)) {
+            return;
+        };
+        let record = vector::pop_back(records);
+        import_existing_operator_records_recursive(records);
+        upsert_legacy_operator_record(record);
+    }
+
+    fun upsert_legacy_operator_record(record: LegacyOperatorRecord) acquires OperatorRegistry {
+        let LegacyOperatorRecord {
+            lottery_id,
+            owner,
+            mut operators,
+        } = record;
+        let registry = borrow_registry_mut(@lottery);
+        ensure_entry(registry, lottery_id);
+        ensure_lottery_id_recorded(&mut registry.lottery_ids, lottery_id, 0);
+        {
+            let entry = table::borrow_mut(&mut registry.entries, lottery_id);
+            reset_operator_entry(entry);
+        };
+        set_owner(registry, lottery_id, owner);
+        record_legacy_operators(registry, lottery_id, &mut operators);
+        emit_snapshot(registry, lottery_id);
+    }
+
+    fun record_legacy_operators(
+        registry: &mut OperatorRegistry,
+        lottery_id: u64,
+        operators: &mut vector<address>,
+    ) acquires OperatorRegistry {
+        if (vector::is_empty(operators)) {
+            return;
+        };
+        let operator = vector::pop_back(operators);
+        record_legacy_operators(registry, lottery_id, operators);
+        grant_operator(registry, lottery_id, operator, registry.admin);
+    }
+
+    fun reset_operator_entry(entry: &mut LotteryOperatorEntry) {
+        entry.operators = table::new<address, bool>();
+        entry.operator_list = vector::empty<address>();
+    }
+
+    fun ensure_lottery_id_recorded(ids: &mut vector<u64>, lottery_id: u64, index: u64) {
+        if (contains_lottery_id(ids, lottery_id, index)) {
+            return;
+        };
+        vector::push_back(ids, lottery_id);
+    }
+
+    fun contains_lottery_id(ids: &vector<u64>, lottery_id: u64, index: u64): bool {
+        if (index == vector::length(ids)) {
+            return false;
+        };
+        if (*vector::borrow(ids, index) == lottery_id) {
+            return true;
+        };
+        contains_lottery_id(ids, lottery_id, index + 1)
+    }
+
+    fun ensure_admin(caller: &signer) acquires OperatorRegistry {
+        let registry = borrow_registry(@lottery);
+        if (signer::address_of(caller) != registry.admin) {
+            abort E_UNAUTHORIZED;
+        };
     }
 }

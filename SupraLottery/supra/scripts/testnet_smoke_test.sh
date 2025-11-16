@@ -25,9 +25,9 @@ supra_cli_info "Admin address: ${ADMIN_ADDR}"
 supra_cli_info "Tickets to buy: ${TICKETS_REQUIRED}"
 
 supra_cli_info "Ensuring primary store for admin"
-STORE_STATUS=$(supra_cli_move_view "--function-id ${LOTTERY_ADDR}::treasury_v1::store_registered --args address:${ADMIN_ADDR}" | tr -d '\r')
+STORE_STATUS=$(supra_cli_move_view "--function-id ${LOTTERY_ADDR}::treasury::store_registered --args address:${ADMIN_ADDR}" | tr -d '\r')
 if [[ "${STORE_STATUS}" == *"false"* ]]; then
-  supra_cli_move_run "--function-id ${LOTTERY_ADDR}::treasury_v1::register_store_for --args address:${ADMIN_ADDR} --assume-yes"
+  supra_cli_move_run "--function-id ${LOTTERY_ADDR}::treasury::register_store_for --args address:${ADMIN_ADDR} --assume-yes"
 fi
 
 if [[ -n ${AGGREGATOR_ADDR:-} ]]; then
@@ -47,7 +47,7 @@ if [[ -n ${CONSUMER_ADDRS:-} ]]; then
 fi
 
 supra_cli_info "Minting ${TICKET_FUND} tokens to admin"
-supra_cli_move_run "--function-id ${LOTTERY_ADDR}::treasury_v1::mint_to --args address:${ADMIN_ADDR} u64:${TICKET_FUND} --assume-yes"
+supra_cli_move_run "--function-id ${LOTTERY_ADDR}::treasury::mint_to --args address:${ADMIN_ADDR} u64:${TICKET_FUND} --assume-yes"
 
 supra_cli_info "Reading ticket price"
 PRICE_JSON=$(supra_cli_move_view "--function-id ${LOTTERY_ADDR}::core_main_v2::get_ticket_price" | tr -d '\r')

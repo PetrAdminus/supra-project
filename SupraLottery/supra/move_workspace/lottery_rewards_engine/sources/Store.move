@@ -5,7 +5,7 @@ module lottery_rewards_engine::store {
 
     use lottery_data::instances;
     use lottery_data::treasury_multi;
-    use lottery_data::treasury_v1;
+    use lottery_data::treasury;
     use lottery_utils::math;
     use supra_framework::account;
     use supra_framework::event;
@@ -107,6 +107,16 @@ module lottery_rewards_engine::store {
 
     struct ItemWithStats has copy, drop, store {
         item: StoreItem,
+        sold: u64,
+    }
+
+    public struct LegacyStoreItem has drop, store {
+        lottery_id: u64,
+        item_id: u64,
+        price: u64,
+        metadata: vector<u8>,
+        available: bool,
+        stock: option::Option<u64>,
         sold: u64,
     }
 
@@ -234,7 +244,7 @@ module lottery_rewards_engine::store {
         lottery_id: u64,
         item_id: u64,
         quantity: u64,
-    ) acquires StoreAccess, StoreState, treasury_multi::TreasuryState, treasury_v1::TokenState {
+    ) acquires StoreAccess, StoreState, treasury_multi::TreasuryState, treasury::TokenState {
         if (quantity == 0) {
             abort E_INVALID_QUANTITY;
         };
@@ -389,6 +399,20 @@ module lottery_rewards_engine::store {
         exists<StoreAccess>(@lottery)
     }
 
+    public entry fun import_existing_item(caller: &signer, item: LegacyStoreItem)
+    acquires StoreState {
+        ensure_admin(caller);
+        upsert_legacy_item(item);
+    }
+
+    public entry fun import_existing_items(
+        caller: &signer,
+        mut items: vector<LegacyStoreItem>,
+    ) acquires StoreState {
+        ensure_admin(caller);
+        import_existing_items_recursive(&mut items);
+    }
+
     #[view]
     public fun scope_id(): u64 {
         treasury_multi::scope_store()
@@ -400,7 +424,7 @@ module lottery_rewards_engine::store {
         lottery_id: u64,
         item_id: u64,
         quantity: u64,
-    ): u64 acquires treasury_v1::TokenState {
+    ): u64 acquires treasury::TokenState {
         if (!table::contains(&state.lotteries, lottery_id)) {
             abort E_ITEM_NOT_FOUND;
         };
@@ -414,7 +438,7 @@ module lottery_rewards_engine::store {
         };
         let new_stock = next_stock(&record.item.stock, quantity);
         let total_price = math::safe_mul_u64(record.item.price, quantity, E_PRICE_OVERFLOW);
-        treasury_v1::deposit_from_user(buyer, total_price);
+        treasury::deposit_from_user(buyer, total_price);
         record.item.stock = new_stock;
         record.sold = math::safe_add_u64(record.sold, quantity, E_SOLD_OVERFLOW);
         total_price
@@ -668,6 +692,50 @@ module lottery_rewards_engine::store {
         };
         vector::push_back(dst, *vector::borrow(src, index));
         append_u8(dst, src, index + 1);
+    }
+
+    fun import_existing_items_recursive(items: &mut vector<LegacyStoreItem>) acquires StoreState {
+        if (vector::is_empty(items)) {
+            return;
+        };
+        let item = vector::pop_back(items);
+        import_existing_items_recursive(items);
+        upsert_legacy_item(item);
+    }
+
+    fun upsert_legacy_item(item: LegacyStoreItem) acquires StoreState {
+        ensure_initialized();
+        let LegacyStoreItem {
+            lottery_id,
+            item_id,
+            price,
+            metadata,
+            available,
+            stock,
+            sold,
+        } = item;
+        ensure_lottery_known(lottery_id);
+        let stored_metadata = copy_vec_u8(&metadata);
+        let event_metadata = copy_vec_u8(&metadata);
+        let state = borrow_global_mut<StoreState>(@lottery);
+        let store = borrow_or_add_store(state, lottery_id);
+        if (table::contains(&store.items, item_id)) {
+            let record = table::borrow_mut(&mut store.items, item_id);
+            record.item = StoreItem { price, metadata: stored_metadata, available, stock };
+            record.sold = sold;
+        } else {
+            table::add(
+                &mut store.items,
+                item_id,
+                StoreRecord { item: StoreItem { price, metadata: stored_metadata, available, stock }, sold },
+            );
+            record_item_id(&mut store.item_ids, item_id);
+        };
+        event::emit_event(
+            &mut state.item_events,
+            ItemConfiguredEvent { lottery_id, item_id, price, available, stock, metadata: event_metadata },
+        );
+        emit_store_snapshot(state, lottery_id);
     }
 
     fun contains_u64(values: &vector<u64>, target: u64, index: u64): bool {

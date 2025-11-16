@@ -1,6 +1,6 @@
 module lottery_utils::migration {
     use lottery_data::instances;
-    use lottery_data::treasury_v1;
+    use lottery_data::treasury;
     use std::option;
     use std::signer;
     use std::vector;
@@ -43,7 +43,7 @@ module lottery_utils::migration {
 
     struct MigrationSession has key {
         instances_cap: option::Option<instances::InstancesExportCap>,
-        legacy_cap: option::Option<treasury_v1::LegacyTreasuryCap>,
+        legacy_cap: option::Option<treasury::LegacyTreasuryCap>,
     }
 
     public entry fun init_ledger(caller: &signer) acquires MigrationLedger {
@@ -67,7 +67,7 @@ module lottery_utils::migration {
     }
 
     public entry fun ensure_caps_initialized(caller: &signer)
-    acquires MigrationSession, instances::InstanceControl, treasury_v1::TreasuryV1Control {
+    acquires MigrationSession, instances::InstanceControl, treasury::TreasuryV1Control {
         ensure_admin(caller);
         let addr = signer::address_of(caller);
         if (!exists<MigrationSession>(addr)) {
@@ -75,7 +75,7 @@ module lottery_utils::migration {
                 caller,
                 MigrationSession {
                     instances_cap: option::none<instances::InstancesExportCap>(),
-                    legacy_cap: option::none<treasury_v1::LegacyTreasuryCap>(),
+                    legacy_cap: option::none<treasury::LegacyTreasuryCap>(),
                 },
             );
         };
@@ -96,10 +96,10 @@ module lottery_utils::migration {
             new_instances_cap = extracted;
         };
 
-        let mut new_legacy_cap = option::none<treasury_v1::LegacyTreasuryCap>();
+        let mut new_legacy_cap = option::none<treasury::LegacyTreasuryCap>();
         if (need_legacy_cap) {
-            let control = treasury_v1::borrow_control_mut(@lottery);
-            let extracted = treasury_v1::extract_legacy_cap(control);
+            let control = treasury::borrow_control_mut(@lottery);
+            let extracted = treasury::extract_legacy_cap(control);
             if (!option::is_some(&extracted)) {
                 if (need_instances_cap) {
                     let control_restore = instances::borrow_control_mut(@lottery);
@@ -129,7 +129,7 @@ module lottery_utils::migration {
     }
 
     public entry fun release_caps(caller: &signer)
-    acquires MigrationSession, instances::InstanceControl, treasury_v1::TreasuryV1Control {
+    acquires MigrationSession, instances::InstanceControl, treasury::TreasuryV1Control {
         ensure_admin(caller);
         if (!exists<MigrationSession>(@lottery)) {
             abort E_SESSION_NOT_INITIALIZED;
@@ -144,8 +144,8 @@ module lottery_utils::migration {
         };
         if (option::is_some(&legacy_cap)) {
             let cap = option::destroy_some(legacy_cap);
-            let control = treasury_v1::borrow_control_mut(@lottery);
-            treasury_v1::restore_legacy_cap(control, cap);
+            let control = treasury::borrow_control_mut(@lottery);
+            treasury::restore_legacy_cap(control, cap);
         } else {
             option::destroy_none(legacy_cap);
         };
@@ -157,7 +157,7 @@ module lottery_utils::migration {
         option::borrow(&session.instances_cap)
     }
 
-    public fun borrow_legacy_cap(): &treasury_v1::LegacyTreasuryCap acquires MigrationSession {
+    public fun borrow_legacy_cap(): &treasury::LegacyTreasuryCap acquires MigrationSession {
         ensure_session_ready();
         let session = borrow_global<MigrationSession>(@lottery);
         option::borrow(&session.legacy_cap)

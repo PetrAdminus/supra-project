@@ -7,7 +7,7 @@ module lottery_rewards_engine::autopurchase {
     use lottery_data::lottery_state;
     use lottery_data::rounds;
     use lottery_data::treasury_multi;
-    use lottery_data::treasury_v1;
+    use lottery_data::treasury;
     use lottery_engine::sales;
     use supra_framework::account;
     use supra_framework::event;
@@ -37,6 +37,14 @@ module lottery_rewards_engine::autopurchase {
         total_balance: u64,
     }
 
+    public struct LegacyAutopurchasePlan has drop, store {
+        lottery_id: u64,
+        player: address,
+        balance: u64,
+        tickets_per_draw: u64,
+        active: bool,
+    }
+
     struct AutopurchaseState has key {
         admin: address,
         lotteries: table::Table<u64, LotteryPlans>,
@@ -50,7 +58,7 @@ module lottery_rewards_engine::autopurchase {
 
     struct AutopurchaseAccess has key {
         rounds: rounds::AutopurchaseRoundCap,
-        treasury: treasury_v1::AutopurchaseTreasuryCap,
+        treasury: treasury::AutopurchaseTreasuryCap,
     }
 
     struct AutopurchaseLotterySummary has copy, drop, store {
@@ -143,7 +151,7 @@ module lottery_rewards_engine::autopurchase {
     }
 
     public entry fun init_access(caller: &signer)
-    acquires AutopurchaseAccess, AutopurchaseState, rounds::RoundControl, treasury_v1::TreasuryV1Control {
+    acquires AutopurchaseAccess, AutopurchaseState, rounds::RoundControl, treasury::TreasuryV1Control {
         ensure_admin(caller);
         if (exists<AutopurchaseAccess>(@lottery)) {
             abort E_ALREADY_INITIALIZED;
@@ -155,8 +163,8 @@ module lottery_rewards_engine::autopurchase {
         };
         let rounds_cap = option::destroy_some(rounds_cap_opt);
 
-        let treasury_control = treasury_v1::borrow_control_mut(@lottery);
-        let treasury_cap_opt = treasury_v1::extract_autopurchase_cap(treasury_control);
+        let treasury_control = treasury::borrow_control_mut(@lottery);
+        let treasury_cap_opt = treasury::extract_autopurchase_cap(treasury_control);
         if (!option::is_some(&treasury_cap_opt)) {
             rounds::restore_autopurchase_cap(rounds_control, rounds_cap);
             abort E_CAPS_UNAVAILABLE;
@@ -170,7 +178,7 @@ module lottery_rewards_engine::autopurchase {
     }
 
     public entry fun release_access(caller: &signer)
-    acquires AutopurchaseAccess, rounds::RoundControl, treasury_v1::TreasuryV1Control {
+    acquires AutopurchaseAccess, rounds::RoundControl, treasury::TreasuryV1Control {
         let addr = signer::address_of(caller);
         if (addr != @lottery) {
             abort E_NOT_AUTHORIZED;
@@ -182,8 +190,22 @@ module lottery_rewards_engine::autopurchase {
             move_from<AutopurchaseAccess>(@lottery);
         let rounds_control = rounds::borrow_control_mut(@lottery);
         rounds::restore_autopurchase_cap(rounds_control, rounds_cap);
-        let treasury_control = treasury_v1::borrow_control_mut(@lottery);
-        treasury_v1::restore_autopurchase_cap(treasury_control, treasury_cap);
+        let treasury_control = treasury::borrow_control_mut(@lottery);
+        treasury::restore_autopurchase_cap(treasury_control, treasury_cap);
+    }
+
+    public entry fun import_existing_plan(caller: &signer, plan: LegacyAutopurchasePlan)
+    acquires AutopurchaseState {
+        ensure_admin(caller);
+        upsert_legacy_plan(plan);
+    }
+
+    public entry fun import_existing_plans(
+        caller: &signer,
+        mut plans: vector<LegacyAutopurchasePlan>,
+    ) acquires AutopurchaseState {
+        ensure_admin(caller);
+        import_existing_plans_recursive(&mut plans);
     }
 
     #[view]
@@ -236,12 +258,12 @@ module lottery_rewards_engine::autopurchase {
     }
 
     public entry fun deposit(caller: &signer, lottery_id: u64, amount: u64)
-    acquires AutopurchaseState, treasury_v1::TokenState {
+    acquires AutopurchaseState, treasury::TokenState {
         if (amount == 0) {
             abort E_INVALID_AMOUNT;
         };
         ensure_lottery_known(lottery_id);
-        treasury_v1::deposit_from_user(caller, amount);
+        treasury::deposit_from_user(caller, amount);
         ensure_autopurchase_initialized();
         let state = borrow_global_mut<AutopurchaseState>(@lottery);
         let plans = ensure_lottery_plans(state, lottery_id);
@@ -323,7 +345,7 @@ module lottery_rewards_engine::autopurchase {
         caller: &signer,
         lottery_id: u64,
         amount: u64,
-    ) acquires AutopurchaseAccess, AutopurchaseState, treasury_v1::TokenState {
+    ) acquires AutopurchaseAccess, AutopurchaseState, treasury::TokenState {
         if (amount == 0) {
             abort E_INVALID_AMOUNT;
         };
@@ -343,7 +365,7 @@ module lottery_rewards_engine::autopurchase {
         plan.balance = plan.balance - amount;
         plans.total_balance = plans.total_balance - amount;
         let access = borrow_global<AutopurchaseAccess>(@lottery);
-        treasury_v1::payout_with_autopurchase_cap(&access.treasury, player, amount);
+        treasury::payout_with_autopurchase_cap(&access.treasury, player, amount);
         event::emit_event(
             &mut state.refund_events,
             AutopurchaseRefundedEvent { lottery_id, player, amount, remaining_balance: plan.balance },
@@ -571,5 +593,55 @@ module lottery_rewards_engine::autopurchase {
         let registry = instances::borrow_registry(@lottery);
         let record = instances::instance(registry, lottery_id);
         record.ticket_price
+    }
+
+    fun import_existing_plans_recursive(plans: &mut vector<LegacyAutopurchasePlan>)
+    acquires AutopurchaseState {
+        if (vector::is_empty(plans)) {
+            return;
+        };
+        let plan = vector::pop_back(plans);
+        import_existing_plans_recursive(plans);
+        upsert_legacy_plan(plan);
+    }
+
+    fun upsert_legacy_plan(plan: LegacyAutopurchasePlan) acquires AutopurchaseState {
+        ensure_autopurchase_initialized();
+        let LegacyAutopurchasePlan {
+            lottery_id,
+            player,
+            balance,
+            tickets_per_draw,
+            active,
+        } = plan;
+        ensure_lottery_known(lottery_id);
+        let state = borrow_global_mut<AutopurchaseState>(@lottery);
+        let plans = ensure_lottery_plans(state, lottery_id);
+        let previous_balance = if (table::contains(&plans.plans, player)) {
+            let existing = table::borrow_mut(&mut plans.plans, player);
+            let old_balance = existing.balance;
+            existing.balance = balance;
+            existing.tickets_per_draw = tickets_per_draw;
+            existing.active = active;
+            old_balance
+        } else {
+            record_player(plans, player);
+            table::add(
+                &mut plans.plans,
+                player,
+                AutopurchasePlan { balance, tickets_per_draw, active },
+            );
+            0
+        };
+        if (previous_balance > plans.total_balance) {
+            plans.total_balance = balance;
+        } else {
+            plans.total_balance = (plans.total_balance - previous_balance) + balance;
+        };
+        event::emit_event(
+            &mut state.config_events,
+            AutopurchaseConfigUpdatedEvent { lottery_id, player, tickets_per_draw, active },
+        );
+        emit_autopurchase_snapshot(state, lottery_id);
     }
 }

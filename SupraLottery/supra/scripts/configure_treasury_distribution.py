@@ -14,7 +14,7 @@ BASIS_POINT_DENOMINATOR = 10_000
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Обновить распределение казначейства lottery::treasury_v1::set_config",
+        description="Обновить распределение казначейства lottery::treasury::set_config",
     )
     add_monitor_arguments(parser, include_fail_on_low=False)
     parser.add_argument(
@@ -74,7 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "переопределить идентификатор функции. По умолчанию используется "
-            "<lottery_addr>::treasury_v1::set_config"
+            "<lottery_addr>::treasury::set_config"
         ),
     )
     return parser
@@ -119,7 +119,7 @@ def target_function_id(ns: argparse.Namespace) -> str:
         return str(ns.function_id)
     if not ns.lottery_addr:
         raise MonitorError("Нужно указать адрес контракта лотереи (--lottery-addr)")
-    return f"{ns.lottery_addr}::treasury_v1::set_config"
+    return f"{ns.lottery_addr}::treasury::set_config"
 
 
 def execute(ns: argparse.Namespace, *, now: Optional[datetime] = None) -> Dict[str, object]:

@@ -13,6 +13,8 @@ module lottery_data::rounds {
     const E_ROUND_EXISTS: u64 = 4;
     const E_HISTORY_QUEUE_MISSING: u64 = 5;
     const E_HISTORY_CAP_OCCUPIED: u64 = 6;
+    const E_PURCHASE_QUEUE_MISSING: u64 = 7;
+    const E_NOT_ADMIN: u64 = 8;
 
     struct RoundRuntime has copy, drop, store {
         tickets: vector<address>,
@@ -118,6 +120,14 @@ module lottery_data::rounds {
 
     struct PendingPurchaseQueue has key {
         pending: vector<PendingPurchaseRecord>,
+    }
+
+    public struct LegacyRoundRecord has drop, store {
+        lottery_id: u64,
+        tickets: vector<address>,
+        draw_scheduled: bool,
+        next_ticket_id: u64,
+        pending_request: option::Option<u64>,
     }
 
     public entry fun init_registry(caller: &signer) {
@@ -242,6 +252,15 @@ module lottery_data::rounds {
         borrow_global_mut<PendingHistoryQueue>(addr)
     }
 
+    #[view]
+    public fun history_queue_length(): u64 acquires PendingHistoryQueue {
+        if (!exists<PendingHistoryQueue>(@lottery)) {
+            return 0;
+        };
+        let queue = borrow_global<PendingHistoryQueue>(@lottery);
+        vector::length(&queue.pending)
+    }
+
     public fun enqueue_history_record(
         queue: &mut PendingHistoryQueue,
         lottery_id: u64,
@@ -317,6 +336,84 @@ module lottery_data::rounds {
         borrow_global_mut<PendingPurchaseQueue>(addr)
     }
 
+    #[view]
+    public fun purchase_queue_length(): u64 acquires PendingPurchaseQueue {
+        if (!exists<PendingPurchaseQueue>(@lottery)) {
+            return 0;
+        };
+        let queue = borrow_global<PendingPurchaseQueue>(@lottery);
+        vector::length(&queue.pending)
+    }
+
+    public fun enqueue_purchase_record(
+        queue: &mut PendingPurchaseQueue,
+        lottery_id: u64,
+        buyer: address,
+        ticket_count: u64,
+        paid_amount: u64,
+    ) {
+        vector::push_back(
+            &mut queue.pending,
+            PendingPurchaseRecord { lottery_id, buyer, ticket_count, paid_amount },
+        );
+    }
+
+    public fun drain_purchase_queue(
+        _cap: &AutopurchaseRoundCap,
+        limit: u64,
+    ): vector<PendingPurchaseRecord> acquires PendingPurchaseQueue {
+        assert!(exists<PendingPurchaseQueue>(@lottery), E_PURCHASE_QUEUE_MISSING);
+        let queue = borrow_global_mut<PendingPurchaseQueue>(@lottery);
+        let available = vector::length(&queue.pending);
+        let to_take = history_drain_limit(limit, available);
+        let drained = vector::empty<PendingPurchaseRecord>();
+        drain_purchase_records(&mut queue.pending, drained, to_take)
+    }
+
+    public fun destroy_pending_purchase_record(
+        record: PendingPurchaseRecord,
+    ): (u64, address, u64, u64) {
+        let PendingPurchaseRecord { lottery_id, buyer, ticket_count, paid_amount } = record;
+        (lottery_id, buyer, ticket_count, paid_amount)
+    }
+
+    public entry fun import_existing_round(
+        caller: &signer,
+        record: LegacyRoundRecord,
+    ) acquires RoundRegistry {
+        import_existing_rounds(caller, vector::singleton(record))
+    }
+
+    public entry fun import_existing_rounds(
+        caller: &signer,
+        mut records: vector<LegacyRoundRecord>,
+    ) acquires RoundRegistry {
+        ensure_admin(caller);
+        import_existing_rounds_recursive(&mut records);
+    }
+
+    public entry fun import_pending_history_records(
+        caller: &signer,
+        mut records: vector<PendingHistoryRecord>,
+    ) acquires PendingHistoryQueue, RoundRegistry {
+        ensure_admin(caller);
+        assert!(exists<PendingHistoryQueue>(@lottery), E_HISTORY_QUEUE_MISSING);
+        let queue = borrow_global_mut<PendingHistoryQueue>(@lottery);
+        queue.pending = vector::empty<PendingHistoryRecord>();
+        append_history_records(&mut queue.pending, &mut records);
+    }
+
+    public entry fun import_pending_purchase_records(
+        caller: &signer,
+        mut records: vector<PendingPurchaseRecord>,
+    ) acquires PendingPurchaseQueue, RoundRegistry {
+        ensure_admin(caller);
+        assert!(exists<PendingPurchaseQueue>(@lottery), E_PURCHASE_QUEUE_MISSING);
+        let queue = borrow_global_mut<PendingPurchaseQueue>(@lottery);
+        queue.pending = vector::empty<PendingPurchaseRecord>();
+        append_purchase_records(&mut queue.pending, &mut records);
+    }
+
     public fun register_round(registry: &mut RoundRegistry, lottery_id: u64, runtime: RoundRuntime) {
         assert!(!table::contains(&registry.rounds, lottery_id), E_ROUND_EXISTS);
         table::add(&mut registry.rounds, lottery_id, runtime);
@@ -377,5 +474,91 @@ module lottery_data::rounds {
             let next_remaining = remaining - 1;
             drain_history_records(source, next, next_remaining)
         }
+    }
+
+    fun import_existing_rounds_recursive(records: &mut vector<LegacyRoundRecord>) acquires RoundRegistry {
+        if (vector::is_empty(records)) {
+            return;
+        };
+        let record = vector::pop_back(records);
+        import_existing_rounds_recursive(records);
+        apply_legacy_round(record);
+    }
+
+    fun apply_legacy_round(record: LegacyRoundRecord) acquires RoundRegistry {
+        let LegacyRoundRecord {
+            lottery_id,
+            tickets,
+            draw_scheduled,
+            next_ticket_id,
+            pending_request,
+        } = record;
+        let registry = borrow_registry_mut(@lottery);
+        if (!table::contains(&registry.rounds, lottery_id)) {
+            register_round(
+                registry,
+                lottery_id,
+                RoundRuntime {
+                    tickets,
+                    draw_scheduled,
+                    next_ticket_id,
+                    pending_request,
+                },
+            );
+        } else {
+            let runtime = round_mut(registry, lottery_id);
+            runtime.tickets = tickets;
+            runtime.draw_scheduled = draw_scheduled;
+            runtime.next_ticket_id = next_ticket_id;
+            runtime.pending_request = pending_request;
+        };
+        emit_snapshot(registry, lottery_id);
+    }
+
+    fun append_history_records(
+        target: &mut vector<PendingHistoryRecord>,
+        records: &mut vector<PendingHistoryRecord>,
+    ) {
+        if (vector::is_empty(records)) {
+            return;
+        };
+        let record = vector::pop_back(records);
+        append_history_records(target, records);
+        vector::push_back(target, record);
+    }
+
+    fun append_purchase_records(
+        target: &mut vector<PendingPurchaseRecord>,
+        records: &mut vector<PendingPurchaseRecord>,
+    ) {
+        if (vector::is_empty(records)) {
+            return;
+        };
+        let record = vector::pop_back(records);
+        append_purchase_records(target, records);
+        vector::push_back(target, record);
+    }
+
+    fun drain_purchase_records(
+        source: &mut vector<PendingPurchaseRecord>,
+        drained: vector<PendingPurchaseRecord>,
+        remaining: u64,
+    ): vector<PendingPurchaseRecord> {
+        if (remaining == 0 || vector::is_empty(source)) {
+            drained
+        } else {
+            let record = vector::remove(source, 0);
+            let mut next = drained;
+            vector::push_back(&mut next, record);
+            let next_remaining = remaining - 1;
+            drain_purchase_records(source, next, next_remaining)
+        }
+    }
+
+    fun ensure_admin(caller: &signer) acquires RoundRegistry {
+        let registry = borrow_registry(@lottery);
+        if (signer::address_of(caller) != registry.admin) {
+            abort E_NOT_ADMIN;
+        };
     }
 }

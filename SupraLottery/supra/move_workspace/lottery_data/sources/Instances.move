@@ -13,6 +13,17 @@ module lottery_data::instances {
     const E_UNKNOWN_INSTANCE: u64 = 4;
     const E_EXPORT_CAP_OCCUPIED: u64 = 5;
 
+    public struct LegacyInstanceRecord has drop, store {
+        lottery_id: u64,
+        owner: address,
+        lottery_address: address,
+        ticket_price: u64,
+        jackpot_share_bps: u16,
+        tickets_sold: u64,
+        jackpot_accumulated: u64,
+        active: bool,
+    }
+
     struct InstanceRecord has store {
         owner: address,
         lottery_address: address,
@@ -101,6 +112,18 @@ module lottery_data::instances {
         status_events: event::EventHandle<LotteryInstanceStatusUpdatedEvent>,
         owner_events: event::EventHandle<LotteryInstanceOwnerUpdatedEvent>,
         snapshot_events: event::EventHandle<LotteryInstancesSnapshotUpdatedEvent>,
+    }
+
+    public entry fun import_existing_instance(caller: &signer, record: LegacyInstanceRecord)
+    acquires InstanceRegistry {
+        ensure_admin(caller);
+        upsert_legacy_instance(record);
+    }
+
+    public entry fun import_existing_instances(caller: &signer, mut records: vector<LegacyInstanceRecord>)
+    acquires InstanceRegistry {
+        ensure_admin(caller);
+        import_existing_instances_recursive(&mut records);
     }
 
     public entry fun init_registry(caller: &signer, hub: address) {
@@ -313,5 +336,81 @@ module lottery_data::instances {
                 },
             },
         );
+    }
+
+    fun import_existing_instances_recursive(records: &mut vector<LegacyInstanceRecord>)
+    acquires InstanceRegistry {
+        if (vector::is_empty(records)) {
+            return;
+        };
+        let record = vector::pop_back(records);
+        import_existing_instances_recursive(records);
+        upsert_legacy_instance(record);
+    }
+
+    fun upsert_legacy_instance(record: LegacyInstanceRecord) acquires InstanceRegistry {
+        let LegacyInstanceRecord {
+            lottery_id,
+            owner,
+            lottery_address,
+            ticket_price,
+            jackpot_share_bps,
+            tickets_sold,
+            jackpot_accumulated,
+            active,
+        } = record;
+        let registry = borrow_registry_mut(@lottery);
+        if (table::contains(&registry.instances, lottery_id)) {
+            let existing = table::borrow_mut(&mut registry.instances, lottery_id);
+            existing.owner = owner;
+            existing.lottery_address = lottery_address;
+            existing.ticket_price = ticket_price;
+            existing.jackpot_share_bps = jackpot_share_bps;
+            existing.tickets_sold = tickets_sold;
+            existing.jackpot_accumulated = jackpot_accumulated;
+            existing.active = active;
+        } else {
+            let new_record = InstanceRecord {
+                owner,
+                lottery_address,
+                ticket_price,
+                jackpot_share_bps,
+                tickets_sold,
+                jackpot_accumulated,
+                active,
+            };
+            register_instance(registry, lottery_id, new_record);
+            let stored = instance(registry, lottery_id);
+            emit_creation(registry, lottery_id, stored);
+        };
+        ensure_lottery_id_recorded(&mut registry.lottery_ids, lottery_id, 0);
+        emit_blueprint(registry, lottery_id, ticket_price, jackpot_share_bps);
+        emit_status(registry, lottery_id, active);
+        emit_snapshot(registry, lottery_id);
+    }
+
+    fun ensure_lottery_id_recorded(ids: &mut vector<u64>, lottery_id: u64, index: u64) {
+        if (contains_lottery_id(ids, lottery_id, index)) {
+            return;
+        };
+        vector::push_back(ids, lottery_id);
+    }
+
+    fun contains_lottery_id(ids: &vector<u64>, lottery_id: u64, index: u64): bool {
+        let len = vector::length(ids);
+        if (index == len) {
+            return false;
+        };
+        if (*vector::borrow(ids, index) == lottery_id) {
+            return true;
+        };
+        contains_lottery_id(ids, lottery_id, index + 1)
+    }
+
+    fun ensure_admin(caller: &signer) acquires InstanceRegistry {
+        let registry = borrow_registry(@lottery);
+        if (signer::address_of(caller) != registry.admin) {
+            abort E_UNAUTHORIZED;
+        };
     }
 }

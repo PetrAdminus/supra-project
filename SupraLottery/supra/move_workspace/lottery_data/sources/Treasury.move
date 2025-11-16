@@ -1,4 +1,4 @@
-module lottery_data::treasury_v1 {
+module lottery_data::treasury {
     use std::option;
     use std::signer;
 
@@ -16,6 +16,29 @@ module lottery_data::treasury_v1 {
     const E_STORE_FROZEN: u64 = 6;
     const E_AUTOPURCHASE_CAP_OCCUPIED: u64 = 7;
     const E_LEGACY_CAP_OCCUPIED: u64 = 8;
+
+    public struct LegacyVaultConfig has copy, drop, store {
+        bp_jackpot: u64,
+        bp_prize: u64,
+        bp_treasury: u64,
+        bp_marketing: u64,
+        bp_community: u64,
+        bp_team: u64,
+        bp_partners: u64,
+    }
+
+    public struct LegacyVaultRecipients has copy, drop, store {
+        treasury: address,
+        marketing: address,
+        community: address,
+        team: address,
+        partners: address,
+    }
+
+    public struct LegacyVaultState has drop, store {
+        config: LegacyVaultConfig,
+        recipients: LegacyVaultRecipients,
+    }
 
     struct VaultConfig has copy, drop, store {
         bp_jackpot: u64,
@@ -105,6 +128,14 @@ module lottery_data::treasury_v1 {
         admin: address,
         autopurchase_cap: option::Option<AutopurchaseTreasuryCap>,
         legacy_cap: option::Option<LegacyTreasuryCap>,
+    }
+
+    public entry fun import_existing_vaults(caller: &signer, payload: LegacyVaultState)
+    acquires Vaults {
+        ensure_admin_signer(caller);
+        ensure_vaults_initialized();
+        let vaults = borrow_global_mut<Vaults>(@lottery);
+        apply_legacy_vault_state(vaults, payload);
     }
 
     public entry fun init_vaults(caller: &signer, config: VaultConfig, recipients: VaultRecipients) {
@@ -289,7 +320,54 @@ module lottery_data::treasury_v1 {
     }
 
     public fun emit_recipients(vaults: &mut Vaults, previous: option::Option<VaultRecipientsSnapshot>) {
-        let snapshot = VaultRecipientsSnapshot {
+        let snapshot = current_recipient_snapshot(vaults);
+        event::emit_event(&mut vaults.recipient_events, RecipientsUpdatedEvent { previous, next: snapshot });
+    }
+
+    fun ensure_admin_signer(caller: &signer) {
+        let caller_address = signer::address_of(caller);
+        assert!(caller_address == @lottery, E_UNAUTHORIZED);
+    }
+
+    fun ensure_vaults_initialized() {
+        if (!exists<Vaults>(@lottery)) {
+            abort E_NOT_INITIALIZED;
+        };
+    }
+
+    fun apply_legacy_vault_state(vaults: &mut Vaults, payload: LegacyVaultState) {
+        let LegacyVaultState { config, recipients } = payload;
+        vaults.config = convert_legacy_config(config);
+        emit_config(vaults);
+        let previous = option::some(current_recipient_snapshot(vaults));
+        vaults.recipients = convert_legacy_recipients(recipients);
+        emit_recipients(vaults, previous);
+    }
+
+    fun convert_legacy_config(config: LegacyVaultConfig): VaultConfig {
+        VaultConfig {
+            bp_jackpot: config.bp_jackpot,
+            bp_prize: config.bp_prize,
+            bp_treasury: config.bp_treasury,
+            bp_marketing: config.bp_marketing,
+            bp_community: config.bp_community,
+            bp_team: config.bp_team,
+            bp_partners: config.bp_partners,
+        }
+    }
+
+    fun convert_legacy_recipients(recipients: LegacyVaultRecipients): VaultRecipients {
+        VaultRecipients {
+            treasury: recipients.treasury,
+            marketing: recipients.marketing,
+            community: recipients.community,
+            team: recipients.team,
+            partners: recipients.partners,
+        }
+    }
+
+    fun current_recipient_snapshot(vaults: &Vaults): VaultRecipientsSnapshot {
+        VaultRecipientsSnapshot {
             treasury: VaultRecipientStatus {
                 account: vaults.recipients.treasury,
                 registered: true,
@@ -325,7 +403,6 @@ module lottery_data::treasury_v1 {
                 store: option::none<address>(),
                 balance: 0,
             },
-        };
-        event::emit_event(&mut vaults.recipient_events, RecipientsUpdatedEvent { previous, next: snapshot });
+        }
     }
 }

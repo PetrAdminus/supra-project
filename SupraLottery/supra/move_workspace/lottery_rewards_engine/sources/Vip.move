@@ -6,7 +6,7 @@ module lottery_rewards_engine::vip {
 
     use lottery_data::instances;
     use lottery_data::treasury_multi;
-    use lottery_data::treasury_v1;
+    use lottery_data::treasury;
     use supra_framework::account;
     use supra_framework::event;
     use vrf_hub::table;
@@ -38,6 +38,25 @@ module lottery_rewards_engine::vip {
         members: vector<address>,
         total_revenue: u64,
         bonus_tickets_issued: u64,
+    }
+
+    /// Переносимые контейнеры не читают данные напрямую из легаси-пакетов —
+    /// скрипты миграции формируют payload оффчейн (из архивов devnet/testnet,
+    /// снапшотов dry-run либо ручных констант) и подают его в import-entry,
+    /// чтобы развернуть состояние без повторного списания средств.
+    public struct LegacyVipSubscription has drop, store {
+        player: address,
+        expiry_ts: u64,
+        bonus_tickets: u64,
+    }
+
+    public struct LegacyVipLottery has drop, store {
+        lottery_id: u64,
+        config: VipConfig,
+        total_revenue: u64,
+        bonus_tickets_issued: u64,
+        members: vector<address>,
+        subscriptions: vector<LegacyVipSubscription>,
     }
 
     struct VipState has key {
@@ -168,6 +187,20 @@ module lottery_rewards_engine::vip {
         let state = borrow_global_mut<VipState>(@lottery);
         state.admin = new_admin;
         emit_vip_snapshot(state);
+    }
+
+    public entry fun import_existing_lottery(caller: &signer, lottery: LegacyVipLottery)
+    acquires VipState {
+        ensure_admin(caller);
+        upsert_legacy_lottery(lottery);
+    }
+
+    public entry fun import_existing_lotteries(
+        caller: &signer,
+        mut lotteries: vector<LegacyVipLottery>,
+    ) acquires VipState {
+        ensure_admin(caller);
+        import_existing_lotteries_recursive(&mut lotteries);
     }
 
     public entry fun upsert_config(
@@ -425,7 +458,7 @@ module lottery_rewards_engine::vip {
         let lottery = table::borrow_mut(&mut state.lotteries, lottery_id);
         let config_snapshot = lottery.config;
         let price = config_snapshot.price;
-        treasury_v1::deposit_from_user(payer, price);
+        treasury::deposit_from_user(payer, price);
         let treasury_state = treasury_multi::borrow_state_mut(@lottery);
         treasury_multi::record_operations_income_with_cap(
             treasury_state,
@@ -619,6 +652,75 @@ module lottery_rewards_engine::vip {
             return;
         };
         vector::push_back(members, member);
+    }
+
+    fun import_existing_lotteries_recursive(lotteries: &mut vector<LegacyVipLottery>)
+    acquires VipState {
+        if (vector::is_empty(lotteries)) {
+            return;
+        };
+        let lottery = vector::pop_back(lotteries);
+        import_existing_lotteries_recursive(lotteries);
+        upsert_legacy_lottery(lottery);
+    }
+
+    fun upsert_legacy_lottery(lottery: LegacyVipLottery) acquires VipState {
+        ensure_initialized();
+        let LegacyVipLottery {
+            lottery_id,
+            config,
+            total_revenue,
+            bonus_tickets_issued,
+            members,
+            mut subscriptions,
+        } = lottery;
+        ensure_lottery_known(lottery_id);
+        let mut stored_members = copy_address_vector(&members);
+        let mut subscription_table = table::new<address, VipSubscription>();
+        restore_legacy_subscriptions(&mut subscription_table, &mut subscriptions);
+        let state = borrow_global_mut<VipState>(@lottery);
+        if (table::contains(&state.lotteries, lottery_id)) {
+            let _ = table::remove(&mut state.lotteries, lottery_id);
+        };
+        let price = config.price;
+        let duration_secs = config.duration_secs;
+        let bonus_tickets = config.bonus_tickets;
+        table::add(
+            &mut state.lotteries,
+            lottery_id,
+            VipLottery {
+                config,
+                subscriptions: subscription_table,
+                members: stored_members,
+                total_revenue,
+                bonus_tickets_issued,
+            },
+        );
+        record_lottery_id(&mut state.lottery_ids, lottery_id);
+        event::emit_event(
+            &mut state.config_events,
+            VipConfigUpdatedEvent { lottery_id, price, duration_secs, bonus_tickets },
+        );
+        emit_vip_snapshot(state);
+    }
+
+    fun restore_legacy_subscriptions(
+        table_ref: &mut table::Table<address, VipSubscription>,
+        subscriptions: &mut vector<LegacyVipSubscription>,
+    ) {
+        if (vector::is_empty(subscriptions)) {
+            return;
+        };
+        let subscription = vector::pop_back(subscriptions);
+        restore_legacy_subscriptions(table_ref, subscriptions);
+        let LegacyVipSubscription { player, expiry_ts, bonus_tickets } = subscription;
+        if (table::contains(table_ref, player)) {
+            let existing = table::borrow_mut(table_ref, player);
+            existing.expiry_ts = expiry_ts;
+            existing.bonus_tickets = bonus_tickets;
+        } else {
+            table::add(table_ref, player, VipSubscription { expiry_ts, bonus_tickets });
+        };
     }
 
     fun copy_u64_vector(values: &vector<u64>): vector<u64> {
