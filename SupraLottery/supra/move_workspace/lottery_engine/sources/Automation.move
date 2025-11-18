@@ -4,6 +4,7 @@ module lottery_engine::automation {
     use std::vector;
 
     use lottery_data::automation;
+    use lottery_data::automation::{AutomationBotStatus, AutomationRegistrySnapshot};
     use vrf_hub::table;
 
     const E_UNAUTHORIZED_ADMIN: u64 = 1;
@@ -32,6 +33,11 @@ module lottery_engine::automation {
 
     public entry fun init_registry(admin: &signer) {
         automation::init_registry(admin);
+    }
+
+    #[view]
+    public fun is_initialized(): bool {
+        automation::is_initialized()
     }
 
     public entry fun register_bot(
@@ -203,6 +209,21 @@ module lottery_engine::automation {
 
         let registry = automation::borrow_registry_mut(@lottery);
         automation::emit_rejected(registry, operator_addr, action_id, &action_hash, reason_code);
+    }
+
+    #[view]
+    public fun bot_status(operator: address): option::Option<AutomationBotStatus> acquires automation::AutomationRegistry {
+        automation::status_option(operator)
+    }
+
+    #[view]
+    public fun operators(): vector<address> acquires automation::AutomationRegistry {
+        automation::operators()
+    }
+
+    #[view]
+    public fun registry_snapshot(): option::Option<AutomationRegistrySnapshot> acquires automation::AutomationRegistry {
+        automation::registry_snapshot()
     }
 
     public fun ensure_action(

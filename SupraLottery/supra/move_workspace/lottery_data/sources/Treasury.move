@@ -58,6 +58,16 @@ module lottery_data::treasury {
         partners: address,
     }
 
+    struct VaultConfigSnapshot has copy, drop, store {
+        bp_jackpot: u64,
+        bp_prize: u64,
+        bp_treasury: u64,
+        bp_marketing: u64,
+        bp_community: u64,
+        bp_team: u64,
+        bp_partners: u64,
+    }
+
     struct VaultRecipientStatus has copy, drop, store {
         account: address,
         registered: bool,
@@ -72,6 +82,11 @@ module lottery_data::treasury {
         community: VaultRecipientStatus,
         team: VaultRecipientStatus,
         partners: VaultRecipientStatus,
+    }
+
+    struct VaultsSnapshot has copy, drop, store {
+        config: VaultConfigSnapshot,
+        recipients: VaultRecipientsSnapshot,
     }
 
     #[event]
@@ -130,12 +145,54 @@ module lottery_data::treasury {
         legacy_cap: option::Option<LegacyTreasuryCap>,
     }
 
+    struct TreasuryV1CapSnapshot has copy, drop, store {
+        autopurchase_cap: bool,
+        legacy_cap: bool,
+    }
+
+    struct TreasuryV1ControlSnapshot has copy, drop, store {
+        admin: address,
+        caps: TreasuryV1CapSnapshot,
+    }
+
+    struct TokenStateSnapshot has copy, drop, store {
+        metadata: address,
+        has_mint: bool,
+        has_burn: bool,
+        has_transfer: bool,
+    }
+
     public entry fun import_existing_vaults(caller: &signer, payload: LegacyVaultState)
     acquires Vaults {
         ensure_admin_signer(caller);
         ensure_vaults_initialized();
         let vaults = borrow_global_mut<Vaults>(@lottery);
         apply_legacy_vault_state(vaults, payload);
+    }
+
+    #[view]
+    public fun is_initialized(): bool {
+        exists<Vaults>(@lottery)
+    }
+
+    #[view]
+    public fun vaults_snapshot(): option::Option<VaultsSnapshot> acquires Vaults {
+        if (!exists<Vaults>(@lottery)) {
+            option::none<VaultsSnapshot>()
+        } else {
+            let vaults = borrow_global<Vaults>(@lottery);
+            option::some(build_snapshot(vaults))
+        }
+    }
+
+    #[view]
+    public fun token_state_snapshot(): option::Option<TokenStateSnapshot> acquires TokenState {
+        if (!exists<TokenState>(@lottery)) {
+            option::none<TokenStateSnapshot>()
+        } else {
+            let state = borrow_global<TokenState>(@lottery);
+            option::some(build_token_snapshot(state))
+        }
     }
 
     public entry fun init_vaults(caller: &signer, config: VaultConfig, recipients: VaultRecipients) {
@@ -243,6 +300,26 @@ module lottery_data::treasury {
         option::fill(&mut control.legacy_cap, cap);
     }
 
+    #[view]
+    public fun caps_ready(): bool acquires TreasuryV1Control {
+        if (!exists<TreasuryV1Control>(@lottery)) {
+            return false;
+        };
+        let control = borrow_global<TreasuryV1Control>(@lottery);
+        option::is_some(&control.autopurchase_cap) && option::is_some(&control.legacy_cap)
+    }
+
+    #[view]
+    public fun control_snapshot(): option::Option<TreasuryV1ControlSnapshot>
+    acquires TreasuryV1Control {
+        if (!exists<TreasuryV1Control>(@lottery)) {
+            option::none<TreasuryV1ControlSnapshot>()
+        } else {
+            let control = borrow_global<TreasuryV1Control>(@lottery);
+            option::some(build_control_snapshot(&control))
+        }
+    }
+
     public fun deposit_from_user(user: &signer, amount: u64) acquires TokenState {
         ensure_token_initialized();
         let state = borrow_global<TokenState>(@lottery);
@@ -270,6 +347,20 @@ module lottery_data::treasury {
         ensure_not_frozen(treasury_store);
         ensure_not_frozen(recipient_store);
         fungible_asset::transfer_with_ref(&state.transfer_ref, treasury_store, recipient_store, amount);
+    }
+
+    fun build_control_snapshot(control: &TreasuryV1Control): TreasuryV1ControlSnapshot {
+        TreasuryV1ControlSnapshot {
+            admin: control.admin,
+            caps: cap_snapshot(control),
+        }
+    }
+
+    fun cap_snapshot(control: &TreasuryV1Control): TreasuryV1CapSnapshot {
+        TreasuryV1CapSnapshot {
+            autopurchase_cap: option::is_some(&control.autopurchase_cap),
+            legacy_cap: option::is_some(&control.legacy_cap),
+        }
     }
 
     fun ensure_token_initialized() {
@@ -301,6 +392,15 @@ module lottery_data::treasury {
 
     public fun borrow_token_state_mut(addr: address): &mut TokenState acquires TokenState {
         borrow_global_mut<TokenState>(addr)
+    }
+
+    fun build_token_snapshot(state: &TokenState): TokenStateSnapshot {
+        TokenStateSnapshot {
+            metadata: object::object_address(&state.metadata),
+            has_mint: true,
+            has_burn: true,
+            has_transfer: true,
+        }
     }
 
     public fun emit_config(vaults: &mut Vaults) {
@@ -344,8 +444,24 @@ module lottery_data::treasury {
         emit_recipients(vaults, previous);
     }
 
+    fun build_snapshot(vaults: &Vaults): VaultsSnapshot {
+        VaultsSnapshot { config: config_snapshot(&vaults.config), recipients: current_recipient_snapshot(vaults) }
+    }
+
     fun convert_legacy_config(config: LegacyVaultConfig): VaultConfig {
         VaultConfig {
+            bp_jackpot: config.bp_jackpot,
+            bp_prize: config.bp_prize,
+            bp_treasury: config.bp_treasury,
+            bp_marketing: config.bp_marketing,
+            bp_community: config.bp_community,
+            bp_team: config.bp_team,
+            bp_partners: config.bp_partners,
+        }
+    }
+
+    fun config_snapshot(config: &VaultConfig): VaultConfigSnapshot {
+        VaultConfigSnapshot {
             bp_jackpot: config.bp_jackpot,
             bp_prize: config.bp_prize,
             bp_treasury: config.bp_treasury,

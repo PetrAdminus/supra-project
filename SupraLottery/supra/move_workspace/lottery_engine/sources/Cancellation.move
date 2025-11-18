@@ -90,6 +90,15 @@ module lottery_engine::cancellation {
         );
     }
 
+    public fun is_initialized(): bool {
+        cancellations::exists_at(@lottery)
+    }
+
+    public fun ledger_snapshot(): option::Option<cancellations::CancellationSnapshot>
+    acquires cancellations::CancellationLedger {
+        cancellations::ledger_snapshot()
+    }
+
     fun multiply(lhs: u64, rhs: u64): u64 {
         let product = (lhs as u128) * (rhs as u128);
         assert!(product <= 18446744073709551615, E_INVALID_REASON);

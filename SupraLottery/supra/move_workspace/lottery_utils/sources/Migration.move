@@ -21,6 +21,11 @@ module lottery_utils::migration {
         snapshot_events: event::EventHandle<MigrationSnapshotUpdatedEvent>,
     }
 
+    struct MigrationLedgerSnapshot has copy, drop, store {
+        lottery_ids: vector<u64>,
+        snapshots: vector<MigrationSnapshot>,
+    }
+
     struct MigrationSnapshot has copy, drop, store {
         lottery_id: u64,
         ticket_count: u64,
@@ -46,6 +51,11 @@ module lottery_utils::migration {
         legacy_cap: option::Option<treasury::LegacyTreasuryCap>,
     }
 
+    struct MigrationSessionSnapshot has copy, drop, store {
+        instances_cap_ready: bool,
+        legacy_cap_ready: bool,
+    }
+
     public entry fun init_ledger(caller: &signer) acquires MigrationLedger {
         ensure_admin(caller);
         if (exists<MigrationLedger>(@lottery)) {
@@ -64,6 +74,20 @@ module lottery_utils::migration {
     #[view]
     public fun ledger_initialized(): bool {
         exists<MigrationLedger>(@lottery)
+    }
+
+    #[view]
+    public fun is_initialized(): bool {
+        ledger_initialized()
+    }
+
+    #[view]
+    public fun ledger_snapshot(): option::Option<MigrationLedgerSnapshot> acquires MigrationLedger {
+        if (!exists<MigrationLedger>(@lottery)) {
+            return option::none<MigrationLedgerSnapshot>();
+        };
+        let ledger = borrow_global<MigrationLedger>(@lottery);
+        option::some(build_ledger_snapshot(&ledger))
     }
 
     public entry fun ensure_caps_initialized(caller: &signer)
@@ -128,6 +152,11 @@ module lottery_utils::migration {
         option::is_some(&session.instances_cap) && option::is_some(&session.legacy_cap)
     }
 
+    #[view]
+    public fun session_initialized(): bool {
+        exists<MigrationSession>(@lottery)
+    }
+
     public entry fun release_caps(caller: &signer)
     acquires MigrationSession, instances::InstanceControl, treasury::TreasuryV1Control {
         ensure_admin(caller);
@@ -163,6 +192,15 @@ module lottery_utils::migration {
         option::borrow(&session.legacy_cap)
     }
 
+    #[view]
+    public fun session_snapshot(): option::Option<MigrationSessionSnapshot> acquires MigrationSession {
+        if (!exists<MigrationSession>(@lottery)) {
+            return option::none<MigrationSessionSnapshot>();
+        };
+        let session = borrow_global<MigrationSession>(@lottery);
+        option::some(build_session_snapshot(&session))
+    }
+
     public entry fun record_snapshot(caller: &signer, snapshot: MigrationSnapshot)
     acquires MigrationLedger {
         ensure_admin(caller);
@@ -192,6 +230,44 @@ module lottery_utils::migration {
         } else {
             option::some(*table::borrow(&state.snapshots, lottery_id))
         }
+    }
+
+    fun build_ledger_snapshot(ledger: &MigrationLedger): MigrationLedgerSnapshot {
+        let lottery_ids = copy_u64_vector(&ledger.lottery_ids);
+        let snapshots = collect_snapshots(&ledger.snapshots, &ledger.lottery_ids, 0, vector::length(&ledger.lottery_ids));
+        MigrationLedgerSnapshot { lottery_ids, snapshots }
+    }
+
+    fun collect_snapshots(
+        snapshots_table: &table::Table<u64, MigrationSnapshot>,
+        lottery_ids: &vector<u64>,
+        index: u64,
+        len: u64,
+    ): vector<MigrationSnapshot> {
+        if (index >= len) {
+            return vector::empty<MigrationSnapshot>();
+        };
+        let head_id = *vector::borrow(lottery_ids, index);
+        let mut result = vector::empty<MigrationSnapshot>();
+        if (table::contains(snapshots_table, head_id)) {
+            vector::push_back(&mut result, *table::borrow(snapshots_table, head_id));
+        };
+        let tail = collect_snapshots(snapshots_table, lottery_ids, index + 1, len);
+        append_snapshots(&mut result, &tail, 0, vector::length(&tail));
+        result
+    }
+
+    fun append_snapshots(
+        dest: &mut vector<MigrationSnapshot>,
+        src: &vector<MigrationSnapshot>,
+        index: u64,
+        len: u64,
+    ) {
+        if (index >= len) {
+            return;
+        };
+        vector::push_back(dest, *vector::borrow(src, index));
+        append_snapshots(dest, src, index + 1, len);
     }
 
     #[test_only]
@@ -296,5 +372,12 @@ module lottery_utils::migration {
         if (signer::address_of(caller) != @lottery) {
             abort E_NOT_AUTHORIZED;
         };
+    }
+
+    fun build_session_snapshot(session: &MigrationSession): MigrationSessionSnapshot {
+        MigrationSessionSnapshot {
+            instances_cap_ready: option::is_some(&session.instances_cap),
+            legacy_cap_ready: option::is_some(&session.legacy_cap),
+        }
     }
 }

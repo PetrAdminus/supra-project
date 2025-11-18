@@ -1,4 +1,5 @@
 module lottery_rewards_engine::payouts {
+    use std::option;
     use std::signer;
     use std::vector;
 
@@ -12,6 +13,11 @@ module lottery_rewards_engine::payouts {
     const E_STATUS_NOT_PENDING: u64 = 4;
     const E_EMPTY_BATCH: u64 = 5;
     const E_AMOUNT_ZERO: u64 = 6;
+
+    #[view]
+    public fun is_initialized(): bool {
+        payouts::is_initialized()
+    }
 
     public entry fun pay_jackpot_winner(caller: &signer, payout_id: u64)
     acquires instances::InstanceRegistry, payouts::PayoutLedger, treasury_multi::TreasuryState {
@@ -90,6 +96,18 @@ module lottery_rewards_engine::payouts {
         assert!(amount > 0, E_AMOUNT_ZERO);
         let state = treasury_multi::borrow_state_mut(@lottery);
         treasury_multi::record_jackpot_payment(state, recipient, amount);
+    }
+
+    #[view]
+    public fun ledger_snapshot(): option::Option<payouts::PayoutLedgerSnapshot>
+    acquires payouts::PayoutLedger {
+        payouts::ledger_snapshot()
+    }
+
+    #[view]
+    public fun lottery_snapshot(lottery_id: u64): option::Option<payouts::LotteryPayoutSnapshot>
+    acquires payouts::PayoutLedger {
+        payouts::lottery_snapshot(lottery_id)
     }
 
     fun ensure_admin(caller: &signer) acquires instances::InstanceRegistry {

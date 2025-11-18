@@ -60,6 +60,16 @@ module lottery_rewards_engine::referrals {
         lotteries: vector<LotteryReferralSnapshot>,
     }
 
+    struct ReferralRegistrationSnapshot has copy, drop, store {
+        player: address,
+        referrer: address,
+    }
+
+    struct ReferralLedgerSnapshot has copy, drop, store {
+        summary: ReferralSnapshot,
+        registrations: vector<ReferralRegistrationSnapshot>,
+    }
+
     struct ReferralsControl has key {
         treasury_cap: treasury_multi::MultiTreasuryCap,
     }
@@ -112,6 +122,11 @@ module lottery_rewards_engine::referrals {
         referrer_amount: u64,
         referee_amount: u64,
         total_amount: u64,
+    }
+
+    #[view]
+    public fun is_initialized(): bool {
+        exists<ReferralState>(@lottery)
     }
 
     public entry fun init(caller: &signer) acquires ReferralState {
@@ -372,6 +387,15 @@ module lottery_rewards_engine::referrals {
         };
         let state = borrow_global<ReferralState>(@lottery);
         build_referral_snapshot(state)
+    }
+
+    #[view]
+    public fun ledger_snapshot(): ReferralLedgerSnapshot acquires ReferralState {
+        if (!exists<ReferralState>(@lottery)) {
+            return empty_ledger_snapshot();
+        };
+        let state = borrow_global<ReferralState>(@lottery);
+        build_ledger_snapshot(state)
     }
 
     fun record_purchase_internal(
@@ -669,6 +693,13 @@ module lottery_rewards_engine::referrals {
         }
     }
 
+    fun build_ledger_snapshot(state: &ReferralState): ReferralLedgerSnapshot {
+        ReferralLedgerSnapshot {
+            summary: build_referral_snapshot(state),
+            registrations: build_registration_snapshots(&state.referrers),
+        }
+    }
+
     fun build_lottery_snapshots_from_tables(
         lottery_ids: &vector<u64>,
         configs: &table::Table<u64, ReferralConfig>,
@@ -740,6 +771,32 @@ module lottery_rewards_engine::referrals {
 
     fun empty_snapshot(): ReferralSnapshot {
         ReferralSnapshot { admin: @lottery, total_registered: 0, lotteries: vector::empty<LotteryReferralSnapshot>() }
+    }
+
+    fun empty_ledger_snapshot(): ReferralLedgerSnapshot {
+        ReferralLedgerSnapshot { summary: empty_snapshot(), registrations: vector::empty<ReferralRegistrationSnapshot>() }
+    }
+
+    fun build_registration_snapshots(referrers: &table::Table<address, address>): vector<ReferralRegistrationSnapshot> {
+        let keys = table::keys(referrers);
+        collect_registration_snapshots(&keys, referrers, 0)
+    }
+
+    fun collect_registration_snapshots(
+        keys: &vector<address>,
+        referrers: &table::Table<address, address>,
+        index: u64,
+    ): vector<ReferralRegistrationSnapshot> {
+        if (index == vector::length(keys)) {
+            return vector::empty<ReferralRegistrationSnapshot>();
+        };
+        let mut snapshots = collect_registration_snapshots(keys, referrers, index + 1);
+        let player = *vector::borrow(keys, index);
+        if (table::contains(referrers, player)) {
+            let referrer = *table::borrow(referrers, player);
+            vector::push_back(&mut snapshots, ReferralRegistrationSnapshot { player, referrer });
+        };
+        snapshots
     }
 
     fun multiply_bps(amount: u64, bps: u64): u64 {

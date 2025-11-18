@@ -14,6 +14,7 @@ module lottery_gateway::gateway {
     use lottery_engine::operators as engine_operators;
     use lottery_engine::sales;
     use lottery_engine::ticketing;
+    use lottery_gateway::history;
     use lottery_gateway::registry;
     use supra_framework::account;
     use supra_framework::event;
@@ -34,6 +35,21 @@ module lottery_gateway::gateway {
     struct GatewayLottery has copy, drop, store {
         owner: address,
         active: bool,
+    }
+
+    struct LegacyGatewayLottery has copy, drop, store {
+        lottery_id: u64,
+        owner: address,
+        active: bool,
+        ticket_price: u64,
+        auto_draw_threshold: u64,
+        jackpot_share_bps: u16,
+    }
+
+    struct LegacyGatewayRegistry has copy, drop, store {
+        admin: address,
+        next_lottery_id: u64,
+        lotteries: vector<LegacyGatewayLottery>,
     }
 
     #[event]
@@ -145,12 +161,13 @@ module lottery_gateway::gateway {
     }
 
     public entry fun init(caller: &signer, admin: address)
-    acquires GatewayRegistry, instances::InstanceRegistry, registry::LotteryRegistry {
+    acquires GatewayRegistry, history::LotteryHistory, instances::InstanceRegistry, registry::LotteryRegistry {
         let caller_address = signer::address_of(caller);
         assert!(caller_address == @lottery, E_UNAUTHORIZED);
         assert!(!exists<GatewayRegistry>(caller_address), E_ALREADY_INITIALIZED);
 
         registry::init(caller, admin);
+        history::init(caller, admin);
 
         move_to(
             caller,
@@ -193,6 +210,7 @@ module lottery_gateway::gateway {
         jackpot_share_bps: u16,
     ) acquires
         GatewayRegistry,
+        history::LotteryHistory,
         instances::InstanceRegistry,
         lottery_state::LotteryState,
         registry::LotteryRegistry,
@@ -223,6 +241,7 @@ module lottery_gateway::gateway {
                 jackpot_share_bps,
             },
         );
+        history::record_created(caller, lottery_id);
         emit_snapshot(gateway);
     }
 
@@ -240,6 +259,7 @@ module lottery_gateway::gateway {
         let gateway = borrow_global_mut<GatewayRegistry>(@lottery);
         ensure_admin_signer(gateway, caller);
         register_import_batch(gateway, &lottery_ids);
+        normalize_next_lottery_id(gateway);
         emit_snapshot(gateway);
     }
 
@@ -248,6 +268,36 @@ module lottery_gateway::gateway {
         let gateway = borrow_global_mut<GatewayRegistry>(@lottery);
         ensure_admin_signer(gateway, caller);
         align_counter(gateway, next_lottery_id);
+        emit_snapshot(gateway);
+    }
+
+    public entry fun import_existing_lottery(caller: &signer, entry: LegacyGatewayLottery)
+    acquires GatewayRegistry {
+        let gateway = borrow_global_mut<GatewayRegistry>(@lottery);
+        ensure_admin_signer(gateway, caller);
+        upsert_imported_lottery(gateway, entry);
+        normalize_next_lottery_id(gateway);
+        emit_snapshot(gateway);
+    }
+
+    public entry fun import_existing_lotteries(caller: &signer, entries: vector<LegacyGatewayLottery>)
+    acquires GatewayRegistry {
+        let gateway = borrow_global_mut<GatewayRegistry>(@lottery);
+        ensure_admin_signer(gateway, caller);
+        import_lotteries_batch(gateway, &entries, vector::length(&entries));
+        normalize_next_lottery_id(gateway);
+        emit_snapshot(gateway);
+    }
+
+    public entry fun import_existing_gateway_registry(caller: &signer, payload: LegacyGatewayRegistry)
+    acquires GatewayRegistry {
+        let gateway = borrow_global_mut<GatewayRegistry>(@lottery);
+        ensure_admin_signer(gateway, caller);
+        reset_gateway_registry(gateway);
+        gateway.admin = payload.admin;
+        gateway.next_lottery_id = payload.next_lottery_id;
+        import_lotteries_batch(gateway, &payload.lotteries, vector::length(&payload.lotteries));
+        normalize_next_lottery_id(gateway);
         emit_snapshot(gateway);
     }
 
@@ -314,6 +364,7 @@ module lottery_gateway::gateway {
     ) acquires
         GatewayRegistry,
         cancellations::CancellationLedger,
+        history::LotteryHistory,
         instances::InstanceRegistry,
         lottery_state::LotteryState,
         registry::LotteryRegistry,
@@ -322,6 +373,43 @@ module lottery_gateway::gateway {
         cancellation::cancel_lottery(caller, lottery_id, reason_code, canceled_ts);
         sync_status(lottery_id);
         registry::record_cancellation(lottery_id, reason_code, canceled_ts);
+        history::record_canceled(caller, lottery_id, reason_code);
+        let gateway = borrow_global_mut<GatewayRegistry>(@lottery);
+        emit_snapshot(gateway);
+    }
+
+    public entry fun record_existing_cancellation(
+        caller: &signer,
+        update: registry::LegacyCancellationImport,
+    ) acquires
+        GatewayRegistry,
+        history::LotteryHistory,
+        instances::InstanceRegistry,
+        lottery_state::LotteryState,
+        registry::LotteryRegistry,
+        rounds::RoundRegistry
+    {
+        let gateway = borrow_global_mut<GatewayRegistry>(@lottery);
+        ensure_admin_signer(gateway, caller);
+        apply_existing_cancellation(gateway, caller, update);
+        emit_snapshot(gateway);
+    }
+
+    public entry fun record_existing_cancellations(
+        caller: &signer,
+        updates: vector<registry::LegacyCancellationImport>,
+    ) acquires
+        GatewayRegistry,
+        history::LotteryHistory,
+        instances::InstanceRegistry,
+        lottery_state::LotteryState,
+        registry::LotteryRegistry,
+        rounds::RoundRegistry
+    {
+        let gateway = borrow_global_mut<GatewayRegistry>(@lottery);
+        ensure_admin_signer(gateway, caller);
+        record_existing_cancellation_batch(gateway, caller, &updates, vector::length(&updates));
+        emit_snapshot(gateway);
     }
 
     public entry fun schedule_draw(caller: &signer, lottery_id: u64)
@@ -367,6 +455,43 @@ module lottery_gateway::gateway {
         assert!(caller_address == gateway.admin, E_UNAUTHORIZED);
     }
 
+    fun apply_existing_cancellation(
+        gateway: &mut GatewayRegistry,
+        caller: &signer,
+        update: registry::LegacyCancellationImport,
+    ) acquires
+        history::LotteryHistory,
+        instances::InstanceRegistry,
+        lottery_state::LotteryState,
+        registry::LotteryRegistry,
+        rounds::RoundRegistry
+    {
+        registry::record_existing_cancellation(caller, update);
+        sync_status(update.lottery_id);
+        history::record_canceled(caller, update.lottery_id, update.reason_code);
+    }
+
+    fun record_existing_cancellation_batch(
+        gateway: &mut GatewayRegistry,
+        caller: &signer,
+        updates: &vector<registry::LegacyCancellationImport>,
+        remaining: u64,
+    ) acquires
+        history::LotteryHistory,
+        instances::InstanceRegistry,
+        lottery_state::LotteryState,
+        registry::LotteryRegistry,
+        rounds::RoundRegistry
+    {
+        if (remaining == 0) {
+            return;
+        };
+        let next_remaining = remaining - 1;
+        record_existing_cancellation_batch(gateway, caller, updates, next_remaining);
+        let update = *vector::borrow(updates, next_remaining);
+        apply_existing_cancellation(gateway, caller, update);
+    }
+
     fun reserve_lottery_id(gateway: &mut GatewayRegistry): u64 {
         let current = gateway.next_lottery_id;
         let next = current + 1;
@@ -385,6 +510,7 @@ module lottery_gateway::gateway {
             GatewayLottery { owner: record.owner, active: record.active },
         );
         vector::push_back(&mut gateway.lottery_ids, lottery_id);
+        bump_next_lottery_id(gateway, lottery_id);
         ensure_owner_entry(gateway, record.owner);
         let owner_record = table::borrow_mut(&mut gateway.owner_index, record.owner);
         vector::push_back(&mut owner_record.lottery_ids, lottery_id);
@@ -501,6 +627,102 @@ module lottery_gateway::gateway {
         record_creation(gateway, lottery_id);
     }
 
+    fun upsert_imported_lottery(gateway: &mut GatewayRegistry, entry: LegacyGatewayLottery) {
+        let lottery_id = entry.lottery_id;
+        if (table::contains(&gateway.lotteries, lottery_id)) {
+            let summary = table::borrow_mut(&mut gateway.lotteries, lottery_id);
+            let previous_owner = summary.owner;
+            let previous_active = summary.active;
+            add_lottery_id_if_missing(&mut gateway.lottery_ids, lottery_id);
+            if (previous_owner != entry.owner) {
+                if (table::contains(&gateway.owner_index, previous_owner)) {
+                    let record = table::borrow_mut(&mut gateway.owner_index, previous_owner);
+                    remove_lottery_id(&mut record.lottery_ids, lottery_id);
+                };
+                ensure_owner_entry(gateway, entry.owner);
+                let next_record = table::borrow_mut(&mut gateway.owner_index, entry.owner);
+                if (!contains_lottery_id(&next_record.lottery_ids, lottery_id, vector::length(&next_record.lottery_ids))) {
+                    vector::push_back(&mut next_record.lottery_ids, lottery_id);
+                };
+                summary.owner = entry.owner;
+                event::emit_event(
+                    &mut gateway.owner_events,
+                    LotteryOwnerUpdatedEvent {
+                        lottery_id,
+                        previous: option::some(previous_owner),
+                        next: entry.owner,
+                    },
+                );
+            };
+            ensure_owner_entry(gateway, entry.owner);
+            let current_record = table::borrow_mut(&mut gateway.owner_index, entry.owner);
+            if (!contains_lottery_id(&current_record.lottery_ids, lottery_id, vector::length(&current_record.lottery_ids))) {
+                vector::push_back(&mut current_record.lottery_ids, lottery_id);
+            };
+            if (previous_active != entry.active) {
+                summary.active = entry.active;
+                event::emit_event(
+                    &mut gateway.status_events,
+                    LotteryStatusUpdatedEvent { lottery_id, active: entry.active },
+                );
+            };
+            bump_next_lottery_id(gateway, lottery_id);
+            return;
+        };
+
+        table::add(
+            &mut gateway.lotteries,
+            lottery_id,
+            GatewayLottery { owner: entry.owner, active: entry.active },
+        );
+        add_lottery_id_if_missing(&mut gateway.lottery_ids, lottery_id);
+        bump_next_lottery_id(gateway, lottery_id);
+        ensure_owner_entry(gateway, entry.owner);
+        let owner_record = table::borrow_mut(&mut gateway.owner_index, entry.owner);
+        if (!contains_lottery_id(&owner_record.lottery_ids, lottery_id, vector::length(&owner_record.lottery_ids))) {
+            vector::push_back(&mut owner_record.lottery_ids, lottery_id);
+        };
+        event::emit_event(
+            &mut gateway.owner_events,
+            LotteryOwnerUpdatedEvent { lottery_id, previous: option::none<address>(), next: entry.owner },
+        );
+        event::emit_event(
+            &mut gateway.status_events,
+            LotteryStatusUpdatedEvent { lottery_id, active: entry.active },
+        );
+        event::emit_event(
+            &mut gateway.creation_events,
+            LotteryCreatedEvent {
+                lottery_id,
+                owner: entry.owner,
+                ticket_price: entry.ticket_price,
+                auto_draw_threshold: entry.auto_draw_threshold,
+                jackpot_share_bps: entry.jackpot_share_bps,
+            },
+        );
+    }
+
+    fun import_lotteries_batch(
+        gateway: &mut GatewayRegistry,
+        entries: &vector<LegacyGatewayLottery>,
+        remaining: u64,
+    ) {
+        if (remaining == 0) {
+            return;
+        };
+        let next_remaining = remaining - 1;
+        import_lotteries_batch(gateway, entries, next_remaining);
+        let entry = *vector::borrow(entries, next_remaining);
+        upsert_imported_lottery(gateway, entry);
+    }
+
+    fun reset_gateway_registry(gateway: &mut GatewayRegistry) {
+        gateway.lotteries = table::new<u64, GatewayLottery>();
+        gateway.owner_index = table::new<address, OwnerLotteries>();
+        gateway.lottery_ids = vector::empty<u64>();
+        gateway.next_lottery_id = 1;
+    }
+
     fun align_counter(gateway: &mut GatewayRegistry, next_lottery_id: u64) {
         let current_next = gateway.next_lottery_id;
         if (next_lottery_id <= current_next) {
@@ -511,6 +733,21 @@ module lottery_gateway::gateway {
             abort E_INVALID_COUNTER_TARGET;
         };
         gateway.next_lottery_id = next_lottery_id;
+    }
+
+    fun normalize_next_lottery_id(gateway: &mut GatewayRegistry) {
+        let highest = max_lottery_id(&gateway.lottery_ids);
+        let required_next = highest + 1;
+        if (gateway.next_lottery_id < required_next) {
+            gateway.next_lottery_id = required_next;
+        };
+    }
+
+    fun bump_next_lottery_id(gateway: &mut GatewayRegistry, lottery_id: u64) {
+        let required_next = lottery_id + 1;
+        if (gateway.next_lottery_id < required_next) {
+            gateway.next_lottery_id = required_next;
+        };
     }
 
     fun remove_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
@@ -561,6 +798,25 @@ module lottery_gateway::gateway {
         let value = *vector::borrow(source, next_remaining);
         vector::push_back(&mut result, value);
         result
+    }
+
+    fun add_lottery_id_if_missing(ids: &mut vector<u64>, lottery_id: u64) {
+        if (!contains_lottery_id(ids, lottery_id, vector::length(ids))) {
+            vector::push_back(ids, lottery_id);
+        };
+    }
+
+    fun contains_lottery_id(ids: &vector<u64>, lottery_id: u64, remaining: u64): bool {
+        if (remaining == 0) {
+            return false;
+        };
+        let next_remaining = remaining - 1;
+        let value = *vector::borrow(ids, next_remaining);
+        if (value == lottery_id) {
+            true
+        } else {
+            contains_lottery_id(ids, lottery_id, next_remaining)
+        }
     }
 
     fun max_lottery_id(ids: &vector<u64>): u64 {

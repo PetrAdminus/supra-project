@@ -61,6 +61,11 @@ module lottery_rewards_engine::autopurchase {
         treasury: treasury::AutopurchaseTreasuryCap,
     }
 
+    struct AutopurchaseAccessSnapshot has copy, drop, store {
+        rounds_cap: bool,
+        treasury_cap: bool,
+    }
+
     struct AutopurchaseLotterySummary has copy, drop, store {
         total_balance: u64,
         total_players: u64,
@@ -124,6 +129,11 @@ module lottery_rewards_engine::autopurchase {
     struct AutopurchaseSnapshotUpdatedEvent has drop, store, copy {
         admin: address,
         snapshot: AutopurchaseLotterySnapshot,
+    }
+
+    #[view]
+    public fun is_initialized(): bool {
+        exists<AutopurchaseState>(@lottery)
     }
 
     public entry fun init(caller: &signer) acquires AutopurchaseState {
@@ -209,8 +219,27 @@ module lottery_rewards_engine::autopurchase {
     }
 
     #[view]
+    public fun snapshot(): option::Option<AutopurchaseSnapshot> acquires AutopurchaseState {
+        if (!exists<AutopurchaseState>(@lottery)) {
+            return option::none<AutopurchaseSnapshot>()
+        };
+        let state = borrow_global<AutopurchaseState>(@lottery);
+        let lotteries = collect_lottery_snapshots(state, 0, vector::length(&state.lottery_ids));
+        let snapshot = AutopurchaseSnapshot { admin: state.admin, lotteries };
+        option::some(snapshot)
+    }
+
+    #[view]
     public fun caps_ready(): bool {
         exists<AutopurchaseAccess>(@lottery)
+    }
+
+    #[view]
+    public fun access_snapshot(): option::Option<AutopurchaseAccessSnapshot> {
+        if (!exists<AutopurchaseAccess>(@lottery)) {
+            return option::none<AutopurchaseAccessSnapshot>()
+        };
+        option::some(AutopurchaseAccessSnapshot { rounds_cap: true, treasury_cap: true })
     }
 
     public entry fun set_admin(caller: &signer, new_admin: address) acquires AutopurchaseState {
@@ -643,5 +672,34 @@ module lottery_rewards_engine::autopurchase {
             AutopurchaseConfigUpdatedEvent { lottery_id, player, tickets_per_draw, active },
         );
         emit_autopurchase_snapshot(state, lottery_id);
+    }
+
+    fun collect_lottery_snapshots(
+        state: &AutopurchaseState,
+        index: u64,
+        len: u64,
+    ): vector<AutopurchaseLotterySnapshot> {
+        if (index == len) {
+            return vector::empty<AutopurchaseLotterySnapshot>();
+        };
+        let mut snapshots = collect_lottery_snapshots(state, index + 1, len);
+        let lottery_id = *vector::borrow(&state.lottery_ids, index);
+        if (table::contains(&state.lotteries, lottery_id)) {
+            let plans = table::borrow(&state.lotteries, lottery_id);
+            let mut players = vector::empty<AutopurchasePlayerSnapshot>();
+            collect_player_snapshots(plans, 0, &mut players);
+            let active_players = count_active_players(plans, 0);
+            vector::push_back(
+                &mut snapshots,
+                AutopurchaseLotterySnapshot {
+                    lottery_id,
+                    total_balance: plans.total_balance,
+                    total_players: vector::length(&plans.players),
+                    active_players,
+                    players,
+                },
+            );
+        };
+        snapshots
     }
 }

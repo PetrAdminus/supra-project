@@ -25,6 +25,32 @@ module vrf_hub::hub {
     const E_INACTIVE_LOTTERY: u64 = 7;
     const E_NOT_INITIALIZED: u64 = 8;
 
+    public struct LegacyLotteryRegistration has drop, store {
+        lottery_id: u64,
+        owner: address,
+        lottery: address,
+        metadata: vector<u8>,
+        active: bool,
+    }
+
+    public struct LegacyRequestRecord has drop, store {
+        request_id: u64,
+        lottery_id: u64,
+        payload: vector<u8>,
+        payload_hash: vector<u8>,
+    }
+
+    public struct LegacyHubState has drop, store {
+        admin: address,
+        next_lottery_id: u64,
+        next_request_id: u64,
+        lotteries: vector<LegacyLotteryRegistration>,
+        requests: vector<LegacyRequestRecord>,
+        lottery_ids: vector<u64>,
+        pending_request_ids: vector<u64>,
+        callback_sender: option::Option<address>,
+    }
+
 
     struct LotteryRegistration has copy, drop, store {
         owner: address,
@@ -56,6 +82,16 @@ module vrf_hub::hub {
         request_events: event::EventHandle<RandomnessRequestedEvent>,
         fulfill_events: event::EventHandle<RandomnessFulfilledEvent>,
         callback_sender_events: event::EventHandle<CallbackSenderUpdatedEvent>,
+    }
+
+    public entry fun import_existing_state(caller: &signer, payload: LegacyHubState)
+    acquires HubState {
+        import_state_internal(caller, payload);
+    }
+
+    public entry fun migrate_lottery_vrf_gateway_state(caller: &signer, payload: LegacyHubState)
+    acquires HubState {
+        import_state_internal(caller, payload);
     }
 
     #[event]
@@ -100,6 +136,56 @@ module vrf_hub::hub {
 
     struct CallbackSenderStatus has copy, drop {
         sender: option::Option<address>,
+    }
+
+    struct HubSnapshot has copy, drop, store {
+        admin: address,
+        next_lottery_id: u64,
+        next_request_id: u64,
+        lotteries: vector<LotteryRegistration>,
+        requests: vector<RequestRecord>,
+        lottery_ids: vector<u64>,
+        pending_request_ids: vector<u64>,
+        callback_sender: option::Option<address>,
+    }
+
+
+    fun import_state_internal(caller: &signer, payload: LegacyHubState) acquires HubState {
+        ensure_migration_signer(caller);
+        let LegacyHubState {
+            admin,
+            next_lottery_id,
+            next_request_id,
+            lotteries,
+            requests,
+            lottery_ids,
+            pending_request_ids,
+            callback_sender,
+        } = payload;
+        reset_state(caller);
+        move_to(
+            caller,
+            HubState {
+                admin,
+                next_lottery_id,
+                next_request_id,
+                lotteries: table::new(),
+                requests: table::new(),
+                lottery_ids: clone_u64_vector(&lottery_ids),
+                pending_request_ids: clone_u64_vector(&pending_request_ids),
+                callback_sender,
+                register_events: account::new_event_handle<LotteryRegisteredEvent>(caller),
+                status_events: account::new_event_handle<LotteryStatusChangedEvent>(caller),
+                metadata_events: account::new_event_handle<LotteryMetadataUpdatedEvent>(caller),
+                request_events: account::new_event_handle<RandomnessRequestedEvent>(caller),
+                fulfill_events: account::new_event_handle<RandomnessFulfilledEvent>(caller),
+                callback_sender_events: account::new_event_handle<CallbackSenderUpdatedEvent>(caller),
+            },
+        );
+        let state = borrow_global_mut<HubState>(@vrf_hub);
+        apply_callback_sender(state, option::none<address>());
+        import_registrations(state, &lotteries);
+        import_requests(state, &requests);
     }
 
 
@@ -333,6 +419,25 @@ module vrf_hub::hub {
         CallbackSenderStatus { sender: copy_option_address(&state.callback_sender) }
     }
 
+    #[view]
+    public fun hub_snapshot(): option::Option<HubSnapshot> acquires HubState {
+        if (!exists<HubState>(@vrf_hub)) {
+            return option::none<HubSnapshot>()
+        };
+        let state = borrow_global<HubState>(@vrf_hub);
+        let snapshot = HubSnapshot {
+            admin: state.admin,
+            next_lottery_id: state.next_lottery_id,
+            next_request_id: state.next_request_id,
+            lotteries: collect_registrations(&state.lotteries),
+            requests: collect_requests(&state.requests),
+            lottery_ids: clone_ids(&state.lottery_ids),
+            pending_request_ids: clone_ids(&state.pending_request_ids),
+            callback_sender: copy_option_address(&state.callback_sender),
+        };
+        option::some(snapshot)
+    }
+
 
     public fun request_randomness(lottery_id: u64, payload: vector<u8>): u64 acquires HubState {
         let state = borrow_global_mut<HubState>(@vrf_hub);
@@ -542,6 +647,109 @@ module vrf_hub::hub {
         };
     }
 
+    fun ensure_migration_signer(caller: &signer) {
+        let addr = signer::address_of(caller);
+        if (exists<HubState>(@vrf_hub)) {
+            let state = borrow_global<HubState>(@vrf_hub);
+            if (addr != state.admin) {
+                abort E_NOT_AUTHORIZED
+            };
+        } else {
+            if (addr != @vrf_hub) {
+                abort E_NOT_AUTHORIZED
+            };
+        };
+    }
+
+    fun reset_state(_caller: &signer) acquires HubState {
+        if (exists<HubState>(@vrf_hub)) {
+            let _old = move_from<HubState>(@vrf_hub);
+        };
+    }
+
+    fun apply_callback_sender(state: &mut HubState, previous: option::Option<address>) {
+        let current = copy_option_address(&state.callback_sender);
+        if (previous != current) {
+            event::emit_event(
+                &mut state.callback_sender_events,
+                CallbackSenderUpdatedEvent { previous, current },
+            );
+        };
+    }
+
+    fun import_registrations(state: &mut HubState, records: &vector<LegacyLotteryRegistration>) {
+        let len = vector::length(records);
+        let i = 0;
+        while (i < len) {
+            let record_ref = vector::borrow(records, i);
+            add_registration_from_legacy(state, record_ref);
+            i = i + 1;
+        };
+    }
+
+    fun add_registration_from_legacy(state: &mut HubState, record: &LegacyLotteryRegistration) {
+        let metadata_copy = clone_bytes(&record.metadata);
+        table::add(
+            &mut state.lotteries,
+            record.lottery_id,
+            LotteryRegistration {
+                owner: record.owner,
+                lottery: record.lottery,
+                metadata: record.metadata,
+                active: record.active,
+            },
+        );
+        event::emit_event(
+            &mut state.register_events,
+            LotteryRegisteredEvent {
+                lottery_id: record.lottery_id,
+                owner: record.owner,
+                lottery: record.lottery,
+            },
+        );
+        event::emit_event(
+            &mut state.metadata_events,
+            LotteryMetadataUpdatedEvent { lottery_id: record.lottery_id, metadata: metadata_copy },
+        );
+        event::emit_event(
+            &mut state.status_events,
+            LotteryStatusChangedEvent { lottery_id: record.lottery_id, active: record.active },
+        );
+    }
+
+    fun import_requests(state: &mut HubState, records: &vector<LegacyRequestRecord>) {
+        let len = vector::length(records);
+        let i = 0;
+        while (i < len) {
+            let record_ref = vector::borrow(records, i);
+            add_request_from_legacy(state, record_ref);
+            i = i + 1;
+        };
+    }
+
+    fun add_request_from_legacy(state: &mut HubState, record: &LegacyRequestRecord) {
+        let payload_copy = clone_bytes(&record.payload);
+        let payload_hash_copy = clone_bytes(&record.payload_hash);
+        table::add(
+            &mut state.requests,
+            record.request_id,
+            RequestRecord {
+                lottery_id: record.lottery_id,
+                payload: record.payload,
+                payload_hash: record.payload_hash,
+            },
+        );
+        event::emit_event(
+            &mut state.request_events,
+            RandomnessRequestedEvent {
+                request_id: record.request_id,
+                lottery_id: record.lottery_id,
+                payload: payload_copy,
+                payload_hash: payload_hash_copy,
+            },
+        );
+    }
+
     fun ensure_initialized() {
         if (!exists<HubState>(@vrf_hub)) {
             abort E_NOT_INITIALIZED
@@ -572,8 +780,62 @@ module vrf_hub::hub {
         result
     }
 
+    fun clone_u64_vector(values: &vector<u64>): vector<u64> {
+        let out = vector::empty<u64>();
+        let len = vector::length(values);
+        let i = 0;
+        while (i < len) {
+            vector::push_back(&mut out, *vector::borrow(values, i));
+            i = i + 1;
+        };
+        out
+    }
+
     fun compute_payload_hash(payload: &vector<u8>): vector<u8> {
         hash::sha3_256(clone_bytes(payload))
+    }
+
+    fun collect_registrations(lotteries: &table::Table<u64, LotteryRegistration>): vector<LotteryRegistration> {
+        let entries = vector::empty<LotteryRegistration>();
+        let keys = table::keys(lotteries);
+        let len = vector::length(&keys);
+        let i = 0;
+        while (i < len) {
+            let key = *vector::borrow(&keys, i);
+            let registration = table::borrow(lotteries, key);
+            vector::push_back(
+                &mut entries,
+                LotteryRegistration {
+                    owner: registration.owner,
+                    lottery: registration.lottery,
+                    metadata: clone_bytes(&registration.metadata),
+                    active: registration.active,
+                },
+            );
+            i = i + 1;
+        };
+        entries
+    }
+
+    fun collect_requests(requests: &table::Table<u64, RequestRecord>): vector<RequestRecord> {
+        let entries = vector::empty<RequestRecord>();
+        let keys = table::keys(requests);
+        let len = vector::length(&keys);
+        let i = 0;
+        while (i < len) {
+            let key = *vector::borrow(&keys, i);
+            let record = table::borrow(requests, key);
+            vector::push_back(
+                &mut entries,
+                RequestRecord {
+                    lottery_id: record.lottery_id,
+                    payload: clone_bytes(&record.payload),
+                    payload_hash: clone_bytes(&record.payload_hash),
+                },
+            );
+            i = i + 1;
+        };
+        entries
     }
 
     fun remove_pending_request_id(ids: &mut vector<u64>, request_id: u64) {

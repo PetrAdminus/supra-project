@@ -2,6 +2,7 @@ module lottery_utils::price_feed {
     use std::option;
     use std::signer;
     use std::table;
+    use std::vector;
 
     use supra_framework::account;
     use supra_framework::event;
@@ -21,6 +22,9 @@ module lottery_utils::price_feed {
     const E_CLAMP_ACTIVE: u64 = 8;
     const E_PRICE_STALE: u64 = 9;
     const E_CLAMP_NOT_ACTIVE: u64 = 10;
+    const E_INVALID_ADMIN: u64 = 11;
+
+    const DEFAULT_VERSION: u16 = 1;
 
     const DEFAULT_STALENESS_WINDOW: u64 = 300;
     const DEFAULT_CLAMP_THRESHOLD_BPS: u64 = 2_000;
@@ -71,6 +75,12 @@ module lottery_utils::price_feed {
         cleared_ts: u64,
     }
 
+    struct PriceFeedRegistrySnapshot has drop, store {
+        admin: address,
+        version: u16,
+        feeds: vector<PriceFeedView>,
+    }
+
     struct PriceFeedView has drop, store {
         asset_id: u64,
         price: u64,
@@ -81,6 +91,24 @@ module lottery_utils::price_feed {
         fallback_active: bool,
         fallback_reason: u8,
         clamp_active: bool,
+    }
+
+    public struct LegacyPriceFeedRecord has drop, store {
+        asset_id: u64,
+        price: u64,
+        decimals: u8,
+        last_updated_ts: u64,
+        staleness_window: u64,
+        clamp_threshold_bps: u64,
+        fallback_active: bool,
+        fallback_reason: u8,
+        clamp_active: bool,
+    }
+
+    public struct LegacyPriceFeedRegistry has drop, store {
+        admin: address,
+        version: u16,
+        feeds: vector<LegacyPriceFeedRecord>,
     }
 
     struct PriceFeedRegistry has key {
@@ -111,6 +139,33 @@ module lottery_utils::price_feed {
                 clamp_clears: account::new_event_handle<PriceFeedClampClearedEvent>(admin),
             },
         );
+    }
+
+    public entry fun import_existing_feed(admin: &signer, feed: LegacyPriceFeedRecord)
+    acquires PriceFeedRegistry {
+        ensure_registry(admin, DEFAULT_VERSION, feed.asset_id);
+        let registry = borrow_registry_mut(admin);
+        apply_legacy_feed(registry, feed);
+    }
+
+    public entry fun import_existing_feeds(admin: &signer, mut feeds: vector<LegacyPriceFeedRecord>)
+    acquires PriceFeedRegistry {
+        let sample = if (vector::length(&feeds) > 0) {
+            let last = *vector::borrow(&feeds, vector::length(&feeds) - 1);
+            last.asset_id
+        } else {
+            0
+        };
+        ensure_registry(admin, DEFAULT_VERSION, sample);
+        import_feeds_recursive(admin, &mut feeds);
+    }
+
+    public entry fun import_existing_registry(admin: &signer, payload: LegacyPriceFeedRegistry)
+    acquires PriceFeedRegistry {
+        let LegacyPriceFeedRegistry { admin: new_admin, version, feeds } = payload;
+        ensure_migration_signer(admin, new_admin);
+        reset_registry(admin, new_admin, version);
+        import_feeds_from_vector(admin, &feeds);
     }
 
     public entry fun register_feed(
@@ -216,6 +271,19 @@ module lottery_utils::price_feed {
         }
     }
 
+    #[view]
+    public fun registry_snapshot(): option::Option<PriceFeedRegistrySnapshot> {
+        if (!exists<PriceFeedRegistry>(@lottery)) {
+            return option::none<PriceFeedRegistrySnapshot>()
+        };
+        let registry = borrow_registry_ref();
+        let keys = table::keys(&registry.feeds);
+        let feeds = collect_feed_views(&registry.feeds, &keys, 0, vector::length(&keys));
+        option::some(
+            PriceFeedRegistrySnapshot { admin: registry.admin, version: registry.version, feeds },
+        )
+    }
+
     public fun is_initialized(): bool {
         exists<PriceFeedRegistry>(@lottery)
     }
@@ -243,6 +311,48 @@ module lottery_utils::price_feed {
         borrow_global<PriceFeedRegistry>(@lottery)
     }
 
+    fun collect_feed_views(
+        feeds: &table::Table<u64, PriceFeedRecord>,
+        keys: &vector<u64>,
+        index: u64,
+        len: u64,
+    ): vector<PriceFeedView> {
+        if (index >= len) {
+            return vector::empty<PriceFeedView>()
+        };
+        let asset_id = *vector::borrow(keys, index);
+        let feed = table::borrow(feeds, asset_id);
+        let mut current = vector::singleton(build_view(asset_id, feed));
+        let tail = collect_feed_views(feeds, keys, index + 1, len);
+        append_feed_views(&mut current, &tail, 0);
+        current
+    }
+
+    fun append_feed_views(dst: &mut vector<PriceFeedView>, src: &vector<PriceFeedView>, index: u64) {
+        let len = vector::length(src);
+        if (index >= len) {
+            return
+        };
+        let item = *vector::borrow(src, index);
+        vector::push_back(dst, item);
+        append_feed_views(dst, src, index + 1)
+    }
+
+    fun build_view(asset_id: u64, feed: &PriceFeedRecord): PriceFeedView {
+        let record = *feed;
+        PriceFeedView {
+            asset_id,
+            price: record.price,
+            decimals: record.decimals,
+            last_updated_ts: record.last_updated_ts,
+            staleness_window: record.staleness_window,
+            clamp_threshold_bps: record.clamp_threshold_bps,
+            fallback_active: record.fallback_active,
+            fallback_reason: record.fallback_reason,
+            clamp_active: record.clamp_active,
+        }
+    }
+
     fun borrow_record_mut(
         feeds: &mut table::Table<u64, PriceFeedRecord>,
         asset_id: u64,
@@ -261,6 +371,148 @@ module lottery_utils::price_feed {
             abort E_FEED_UNKNOWN
         };
         table::borrow(feeds, asset_id)
+    }
+
+    fun ensure_registry(admin: &signer, version: u16, sample_asset_id: u64) acquires PriceFeedRegistry {
+        let caller = signer::address_of(admin);
+        assert!(caller == @lottery, E_NOT_ADMIN);
+        if (exists<PriceFeedRegistry>(@lottery)) {
+            return
+        };
+        let mut feeds = table::new();
+        if (sample_asset_id > 0) {
+            let placeholder = PriceFeedRecord {
+                asset_id: sample_asset_id,
+                price: 0,
+                decimals: 0,
+                last_updated_ts: 0,
+                staleness_window: DEFAULT_STALENESS_WINDOW,
+                clamp_threshold_bps: DEFAULT_CLAMP_THRESHOLD_BPS,
+                fallback_active: false,
+                fallback_reason: 0,
+                clamp_active: false,
+            };
+            table::add(&mut feeds, sample_asset_id, placeholder);
+        };
+        move_to(
+            admin,
+            PriceFeedRegistry {
+                admin: caller,
+                version,
+                feeds,
+                updates: account::new_event_handle<PriceFeedUpdatedEvent>(admin),
+                fallbacks: account::new_event_handle<PriceFeedFallbackEvent>(admin),
+                clamps: account::new_event_handle<PriceFeedClampEvent>(admin),
+                clamp_clears: account::new_event_handle<PriceFeedClampClearedEvent>(admin),
+            },
+        );
+    }
+
+    fun reset_registry(admin: &signer, new_admin: address, version: u16) acquires PriceFeedRegistry {
+        let caller = signer::address_of(admin);
+        assert!(caller == @lottery, E_NOT_ADMIN);
+        if (new_admin != @lottery) {
+            abort E_INVALID_ADMIN
+        };
+        if (exists<PriceFeedRegistry>(@lottery)) {
+            let _old = move_from<PriceFeedRegistry>(@lottery);
+        };
+        move_to(
+            admin,
+            PriceFeedRegistry {
+                admin: new_admin,
+                version,
+                feeds: table::new(),
+                updates: account::new_event_handle<PriceFeedUpdatedEvent>(admin),
+                fallbacks: account::new_event_handle<PriceFeedFallbackEvent>(admin),
+                clamps: account::new_event_handle<PriceFeedClampEvent>(admin),
+                clamp_clears: account::new_event_handle<PriceFeedClampClearedEvent>(admin),
+            },
+        );
+    }
+
+    fun apply_legacy_feed(registry: &mut PriceFeedRegistry, feed: LegacyPriceFeedRecord) {
+        let LegacyPriceFeedRecord {
+            asset_id,
+            price,
+            decimals,
+            last_updated_ts,
+            staleness_window,
+            clamp_threshold_bps,
+            fallback_active,
+            fallback_reason,
+            clamp_active,
+        } = feed;
+        assert!(decimals <= 18, E_DECIMALS_INVALID);
+        let had_record = table::contains(&registry.feeds, asset_id);
+        let old_price = if (had_record) {
+            let existing = borrow_record_mut(&mut registry.feeds, asset_id);
+            let previous_price = existing.price;
+            *existing = PriceFeedRecord {
+                asset_id,
+                price,
+                decimals,
+                last_updated_ts,
+                staleness_window,
+                clamp_threshold_bps,
+                fallback_active,
+                fallback_reason,
+                clamp_active,
+            };
+            previous_price
+        } else {
+            let record = PriceFeedRecord {
+                asset_id,
+                price,
+                decimals,
+                last_updated_ts,
+                staleness_window,
+                clamp_threshold_bps,
+                fallback_active,
+                fallback_reason,
+                clamp_active,
+            };
+            table::add(&mut registry.feeds, asset_id, record);
+            0
+        };
+        emit_update(&mut registry.updates, asset_id, price, decimals, last_updated_ts);
+        if (fallback_active) {
+            emit_fallback(&mut registry.fallbacks, asset_id, true, fallback_reason);
+        };
+        if (clamp_active) {
+            let previous = if (had_record) { old_price } else { price };
+            emit_clamp(&mut registry.clamps, asset_id, previous, price, clamp_threshold_bps);
+        } else if (had_record && old_price != price) {
+            emit_clamp_cleared(&mut registry.clamp_clears, asset_id, last_updated_ts);
+        };
+    }
+
+    fun import_feeds_recursive(admin: &signer, feeds: &mut vector<LegacyPriceFeedRecord>) acquires PriceFeedRegistry {
+        let len = vector::length(feeds);
+        if (len == 0) {
+            return
+        };
+        let last = vector::pop_back(feeds);
+        import_feeds_recursive(admin, feeds);
+        let registry = borrow_registry_mut(admin);
+        apply_legacy_feed(registry, last);
+    }
+
+    fun import_feeds_from_vector(admin: &signer, feeds: &vector<LegacyPriceFeedRecord>) acquires PriceFeedRegistry {
+        let len = vector::length(feeds);
+        let mut idx = 0;
+        while (idx < len) {
+            let record = *vector::borrow(feeds, idx);
+            let registry = borrow_registry_mut(admin);
+            apply_legacy_feed(registry, record);
+            idx = idx + 1;
+        };
+    }
+
+    fun ensure_migration_signer(admin: &signer, target_admin: address) {
+        let caller = signer::address_of(admin);
+        assert!(caller == @lottery, E_NOT_ADMIN);
+        assert!(target_admin == @lottery, E_INVALID_ADMIN);
     }
 
     fun unwrap_or(opt: option::Option<u64>, default: u64): u64 {

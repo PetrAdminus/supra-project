@@ -1,4 +1,5 @@
 module lottery_engine::vrf {
+    use std::option;
     use std::signer;
 
     use lottery_data::vrf_deposit;
@@ -102,6 +103,15 @@ module lottery_engine::vrf {
         };
         let ledger = vrf_deposit::ledger(@lottery);
         ledger.status
+    }
+
+    public fun is_initialized(): bool {
+        vrf_deposit::is_initialized()
+    }
+
+    public fun ledger_snapshot(): option::Option<vrf_deposit::VrfDepositSnapshot>
+    acquires vrf_deposit::VrfDepositLedger {
+        vrf_deposit::ledger_snapshot()
     }
 
     fun ensure_admin_mut(caller: &signer): &mut vrf_deposit::VrfDepositLedger acquires vrf_deposit::VrfDepositLedger {

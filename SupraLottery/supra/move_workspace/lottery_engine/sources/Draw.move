@@ -10,6 +10,7 @@ module lottery_engine::draw {
     use lottery_data::rounds;
     use lottery_engine::vrf;
     use supra_framework::event;
+    use vrf_hub::table;
     use vrf_hub::vrf_hub;
 
     const E_UNAUTHORIZED_ADMIN: u64 = 1;
@@ -20,6 +21,22 @@ module lottery_engine::draw {
     const E_PENDING_REQUEST_MISMATCH: u64 = 6;
     const E_RANDOMNESS_TOO_SHORT: u64 = 7;
     const E_RANDOMNESS_OVERFLOW: u64 = 8;
+
+    public struct DrawLotterySnapshot has copy, drop, store {
+        lottery_id: u64,
+        draw_scheduled_round: bool,
+        draw_scheduled_state: bool,
+        pending_request_round: option::Option<u64>,
+        pending_request_state: option::Option<u64>,
+        last_request_payload_hash: option::Option<vector<u8>>,
+        last_requester: option::Option<address>,
+        ticket_count_round: u64,
+        ticket_count_state: u64,
+        next_ticket_id_round: u64,
+        next_ticket_id_state: u64,
+        request_count: u64,
+        response_count: u64,
+    }
 
     public entry fun schedule_draw(caller: &signer, lottery_id: u64)
     acquires instances::InstanceRegistry, lottery_state::LotteryState, rounds::RoundRegistry {
@@ -225,6 +242,57 @@ module lottery_engine::draw {
         lottery_state::emit_snapshot(state, lottery_id);
     }
 
+    #[view]
+    public fun draw_snapshot(lottery_id: u64): option::Option<DrawLotterySnapshot>
+    acquires instances::InstanceRegistry, lottery_state::LotteryState, rounds::RoundRegistry {
+        if (!instances::is_initialized()) {
+            return option::none<DrawLotterySnapshot>();
+        };
+        if (!lottery_state::is_initialized()) {
+            return option::none<DrawLotterySnapshot>();
+        };
+        if (!rounds::is_initialized()) {
+            return option::none<DrawLotterySnapshot>();
+        };
+
+        let registry = instances::borrow_registry(@lottery);
+        let state = lottery_state::borrow(@lottery);
+        let rounds_registry = rounds::borrow_registry(@lottery);
+        if (!table::contains(&registry.instances, lottery_id)) {
+            return option::none<DrawLotterySnapshot>();
+        };
+        if (!table::contains(&state.lotteries, lottery_id)) {
+            return option::none<DrawLotterySnapshot>();
+        };
+        if (!table::contains(&rounds_registry.rounds, lottery_id)) {
+            return option::none<DrawLotterySnapshot>();
+        };
+
+        let snapshot = build_draw_snapshot(&registry, &state, &rounds_registry, lottery_id);
+        option::some(snapshot)
+    }
+
+    #[view]
+    public fun draw_snapshots(): option::Option<vector<DrawLotterySnapshot>>
+    acquires instances::InstanceRegistry, lottery_state::LotteryState, rounds::RoundRegistry {
+        if (!instances::is_initialized()) {
+            return option::none<vector<DrawLotterySnapshot>>();
+        };
+        if (!lottery_state::is_initialized()) {
+            return option::none<vector<DrawLotterySnapshot>>();
+        };
+        if (!rounds::is_initialized()) {
+            return option::none<vector<DrawLotterySnapshot>>();
+        };
+
+        let registry = instances::borrow_registry(@lottery);
+        let state = lottery_state::borrow(@lottery);
+        let rounds_registry = rounds::borrow_registry(@lottery);
+        let len = vector::length(&registry.lottery_ids);
+        let snapshots = collect_draw_snapshots(&registry, &state, &rounds_registry, 0, len);
+        option::some(snapshots)
+    }
+
     fun randomness_to_index(randomness: &vector<u8>, ticket_count: u64): u64 {
         let random_value = randomness_to_u64(randomness);
         random_value % ticket_count
@@ -234,6 +302,81 @@ module lottery_engine::draw {
         let length = vector::length(randomness);
         assert!(length >= 8, E_RANDOMNESS_TOO_SHORT);
         accumulate_randomness(randomness, 0, 0)
+    }
+
+    fun build_draw_snapshot(
+        registry: &instances::InstanceRegistry,
+        state: &lottery_state::LotteryState,
+        rounds_registry: &rounds::RoundRegistry,
+        lottery_id: u64,
+    ): DrawLotterySnapshot {
+        let runtime = table::borrow(&state.lotteries, lottery_id);
+        let round_runtime = table::borrow(&rounds_registry.rounds, lottery_id);
+
+        let pending_request_state = runtime.pending_request.request_id;
+        let last_request_payload_hash = clone_option_bytes(&runtime.pending_request.last_request_payload_hash);
+        let last_requester = runtime.pending_request.last_requester;
+        let tickets_state = &runtime.tickets.participants;
+        let tickets_round = &round_runtime.tickets;
+
+        DrawLotterySnapshot {
+            lottery_id,
+            draw_scheduled_round: round_runtime.draw_scheduled,
+            draw_scheduled_state: runtime.draw.draw_scheduled,
+            pending_request_round: round_runtime.pending_request,
+            pending_request_state,
+            last_request_payload_hash,
+            last_requester,
+            ticket_count_round: vector::length(tickets_round),
+            ticket_count_state: vector::length(tickets_state),
+            next_ticket_id_round: round_runtime.next_ticket_id,
+            next_ticket_id_state: runtime.tickets.next_ticket_id,
+            request_count: runtime.vrf_stats.request_count,
+            response_count: runtime.vrf_stats.response_count,
+        }
+    }
+
+    fun collect_draw_snapshots(
+        registry: &instances::InstanceRegistry,
+        state: &lottery_state::LotteryState,
+        rounds_registry: &rounds::RoundRegistry,
+        index: u64,
+        len: u64,
+    ): vector<DrawLotterySnapshot> {
+        if (index >= len) {
+            return vector::empty<DrawLotterySnapshot>();
+        };
+
+        let lottery_id = *vector::borrow(&registry.lottery_ids, index);
+        let mut current = vector::empty<DrawLotterySnapshot>();
+        if (table::contains(&state.lotteries, lottery_id) && table::contains(&rounds_registry.rounds, lottery_id)) {
+            let snapshot = build_draw_snapshot(registry, state, rounds_registry, lottery_id);
+            vector::push_back(&mut current, snapshot);
+        };
+        let tail = collect_draw_snapshots(registry, state, rounds_registry, index + 1, len);
+        append_draw_snapshots(&mut current, &tail, 0);
+        current
+    }
+
+    fun append_draw_snapshots(
+        dst: &mut vector<DrawLotterySnapshot>,
+        src: &vector<DrawLotterySnapshot>,
+        index: u64,
+    ) {
+        let len = vector::length(src);
+        if (index >= len) {
+            return;
+        };
+        vector::push_back(dst, *vector::borrow(src, index));
+        append_draw_snapshots(dst, src, index + 1);
+    }
+
+    fun clone_option_bytes(value: &option::Option<vector<u8>>): option::Option<vector<u8>> {
+        if (option::is_some(value)) {
+            option::some(clone_bytes(option::borrow(value)))
+        } else {
+            option::none<vector<u8>>()
+        }
     }
 
     fun accumulate_randomness(randomness: &vector<u8>, index: u64, acc: u64): u64 {

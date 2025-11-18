@@ -1,5 +1,6 @@
 module lottery_data::payouts {
     use std::hash;
+    use std::option;
     use std::signer;
     use std::vector;
 
@@ -91,9 +92,42 @@ module lottery_data::payouts {
         next_payout_id: u64,
         states: table::Table<u64, LotteryPayoutState>,
         payout_index: table::Table<u64, u64>,
+        lottery_ids: vector<u64>,
         winner_events: event::EventHandle<WinnerRecordedEvent>,
         payout_events: event::EventHandle<PayoutStatusUpdatedEvent>,
         refund_events: event::EventHandle<RefundIssuedEvent>,
+    }
+
+    #[view]
+    public fun is_initialized(): bool {
+        exists<PayoutLedger>(@lottery)
+    }
+
+    struct PayoutRecordSnapshot has copy, drop, store {
+        payout_id: u64,
+        lottery_id: u64,
+        round_number: u64,
+        winner: address,
+        ticket_index: u64,
+        amount: u64,
+        status: u8,
+        randomness_hash: vector<u8>,
+        payload_hash: vector<u8>,
+    }
+
+    struct LotteryPayoutSnapshot has copy, drop, store {
+        lottery_id: u64,
+        round_number: u64,
+        pending_count: u64,
+        paid_count: u64,
+        refunded_count: u64,
+        payouts: vector<PayoutRecordSnapshot>,
+    }
+
+    struct PayoutLedgerSnapshot has copy, drop, store {
+        admin: address,
+        next_payout_id: u64,
+        lotteries: vector<LotteryPayoutSnapshot>,
     }
 
     public entry fun init_ledger(caller: &signer) {
@@ -108,6 +142,7 @@ module lottery_data::payouts {
                 next_payout_id: 1,
                 states: table::new<u64, LotteryPayoutState>(),
                 payout_index: table::new<u64, u64>(),
+                lottery_ids: vector::empty<u64>(),
                 winner_events: account::new_event_handle<WinnerRecordedEvent>(caller),
                 payout_events: account::new_event_handle<PayoutStatusUpdatedEvent>(caller),
                 refund_events: account::new_event_handle<RefundIssuedEvent>(caller),
@@ -139,6 +174,31 @@ module lottery_data::payouts {
 
     public fun status_refunded(): u8 {
         STATUS_REFUNDED
+    }
+
+    #[view]
+    public fun ledger_snapshot(): option::Option<PayoutLedgerSnapshot> acquires PayoutLedger {
+        if (!exists<PayoutLedger>(@lottery)) {
+            return option::none<PayoutLedgerSnapshot>();
+        };
+        let ledger = borrow(@lottery);
+        let lotteries = collect_lottery_snapshots(ledger, 0, vector::length(&ledger.lottery_ids));
+        let snapshot = PayoutLedgerSnapshot { admin: ledger.admin, next_payout_id: ledger.next_payout_id, lotteries };
+        option::some(snapshot)
+    }
+
+    #[view]
+    public fun lottery_snapshot(lottery_id: u64): option::Option<LotteryPayoutSnapshot>
+    acquires PayoutLedger {
+        if (!exists<PayoutLedger>(@lottery)) {
+            return option::none<LotteryPayoutSnapshot>();
+        };
+        if (!table::contains(&borrow(@lottery).states, lottery_id)) {
+            return option::none<LotteryPayoutSnapshot>();
+        };
+        let ledger = borrow(@lottery);
+        let snapshot = build_lottery_snapshot(ledger, lottery_id);
+        option::some(snapshot)
     }
 
     public entry fun import_existing_payout(caller: &signer, record: LegacyPayoutRecord)
@@ -248,8 +308,26 @@ module lottery_data::payouts {
                     payout_ids: vector::empty<u64>(),
                 },
             );
+            record_lottery_id(&mut ledger.lottery_ids, lottery_id);
         };
         table::borrow_mut(&mut ledger.states, lottery_id)
+    }
+
+    fun record_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
+        if (contains_lottery_id(ids, lottery_id, 0)) {
+            return;
+        };
+        vector::push_back(ids, lottery_id);
+    }
+
+    fun contains_lottery_id(ids: &vector<u64>, lottery_id: u64, index: u64): bool {
+        if (index == vector::length(ids)) {
+            return false;
+        };
+        if (*vector::borrow(ids, index) == lottery_id) {
+            return true;
+        };
+        contains_lottery_id(ids, lottery_id, index + 1)
     }
 
     fun update_status(
@@ -345,6 +423,67 @@ module lottery_data::payouts {
         vector::push_back(copy, *vector::borrow(source, index));
         let next_index = index + 1;
         clone_bytes_into(copy, source, next_index, len);
+    }
+
+    fun collect_lottery_snapshots(
+        ledger: &PayoutLedger,
+        index: u64,
+        len: u64,
+    ): vector<LotteryPayoutSnapshot> {
+        if (index == len) {
+            return vector::empty<LotteryPayoutSnapshot>();
+        };
+        let mut snapshots = collect_lottery_snapshots(ledger, index + 1, len);
+        let lottery_id = *vector::borrow(&ledger.lottery_ids, index);
+        if (table::contains(&ledger.states, lottery_id)) {
+            let snapshot = build_lottery_snapshot(ledger, lottery_id);
+            vector::push_back(&mut snapshots, snapshot);
+        };
+        snapshots
+    }
+
+    fun build_lottery_snapshot(ledger: &PayoutLedger, lottery_id: u64): LotteryPayoutSnapshot {
+        let state = table::borrow(&ledger.states, lottery_id);
+        let payouts = collect_payout_snapshots(state, 0, vector::length(&state.payout_ids));
+        LotteryPayoutSnapshot {
+            lottery_id,
+            round_number: state.round_number,
+            pending_count: state.pending_count,
+            paid_count: state.paid_count,
+            refunded_count: state.refunded_count,
+            payouts,
+        }
+    }
+
+    fun collect_payout_snapshots(
+        state: &LotteryPayoutState,
+        index: u64,
+        len: u64,
+    ): vector<PayoutRecordSnapshot> {
+        if (index == len) {
+            return vector::empty<PayoutRecordSnapshot>();
+        };
+        let mut current = collect_payout_snapshots(state, index + 1, len);
+        let payout_id = *vector::borrow(&state.payout_ids, index);
+        if (table::contains(&state.payouts, payout_id)) {
+            let record = table::borrow(&state.payouts, payout_id);
+            vector::push_back(&mut current, payout_snapshot(record));
+        };
+        current
+    }
+
+    fun payout_snapshot(record: &PayoutRecord): PayoutRecordSnapshot {
+        PayoutRecordSnapshot {
+            payout_id: record.payout_id,
+            lottery_id: record.lottery_id,
+            round_number: record.round_number,
+            winner: record.winner,
+            ticket_index: record.ticket_index,
+            amount: record.amount,
+            status: record.status,
+            randomness_hash: clone_bytes(&record.randomness_hash),
+            payload_hash: clone_bytes(&record.payload_hash),
+        }
     }
 
     fun import_existing_payouts_recursive(records: &mut vector<LegacyPayoutRecord>)

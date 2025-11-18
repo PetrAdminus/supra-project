@@ -19,12 +19,26 @@ module lottery_data::jackpot {
         pending_payload: option::Option<vector<u8>>,
     }
 
+    struct JackpotRuntimeView has copy, drop, store {
+        lottery_id: u64,
+        tickets: vector<address>,
+        draw_scheduled: bool,
+        pending_request_id: option::Option<u64>,
+        pending_payload: option::Option<vector<u8>>,
+    }
+
     struct JackpotSnapshot has copy, drop, store {
         lottery_id: u64,
         ticket_count: u64,
         draw_scheduled: bool,
         has_pending_request: bool,
         pending_request_id: option::Option<u64>,
+    }
+
+    struct JackpotRegistrySnapshot has copy, drop, store {
+        admin: address,
+        lottery_ids: vector<u64>,
+        snapshots: vector<JackpotSnapshot>,
     }
 
     #[event]
@@ -73,6 +87,11 @@ module lottery_data::jackpot {
         request_events: event::EventHandle<JackpotRequestIssuedEvent>,
         fulfill_events: event::EventHandle<JackpotFulfilledEvent>,
         snapshot_events: event::EventHandle<JackpotSnapshotUpdatedEvent>,
+    }
+
+    #[view]
+    public fun is_initialized(): bool {
+        exists<JackpotRegistry>(@lottery)
     }
 
     public entry fun init_registry(caller: &signer) {
@@ -240,14 +259,55 @@ module lottery_data::jackpot {
 
     public fun emit_snapshot(registry: &mut JackpotRegistry, lottery_id: u64) {
         let runtime_ref = jackpot(registry, lottery_id);
-        let snapshot = JackpotSnapshot {
-            lottery_id,
-            ticket_count: vector::length(&runtime_ref.tickets),
-            draw_scheduled: runtime_ref.draw_scheduled,
-            has_pending_request: option::is_some(&runtime_ref.pending_request),
-            pending_request_id: runtime_ref.pending_request,
-        };
+        let snapshot = build_snapshot(lottery_id, runtime_ref);
         event::emit_event(&mut registry.snapshot_events, JackpotSnapshotUpdatedEvent { lottery_id, snapshot });
+    }
+
+    #[view]
+    public fun registry_snapshot(): option::Option<JackpotRegistrySnapshot> acquires JackpotRegistry {
+        if (!exists<JackpotRegistry>(@lottery)) {
+            return option::none<JackpotRegistrySnapshot>();
+        };
+        let registry = borrow_registry(@lottery);
+        let ids = clone_u64s(&registry.lottery_ids);
+        let snapshots = collect_snapshots(&registry.jackpots, &registry.lottery_ids, 0, vector::length(&registry.lottery_ids));
+        option::some(JackpotRegistrySnapshot { admin: registry.admin, lottery_ids: ids, snapshots })
+    }
+
+    #[view]
+    public fun lottery_snapshot(lottery_id: u64): option::Option<JackpotSnapshot> acquires JackpotRegistry {
+        if (!exists<JackpotRegistry>(@lottery)) {
+            return option::none<JackpotSnapshot>();
+        };
+        let registry = borrow_registry(@lottery);
+        if (!table::contains(&registry.jackpots, lottery_id)) {
+            return option::none<JackpotSnapshot>();
+        };
+        let runtime_ref = table::borrow(&registry.jackpots, lottery_id);
+        option::some(build_snapshot(lottery_id, runtime_ref))
+    }
+
+    #[view]
+    public fun runtime_view(lottery_id: u64): option::Option<JackpotRuntimeView> acquires JackpotRegistry {
+        if (!exists<JackpotRegistry>(@lottery)) {
+            return option::none<JackpotRuntimeView>();
+        };
+        let registry = borrow_registry(@lottery);
+        if (!table::contains(&registry.jackpots, lottery_id)) {
+            return option::none<JackpotRuntimeView>();
+        };
+        let runtime_ref = table::borrow(&registry.jackpots, lottery_id);
+        option::some(build_runtime_view(lottery_id, runtime_ref))
+    }
+
+    #[view]
+    public fun runtime_views(): option::Option<vector<JackpotRuntimeView>> acquires JackpotRegistry {
+        if (!exists<JackpotRegistry>(@lottery)) {
+            return option::none<vector<JackpotRuntimeView>>();
+        };
+        let registry = borrow_registry(@lottery);
+        let views = collect_runtime_views(&registry.jackpots, &registry.lottery_ids, 0, vector::length(&registry.lottery_ids));
+        option::some(views)
     }
 
     public fun empty_runtime(): JackpotRuntime {
@@ -256,6 +316,16 @@ module lottery_data::jackpot {
             draw_scheduled: false,
             pending_request: option::none<u64>(),
             pending_payload: option::none<vector<u8>>(),
+        }
+    }
+
+    fun build_snapshot(lottery_id: u64, runtime_ref: &JackpotRuntime): JackpotSnapshot {
+        JackpotSnapshot {
+            lottery_id,
+            ticket_count: vector::length(&runtime_ref.tickets),
+            draw_scheduled: runtime_ref.draw_scheduled,
+            has_pending_request: option::is_some(&runtime_ref.pending_request),
+            pending_request_id: runtime_ref.pending_request,
         }
     }
 
@@ -288,5 +358,126 @@ module lottery_data::jackpot {
         vector::push_back(buffer, byte);
         let next_index = index + 1;
         clone_into(buffer, data, next_index, len);
+    }
+
+    fun collect_snapshots(
+        jackpots: &table::Table<u64, JackpotRuntime>,
+        lottery_ids: &vector<u64>,
+        index: u64,
+        len: u64,
+    ): vector<JackpotSnapshot> {
+        if (index >= len) {
+            return vector::empty<JackpotSnapshot>();
+        };
+        let lottery_id = *vector::borrow(lottery_ids, index);
+        let runtime_ref = table::borrow(jackpots, lottery_id);
+        let current_snapshot = build_snapshot(lottery_id, runtime_ref);
+        let result = vector::empty<JackpotSnapshot>();
+        vector::push_back(&mut result, current_snapshot);
+        let tail = collect_snapshots(jackpots, lottery_ids, index + 1, len);
+        append_snapshot_tail(&mut result, &tail, 0);
+        result
+    }
+
+    fun collect_runtime_views(
+        jackpots: &table::Table<u64, JackpotRuntime>,
+        lottery_ids: &vector<u64>,
+        index: u64,
+        len: u64,
+    ): vector<JackpotRuntimeView> {
+        if (index >= len) {
+            return vector::empty<JackpotRuntimeView>();
+        };
+        let lottery_id = *vector::borrow(lottery_ids, index);
+        let runtime_ref = table::borrow(jackpots, lottery_id);
+        let current = build_runtime_view(lottery_id, runtime_ref);
+        let buffer = vector::empty<JackpotRuntimeView>();
+        vector::push_back(&mut buffer, current);
+        let tail = collect_runtime_views(jackpots, lottery_ids, index + 1, len);
+        append_runtime_tail(&mut buffer, &tail, 0);
+        buffer
+    }
+
+    fun build_runtime_view(lottery_id: u64, runtime_ref: &JackpotRuntime): JackpotRuntimeView {
+        JackpotRuntimeView {
+            lottery_id,
+            tickets: clone_addresses(&runtime_ref.tickets),
+            draw_scheduled: runtime_ref.draw_scheduled,
+            pending_request_id: runtime_ref.pending_request,
+            pending_payload: clone_payload(&runtime_ref.pending_payload),
+        }
+    }
+
+    fun clone_payload(payload: &option::Option<vector<u8>>): option::Option<vector<u8>> {
+        if (!option::is_some(payload)) {
+            return option::none<vector<u8>>();
+        };
+        let data = option::borrow(payload);
+        option::some(clone_bytes(data))
+    }
+
+    fun clone_addresses(addresses: &vector<address>): vector<address> {
+        let buffer = vector::empty<address>();
+        let len = vector::length(addresses);
+        clone_addresses_into(&mut buffer, addresses, 0, len);
+        buffer
+    }
+
+    fun clone_addresses_into(
+        buffer: &mut vector<address>,
+        addresses: &vector<address>,
+        index: u64,
+        len: u64,
+    ) {
+        if (index >= len) {
+            return;
+        };
+        let addr = *vector::borrow(addresses, index);
+        vector::push_back(buffer, addr);
+        let next_index = index + 1;
+        clone_addresses_into(buffer, addresses, next_index, len);
+    }
+
+    fun append_snapshot_tail(
+        head: &mut vector<JackpotSnapshot>,
+        tail: &vector<JackpotSnapshot>,
+        index: u64,
+    ) {
+        if (index >= vector::length(tail)) {
+            return;
+        };
+        let item = *vector::borrow(tail, index);
+        vector::push_back(head, item);
+        append_snapshot_tail(head, tail, index + 1);
+    }
+
+    fun append_runtime_tail(
+        head: &mut vector<JackpotRuntimeView>,
+        tail: &vector<JackpotRuntimeView>,
+        index: u64,
+    ) {
+        if (index >= vector::length(tail)) {
+            return;
+        };
+        let item = *vector::borrow(tail, index);
+        vector::push_back(head, item);
+        append_runtime_tail(head, tail, index + 1);
+    }
+
+    fun clone_u64s(data: &vector<u64>): vector<u64> {
+        let buffer = vector::empty<u64>();
+        let len = vector::length(data);
+        clone_u64s_into(&mut buffer, data, 0, len);
+        buffer
+    }
+
+    fun clone_u64s_into(buffer: &mut vector<u64>, data: &vector<u64>, index: u64, len: u64) {
+        if (index >= len) {
+            return;
+        };
+        let value = *vector::borrow(data, index);
+        vector::push_back(buffer, value);
+        let next_index = index + 1;
+        clone_u64s_into(buffer, data, next_index, len);
     }
 }
