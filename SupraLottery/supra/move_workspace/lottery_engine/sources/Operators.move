@@ -67,4 +67,14 @@ module lottery_engine::operators {
 
         abort E_NOT_AUTHORIZED;
     }
+
+    public fun registry_snapshot(): option::Option<operators::OperatorRegistrySnapshot>
+    acquires operators::OperatorRegistry {
+        if (!exists<operators::OperatorRegistry>(@lottery)) {
+            return option::none<operators::OperatorRegistrySnapshot>();
+        };
+
+        let snapshot = operators::registry_snapshot();
+        option::some(snapshot)
+    }
 }

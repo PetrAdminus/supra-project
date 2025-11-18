@@ -144,12 +144,55 @@ module lottery_data::treasury_multi {
         scope: u64,
     }
 
+    struct CapSnapshot has copy, drop, store {
+        present: bool,
+        scope: u64,
+    }
+
+    struct ControlSnapshot has copy, drop, store {
+        admin: address,
+        jackpot: CapSnapshot,
+        referrals: CapSnapshot,
+        store: CapSnapshot,
+        vip: CapSnapshot,
+    }
+
     struct TreasuryMultiControl has key {
         admin: address,
         jackpot_cap: option::Option<MultiTreasuryCap>,
         referrals_cap: option::Option<MultiTreasuryCap>,
         store_cap: option::Option<MultiTreasuryCap>,
         vip_cap: option::Option<MultiTreasuryCap>,
+    }
+
+    struct RecipientSnapshot has copy, drop, store {
+        recipient: address,
+        registered: bool,
+        frozen: bool,
+        store: option::Option<address>,
+        balance: u64,
+    }
+
+    struct LotterySnapshot has copy, drop, store {
+        lottery_id: u64,
+        prize_bps: u64,
+        jackpot_bps: u64,
+        operations_bps: u64,
+        prize_balance: u64,
+        operations_balance: u64,
+    }
+
+    struct TreasurySnapshot has copy, drop, store {
+        admin: address,
+        jackpot_recipient: RecipientSnapshot,
+        operations_recipient: RecipientSnapshot,
+        jackpot_balance: u64,
+        lotteries: vector<LotterySnapshot>,
+    }
+
+    #[view]
+    public fun is_initialized(): bool {
+        exists<TreasuryState>(@lottery)
     }
 
     public entry fun import_existing_state(caller: &signer, payload: LegacyMultiTreasuryState)
@@ -170,6 +213,40 @@ module lottery_data::treasury_multi {
     ) acquires TreasuryState {
         ensure_admin_signer(caller);
         import_existing_lotteries_recursive(&mut records);
+    }
+
+    #[view]
+    public fun caps_ready(): bool acquires TreasuryMultiControl {
+        if (!exists<TreasuryMultiControl>(@lottery)) {
+            false
+        } else {
+            let control = borrow_global<TreasuryMultiControl>(@lottery);
+            option::is_some(&control.jackpot_cap)
+                && option::is_some(&control.referrals_cap)
+                && option::is_some(&control.store_cap)
+                && option::is_some(&control.vip_cap)
+        }
+    }
+
+    #[view]
+    public fun control_snapshot(): option::Option<ControlSnapshot> acquires TreasuryMultiControl {
+        if (!exists<TreasuryMultiControl>(@lottery)) {
+            option::none<ControlSnapshot>()
+        } else {
+            let control = borrow_global<TreasuryMultiControl>(@lottery);
+            let snapshot = build_control_snapshot(control);
+            option::some(snapshot)
+        }
+    }
+
+    #[view]
+    public fun state_snapshot(): option::Option<TreasurySnapshot> acquires TreasuryState {
+        if (!exists<TreasuryState>(@lottery)) {
+            option::none<TreasurySnapshot>()
+        } else {
+            let state = borrow_global<TreasuryState>(@lottery);
+            option::some(build_state_snapshot(state))
+        }
     }
 
     public entry fun init_state(
@@ -225,6 +302,16 @@ module lottery_data::treasury_multi {
 
     public fun borrow_state_mut(addr: address): &mut TreasuryState acquires TreasuryState {
         borrow_global_mut<TreasuryState>(addr)
+    }
+
+    #[view]
+    public fun has_state(addr: address): bool {
+        exists<TreasuryState>(addr)
+    }
+
+    #[view]
+    public fun has_lottery(state: &TreasuryState, lottery_id: u64): bool {
+        table::contains(&state.configs, lottery_id)
     }
 
     public fun borrow_control(addr: address): &TreasuryMultiControl acquires TreasuryMultiControl {
@@ -290,6 +377,25 @@ module lottery_data::treasury_multi {
     public fun ensure_scope_for_operations_income(cap: &MultiTreasuryCap) {
         let scope = cap.scope;
         assert!(scope == SCOPE_STORE || scope == SCOPE_VIP, E_SCOPE_MISMATCH);
+    }
+
+    fun build_control_snapshot(control: &TreasuryMultiControl): ControlSnapshot {
+        ControlSnapshot {
+            admin: control.admin,
+            jackpot: cap_snapshot(&control.jackpot_cap),
+            referrals: cap_snapshot(&control.referrals_cap),
+            store: cap_snapshot(&control.store_cap),
+            vip: cap_snapshot(&control.vip_cap),
+        }
+    }
+
+    fun cap_snapshot(slot: &option::Option<MultiTreasuryCap>): CapSnapshot {
+        if (option::is_some(slot)) {
+            let scope = option::borrow(slot).scope;
+            CapSnapshot { present: true, scope }
+        } else {
+            CapSnapshot { present: false, scope: 0 }
+        }
     }
 
     public fun admin(state: &TreasuryState): address {
@@ -503,6 +609,82 @@ module lottery_data::treasury_multi {
             &mut state.operations_bonus_events,
             OperationsBonusPaidEvent { lottery_id, recipient, amount },
         );
+    }
+
+    fun build_state_snapshot(state: &TreasuryState): TreasurySnapshot {
+        let lotteries = collect_lottery_snapshots(
+            &state.lottery_ids,
+            &state.configs,
+            &state.pools,
+            0,
+            vector::length(&state.lottery_ids),
+        );
+        TreasurySnapshot {
+            admin: state.admin,
+            jackpot_recipient: recipient_snapshot(&state.jackpot_recipient),
+            operations_recipient: recipient_snapshot(&state.operations_recipient),
+            jackpot_balance: state.jackpot_balance,
+            lotteries,
+        }
+    }
+
+    fun recipient_snapshot(status: &RecipientStatus): RecipientSnapshot {
+        RecipientSnapshot {
+            recipient: status.recipient,
+            registered: status.registered,
+            frozen: status.frozen,
+            store: status.store,
+            balance: status.balance,
+        }
+    }
+
+    fun collect_lottery_snapshots(
+        lottery_ids: &vector<u64>,
+        configs: &table::Table<u64, LotteryShareConfig>,
+        pools: &table::Table<u64, LotteryPool>,
+        index: u64,
+        len: u64,
+    ): vector<LotterySnapshot> {
+        if (index >= len) {
+            return vector::empty<LotterySnapshot>();
+        };
+        let lottery_id = *vector::borrow(lottery_ids, index);
+        let snapshot = build_lottery_snapshot(lottery_id, configs, pools);
+        let mut current = vector::empty<LotterySnapshot>();
+        vector::push_back(&mut current, snapshot);
+        let tail = collect_lottery_snapshots(lottery_ids, configs, pools, index + 1, len);
+        append_lottery_snapshots(&mut current, &tail, 0);
+        current
+    }
+
+    fun append_lottery_snapshots(
+        dst: &mut vector<LotterySnapshot>,
+        src: &vector<LotterySnapshot>,
+        index: u64,
+    ) {
+        let len = vector::length(src);
+        if (index >= len) {
+            return;
+        };
+        vector::push_back(dst, *vector::borrow(src, index));
+        append_lottery_snapshots(dst, src, index + 1);
+    }
+
+    fun build_lottery_snapshot(
+        lottery_id: u64,
+        configs: &table::Table<u64, LotteryShareConfig>,
+        pools: &table::Table<u64, LotteryPool>,
+    ): LotterySnapshot {
+        let config = *table::borrow(configs, lottery_id);
+        let pool = *table::borrow(pools, lottery_id);
+        LotterySnapshot {
+            lottery_id,
+            prize_bps: config.prize_bps,
+            jackpot_bps: config.jackpot_bps,
+            operations_bps: config.operations_bps,
+            prize_balance: pool.prize_balance,
+            operations_balance: pool.operations_balance,
+        }
     }
 
     public fun record_operations_income_with_cap(

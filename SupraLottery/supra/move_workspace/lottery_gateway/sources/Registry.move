@@ -35,8 +35,25 @@ module lottery_gateway::registry {
         cancellation: option::Option<LotteryCancellationSummary>,
     }
 
+    struct LegacyLotteryRegistryEntry has copy, drop, store {
+        lottery_id: u64,
+        owner: address,
+        lottery_address: address,
+        ticket_price: u64,
+        jackpot_share_bps: u16,
+        active: bool,
+        cancellation: option::Option<LotteryCancellationSummary>,
+    }
+
+    struct LegacyLotteryRegistry has copy, drop, store {
+        admin: address,
+        next_lottery_id: u64,
+        entries: vector<LegacyLotteryRegistryEntry>,
+    }
+
     struct LotteryRegistrySnapshot has copy, drop, store {
         admin: address,
+        next_lottery_id: u64,
         total_lotteries: u64,
         entries: vector<LotteryRegistryEntry>,
     }
@@ -49,6 +66,7 @@ module lottery_gateway::registry {
 
     struct LotteryRegistry has key {
         admin: address,
+        next_lottery_id: u64,
         entries: table::Table<u64, LotteryRegistryEntry>,
         lottery_ids: vector<u64>,
         snapshot_events: event::EventHandle<LotteryRegistrySnapshotUpdatedEvent>,
@@ -62,6 +80,7 @@ module lottery_gateway::registry {
             caller,
             LotteryRegistry {
                 admin,
+                next_lottery_id: 1,
                 entries: table::new<u64, LotteryRegistryEntry>(),
                 lottery_ids: vector::empty<u64>(),
                 snapshot_events: account::new_event_handle<LotteryRegistrySnapshotUpdatedEvent>(caller),
@@ -151,6 +170,40 @@ module lottery_gateway::registry {
         record_existing_batch(registry, &updates, len);
     }
 
+    public entry fun import_existing_entry(caller: &signer, entry: LegacyLotteryRegistryEntry)
+    acquires LotteryRegistry {
+        ensure_initialized();
+        ensure_admin_signer(caller);
+        let registry = borrow_global_mut<LotteryRegistry>(@lottery);
+        let previous = option::some(build_snapshot(registry));
+        upsert_entry(registry, entry);
+        emit_snapshot(registry, previous);
+    }
+
+    public entry fun import_existing_entries(caller: &signer, entries: vector<LegacyLotteryRegistryEntry>)
+    acquires LotteryRegistry {
+        ensure_initialized();
+        ensure_admin_signer(caller);
+        let registry = borrow_global_mut<LotteryRegistry>(@lottery);
+        let previous = option::some(build_snapshot(registry));
+        import_entries_batch(registry, &entries, vector::length(&entries));
+        emit_snapshot(registry, previous);
+    }
+
+    public entry fun import_existing_registry(caller: &signer, payload: LegacyLotteryRegistry)
+    acquires LotteryRegistry {
+        ensure_initialized();
+        ensure_admin_signer(caller);
+        let registry = borrow_global_mut<LotteryRegistry>(@lottery);
+        let previous = option::some(build_snapshot(registry));
+        clear_registry(registry);
+        registry.admin = payload.admin;
+        registry.next_lottery_id = payload.next_lottery_id;
+        import_entries_batch(registry, &payload.entries, vector::length(&payload.entries));
+        normalize_next_lottery_id(registry);
+        emit_snapshot(registry, previous);
+    }
+
     #[view]
     public fun registry_snapshot(): option::Option<LotteryRegistrySnapshot> acquires LotteryRegistry {
         if (!exists<LotteryRegistry>(@lottery)) {
@@ -224,6 +277,38 @@ module lottery_gateway::registry {
             },
         );
         vector::push_back(&mut registry.lottery_ids, lottery_id);
+        bump_next_lottery_id(registry, lottery_id);
+    }
+
+    fun upsert_entry(registry: &mut LotteryRegistry, entry: LegacyLotteryRegistryEntry) {
+        let lottery_id = entry.lottery_id;
+        if (table::contains(&registry.entries, lottery_id)) {
+            let existing = table::borrow_mut(&mut registry.entries, lottery_id);
+            existing.owner = entry.owner;
+            existing.lottery_address = entry.lottery_address;
+            existing.ticket_price = entry.ticket_price;
+            existing.jackpot_share_bps = entry.jackpot_share_bps;
+            existing.active = entry.active;
+            existing.cancellation = entry.cancellation;
+            return;
+        };
+        if (!contains_id(&registry.lottery_ids, lottery_id, vector::length(&registry.lottery_ids))) {
+            vector::push_back(&mut registry.lottery_ids, lottery_id);
+        };
+        table::add(&mut registry.entries, lottery_id, convert_legacy_entry(entry));
+        bump_next_lottery_id(registry, lottery_id);
+    }
+
+    fun convert_legacy_entry(entry: LegacyLotteryRegistryEntry): LotteryRegistryEntry {
+        LotteryRegistryEntry {
+            lottery_id: entry.lottery_id,
+            owner: entry.owner,
+            lottery_address: entry.lottery_address,
+            ticket_price: entry.ticket_price,
+            jackpot_share_bps: entry.jackpot_share_bps,
+            active: entry.active,
+            cancellation: entry.cancellation,
+        }
     }
 
     fun apply_cancellation_update(
@@ -252,6 +337,20 @@ module lottery_gateway::registry {
         record_existing_batch(registry, updates, next_remaining);
         let update = *vector::borrow(updates, next_remaining);
         apply_cancellation_update(registry, update.lottery_id, update.reason_code, update.canceled_ts);
+    }
+
+    fun import_entries_batch(
+        registry: &mut LotteryRegistry,
+        entries: &vector<LegacyLotteryRegistryEntry>,
+        remaining: u64,
+    ) {
+        if (remaining == 0) {
+            return;
+        };
+        let next_remaining = remaining - 1;
+        import_entries_batch(registry, entries, next_remaining);
+        let entry = *vector::borrow(entries, next_remaining);
+        upsert_entry(registry, entry);
     }
 
     fun update_entry_from_instance(
@@ -285,6 +384,7 @@ module lottery_gateway::registry {
     fun build_snapshot(registry: &LotteryRegistry): LotteryRegistrySnapshot {
         LotteryRegistrySnapshot {
             admin: registry.admin,
+            next_lottery_id: registry.next_lottery_id,
             total_lotteries: vector::length(&registry.lottery_ids),
             entries: collect_entries(registry, &registry.lottery_ids, vector::length(&registry.lottery_ids)),
         }
@@ -323,5 +423,75 @@ module lottery_gateway::registry {
         let value = *vector::borrow(source, next_remaining);
         vector::push_back(&mut ids, value);
         ids
+    }
+
+    fun contains_id(ids: &vector<u64>, target: u64, remaining: u64): bool {
+        if (remaining == 0) {
+            return false;
+        };
+        let next_remaining = remaining - 1;
+        let current = *vector::borrow(ids, next_remaining);
+        if (current == target) {
+            true
+        } else {
+            contains_id(ids, target, next_remaining)
+        }
+    }
+
+    fun clear_registry(registry: &mut LotteryRegistry) {
+        let ids = clone_ids(&registry.lottery_ids);
+        clear_entries(registry, &ids, vector::length(&ids));
+        registry.lottery_ids = vector::empty<u64>();
+        registry.next_lottery_id = 1;
+    }
+
+    fun clear_entries(
+        registry: &mut LotteryRegistry,
+        ids: &vector<u64>,
+        remaining: u64,
+    ) {
+        if (remaining == 0) {
+            return;
+        };
+        let next_remaining = remaining - 1;
+        clear_entries(registry, ids, next_remaining);
+        let lottery_id = *vector::borrow(ids, next_remaining);
+        if (table::contains(&registry.entries, lottery_id)) {
+            table::remove(&mut registry.entries, lottery_id);
+        };
+    }
+
+    fun normalize_next_lottery_id(registry: &mut LotteryRegistry) {
+        let highest = max_lottery_id(&registry.lottery_ids);
+        let required_next = highest + 1;
+        if (registry.next_lottery_id < required_next) {
+            registry.next_lottery_id = required_next;
+        };
+    }
+
+    fun bump_next_lottery_id(registry: &mut LotteryRegistry, lottery_id: u64) {
+        let required_next = lottery_id + 1;
+        if (registry.next_lottery_id < required_next) {
+            registry.next_lottery_id = required_next;
+        };
+    }
+
+    fun max_lottery_id(ids: &vector<u64>): u64 {
+        let len = vector::length(ids);
+        max_lottery_id_inner(ids, len)
+    }
+
+    fun max_lottery_id_inner(ids: &vector<u64>, remaining: u64): u64 {
+        if (remaining == 0) {
+            return 0;
+        };
+        let next_remaining = remaining - 1;
+        let best = max_lottery_id_inner(ids, next_remaining);
+        let value = *vector::borrow(ids, next_remaining);
+        if (value > best) {
+            value
+        } else {
+            best
+        }
     }
 }

@@ -19,8 +19,15 @@ module lottery_rewards_engine::jackpot {
     const E_RANDOMNESS_OVERFLOW: u64 = 8;
     const E_EMPTY_JACKPOT: u64 = 9;
     const E_REQUESTS_PAUSED: u64 = 10;
+    const E_CAPS_NOT_INITIALIZED: u64 = 11;
+    const E_CAPS_UNAVAILABLE: u64 = 12;
+    const E_ACCESS_ALREADY_INITIALIZED: u64 = 13;
 
     const RANDOMNESS_WINDOW: u64 = 8;
+
+    struct JackpotAccess has key {
+        cap: treasury_multi::MultiTreasuryCap,
+    }
 
     public struct LegacyJackpotRuntime has drop, store {
         lottery_id: u64,
@@ -97,7 +104,7 @@ module lottery_rewards_engine::jackpot {
         caller: &signer,
         request_id: u64,
         randomness: vector<u8>,
-    ) acquires jackpot::JackpotRegistry, treasury_multi::TreasuryState, vrf_deposit::VrfDepositLedger {
+    ) acquires JackpotAccess, jackpot::JackpotRegistry, treasury_multi::TreasuryState, vrf_deposit::VrfDepositLedger {
         vrf_hub::ensure_callback_sender(caller);
         let record = vrf_hub::consume_request(request_id);
         let lottery_id = vrf_hub::request_record_lottery_id(&record);
@@ -133,6 +140,66 @@ module lottery_rewards_engine::jackpot {
     ) acquires instances::InstanceRegistry, jackpot::JackpotRegistry {
         ensure_admin(caller);
         import_existing_jackpots_recursive(&mut payloads);
+    }
+
+    public entry fun init_access(caller: &signer)
+    acquires JackpotAccess, treasury_multi::TreasuryMultiControl {
+        ensure_caps_admin(caller);
+        if (exists<JackpotAccess>(@lottery)) {
+            abort E_ACCESS_ALREADY_INITIALIZED;
+        };
+        let control = treasury_multi::borrow_control_mut(@lottery);
+        let cap_opt = treasury_multi::extract_jackpot_cap(control);
+        if (!option::is_some(&cap_opt)) {
+            abort E_CAPS_UNAVAILABLE;
+        };
+        let cap = option::destroy_some(cap_opt);
+        move_to(caller, JackpotAccess { cap });
+    }
+
+    public entry fun release_access(caller: &signer)
+    acquires JackpotAccess, treasury_multi::TreasuryMultiControl {
+        ensure_caps_admin(caller);
+        if (!exists<JackpotAccess>(@lottery)) {
+            abort E_CAPS_NOT_INITIALIZED;
+        };
+        let JackpotAccess { cap } = move_from<JackpotAccess>(@lottery);
+        let control = treasury_multi::borrow_control_mut(@lottery);
+        treasury_multi::restore_jackpot_cap(control, cap);
+    }
+
+    #[view]
+    public fun is_initialized(): bool {
+        jackpot::is_initialized()
+    }
+
+    #[view]
+    public fun caps_ready(): bool {
+        exists<JackpotAccess>(@lottery)
+    }
+
+    #[view]
+    public fun registry_snapshot(): option::Option<jackpot::JackpotRegistrySnapshot>
+    acquires jackpot::JackpotRegistry {
+        jackpot::registry_snapshot()
+    }
+
+    #[view]
+    public fun lottery_snapshot(lottery_id: u64): option::Option<jackpot::JackpotSnapshot>
+    acquires jackpot::JackpotRegistry {
+        jackpot::lottery_snapshot(lottery_id)
+    }
+
+    #[view]
+    public fun runtime_view(lottery_id: u64): option::Option<jackpot::JackpotRuntimeView>
+    acquires jackpot::JackpotRegistry {
+        jackpot::runtime_view(lottery_id)
+    }
+
+    #[view]
+    public fun runtime_views(): option::Option<vector<jackpot::JackpotRuntimeView>>
+    acquires jackpot::JackpotRegistry {
+        jackpot::runtime_views()
     }
 
     fun ensure_admin(caller: &signer) acquires instances::InstanceRegistry {
@@ -203,7 +270,10 @@ module lottery_rewards_engine::jackpot {
     }
 
     fun drain_jackpot_balance(winner: address): u64
-    acquires treasury_multi::TreasuryState {
+    acquires JackpotAccess, treasury_multi::TreasuryState {
+        ensure_caps_ready();
+        let access = borrow_global<JackpotAccess>(@lottery);
+        treasury_multi::ensure_scope(&access.cap, treasury_multi::scope_jackpot());
         let state = treasury_multi::borrow_state_mut(@lottery);
         let amount = treasury_multi::jackpot_balance(state);
         assert!(amount > 0, E_EMPTY_JACKPOT);
@@ -317,5 +387,17 @@ module lottery_rewards_engine::jackpot {
             pending_request_id,
             pending_payload,
         );
+    }
+
+    fun ensure_caps_admin(caller: &signer) {
+        if (signer::address_of(caller) != @lottery) {
+            abort E_UNAUTHORIZED;
+        };
+    }
+
+    fun ensure_caps_ready() {
+        if (!exists<JackpotAccess>(@lottery)) {
+            abort E_CAPS_NOT_INITIALIZED;
+        };
     }
 }

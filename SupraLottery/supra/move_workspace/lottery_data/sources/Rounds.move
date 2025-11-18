@@ -32,6 +32,19 @@ module lottery_data::rounds {
         pending_request_id: option::Option<u64>,
     }
 
+    struct RoundRuntimeSnapshot has copy, drop, store {
+        lottery_id: u64,
+        tickets: vector<address>,
+        draw_scheduled: bool,
+        next_ticket_id: u64,
+        pending_request_id: option::Option<u64>,
+    }
+
+    struct RoundRegistrySnapshot has copy, drop, store {
+        admin: address,
+        rounds: vector<RoundRuntimeSnapshot>,
+    }
+
     #[event]
     struct TicketPurchasedEvent has drop, store, copy {
         lottery_id: u64,
@@ -97,6 +110,12 @@ module lottery_data::rounds {
         autopurchase_cap: option::Option<AutopurchaseRoundCap>,
     }
 
+    struct RoundControlSnapshot has copy, drop, store {
+        admin: address,
+        history_cap_present: bool,
+        autopurchase_cap_present: bool,
+    }
+
     struct PendingHistoryRecord has drop, store {
         lottery_id: u64,
         request_id: u64,
@@ -120,6 +139,14 @@ module lottery_data::rounds {
 
     struct PendingPurchaseQueue has key {
         pending: vector<PendingPurchaseRecord>,
+    }
+
+    struct PendingHistorySnapshot has drop, store {
+        records: vector<PendingHistoryRecord>,
+    }
+
+    struct PendingPurchaseSnapshot has drop, store {
+        records: vector<PendingPurchaseRecord>,
     }
 
     public struct LegacyRoundRecord has drop, store {
@@ -222,6 +249,32 @@ module lottery_data::rounds {
 
     public fun autopurchase_cap_available(control: &RoundControl): bool {
         option::is_some(&control.autopurchase_cap)
+    }
+
+    #[view]
+    public fun caps_ready(): bool acquires RoundControl {
+        if (!exists<RoundControl>(@lottery)) {
+            return false;
+        };
+        let control = borrow_global<RoundControl>(@lottery);
+        history_cap_available(&control) && autopurchase_cap_available(&control)
+    }
+
+    #[view]
+    public fun control_snapshot(): option::Option<RoundControlSnapshot> acquires RoundControl {
+        if (!exists<RoundControl>(@lottery)) {
+            return option::none<RoundControlSnapshot>();
+        };
+        let control = borrow_global<RoundControl>(@lottery);
+        option::some(build_control_snapshot(&control))
+    }
+
+    fun build_control_snapshot(control: &RoundControl): RoundControlSnapshot {
+        RoundControlSnapshot {
+            admin: control.admin,
+            history_cap_present: history_cap_available(control),
+            autopurchase_cap_present: autopurchase_cap_available(control),
+        }
     }
 
     public fun extract_autopurchase_cap(
@@ -345,6 +398,63 @@ module lottery_data::rounds {
         vector::length(&queue.pending)
     }
 
+    #[view]
+    public fun pending_history_snapshot(): option::Option<PendingHistorySnapshot>
+    acquires PendingHistoryQueue {
+        if (!exists<PendingHistoryQueue>(@lottery)) {
+            option::none<PendingHistorySnapshot>()
+        } else {
+            let queue = borrow_global<PendingHistoryQueue>(@lottery);
+            option::some(build_history_snapshot(&queue.pending))
+        }
+    }
+
+    #[view]
+    public fun is_initialized(): bool {
+        exists<RoundRegistry>(@lottery)
+    }
+
+    #[view]
+    public fun registry_snapshot(): option::Option<RoundRegistrySnapshot>
+    acquires RoundRegistry {
+        if (!exists<RoundRegistry>(@lottery)) {
+            return option::none<RoundRegistrySnapshot>();
+        };
+
+        let registry = borrow_global<RoundRegistry>(@lottery);
+        let rounds = collect_round_snapshots(&registry, 0, vector::length(&registry.lottery_ids));
+        let snapshot = RoundRegistrySnapshot { admin: registry.admin, rounds };
+
+        option::some(snapshot)
+    }
+
+    #[view]
+    public fun round_snapshot(lottery_id: u64): option::Option<RoundRuntimeSnapshot>
+    acquires RoundRegistry {
+        if (!exists<RoundRegistry>(@lottery)) {
+            return option::none<RoundRuntimeSnapshot>();
+        };
+
+        let registry = borrow_global<RoundRegistry>(@lottery);
+        if (!table::contains(&registry.rounds, lottery_id)) {
+            return option::none<RoundRuntimeSnapshot>();
+        };
+
+        let snapshot = build_round_snapshot(&registry, lottery_id);
+        option::some(snapshot)
+    }
+
+    #[view]
+    public fun pending_purchase_snapshot(): option::Option<PendingPurchaseSnapshot>
+    acquires PendingPurchaseQueue {
+        if (!exists<PendingPurchaseQueue>(@lottery)) {
+            option::none<PendingPurchaseSnapshot>()
+        } else {
+            let queue = borrow_global<PendingPurchaseQueue>(@lottery);
+            option::some(build_purchase_snapshot(&queue.pending))
+        }
+    }
+
     public fun enqueue_purchase_record(
         queue: &mut PendingPurchaseQueue,
         lottery_id: u64,
@@ -452,6 +562,81 @@ module lottery_data::rounds {
         }
     }
 
+    fun build_round_snapshot(registry: &RoundRegistry, lottery_id: u64): RoundRuntimeSnapshot {
+        let runtime = table::borrow(&registry.rounds, lottery_id);
+        let tickets = clone_addresses(&runtime.tickets, 0, vector::length(&runtime.tickets));
+        let pending_request_id = clone_option_u64(&runtime.pending_request);
+
+        RoundRuntimeSnapshot {
+            lottery_id,
+            tickets,
+            draw_scheduled: runtime.draw_scheduled,
+            next_ticket_id: runtime.next_ticket_id,
+            pending_request_id,
+        }
+    }
+
+    fun collect_round_snapshots(
+        registry: &RoundRegistry,
+        index: u64,
+        len: u64,
+    ): vector<RoundRuntimeSnapshot> {
+        if (index >= len) {
+            return vector::empty<RoundRuntimeSnapshot>();
+        };
+
+        let mut current = vector::empty<RoundRuntimeSnapshot>();
+        let lottery_id = *vector::borrow(&registry.lottery_ids, index);
+        vector::push_back(&mut current, build_round_snapshot(registry, lottery_id));
+
+        let tail = collect_round_snapshots(registry, index + 1, len);
+        append_round_snapshots(&mut current, &tail, 0);
+        current
+    }
+
+    fun append_round_snapshots(
+        dst: &mut vector<RoundRuntimeSnapshot>,
+        src: &vector<RoundRuntimeSnapshot>,
+        index: u64,
+    ) {
+        if (index >= vector::length(src)) {
+            return;
+        };
+
+        vector::push_back(dst, *vector::borrow(src, index));
+        append_round_snapshots(dst, src, index + 1);
+    }
+
+    fun clone_addresses(addresses: &vector<address>, index: u64, len: u64): vector<address> {
+        if (index >= len) {
+            return vector::empty<address>();
+        };
+
+        let mut current = vector::empty<address>();
+        vector::push_back(&mut current, *vector::borrow(addresses, index));
+
+        let tail = clone_addresses(addresses, index + 1, len);
+        append_addresses(&mut current, &tail, 0);
+        current
+    }
+
+    fun append_addresses(dst: &mut vector<address>, src: &vector<address>, index: u64) {
+        if (index >= vector::length(src)) {
+            return;
+        };
+
+        vector::push_back(dst, *vector::borrow(src, index));
+        append_addresses(dst, src, index + 1);
+    }
+
+    fun clone_option_u64(value: &option::Option<u64>): option::Option<u64> {
+        if (option::is_some(value)) {
+            option::some(*option::borrow(value))
+        } else {
+            option::none<u64>()
+        }
+    }
+
     fun history_drain_limit(limit: u64, available: u64): u64 {
         if (limit == 0 || limit >= available) {
             available
@@ -553,6 +738,94 @@ module lottery_data::rounds {
             let next_remaining = remaining - 1;
             drain_purchase_records(source, next, next_remaining)
         }
+    }
+
+    fun build_history_snapshot(pending: &vector<PendingHistoryRecord>): PendingHistorySnapshot {
+        PendingHistorySnapshot {
+            records: clone_history_records(pending),
+        }
+    }
+
+    fun build_purchase_snapshot(pending: &vector<PendingPurchaseRecord>): PendingPurchaseSnapshot {
+        PendingPurchaseSnapshot {
+            records: clone_purchase_records(pending),
+        }
+    }
+
+    fun clone_history_records(records: &vector<PendingHistoryRecord>): vector<PendingHistoryRecord> {
+        let buffer = vector::empty<PendingHistoryRecord>();
+        let len = vector::length(records);
+        append_history_records_clone(records, &mut buffer, 0, len);
+        buffer
+    }
+
+    fun clone_purchase_records(records: &vector<PendingPurchaseRecord>): vector<PendingPurchaseRecord> {
+        let buffer = vector::empty<PendingPurchaseRecord>();
+        let len = vector::length(records);
+        append_purchase_records_clone(records, &mut buffer, 0, len);
+        buffer
+    }
+
+    fun append_history_records_clone(
+        source: &vector<PendingHistoryRecord>,
+        dest: &mut vector<PendingHistoryRecord>,
+        index: u64,
+        len: u64,
+    ) {
+        if (index >= len) {
+            return;
+        };
+        let record_ref = vector::borrow(source, index);
+        vector::push_back(
+            dest,
+            PendingHistoryRecord {
+                lottery_id: record_ref.lottery_id,
+                request_id: record_ref.request_id,
+                winner: record_ref.winner,
+                ticket_index: record_ref.ticket_index,
+                prize_amount: record_ref.prize_amount,
+                random_bytes: clone_bytes(&record_ref.random_bytes),
+                payload: clone_bytes(&record_ref.payload),
+            },
+        );
+        append_history_records_clone(source, dest, index + 1, len);
+    }
+
+    fun append_purchase_records_clone(
+        source: &vector<PendingPurchaseRecord>,
+        dest: &mut vector<PendingPurchaseRecord>,
+        index: u64,
+        len: u64,
+    ) {
+        if (index >= len) {
+            return;
+        };
+        let record_ref = vector::borrow(source, index);
+        vector::push_back(
+            dest,
+            PendingPurchaseRecord {
+                lottery_id: record_ref.lottery_id,
+                buyer: record_ref.buyer,
+                ticket_count: record_ref.ticket_count,
+                paid_amount: record_ref.paid_amount,
+            },
+        );
+        append_purchase_records_clone(source, dest, index + 1, len);
+    }
+
+    fun clone_bytes(source: &vector<u8>): vector<u8> {
+        let buffer = vector::empty<u8>();
+        let len = vector::length(source);
+        append_bytes(source, &mut buffer, 0, len);
+        buffer
+    }
+
+    fun append_bytes(source: &vector<u8>, dest: &mut vector<u8>, index: u64, len: u64) {
+        if (index >= len) {
+            return;
+        };
+        vector::push_back(dest, *vector::borrow(source, index));
+        append_bytes(source, dest, index + 1, len);
     }
 
     fun ensure_admin(caller: &signer) acquires RoundRegistry {

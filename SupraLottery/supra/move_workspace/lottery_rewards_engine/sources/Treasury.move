@@ -1,4 +1,5 @@
 module lottery_rewards_engine::treasury {
+    use std::option;
     use std::signer;
 
     use lottery_data::instances;
@@ -114,5 +115,44 @@ module lottery_rewards_engine::treasury {
     fun as_u16(value: u64): u16 {
         assert!(value <= 65535, E_INVALID_SHARES);
         value as u16
+    }
+
+    #[view]
+    public fun is_initialized(): bool acquires treasury_multi::TreasuryState {
+        treasury_multi::has_state(@lottery)
+    }
+
+    #[view]
+    public fun state_snapshot(): option::Option<treasury_multi::TreasurySnapshot>
+    acquires treasury_multi::TreasuryState {
+        treasury_multi::state_snapshot()
+    }
+
+    #[view]
+    public fun lottery_config(lottery_id: u64): option::Option<(u64, u64, u64)>
+    acquires treasury_multi::TreasuryState {
+        if (!treasury_multi::has_state(@lottery)) {
+            return option::none<(u64, u64, u64)>();
+        };
+
+        let state = treasury_multi::borrow_state(@lottery);
+        if (!treasury_multi::has_lottery(state, lottery_id)) {
+            return option::none<(u64, u64, u64)>();
+        };
+
+        let shares = treasury_multi::share_config(state, lottery_id);
+        option::some(shares)
+    }
+
+    #[view]
+    public fun recipients(): option::Option<(address, address)> acquires treasury_multi::TreasuryState {
+        if (!treasury_multi::has_state(@lottery)) {
+            return option::none<(address, address)>();
+        };
+
+        let state = treasury_multi::borrow_state(@lottery);
+        let jackpot = treasury_multi::jackpot_recipient(state);
+        let operations = treasury_multi::operations_recipient(state);
+        option::some((jackpot, operations))
     }
 }

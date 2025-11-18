@@ -12,6 +12,21 @@ module lottery_factory::registry {
     const E_NOT_AUTHORIZED: u64 = 3;
     const E_UNKNOWN_LOTTERY: u64 = 4;
 
+    public struct LegacyFactoryEntry has drop, store {
+        lottery_id: u64,
+        owner: address,
+        lottery: address,
+        ticket_price: u64,
+        jackpot_share_bps: u16,
+    }
+
+    public struct LegacyFactoryState has drop, store {
+        admin: address,
+        next_lottery_id: u64,
+        lottery_ids: vector<u64>,
+        lotteries: vector<LegacyFactoryEntry>,
+    }
+
     struct LotteryBlueprint has copy, drop, store {
         ticket_price: u64,
         jackpot_share_bps: u16,
@@ -33,12 +48,15 @@ module lottery_factory::registry {
 
     struct LotteryRegistrySnapshot has copy, drop, store {
         admin: address,
+        next_lottery_id: u64,
+        total_lotteries: u64,
         lotteries: vector<LotteryRegistryEntry>,
     }
 
     struct FactoryState has key {
         admin: address,
         lotteries: table::Table<u64, LotteryInfo>,
+        next_lottery_id: u64,
         lottery_ids: vector<u64>,
         planned_events: event::EventHandle<LotteryPlannedEvent>,
         activated_events: event::EventHandle<LotteryActivatedEvent>,
@@ -60,6 +78,8 @@ module lottery_factory::registry {
     #[event]
     struct LotteryRegistrySnapshotUpdatedEvent has drop, store, copy {
         admin: address,
+        next_lottery_id: u64,
+        total_lotteries: u64,
         lotteries: vector<LotteryRegistryEntry>,
     }
 
@@ -74,6 +94,7 @@ module lottery_factory::registry {
         let state = FactoryState {
             admin: addr,
             lotteries: table::new(),
+            next_lottery_id: 1,
             lottery_ids: vector::empty<u64>(),
             planned_events: account::new_event_handle<LotteryPlannedEvent>(caller),
             activated_events: account::new_event_handle<LotteryActivatedEvent>(caller),
@@ -82,6 +103,34 @@ module lottery_factory::registry {
         move_to(caller, state);
         let state_ref = borrow_global_mut<FactoryState>(@lottery_factory);
         emit_registry_snapshot(state_ref);
+    }
+
+    public entry fun import_existing_lottery(caller: &signer, entry: LegacyFactoryEntry)
+    acquires FactoryState {
+        ensure_migration_signer(caller);
+        ensure_or_init_state(caller, signer::address_of(caller));
+        let state = borrow_global_mut<FactoryState>(@lottery_factory);
+        upsert_legacy_entry(state, &entry);
+        emit_registry_snapshot(state);
+    }
+
+    public entry fun import_existing_lotteries(caller: &signer, mut entries: vector<LegacyFactoryEntry>)
+    acquires FactoryState {
+        ensure_migration_signer(caller);
+        ensure_or_init_state(caller, signer::address_of(caller));
+        import_lottery_entries(borrow_global_mut<FactoryState>(@lottery_factory), &mut entries);
+        let state = borrow_global_mut<FactoryState>(@lottery_factory);
+        emit_registry_snapshot(state);
+    }
+
+    public entry fun import_existing_registry(caller: &signer, payload: LegacyFactoryState)
+    acquires FactoryState {
+        import_registry_internal(caller, payload);
+    }
+
+    public entry fun migrate_factory_state(caller: &signer, payload: LegacyFactoryState)
+    acquires FactoryState {
+        import_registry_internal(caller, payload);
     }
 
     #[view]
@@ -124,6 +173,7 @@ module lottery_factory::registry {
             LotteryInfo { owner, lottery, blueprint },
         );
         record_lottery_id(&mut state.lottery_ids, lottery_id);
+        bump_next_lottery_id(state, lottery_id);
         event::emit_event(&mut state.planned_events, LotteryPlannedEvent { lottery_id, owner });
         event::emit_event(&mut state.activated_events, LotteryActivatedEvent { lottery_id, lottery });
         emit_registry_snapshot(state);
@@ -259,6 +309,8 @@ module lottery_factory::registry {
         if (!exists<FactoryState>(@lottery_factory)) {
             return LotteryRegistrySnapshot {
                 admin: @lottery_factory,
+                next_lottery_id: 1,
+                total_lotteries: 0,
                 lotteries: vector::empty<LotteryRegistryEntry>(),
             }
         };
@@ -269,9 +321,11 @@ module lottery_factory::registry {
     #[test_only]
     public fun registry_snapshot_fields_for_test(
         snapshot: &LotteryRegistrySnapshot
-    ): (address, vector<LotteryRegistryEntry>) {
+    ): (address, u64, u64, vector<LotteryRegistryEntry>) {
         (
             snapshot.admin,
+            snapshot.next_lottery_id,
+            snapshot.total_lotteries,
             copy_registry_entries(&snapshot.lotteries),
         )
     }
@@ -279,9 +333,11 @@ module lottery_factory::registry {
     #[test_only]
     public fun registry_snapshot_event_fields_for_test(
         event: &LotteryRegistrySnapshotUpdatedEvent
-    ): (address, vector<LotteryRegistryEntry>) {
+    ): (address, u64, u64, vector<LotteryRegistryEntry>) {
         (
             event.admin,
+            event.next_lottery_id,
+            event.total_lotteries,
             copy_registry_entries(&event.lotteries),
         )
     }
@@ -322,18 +378,114 @@ module lottery_factory::registry {
         };
     }
 
+    fun ensure_migration_signer(caller: &signer) acquires FactoryState {
+        if (exists<FactoryState>(@lottery_factory)) {
+            ensure_admin(caller);
+        } else {
+            let addr = signer::address_of(caller);
+            if (addr != @lottery_factory) {
+                abort E_NOT_AUTHORIZED
+            };
+        };
+    }
+
     fun emit_registry_snapshot(state: &mut FactoryState) {
         let snapshot = build_registry_snapshot(state);
-        let LotteryRegistrySnapshot { admin, lotteries } = snapshot;
+        let LotteryRegistrySnapshot {
+            admin,
+            next_lottery_id,
+            total_lotteries,
+            lotteries,
+        } = snapshot;
         event::emit_event(
             &mut state.snapshot_events,
-            LotteryRegistrySnapshotUpdatedEvent { admin, lotteries },
+            LotteryRegistrySnapshotUpdatedEvent {
+                admin,
+                next_lottery_id,
+                total_lotteries,
+                lotteries,
+            },
+        );
+    }
+
+    fun import_registry_internal(caller: &signer, payload: LegacyFactoryState)
+    acquires FactoryState {
+        ensure_migration_signer(caller);
+        let LegacyFactoryState { admin, next_lottery_id, lottery_ids, lotteries } = payload;
+        reset_state(caller, admin);
+        let state = borrow_global_mut<FactoryState>(@lottery_factory);
+        import_lottery_entries_from_vector(state, &lotteries);
+        overwrite_lottery_ids(state, &lottery_ids);
+        normalize_next_lottery_id(state, next_lottery_id);
+        emit_registry_snapshot(state);
+    }
+
+    fun import_lottery_entries(state: &mut FactoryState, entries: &mut vector<LegacyFactoryEntry>) {
+        import_lottery_entries_recursive(state, entries, vector::length(entries));
+    }
+
+    fun import_lottery_entries_from_vector(state: &mut FactoryState, entries: &vector<LegacyFactoryEntry>) {
+        let len = vector::length(entries);
+        let idx = 0;
+        while (idx < len) {
+            let entry_ref = vector::borrow(entries, idx);
+            upsert_legacy_entry(state, entry_ref);
+            idx = idx + 1;
+        };
+    }
+
+    fun import_lottery_entries_recursive(
+        state: &mut FactoryState,
+        entries: &mut vector<LegacyFactoryEntry>,
+        remaining: u64,
+    ) {
+        if (remaining == 0) {
+            return
+        };
+        let last = vector::pop_back(entries);
+        import_lottery_entries_recursive(state, entries, remaining - 1);
+        upsert_legacy_entry(state, &last);
+    }
+
+    fun upsert_legacy_entry(state: &mut FactoryState, entry: &LegacyFactoryEntry) {
+        let lottery_id = entry.lottery_id;
+        let blueprint = LotteryBlueprint {
+            ticket_price: entry.ticket_price,
+            jackpot_share_bps: entry.jackpot_share_bps,
+        };
+        if (table::contains(&state.lotteries, lottery_id)) {
+            let info = table::borrow_mut(&mut state.lotteries, lottery_id);
+            info.owner = entry.owner;
+            info.lottery = entry.lottery;
+            info.blueprint = blueprint;
+        } else {
+            table::add(
+                &mut state.lotteries,
+                lottery_id,
+                LotteryInfo {
+                    owner: entry.owner,
+                    lottery: entry.lottery,
+                    blueprint,
+                },
+            );
+        };
+        record_lottery_id(&mut state.lottery_ids, lottery_id);
+        bump_next_lottery_id(state, lottery_id);
+        event::emit_event(
+            &mut state.planned_events,
+            LotteryPlannedEvent { lottery_id, owner: entry.owner },
+        );
+        event::emit_event(
+            &mut state.activated_events,
+            LotteryActivatedEvent { lottery_id, lottery: entry.lottery },
         );
     }
 
     fun build_registry_snapshot(state: &FactoryState): LotteryRegistrySnapshot {
         LotteryRegistrySnapshot {
             admin: state.admin,
+            next_lottery_id: state.next_lottery_id,
+            total_lotteries: vector::length(&state.lottery_ids),
             lotteries: collect_registry_entries(&state.lotteries, &state.lottery_ids),
         }
     }
@@ -380,6 +532,10 @@ module lottery_factory::registry {
         out
     }
 
+    fun overwrite_lottery_ids(state: &mut FactoryState, ids: &vector<u64>) {
+        state.lottery_ids = copy_u64_vector(ids);
+    }
+
     fun record_lottery_id(ids: &mut vector<u64>, lottery_id: u64) {
         let len = vector::length(ids);
         let idx = 0;
@@ -392,6 +548,34 @@ module lottery_factory::registry {
         vector::push_back(ids, lottery_id);
     }
 
+    fun normalize_next_lottery_id(state: &mut FactoryState, imported_next: u64) {
+        let highest = max_lottery_id(&state.lottery_ids);
+        let required = highest + 1;
+        let desired = if (imported_next > required) { imported_next } else { required };
+        state.next_lottery_id = desired;
+    }
+
+    fun max_lottery_id(ids: &vector<u64>): u64 {
+        let len = vector::length(ids);
+        let idx = 0;
+        let max_value = 0;
+        while (idx < len) {
+            let value = *vector::borrow(ids, idx);
+            if (value > max_value) {
+                max_value = value;
+            };
+            idx = idx + 1;
+        };
+        max_value
+    }
+
+    fun bump_next_lottery_id(state: &mut FactoryState, lottery_id: u64) {
+        let required_next = lottery_id + 1;
+        if (state.next_lottery_id < required_next) {
+            state.next_lottery_id = required_next;
+        };
+    }
+
     fun copy_u64_vector(values: &vector<u64>): vector<u64> {
         let out = vector::empty<u64>();
         let len = vector::length(values);
@@ -401,6 +585,41 @@ module lottery_factory::registry {
             idx = idx + 1;
         };
         out
+    }
+
+    fun ensure_or_init_state(caller: &signer, admin: address) acquires FactoryState {
+        if (!exists<FactoryState>(@lottery_factory)) {
+            move_to(
+                caller,
+                FactoryState {
+                    admin,
+                    lotteries: table::new(),
+                    next_lottery_id: 1,
+                    lottery_ids: vector::empty<u64>(),
+                    planned_events: account::new_event_handle<LotteryPlannedEvent>(caller),
+                    activated_events: account::new_event_handle<LotteryActivatedEvent>(caller),
+                    snapshot_events: account::new_event_handle<LotteryRegistrySnapshotUpdatedEvent>(caller),
+                },
+            );
+        };
+    }
+
+    fun reset_state(caller: &signer, admin: address) acquires FactoryState {
+        if (exists<FactoryState>(@lottery_factory)) {
+            let _old = move_from<FactoryState>(@lottery_factory);
+        };
+        move_to(
+            caller,
+            FactoryState {
+                admin,
+                lotteries: table::new(),
+                next_lottery_id: 1,
+                lottery_ids: vector::empty<u64>(),
+                planned_events: account::new_event_handle<LotteryPlannedEvent>(caller),
+                activated_events: account::new_event_handle<LotteryActivatedEvent>(caller),
+                snapshot_events: account::new_event_handle<LotteryRegistrySnapshotUpdatedEvent>(caller),
+            },
+        );
     }
 
     fun ensure_initialized() {

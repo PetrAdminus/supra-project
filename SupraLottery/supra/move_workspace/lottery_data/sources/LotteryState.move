@@ -148,6 +148,30 @@ module lottery_data::lottery_state {
         vrf_request_events: event::EventHandle<VrfRequestConfigUpdatedEvent>,
     }
 
+    struct PendingRequestSnapshot has copy, drop, store {
+        request_id: option::Option<u64>,
+        last_request_payload_hash: option::Option<vector<u8>>,
+        last_requester: option::Option<address>,
+    }
+
+    struct LotteryRuntimeSnapshot has copy, drop, store {
+        lottery_id: u64,
+        ticket_price: u64,
+        jackpot_amount: u64,
+        tickets: TicketLedger,
+        draw: DrawSettings,
+        pending_request: PendingRequestSnapshot,
+        gas: GasBudget,
+        vrf_stats: VrfStats,
+        whitelist: WhitelistState,
+        request_config: option::Option<VrfRequestConfig>,
+    }
+
+    struct LotteryStateSnapshot has copy, drop, store {
+        admin: address,
+        lotteries: vector<LotteryRuntimeSnapshot>,
+    }
+
     public entry fun import_existing_lottery(caller: &signer, record: LegacyLotteryRuntime)
     acquires LotteryState {
         ensure_admin(caller);
@@ -181,6 +205,10 @@ module lottery_data::lottery_state {
 
     public fun exists_at(addr: address): bool {
         exists<LotteryState>(addr)
+    }
+
+    public fun is_initialized(): bool {
+        exists_at(state_address())
     }
 
     public fun borrow(addr: address): &LotteryState acquires LotteryState {
@@ -291,6 +319,32 @@ module lottery_data::lottery_state {
         };
     }
 
+    public fun runtime_snapshot(lottery_id: u64): option::Option<LotteryRuntimeSnapshot> acquires LotteryState {
+        if (!exists_at(state_address())) {
+            return option::none<LotteryRuntimeSnapshot>();
+        };
+
+        let state_ref = borrow_global<LotteryState>(state_address());
+        if (!table::contains(&state_ref.lotteries, lottery_id)) {
+            return option::none<LotteryRuntimeSnapshot>();
+        };
+
+        let snapshot = build_runtime_snapshot(&state_ref, lottery_id);
+        option::some(snapshot)
+    }
+
+    public fun state_snapshot(): option::Option<LotteryStateSnapshot> acquires LotteryState {
+        if (!exists_at(state_address())) {
+            return option::none<LotteryStateSnapshot>();
+        };
+
+        let state_ref = borrow_global<LotteryState>(state_address());
+        let lotteries = collect_runtime_snapshots(&state_ref, 0, vector::length(&state_ref.lottery_ids));
+
+        let snapshot = LotteryStateSnapshot { admin: state_ref.admin, lotteries };
+        option::some(snapshot)
+    }
+
     fun clone_option_address(value: &option::Option<address>): option::Option<address> {
         if (option::is_some(value)) {
             option::some(*option::borrow(value))
@@ -387,6 +441,151 @@ module lottery_data::lottery_state {
         emit_vrf_gas_budget(state_ref, lottery_id);
         emit_vrf_whitelist(state_ref, lottery_id);
         emit_vrf_request_config(state_ref, lottery_id);
+    }
+
+    fun build_runtime_snapshot(state: &LotteryState, lottery_id: u64): LotteryRuntimeSnapshot {
+        let runtime_ref = runtime(state, lottery_id);
+        let tickets = TicketLedger {
+            participants: clone_addresses(&runtime_ref.tickets.participants, 0, vector::length(&runtime_ref.tickets.participants)),
+            next_ticket_id: runtime_ref.tickets.next_ticket_id,
+        };
+
+        let pending_request = PendingRequestSnapshot {
+            request_id: clone_option_u64(&runtime_ref.pending_request.request_id),
+            last_request_payload_hash: clone_option_bytes(&runtime_ref.pending_request.last_request_payload_hash),
+            last_requester: clone_option_address(&runtime_ref.pending_request.last_requester),
+        };
+
+        LotteryRuntimeSnapshot {
+            lottery_id,
+            ticket_price: runtime_ref.ticket_price,
+            jackpot_amount: runtime_ref.jackpot_amount,
+            tickets,
+            draw: runtime_ref.draw,
+            pending_request,
+            gas: runtime_ref.gas,
+            vrf_stats: runtime_ref.vrf_stats,
+            whitelist: build_whitelist_snapshot(&runtime_ref.whitelist),
+            request_config: clone_option_request_config(&runtime_ref.request_config),
+        }
+    }
+
+    fun collect_runtime_snapshots(state: &LotteryState, index: u64, len: u64): vector<LotteryRuntimeSnapshot> {
+        if (index == len) {
+            return vector::empty<LotteryRuntimeSnapshot>();
+        };
+
+        let lottery_id = *vector::borrow(&state.lottery_ids, index);
+        let mut current = vector::empty<LotteryRuntimeSnapshot>();
+        let snapshot = build_runtime_snapshot(state, lottery_id);
+        vector::push_back(&mut current, snapshot);
+
+        let tail = collect_runtime_snapshots(state, index + 1, len);
+        append_runtime_snapshots(&mut current, &tail, 0);
+
+        current
+    }
+
+    fun append_runtime_snapshots(dst: &mut vector<LotteryRuntimeSnapshot>, src: &vector<LotteryRuntimeSnapshot>, index: u64) {
+        if (index == vector::length(src)) {
+            return;
+        };
+
+        let value = *vector::borrow(src, index);
+        vector::push_back(dst, value);
+        append_runtime_snapshots(dst, src, index + 1);
+    }
+
+    fun clone_addresses(addresses: &vector<address>, index: u64, len: u64): vector<address> {
+        if (index == len) {
+            return vector::empty<address>();
+        };
+
+        let value = *vector::borrow(addresses, index);
+        let mut current = vector::empty<address>();
+        vector::push_back(&mut current, value);
+
+        let tail = clone_addresses(addresses, index + 1, len);
+        append_addresses(&mut current, &tail, 0);
+
+        current
+    }
+
+    fun append_addresses(dst: &mut vector<address>, src: &vector<address>, index: u64) {
+        if (index == vector::length(src)) {
+            return;
+        };
+
+        let value = *vector::borrow(src, index);
+        vector::push_back(dst, value);
+        append_addresses(dst, src, index + 1);
+    }
+
+    fun build_whitelist_snapshot(source: &WhitelistState): WhitelistState {
+        WhitelistState {
+            callback_sender: clone_option_address(&source.callback_sender),
+            consumers: clone_addresses(&source.consumers, 0, vector::length(&source.consumers)),
+            client_snapshot: clone_option_client_snapshot(&source.client_snapshot),
+            consumer_snapshot: clone_option_consumer_snapshot(&source.consumer_snapshot),
+        }
+    }
+
+    fun clone_option_u64(value: &option::Option<u64>): option::Option<u64> {
+        if (option::is_some(value)) {
+            option::some(*option::borrow(value))
+        } else {
+            option::none<u64>()
+        }
+    }
+
+    fun clone_option_bytes(value: &option::Option<vector<u8>>): option::Option<vector<u8>> {
+        if (option::is_some(value)) {
+            let bytes_ref = option::borrow(value);
+            let mut bytes = vector::empty<u8>();
+            clone_bytes(&mut bytes, bytes_ref, 0, vector::length(bytes_ref));
+            option::some(bytes)
+        } else {
+            option::none<vector<u8>>()
+        }
+    }
+
+    fun clone_bytes(dst: &mut vector<u8>, src: &vector<u8>, index: u64, len: u64) {
+        if (index == len) {
+            return;
+        };
+
+        let value = *vector::borrow(src, index);
+        vector::push_back(dst, value);
+        clone_bytes(dst, src, index + 1, len);
+    }
+
+    fun clone_option_client_snapshot(value: &option::Option<ClientWhitelistSnapshot>): option::Option<ClientWhitelistSnapshot> {
+        if (option::is_some(value)) {
+            let snapshot = option::borrow(value);
+            option::some(*snapshot)
+        } else {
+            option::none<ClientWhitelistSnapshot>()
+        }
+    }
+
+    fun clone_option_consumer_snapshot(
+        value: &option::Option<ConsumerWhitelistSnapshot>,
+    ): option::Option<ConsumerWhitelistSnapshot> {
+        if (option::is_some(value)) {
+            let snapshot = option::borrow(value);
+            option::some(*snapshot)
+        } else {
+            option::none<ConsumerWhitelistSnapshot>()
+        }
+    }
+
+    fun clone_option_request_config(value: &option::Option<VrfRequestConfig>): option::Option<VrfRequestConfig> {
+        if (option::is_some(value)) {
+            let config = option::borrow(value);
+            option::some(*config)
+        } else {
+            option::none<VrfRequestConfig>()
+        }
     }
 
     fun ensure_admin(caller: &signer) acquires LotteryState {

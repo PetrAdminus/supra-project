@@ -45,6 +45,12 @@ module lottery_data::instances {
         active: bool,
     }
 
+    struct InstanceRegistrySnapshot has copy, drop, store {
+        admin: address,
+        hub: address,
+        instances: vector<InstanceSnapshot>,
+    }
+
     struct InstanceControl has key {
         admin: address,
         export_cap: option::Option<InstancesExportCap>,
@@ -147,6 +153,34 @@ module lottery_data::instances {
                 snapshot_events: account::new_event_handle<LotteryInstancesSnapshotUpdatedEvent>(caller),
             },
         );
+    }
+
+    #[view]
+    public fun is_initialized(): bool {
+        exists<InstanceRegistry>(@lottery)
+    }
+
+    #[view]
+    public fun registry_snapshot(): option::Option<InstanceRegistrySnapshot> acquires InstanceRegistry {
+        if (!exists<InstanceRegistry>(@lottery)) {
+            return option::none<InstanceRegistrySnapshot>();
+        };
+        let registry = borrow_registry(@lottery);
+        let snapshot = build_registry_snapshot(registry);
+        option::some(snapshot)
+    }
+
+    #[view]
+    public fun instance_snapshot(lottery_id: u64): option::Option<InstanceSnapshot> acquires InstanceRegistry {
+        if (!exists<InstanceRegistry>(@lottery)) {
+            return option::none<InstanceSnapshot>();
+        };
+        let registry = borrow_registry(@lottery);
+        if (!table::contains(&registry.instances, lottery_id)) {
+            return option::none<InstanceSnapshot>();
+        };
+        let record = table::borrow(&registry.instances, lottery_id);
+        option::some(build_instance_snapshot(lottery_id, record))
     }
 
     public entry fun init_control(caller: &signer) {
@@ -336,6 +370,56 @@ module lottery_data::instances {
                 },
             },
         );
+    }
+
+    fun build_registry_snapshot(registry: &InstanceRegistry): InstanceRegistrySnapshot {
+        let lottery_ids = &registry.lottery_ids;
+        let len = vector::length(lottery_ids);
+        let instances = collect_instance_snapshots(&registry.instances, lottery_ids, 0, len);
+        InstanceRegistrySnapshot { admin: registry.admin, hub: registry.hub, instances }
+    }
+
+    fun collect_instance_snapshots(
+        instances: &table::Table<u64, InstanceRecord>,
+        lottery_ids: &vector<u64>,
+        index: u64,
+        len: u64,
+    ): vector<InstanceSnapshot> {
+        if (index == len) {
+            return vector::empty<InstanceSnapshot>();
+        };
+        let current_id = *vector::borrow(lottery_ids, index);
+        let current_record = table::borrow(instances, current_id);
+        let mut snapshots = vector::singleton(build_instance_snapshot(current_id, current_record));
+        let tail = collect_instance_snapshots(instances, lottery_ids, index + 1, len);
+        append_instance_snapshots(&mut snapshots, &tail, 0);
+        snapshots
+    }
+
+    fun build_instance_snapshot(lottery_id: u64, record: &InstanceRecord): InstanceSnapshot {
+        InstanceSnapshot {
+            lottery_id,
+            owner: record.owner,
+            lottery_address: record.lottery_address,
+            ticket_price: record.ticket_price,
+            jackpot_share_bps: record.jackpot_share_bps,
+            tickets_sold: record.tickets_sold,
+            jackpot_accumulated: record.jackpot_accumulated,
+            active: record.active,
+        }
+    }
+
+    fun append_instance_snapshots(
+        dst: &mut vector<InstanceSnapshot>,
+        src: &vector<InstanceSnapshot>,
+        index: u64,
+    ) {
+        let len = vector::length(src);
+        if (index == len) {
+            return;
+        };
+        vector::push_back(dst, *vector::borrow(src, index));
+        append_instance_snapshots(dst, src, index + 1);
     }
 
     fun import_existing_instances_recursive(records: &mut vector<LegacyInstanceRecord>)

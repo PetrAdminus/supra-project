@@ -119,6 +119,15 @@ module lottery_utils::metadata {
         clone_u64_vector(&registry.lottery_ids)
     }
 
+    #[view]
+    public fun registry_snapshot(): option::Option<MetadataSnapshot> acquires MetadataRegistry {
+        if (!exists<MetadataRegistry>(@lottery)) {
+            return option::none<MetadataSnapshot>();
+        };
+        let registry = borrow_global<MetadataRegistry>(@lottery);
+        option::some(build_snapshot(&registry))
+    }
+
     public fun new_metadata(
         title: vector<u8>,
         description: vector<u8>,

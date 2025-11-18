@@ -1,4 +1,5 @@
 module lottery_data::cancellations {
+    use std::option;
     use std::signer;
     use std::vector;
 
@@ -23,6 +24,23 @@ module lottery_data::cancellations {
     }
 
     struct CancellationRecord has copy, drop, store {
+        reason_code: u8,
+        canceled_ts: u64,
+        previous_status: u8,
+        tickets_sold: u64,
+        proceeds_accum: u64,
+        jackpot_locked: u64,
+        pending_tickets_cleared: u64,
+    }
+
+    public struct CancellationSnapshot has drop, store {
+        admin: address,
+        lottery_ids: vector<u64>,
+        records: vector<CancellationRecordSnapshot>,
+    }
+
+    public struct CancellationRecordSnapshot has copy, drop, store {
+        lottery_id: u64,
         reason_code: u8,
         canceled_ts: u64,
         previous_status: u8,
@@ -79,6 +97,10 @@ module lottery_data::cancellations {
         import_existing_cancellations_recursive(&mut records);
     }
 
+    public fun is_initialized(): bool {
+        exists_at(@lottery)
+    }
+
     public fun exists_at(addr: address): bool {
         exists<CancellationLedger>(addr)
     }
@@ -124,6 +146,19 @@ module lottery_data::cancellations {
     public fun has_record(lottery_id: u64): bool acquires CancellationLedger {
         let ledger = borrow(@lottery);
         table::contains(&ledger.records, lottery_id)
+    }
+
+    public fun ledger_snapshot(): option::Option<CancellationSnapshot> acquires CancellationLedger {
+        if (!exists_at(@lottery)) {
+            return option::none<CancellationSnapshot>();
+        };
+
+        let ledger = borrow(@lottery);
+        let lottery_ids = table::keys(&ledger.records);
+        let len = vector::length(&lottery_ids);
+        let records = collect_cancellation_snapshots(&ledger.records, &lottery_ids, 0, len);
+
+        option::some(CancellationSnapshot { admin: ledger.admin, lottery_ids, records })
     }
 
     fun ensure_admin(caller: &signer) acquires CancellationLedger {
@@ -186,5 +221,52 @@ module lottery_data::cancellations {
                 pending_tickets_cleared: record.pending_tickets_cleared,
             },
         );
+    }
+
+    fun collect_cancellation_snapshots(
+        records: &table::Table<u64, CancellationRecord>,
+        lottery_ids: &vector<u64>,
+        index: u64,
+        len: u64,
+    ): vector<CancellationRecordSnapshot> {
+        if (index == len) {
+            return vector::empty<CancellationRecordSnapshot>();
+        };
+
+        let lottery_id = *vector::borrow(lottery_ids, index);
+        let record = table::borrow(records, lottery_id);
+
+        let current = vector::singleton(build_record_snapshot(lottery_id, record));
+        let tail = collect_cancellation_snapshots(records, lottery_ids, index + 1, len);
+        append_record_snapshots(&mut current, &tail, 0);
+        current
+    }
+
+    fun append_record_snapshots(
+        dst: &mut vector<CancellationRecordSnapshot>,
+        src: &vector<CancellationRecordSnapshot>,
+        index: u64,
+    ) {
+        let len = vector::length(src);
+        if (index == len) {
+            return;
+        };
+
+        let snapshot = *vector::borrow(src, index);
+        vector::push_back(dst, snapshot);
+        append_record_snapshots(dst, src, index + 1);
+    }
+
+    fun build_record_snapshot(lottery_id: u64, record: &CancellationRecord): CancellationRecordSnapshot {
+        CancellationRecordSnapshot {
+            lottery_id,
+            reason_code: record.reason_code,
+            canceled_ts: record.canceled_ts,
+            previous_status: record.previous_status,
+            tickets_sold: record.tickets_sold,
+            proceeds_accum: record.proceeds_accum,
+            jackpot_locked: record.jackpot_locked,
+            pending_tickets_cleared: record.pending_tickets_cleared,
+        }
     }
 }

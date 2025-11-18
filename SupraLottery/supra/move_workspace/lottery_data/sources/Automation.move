@@ -79,6 +79,16 @@ module lottery_data::automation {
         last_action_hash: vector<u8>,
     }
 
+    struct AutomationRegistrySnapshot has copy, drop, store {
+        admin: address,
+        bots: vector<AutomationBotStatus>,
+    }
+
+    #[view]
+    public fun is_initialized(): bool {
+        exists<AutomationRegistry>(@lottery)
+    }
+
     #[event]
     struct AutomationBotRegisteredEvent has drop, store, copy {
         operator: address,
@@ -176,6 +186,23 @@ module lottery_data::automation {
     ) acquires AutomationRegistry {
         ensure_registry_admin(caller);
         import_existing_bots_recursive(&bots, vector::length(&bots));
+    }
+
+    public entry fun claim_cap_from_registry(operator: &signer)
+    acquires AutomationRegistry, AutomationCap {
+        ensure_registry_initialized();
+        let operator_addr = signer::address_of(operator);
+        assert!(!exists<AutomationCap>(operator_addr), E_CAP_EXISTS);
+        let registry = borrow_registry(@lottery);
+        assert!(table::contains(&registry.bots, operator_addr), E_BOT_UNKNOWN);
+        let bot = table::borrow(&registry.bots, operator_addr);
+        let cron_spec = clone_bytes(&bot.cron_spec);
+        move_to(operator, AutomationCap { operator: operator_addr, cron_spec });
+    }
+
+    #[view]
+    public fun cap_exists(operator_addr: address): bool acquires AutomationCap {
+        exists<AutomationCap>(operator_addr)
     }
 
     public fun borrow_registry(addr: address): &AutomationRegistry acquires AutomationRegistry {
@@ -409,6 +436,18 @@ module lottery_data::automation {
         option::some(status_for(registry, operator))
     }
 
+    #[view]
+    public fun registry_snapshot(): option::Option<AutomationRegistrySnapshot> acquires AutomationRegistry {
+        if (!exists<AutomationRegistry>(@lottery)) {
+            return option::none<AutomationRegistrySnapshot>()
+        };
+        let registry = borrow_registry(@lottery);
+        let operators = table::keys(&registry.bots);
+        let snapshots = collect_statuses(registry, &operators, 0, vector::length(&operators));
+        let snapshot = AutomationRegistrySnapshot { admin: registry.admin, bots: snapshots };
+        option::some(snapshot)
+    }
+
     public fun operators(): vector<address> acquires AutomationRegistry {
         if (!exists<AutomationRegistry>(@lottery)) {
             return vector::empty<address>()
@@ -562,5 +601,22 @@ module lottery_data::automation {
         vector::push_back(buffer, value);
         let next = index + 1;
         clone_u64s_into(buffer, source, next, len);
+    }
+
+    fun collect_statuses(
+        registry: &AutomationRegistry,
+        operators: &vector<address>,
+        index: u64,
+        len: u64,
+    ): vector<AutomationBotStatus> {
+        if (index >= len) {
+            return vector::empty<AutomationBotStatus>()
+        };
+        let status = status_for(registry, *vector::borrow(operators, index));
+        let result = vector::empty<AutomationBotStatus>();
+        vector::push_back(&result, status);
+        let tail = collect_statuses(registry, operators, index + 1, len);
+        vector::append(&result, tail);
+        result
     }
 }

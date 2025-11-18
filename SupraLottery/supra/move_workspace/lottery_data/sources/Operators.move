@@ -23,6 +23,17 @@ module lottery_data::operators {
         operator_list: vector<address>,
     }
 
+    struct OperatorRegistrySnapshot has copy, drop, store {
+        admin: address,
+        lottery_ids: vector<u64>,
+        entries: vector<LotteryOperatorSnapshot>,
+    }
+
+    struct LotteryOperatorSnapshot has copy, drop, store {
+        lottery_id: u64,
+        snapshot: OperatorSnapshot,
+    }
+
     struct OperatorSnapshot has copy, drop, store {
         owner: option::Option<address>,
         operators: vector<address>,
@@ -130,6 +141,15 @@ module lottery_data::operators {
         };
         let entry = table::borrow(&registry.entries, lottery_id);
         table::contains(&entry.operators, operator)
+    }
+
+    public fun registry_snapshot(): OperatorRegistrySnapshot acquires OperatorRegistry {
+        let registry = borrow_registry(@lottery);
+        OperatorRegistrySnapshot {
+            admin: registry.admin,
+            lottery_ids: registry.lottery_ids,
+            entries: build_registry_snapshots(&registry.entries, &registry.lottery_ids, 0),
+        }
     }
 
     public fun ensure_entry(registry: &mut OperatorRegistry, lottery_id: u64) {
@@ -281,6 +301,31 @@ module lottery_data::operators {
             return true;
         };
         contains_lottery_id(ids, lottery_id, index + 1)
+    }
+
+    fun build_registry_snapshots(
+        entries: &table::Table<u64, LotteryOperatorEntry>,
+        lottery_ids: &vector<u64>,
+        index: u64,
+    ): vector<LotteryOperatorSnapshot> {
+        if (index == vector::length(lottery_ids)) {
+            return vector::empty<LotteryOperatorSnapshot>();
+        };
+
+        let lottery_id = *vector::borrow(lottery_ids, index);
+        let mut snapshots = build_registry_snapshots(entries, lottery_ids, index + 1);
+        let entry = table::borrow(entries, lottery_id);
+        vector::push_back(
+            &mut snapshots,
+            LotteryOperatorSnapshot {
+                lottery_id,
+                snapshot: OperatorSnapshot {
+                    owner: entry.owner,
+                    operators: entry.operator_list,
+                },
+            },
+        );
+        snapshots
     }
 
     fun ensure_admin(caller: &signer) acquires OperatorRegistry {

@@ -1,6 +1,8 @@
 module lottery_engine::ticketing {
     use std::option;
     use std::signer;
+    use std::table;
+    use std::vector;
 
     use lottery_data::instances;
     use lottery_data::jackpot;
@@ -17,6 +19,21 @@ module lottery_engine::ticketing {
     const MIN_AUTO_DRAW_THRESHOLD: u64 = 1;
     const MAX_AUTO_DRAW_THRESHOLD: u64 = 1_000;
     const MAX_JACKPOT_SHARE_BPS: u16 = 10_000;
+
+    #[view]
+    public fun is_initialized(): bool {
+        instances::is_initialized() && lottery_state::is_initialized() && rounds::is_initialized()
+    }
+
+    public struct TicketingBlueprintSnapshot has copy, drop, store {
+        lottery_id: u64,
+        owner: address,
+        lottery_address: address,
+        active: bool,
+        ticket_price: u64,
+        jackpot_share_bps: u16,
+        auto_draw_threshold: u64,
+    }
 
     public entry fun create_lottery(
         caller: &signer,
@@ -86,6 +103,48 @@ module lottery_engine::ticketing {
         lottery_state::emit_snapshot(state, lottery_id);
     }
 
+    #[view]
+    public fun blueprint_snapshot(lottery_id: u64): option::Option<TicketingBlueprintSnapshot>
+    acquires instances::InstanceRegistry, lottery_state::LotteryState {
+        if (!exists<instances::InstanceRegistry>(@lottery)) {
+            return option::none<TicketingBlueprintSnapshot>();
+        };
+        if (!exists<lottery_state::LotteryState>(@lottery)) {
+            return option::none<TicketingBlueprintSnapshot>();
+        };
+
+        let registry = instances::borrow_registry(@lottery);
+        if (!table::contains(&registry.instances, lottery_id)) {
+            return option::none<TicketingBlueprintSnapshot>();
+        };
+
+        let state = lottery_state::borrow(@lottery);
+        if (!table::contains(&state.lotteries, lottery_id)) {
+            return option::none<TicketingBlueprintSnapshot>();
+        };
+
+        let record = table::borrow(&registry.instances, lottery_id);
+        let runtime = table::borrow(&state.lotteries, lottery_id);
+        option::some(build_blueprint_snapshot(lottery_id, record, runtime))
+    }
+
+    #[view]
+    public fun blueprint_snapshots(): option::Option<vector<TicketingBlueprintSnapshot>>
+    acquires instances::InstanceRegistry, lottery_state::LotteryState {
+        if (!exists<instances::InstanceRegistry>(@lottery)) {
+            return option::none<vector<TicketingBlueprintSnapshot>>();
+        };
+        if (!exists<lottery_state::LotteryState>(@lottery)) {
+            return option::none<vector<TicketingBlueprintSnapshot>>();
+        };
+
+        let registry = instances::borrow_registry(@lottery);
+        let state = lottery_state::borrow(@lottery);
+        let len = vector::length(&registry.lottery_ids);
+        let snapshots = collect_blueprint_snapshots(&registry, &state, 0, len);
+        option::some(snapshots)
+    }
+
     fun validate_price(price: u64) {
         assert!(price >= MIN_TICKET_PRICE, E_INVALID_TICKET_PRICE);
         assert!(price <= MAX_TICKET_PRICE, E_INVALID_TICKET_PRICE);
@@ -116,5 +175,58 @@ module lottery_engine::ticketing {
     ) acquires lottery_state::LotteryState {
         let runtime = lottery_state::runtime_mut(state, lottery_id);
         runtime.ticket_price = new_ticket_price;
+    }
+
+    fun build_blueprint_snapshot(
+        lottery_id: u64,
+        record: &instances::InstanceRecord,
+        runtime: &lottery_state::LotteryRuntime,
+    ): TicketingBlueprintSnapshot {
+        TicketingBlueprintSnapshot {
+            lottery_id,
+            owner: record.owner,
+            lottery_address: record.lottery_address,
+            active: record.active,
+            ticket_price: record.ticket_price,
+            jackpot_share_bps: record.jackpot_share_bps,
+            auto_draw_threshold: runtime.draw.auto_draw_threshold,
+        }
+    }
+
+    fun collect_blueprint_snapshots(
+        registry: &instances::InstanceRegistry,
+        state: &lottery_state::LotteryState,
+        index: u64,
+        len: u64,
+    ): vector<TicketingBlueprintSnapshot> {
+        if (index >= len) {
+            return vector::empty<TicketingBlueprintSnapshot>();
+        };
+
+        let lottery_id = *vector::borrow(&registry.lottery_ids, index);
+        let mut current = vector::empty<TicketingBlueprintSnapshot>();
+        if (table::contains(&registry.instances, lottery_id) && table::contains(&state.lotteries, lottery_id)) {
+            let record = table::borrow(&registry.instances, lottery_id);
+            let runtime = table::borrow(&state.lotteries, lottery_id);
+            let snapshot = build_blueprint_snapshot(lottery_id, record, runtime);
+            vector::push_back(&mut current, snapshot);
+        };
+
+        let tail = collect_blueprint_snapshots(registry, state, index + 1, len);
+        append_blueprint_snapshots(&mut current, &tail, 0);
+        current
+    }
+
+    fun append_blueprint_snapshots(
+        dst: &mut vector<TicketingBlueprintSnapshot>,
+        src: &vector<TicketingBlueprintSnapshot>,
+        index: u64,
+    ) {
+        let len = vector::length(src);
+        if (index >= len) {
+            return;
+        };
+        vector::push_back(dst, *vector::borrow(src, index));
+        append_blueprint_snapshots(dst, src, index + 1);
     }
 }

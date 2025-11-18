@@ -1,5 +1,6 @@
 module lottery_engine::sales {
     friend lottery_rewards_engine::autopurchase;
+    use std::option;
     use std::signer;
     use std::vector;
 
@@ -8,6 +9,7 @@ module lottery_engine::sales {
     use lottery_data::rounds;
     use lottery_data::treasury_multi;
     use lottery_rewards_engine::treasury;
+    use vrf_hub::table;
     use supra_framework::event;
 
     const E_TICKET_LIMIT_EXCEEDED: u64 = 1;
@@ -20,6 +22,17 @@ module lottery_engine::sales {
 
     const MAX_SUPPORTED_TICKETS_PER_PURCHASE: u64 = 128;
     const BPS_DENOMINATOR: u128 = 10_000;
+
+    public struct SalesLotterySnapshot has copy, drop, store {
+        lottery_id: u64,
+        ticket_price: u64,
+        jackpot_share_bps: u16,
+        tickets_sold: u64,
+        jackpot_accumulated: u64,
+        next_ticket_id: u64,
+        auto_draw_threshold: u64,
+        draw_scheduled: bool,
+    }
 
     public entry fun enter_paid_round(
         caller: &signer,
@@ -380,6 +393,100 @@ module lottery_engine::sales {
             schedule_now,
         );
         rounds::emit_snapshot(rounds_registry, lottery_id);
+    }
+
+    #[view]
+    public fun sales_snapshot(lottery_id: u64): option::Option<SalesLotterySnapshot>
+    acquires instances::InstanceRegistry, lottery_state::LotteryState {
+        if (!instances::is_initialized()) {
+            return option::none<SalesLotterySnapshot>();
+        };
+        if (!lottery_state::is_initialized()) {
+            return option::none<SalesLotterySnapshot>();
+        };
+
+        let registry = instances::borrow_registry(@lottery);
+        let state = lottery_state::borrow(@lottery);
+        if (!table::contains(&registry.instances, lottery_id)) {
+            return option::none<SalesLotterySnapshot>();
+        };
+        if (!table::contains(&state.lotteries, lottery_id)) {
+            return option::none<SalesLotterySnapshot>();
+        };
+
+        let snapshot = build_sales_snapshot(&registry, &state, lottery_id);
+        option::some(snapshot)
+    }
+
+    #[view]
+    public fun sales_snapshots(): option::Option<vector<SalesLotterySnapshot>>
+    acquires instances::InstanceRegistry, lottery_state::LotteryState {
+        if (!instances::is_initialized()) {
+            return option::none<vector<SalesLotterySnapshot>>();
+        };
+        if (!lottery_state::is_initialized()) {
+            return option::none<vector<SalesLotterySnapshot>>();
+        };
+
+        let registry = instances::borrow_registry(@lottery);
+        let state = lottery_state::borrow(@lottery);
+        let len = vector::length(&registry.lottery_ids);
+        let snapshots = collect_sales_snapshots(&registry, &state, 0, len);
+        option::some(snapshots)
+    }
+
+    fun build_sales_snapshot(
+        registry: &instances::InstanceRegistry,
+        state: &lottery_state::LotteryState,
+        lottery_id: u64,
+    ): SalesLotterySnapshot {
+        let record = table::borrow(&registry.instances, lottery_id);
+        let runtime = table::borrow(&state.lotteries, lottery_id);
+
+        SalesLotterySnapshot {
+            lottery_id,
+            ticket_price: record.ticket_price,
+            jackpot_share_bps: record.jackpot_share_bps,
+            tickets_sold: record.tickets_sold,
+            jackpot_accumulated: record.jackpot_accumulated,
+            next_ticket_id: runtime.tickets.next_ticket_id,
+            auto_draw_threshold: runtime.draw.auto_draw_threshold,
+            draw_scheduled: runtime.draw.draw_scheduled,
+        }
+    }
+
+    fun collect_sales_snapshots(
+        registry: &instances::InstanceRegistry,
+        state: &lottery_state::LotteryState,
+        index: u64,
+        len: u64,
+    ): vector<SalesLotterySnapshot> {
+        if (index >= len) {
+            return vector::empty<SalesLotterySnapshot>();
+        };
+
+        let lottery_id = *vector::borrow(&registry.lottery_ids, index);
+        let mut current = vector::empty<SalesLotterySnapshot>();
+        if (table::contains(&state.lotteries, lottery_id)) {
+            let snapshot = build_sales_snapshot(registry, state, lottery_id);
+            vector::push_back(&mut current, snapshot);
+        };
+        let tail = collect_sales_snapshots(registry, state, index + 1, len);
+        append_sales_snapshots(&mut current, &tail, 0);
+        current
+    }
+
+    fun append_sales_snapshots(
+        dst: &mut vector<SalesLotterySnapshot>,
+        src: &vector<SalesLotterySnapshot>,
+        index: u64,
+    ) {
+        let len = vector::length(src);
+        if (index >= len) {
+            return;
+        };
+        vector::push_back(dst, *vector::borrow(src, index));
+        append_sales_snapshots(dst, src, index + 1);
     }
 
     fun select_chunk(remaining: u64): u64 {
