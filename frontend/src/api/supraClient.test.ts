@@ -219,13 +219,13 @@ describe("supraClient caching", () => {
       hub: {
         requests: [
           {
-            event_type: "vrf_hub::RandomnessRequestedEvent",
+            event_type: "lottery_vrf_gateway::RandomnessRequestedEvent",
             data: { request_id: "0xabc" },
           },
         ],
         fulfillments: [
           {
-            event_type: "vrf_hub::RandomnessFulfilledEvent",
+            event_type: "lottery_vrf_gateway::RandomnessFulfilledEvent",
             data: { request_id: "0xabc", randomness: "0x4455" },
           },
         ],
@@ -243,7 +243,7 @@ describe("supraClient caching", () => {
     expect(log.round.pendingRequestId).toBe("0xabc");
     expect(log.round.snapshot?.["ticket_count"]).toBe(128);
     expect(log.round.requests).toHaveLength(1);
-    expect(log.hub.fulfillments[0]?.event_type).toBe("vrf_hub::RandomnessFulfilledEvent");
+    expect(log.hub.fulfillments[0]?.event_type).toBe("lottery_vrf_gateway::RandomnessFulfilledEvent");
   });
 
   it("maps lottery multi views payload and normalizes query parameters", async () => {

@@ -6,7 +6,7 @@ module lottery_data::payouts {
 
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
     const E_NOT_PUBLISHED: u64 = 2;
@@ -101,6 +101,26 @@ module lottery_data::payouts {
     #[view]
     public fun is_initialized(): bool {
         exists<PayoutLedger>(@lottery)
+    }
+
+    #[view]
+    public fun ready(): bool acquires PayoutLedger {
+        if (!exists<PayoutLedger>(@lottery)) {
+            return false;
+        };
+
+        let ledger = borrow(@lottery);
+        if (ledger.admin != @lottery) {
+            return false;
+        };
+
+        let lotteries_ok = lotteries_ready(ledger, 0, vector::length(&ledger.lottery_ids));
+        if (!lotteries_ok) {
+            return false;
+        };
+
+        let payout_ids = table::keys(&ledger.payout_index);
+        payout_index_ready(ledger, &payout_ids, 0, vector::length(&payout_ids))
     }
 
     struct PayoutRecordSnapshot has copy, drop, store {
@@ -199,6 +219,32 @@ module lottery_data::payouts {
         let ledger = borrow(@lottery);
         let snapshot = build_lottery_snapshot(ledger, lottery_id);
         option::some(snapshot)
+    }
+
+    #[view]
+    public fun payout_record_snapshot(payout_id: u64): option::Option<PayoutRecordSnapshot>
+    acquires PayoutLedger {
+        if (!exists<PayoutLedger>(@lottery)) {
+            return option::none<PayoutRecordSnapshot>();
+        };
+
+        let ledger = borrow(@lottery);
+        if (!table::contains(&ledger.payout_index, payout_id)) {
+            return option::none<PayoutRecordSnapshot>();
+        };
+
+        let lottery_id = *table::borrow(&ledger.payout_index, payout_id);
+        if (!table::contains(&ledger.states, lottery_id)) {
+            return option::none<PayoutRecordSnapshot>();
+        };
+
+        let state = table::borrow(&ledger.states, lottery_id);
+        if (!table::contains(&state.payouts, payout_id)) {
+            return option::none<PayoutRecordSnapshot>();
+        };
+
+        let record = table::borrow(&state.payouts, payout_id);
+        option::some(payout_snapshot(record))
     }
 
     public entry fun import_existing_payout(caller: &signer, record: LegacyPayoutRecord)
@@ -453,6 +499,65 @@ module lottery_data::payouts {
             refunded_count: state.refunded_count,
             payouts,
         }
+    }
+
+    fun lotteries_ready(ledger: &PayoutLedger, index: u64, len: u64): bool {
+        if (index == len) {
+            return true;
+        };
+
+        let lottery_id = *vector::borrow(&ledger.lottery_ids, index);
+        if (!table::contains(&ledger.states, lottery_id)) {
+            return false;
+        };
+
+        let state = table::borrow(&ledger.states, lottery_id);
+        if (!state_ready(state, 0, vector::length(&state.payout_ids))) {
+            return false;
+        };
+
+        lotteries_ready(ledger, index + 1, len)
+    }
+
+    fun state_ready(state: &LotteryPayoutState, index: u64, len: u64): bool {
+        if (index == len) {
+            return true;
+        };
+
+        let payout_id = *vector::borrow(&state.payout_ids, index);
+        if (!table::contains(&state.payouts, payout_id)) {
+            return false;
+        };
+
+        state_ready(state, index + 1, len)
+    }
+
+    fun payout_index_ready(
+        ledger: &PayoutLedger,
+        payout_ids: &vector<u64>,
+        index: u64,
+        len: u64,
+    ): bool {
+        if (index == len) {
+            return true;
+        };
+
+        let payout_id = *vector::borrow(payout_ids, index);
+        if (!table::contains(&ledger.payout_index, payout_id)) {
+            return false;
+        };
+
+        let lottery_id = *table::borrow(&ledger.payout_index, payout_id);
+        if (!table::contains(&ledger.states, lottery_id)) {
+            return false;
+        };
+
+        let state = table::borrow(&ledger.states, lottery_id);
+        if (!table::contains(&state.payouts, payout_id)) {
+            return false;
+        };
+
+        payout_index_ready(ledger, payout_ids, index + 1, len)
     }
 
     fun collect_payout_snapshots(

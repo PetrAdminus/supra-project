@@ -9,7 +9,7 @@ module lottery_support::support_history_sync_tests {
     #[test(
         lottery_admin = @lottery,
         factory_admin = @lottery_factory,
-        vrf_admin = @vrf_hub,
+        vrf_admin = @lottery_vrf_gateway,
         player = @player1,
     )]
     fun sync_draws_records_history(

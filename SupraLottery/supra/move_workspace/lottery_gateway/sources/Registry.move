@@ -6,7 +6,7 @@ module lottery_gateway::registry {
     use lottery_data::instances;
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
     const E_UNAUTHORIZED: u64 = 2;
@@ -92,6 +92,11 @@ module lottery_gateway::registry {
 
     public fun is_initialized(): bool {
         exists<LotteryRegistry>(@lottery)
+    }
+
+    #[view]
+    public fun ready(): bool {
+        is_initialized() && instances::is_initialized()
     }
 
     public fun set_admin(new_admin: address) acquires LotteryRegistry {

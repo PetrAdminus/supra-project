@@ -9,7 +9,7 @@ module lottery_rewards_engine::store {
     use lottery_utils::math;
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const E_NOT_AUTHORIZED: u64 = 1;
     const E_ALREADY_INITIALIZED: u64 = 2;

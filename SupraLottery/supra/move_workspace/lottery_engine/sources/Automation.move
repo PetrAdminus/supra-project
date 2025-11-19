@@ -5,7 +5,7 @@ module lottery_engine::automation {
 
     use lottery_data::automation;
     use lottery_data::automation::{AutomationBotStatus, AutomationRegistrySnapshot};
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const E_UNAUTHORIZED_ADMIN: u64 = 1;
     const E_ACTIONS_EMPTY: u64 = 2;

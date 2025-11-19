@@ -9,6 +9,7 @@ from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..accounts.tables import Base
+from ..lib.sqlalchemy import MetadataAliasMixin
 
 
 def _utcnow() -> datetime:
@@ -30,7 +31,7 @@ class SupportArticle(Base):
     updated_at: Mapped[datetime] = mapped_column(default=_utcnow, onupdate=_utcnow)
 
 
-class SupportTicket(Base):
+class SupportTicket(MetadataAliasMixin, Base):
     """Обращение пользователя в службу поддержки."""
 
     __tablename__ = "support_tickets"
@@ -41,7 +42,9 @@ class SupportTicket(Base):
     subject: Mapped[str] = mapped_column(String(240))
     body: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(32), default="new", index=True)
-    metadata: Mapped[dict[str, Any]] = mapped_column(MutableDict.as_mutable(JSON), default=dict)
+    _metadata: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", MutableDict.as_mutable(JSON), default=dict
+    )
     created_at: Mapped[datetime] = mapped_column(default=_utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(default=_utcnow, onupdate=_utcnow)
 

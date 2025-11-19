@@ -36,7 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "переопределить идентификатор функции. По умолчанию используется "
-            "<lottery_addr>::main_v2::remove_subscription"
+            "<lottery_addr>::core_main_v2::remove_subscription"
         ),
     )
     return parser
@@ -92,7 +92,7 @@ def target_function_id(ns: argparse.Namespace) -> str:
     lottery_addr = getattr(ns, "lottery_addr", None)
     if not lottery_addr:
         raise MonitorError("Нужно указать адрес контракта лотереи (--lottery-addr)")
-    return f"{lottery_addr}::main_v2::remove_subscription"
+    return f"{lottery_addr}::core_main_v2::remove_subscription"
 
 
 def execute(ns: argparse.Namespace, *, now: Optional[datetime] = None) -> Dict[str, Any]:

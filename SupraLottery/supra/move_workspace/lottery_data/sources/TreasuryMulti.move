@@ -5,7 +5,7 @@ module lottery_data::treasury_multi {
 
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
     const E_UNAUTHORIZED: u64 = 2;

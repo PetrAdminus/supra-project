@@ -11,7 +11,7 @@ module lottery_rewards::rewards_referrals_tests {
     use std::option;
     use std::signer;
     use std::vector;
-    use vrf_hub::hub;
+    use lottery_vrf_gateway::hub;
 
     fun setup_environment(
         vrf_admin: &signer,
@@ -23,7 +23,7 @@ module lottery_rewards::rewards_referrals_tests {
         test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
-        instances::init(lottery_admin, @vrf_hub);
+        instances::init(lottery_admin, @lottery_vrf_gateway);
         rounds::init(lottery_admin);
         treasury_v1::init_token(
             lottery_admin,
@@ -46,7 +46,7 @@ module lottery_rewards::rewards_referrals_tests {
     }
 
     #[test(
-        vrf_admin = @vrf_hub,
+        vrf_admin = @lottery_vrf_gateway,
         factory_admin = @lottery_factory,
         lottery_admin = @lottery,
         buyer = @player1,
@@ -199,7 +199,7 @@ module lottery_rewards::rewards_referrals_tests {
     }
 
     #[test(
-        vrf_admin = @vrf_hub,
+        vrf_admin = @lottery_vrf_gateway,
         factory_admin = @lottery_factory,
         lottery_admin = @lottery,
         buyer = @player3,

@@ -12,7 +12,7 @@ module lottery_rewards::rewards_vip_tests {
     use std::signer;
     use std::timestamp;
     use std::vector;
-    use vrf_hub::hub;
+    use lottery_vrf_gateway::hub;
 
     const VIP_PRICE: u64 = 250;
     const VIP_DURATION: u64 = 1_000;
@@ -48,7 +48,7 @@ module lottery_rewards::rewards_vip_tests {
         if (!treasury_multi::is_initialized()) {
             treasury_multi::init(lottery_admin, @jackpot_pool, @operations_pool);
         };
-        instances::init(lottery_admin, @vrf_hub);
+        instances::init(lottery_admin, @lottery_vrf_gateway);
         rounds::init(lottery_admin);
         vip::init(lottery_admin);
 
@@ -63,7 +63,7 @@ module lottery_rewards::rewards_vip_tests {
     }
 
     #[test(
-        vrf_admin = @vrf_hub,
+        vrf_admin = @lottery_vrf_gateway,
         factory_admin = @lottery_factory,
         lottery_admin = @lottery,
         player = @player1,
@@ -330,7 +330,7 @@ module lottery_rewards::rewards_vip_tests {
     }
 
     #[test(
-        vrf_admin = @vrf_hub,
+        vrf_admin = @lottery_vrf_gateway,
         factory_admin = @lottery_factory,
         lottery_admin = @lottery,
         gift_admin = @player2,

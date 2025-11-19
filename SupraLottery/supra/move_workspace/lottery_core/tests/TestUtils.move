@@ -12,7 +12,7 @@ module lottery_core::test_utils {
     use std::timestamp;
     use std::vector;
     use supra_framework::event;
-    use vrf_hub::hub;
+    use lottery_vrf_gateway::hub;
 
     const FRAMEWORK_ADDRESS: address = @SupraFramework;
     const TREASURY_TEST_FUNDS: u64 = 1_000_000;
@@ -24,7 +24,7 @@ module lottery_core::test_utils {
         account::create_account_for_test(@lottery_factory);
         account::create_account_for_test(@lottery_owner);
         account::create_account_for_test(@lottery_contract);
-        account::create_account_for_test(@vrf_hub);
+        account::create_account_for_test(@lottery_vrf_gateway);
         account::create_account_for_test(@jackpot_pool);
         account::create_account_for_test(@operations_pool);
         account::create_account_for_test(@player1);
@@ -179,7 +179,7 @@ module lottery_core::test_utils {
         hub::set_callback_sender(vrf_admin, aggregator);
         main_v2::set_callback_aggregator_for_test(option::some(aggregator));
         if (!instances::is_initialized()) {
-            instances::init(lottery_admin, @vrf_hub);
+            instances::init(lottery_admin, @lottery_vrf_gateway);
         };
         if (!rounds::is_initialized()) {
             rounds::init(lottery_admin);

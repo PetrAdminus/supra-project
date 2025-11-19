@@ -5,9 +5,9 @@ module lottery_factory::factory_tests {
     use std::vector;
     use supra_framework::event;
     use lottery_factory::registry;
-    use vrf_hub::hub;
+    use lottery_vrf_gateway::hub;
 
-    const HUB_ADDR: address = @vrf_hub;
+    const HUB_ADDR: address = @lottery_vrf_gateway;
     const FACTORY_ADDR: address = @lottery_factory;
     const OWNER: address = @0x101;
     const LOTTERY_ADDR: address = @0x202;
@@ -17,7 +17,17 @@ module lottery_factory::factory_tests {
         setup_accounts();
         let hub_signer = account::create_signer_for_test(HUB_ADDR);
         hub::init(&hub_signer);
-        hub::set_admin(&hub_signer, FACTORY_ADDR);
+        let hub_payload = hub::LegacyHubState {
+            admin: FACTORY_ADDR,
+            next_lottery_id: 1,
+            next_request_id: 0,
+            lotteries: vector::empty<hub::LegacyLotteryRegistration>(),
+            requests: vector::empty<hub::LegacyRequestRecord>(),
+            lottery_ids: vector::empty<u64>(),
+            pending_request_ids: vector::empty<u64>(),
+            callback_sender: option::none<address>(),
+        };
+        hub::migrate_lottery_vrf_gateway_state(&hub_signer, hub_payload);
 
         let factory_signer = account::create_signer_for_test(FACTORY_ADDR);
         registry::init(&factory_signer);
@@ -40,7 +50,16 @@ module lottery_factory::factory_tests {
         let blueprint = registry::new_blueprint(10, 100);
         let lottery_id = registry::create_lottery(&factory_signer, OWNER, LOTTERY_ADDR, blueprint, b"meta");
         assert!(lottery_id == 1, 0);
-        assert!(hub::is_lottery_active(lottery_id), 0);
+        let vrf_snapshot = hub::hub_snapshot();
+        let vrf_ids = vrf_snapshot.lottery_ids;
+        let vrf_lotteries = vrf_snapshot.lotteries;
+        assert!(vector::length(&vrf_ids) == 1, 133);
+        assert!(*vector::borrow(&vrf_ids, 0) == lottery_id, 134);
+        assert!(vector::length(&vrf_lotteries) == 1, 135);
+        let vrf_registration = vector::borrow(&vrf_lotteries, 0);
+        assert!(vrf_registration.owner == OWNER, 136);
+        assert!(vrf_registration.lottery == LOTTERY_ADDR, 137);
+        assert!(vrf_registration.active, 138);
 
         let planned_events = event::emitted_events<registry::LotteryPlannedEvent>();
         assert!(vector::length(&planned_events) == 1, 103);

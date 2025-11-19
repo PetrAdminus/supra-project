@@ -11,7 +11,7 @@ module lottery_rewards_engine::autopurchase {
     use lottery_engine::sales;
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
     const E_NOT_INITIALIZED: u64 = 2;
@@ -232,6 +232,29 @@ module lottery_rewards_engine::autopurchase {
     #[view]
     public fun caps_ready(): bool {
         exists<AutopurchaseAccess>(@lottery)
+    }
+
+    #[view]
+    public fun ready(): bool {
+        if (!is_initialized()) {
+            return false;
+        };
+        if (!caps_ready()) {
+            return false;
+        };
+        if (!rounds::is_initialized()) {
+            return false;
+        };
+        if (!rounds::purchase_queue_initialized()) {
+            return false;
+        };
+        if (!treasury::is_initialized()) {
+            return false;
+        };
+        if (!treasury::caps_ready()) {
+            return false;
+        };
+        true
     }
 
     #[view]

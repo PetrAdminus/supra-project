@@ -29,7 +29,7 @@ module lottery_rewards::rewards_rounds_sync_tests {
     #[test(
         lottery_admin = @lottery,
         factory_admin = @lottery_factory,
-        vrf_admin = @vrf_hub,
+        vrf_admin = @lottery_vrf_gateway,
         buyer = @player1,
         referrer = @player2,
     )]
@@ -42,7 +42,7 @@ module lottery_rewards::rewards_rounds_sync_tests {
     ) {
         test_utils::bootstrap_multi_treasury(lottery_admin, factory_admin, vrf_admin);
         if (!instances::is_initialized()) {
-            instances::init(lottery_admin, @vrf_hub);
+            instances::init(lottery_admin, @lottery_vrf_gateway);
         };
         if (!rounds::is_initialized()) {
             rounds::init(lottery_admin);

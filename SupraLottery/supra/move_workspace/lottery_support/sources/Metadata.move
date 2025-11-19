@@ -3,7 +3,7 @@ module lottery_support::support_metadata {
     use std::signer;
     use std::vector;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const E_ALREADY_INIT: u64 = 1;
     const E_NOT_INITIALIZED: u64 = 2;

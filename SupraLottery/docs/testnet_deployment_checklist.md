@@ -21,7 +21,7 @@ docker compose run --rm --entrypoint bash supra_cli `
   -lc "/supra/supra move tool compile --package-dir /supra/move_workspace/lottery_rewards \
         --skip-fetch-latest-git-deps"
 ```
-- [x] Supplementary loop run to compile `lottery_factory`, `vrf_hub`, and `SupraVrf` with the same toolchain.
+- [x] Supplementary loop run to compile `lottery_factory`, `lottery_vrf_gateway`, and `SupraVrf` with the same toolchain.
 - [x] Verify `build/` directories are produced without errors.
 - [x] Run unit tests for each package:
   ```bash
@@ -54,7 +54,7 @@ docker compose -f SupraLottery/compose.yaml run --rm supra_cli `
 - [x] Publish `lottery_core` (store tx hash).
 - [x] Publish `lottery_support`.
 - [x] Publish `lottery_rewards`.
-- [x] Ensure `vrf_hub` and `lottery_factory` are published and up to date.
+- [x] Ensure `lottery_vrf_gateway` and `lottery_factory` are published and up to date.
   - Tx-хеши публикаций не зафиксированы: вывод CLI был усечён в терминале.
 
 ## 3. Initialisation

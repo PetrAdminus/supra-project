@@ -6,7 +6,7 @@ SupraLottery is a family of Move packages for running lottery draws on the Supra
 - `lottery_core` — ticket lifecycle, round queues, treasury logic
 - `lottery_support` — history, metadata, migration utilities
 - `lottery_rewards` — VIP tiers, referrals, autopurchase, jackpot, NFT rewards
-- `vrf_hub`, `lottery_factory`, `SupraVrf` — shared infrastructure
+- `lottery_vrf_gateway`, `lottery_factory`, `SupraVrf` — shared infrastructure
 
 Each package lives in `SupraLottery/supra/move_workspace/<name>` and has its own tests and publish commands (see `docs/testnet_runbook.md`).
 

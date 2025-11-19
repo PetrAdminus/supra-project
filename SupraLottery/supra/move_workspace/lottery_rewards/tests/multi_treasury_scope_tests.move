@@ -7,7 +7,7 @@ module lottery_rewards::multi_treasury_scope_tests {
     use lottery_rewards::rewards_test_utils as test_utils;
     use lottery_rewards::rewards_vip as vip;
 
-    #[test(admin = @lottery, factory = @lottery_factory, vrf = @vrf_hub)]
+    #[test(admin = @lottery, factory = @lottery_factory, vrf = @lottery_vrf_gateway)]
     fun scopes_are_isolated(admin: &signer, factory: &signer, vrf: &signer) {
         test_utils::bootstrap_multi_treasury(admin, factory, vrf);
         if (!store::is_initialized()) {
@@ -80,7 +80,7 @@ module lottery_rewards::multi_treasury_scope_tests {
         let _ = vrf;
     }
 
-    #[test(admin = @lottery, factory = @lottery_factory, vrf = @vrf_hub)]
+    #[test(admin = @lottery, factory = @lottery_factory, vrf = @lottery_vrf_gateway)]
     #[expected_failure(
         location = lottery_core::core_treasury_multi,
         abort_code = treasury_multi::E_CORE_CAP_BORROWED,

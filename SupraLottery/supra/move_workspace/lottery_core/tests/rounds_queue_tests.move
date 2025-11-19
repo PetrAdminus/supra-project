@@ -10,7 +10,7 @@ module lottery_core::core_rounds_queue_tests {
     #[test(
         lottery_admin = @lottery,
         factory_admin = @lottery_factory,
-        vrf_admin = @vrf_hub,
+        vrf_admin = @lottery_vrf_gateway,
         player = @player1,
     )]
     fun queues_roundtrip(

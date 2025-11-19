@@ -52,7 +52,7 @@ def get_article(slug: str) -> SupportArticleResponse:
 
 @router.put("/articles/{slug}", response_model=SupportArticleResponse)
 def put_article(slug: str, payload: SupportArticleCreate) -> SupportArticleResponse:
-    data = payload.dict()
+    data = payload.model_dump()
     data["slug"] = slug
     article = create_or_update_article(data)
     return SupportArticleResponse(
@@ -68,5 +68,5 @@ def put_article(slug: str, payload: SupportArticleCreate) -> SupportArticleRespo
 
 @router.post("/tickets", response_model=SupportTicketResponse, status_code=status.HTTP_201_CREATED)
 def post_ticket(payload: SupportTicketCreate) -> SupportTicketResponse:
-    ticket = create_ticket(payload.dict())
+    ticket = create_ticket(payload.model_dump())
     return SupportTicketResponse(id=ticket.id, status=ticket.status, created_at=ticket.created_at)

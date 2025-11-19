@@ -7,7 +7,7 @@ module lottery_support::support_history {
     use std::vector;
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const MAX_HISTORY_LENGTH: u64 = 128;
 

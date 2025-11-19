@@ -5,7 +5,7 @@ module lottery_data::automation {
 
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
     const E_UNAUTHORIZED: u64 = 2;
@@ -82,6 +82,10 @@ module lottery_data::automation {
     struct AutomationRegistrySnapshot has copy, drop, store {
         admin: address,
         bots: vector<AutomationBotStatus>,
+    }
+
+    struct AutomationCapsSnapshot has copy, drop, store {
+        missing_caps: vector<address>,
     }
 
     #[view]
@@ -448,6 +452,27 @@ module lottery_data::automation {
         option::some(snapshot)
     }
 
+    #[view]
+    public fun caps_ready(): bool acquires AutomationRegistry {
+        if (!exists<AutomationRegistry>(@lottery)) {
+            return false;
+        };
+        let registry = borrow_registry(@lottery);
+        let operators = table::keys(&registry.bots);
+        all_caps_present(&operators, 0, vector::length(&operators))
+    }
+
+    #[view]
+    public fun caps_snapshot(): AutomationCapsSnapshot acquires AutomationRegistry {
+        if (!exists<AutomationRegistry>(@lottery)) {
+            return AutomationCapsSnapshot { missing_caps: vector::empty<address>() };
+        };
+        let registry = borrow_registry(@lottery);
+        let operators = table::keys(&registry.bots);
+        let missing_caps = collect_missing_caps(&operators, 0, vector::length(&operators));
+        AutomationCapsSnapshot { missing_caps }
+    }
+
     public fun operators(): vector<address> acquires AutomationRegistry {
         if (!exists<AutomationRegistry>(@lottery)) {
             return vector::empty<address>()
@@ -468,6 +493,36 @@ module lottery_data::automation {
         let bot_ref = vector::borrow(bots, next_remaining);
         let cloned = clone_legacy_bot(bot_ref);
         upsert_legacy_bot(cloned);
+    }
+
+    fun all_caps_present(operators: &vector<address>, current: u64, total: u64): bool {
+        if (current == total) {
+            return true;
+        };
+        let idx = current;
+        let next = current + 1;
+        if (!exists<AutomationCap>(*vector::borrow(operators, idx))) {
+            return false;
+        };
+        all_caps_present(operators, next, total)
+    }
+
+    fun collect_missing_caps(
+        operators: &vector<address>,
+        current: u64,
+        total: u64,
+    ): vector<address> {
+        if (current == total) {
+            return vector::empty<address>()
+        };
+        let idx = current;
+        let next = current + 1;
+        let mut_tail = collect_missing_caps(operators, next, total);
+        let operator = *vector::borrow(operators, idx);
+        if (!exists<AutomationCap>(operator)) {
+            vector::push_back(&mut_tail, operator);
+        };
+        mut_tail
     }
 
     fun upsert_legacy_bot(bot: LegacyAutomationBot) acquires AutomationRegistry {

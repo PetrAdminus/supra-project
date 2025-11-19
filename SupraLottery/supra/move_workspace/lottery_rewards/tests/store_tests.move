@@ -10,7 +10,7 @@ module lottery_rewards::rewards_store_tests {
     use std::option;
     use std::signer;
     use std::vector;
-    use vrf_hub::hub;
+    use lottery_vrf_gateway::hub;
 
     const ITEM_PRICE: u64 = 150;
     const ITEM_STOCK: u64 = 5;
@@ -40,7 +40,7 @@ module lottery_rewards::rewards_store_tests {
         test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
-        instances::init(lottery_admin, @vrf_hub);
+        instances::init(lottery_admin, @lottery_vrf_gateway);
         rounds::init(lottery_admin);
         if (!treasury_multi::is_initialized()) {
             treasury_multi::init(lottery_admin, @jackpot_pool, @operations_pool);
@@ -58,7 +58,7 @@ module lottery_rewards::rewards_store_tests {
     }
 
     #[test(
-        vrf_admin = @vrf_hub,
+        vrf_admin = @lottery_vrf_gateway,
         factory_admin = @lottery_factory,
         lottery_admin = @lottery,
         buyer = @player1,
@@ -174,7 +174,7 @@ module lottery_rewards::rewards_store_tests {
     }
 
     #[test(
-        vrf_admin = @vrf_hub,
+        vrf_admin = @lottery_vrf_gateway,
         factory_admin = @lottery_factory,
         lottery_admin = @lottery,
         buyer = @player2,
