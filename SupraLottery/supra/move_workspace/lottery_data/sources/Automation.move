@@ -5,6 +5,7 @@ module lottery_data::automation {
 
     use supra_framework::account;
     use supra_framework::event;
+    use lottery_multi::automation as legacy_automation;
     use lottery_vrf_gateway::table;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
@@ -14,6 +15,7 @@ module lottery_data::automation {
     const E_CAP_EXISTS: u64 = 5;
     const E_CAP_MISSING: u64 = 6;
     const E_NOT_INITIALIZED: u64 = 7;
+    const E_OPERATOR_MISMATCH: u64 = 8;
 
     public struct AutomationState has store {
         allowed_actions: vector<u64>,
@@ -190,6 +192,21 @@ module lottery_data::automation {
     ) acquires AutomationRegistry {
         ensure_registry_admin(caller);
         import_existing_bots_recursive(&bots, vector::length(&bots));
+    }
+
+    public entry fun claim_automation_cap(
+        operator: &signer,
+        legacy_cap: legacy_automation::AutomationCap,
+    ) acquires AutomationRegistry, AutomationCap {
+        ensure_registry_initialized();
+        let operator_addr = signer::address_of(operator);
+        let legacy_automation::AutomationCap { operator: legacy_operator, cron_spec } = legacy_cap;
+        assert!(operator_addr == legacy_operator, E_OPERATOR_MISMATCH);
+        assert!(!exists<AutomationCap>(operator_addr), E_CAP_EXISTS);
+        let registry = borrow_registry(@lottery);
+        assert!(table::contains(&registry.bots, operator_addr), E_BOT_UNKNOWN);
+        let cloned_cron_spec = clone_bytes(&cron_spec);
+        move_to(operator, AutomationCap { operator: operator_addr, cron_spec: cloned_cron_spec });
     }
 
     public entry fun claim_cap_from_registry(operator: &signer)

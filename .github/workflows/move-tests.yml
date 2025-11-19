@@ -48,6 +48,13 @@ jobs:
               python -m supra.scripts.move_tests --workspace SupraLottery/supra/move_workspace --all-packages --mode check --dry-run --cli-flavour aptos
           fi
 
+      - name: Проверка карты миграции
+        env:
+          PYTHONPATH: SupraLottery
+        run: |
+          set -euo pipefail
+          docs/architecture/tools/run_migration_checks.sh
+
       - name: Upload move-test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -57,3 +64,6 @@ jobs:
             tmp/move-test-report.json
             tmp/move-test-report.xml
             tmp/unittest.log
+            tmp/move_struct_inventory.json
+            tmp/move_struct_inventory.md
+            tmp/migration_plan_status.json

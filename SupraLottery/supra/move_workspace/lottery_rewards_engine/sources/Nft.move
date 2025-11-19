@@ -194,6 +194,29 @@ module lottery_rewards_engine::nft {
     }
 
     #[view]
+    public fun ready(): bool acquires BadgeAuthority {
+        if (!exists<BadgeAuthority>(@lottery)) {
+            return false;
+        };
+        let authority = borrow_global<BadgeAuthority>(@lottery);
+        let owners_len = vector::length(&authority.owners);
+        if (authority.admin != @lottery) {
+            return false;
+        };
+        if (!owners_unique(&authority.owners, 0, owners_len)) {
+            return false;
+        };
+        if (table::length(&authority.users) != owners_len) {
+            return false;
+        };
+        let (owners_ok, max_badge_id) = owners_ready(&authority.users, &authority.owners, 0, owners_len, 0);
+        if (!owners_ok) {
+            return false;
+        };
+        authority.next_badge_id >= max_badge_id + 1
+    }
+
+    #[view]
     public fun is_initialized(): bool {
         exists<BadgeAuthority>(@lottery)
     }
@@ -517,6 +540,87 @@ module lottery_rewards_engine::nft {
         let authority = borrow_global_mut<BadgeAuthority>(@lottery);
         apply_legacy_authority(authority, payload);
         emit_all_snapshots_internal(authority);
+    }
+
+    fun owners_ready(
+        users: &table::Table<address, UserBadges>,
+        owners: &vector<address>,
+        index: u64,
+        len: u64,
+        current_max: u64,
+    ): (bool, u64) {
+        if (index == len) {
+            return (true, current_max);
+        };
+        let owner = *vector::borrow(owners, index);
+        if (!table::contains(users, owner)) {
+            return (false, current_max);
+        };
+        let collection = table::borrow(users, owner);
+        if (table::length(&collection.badges) != vector::length(&collection.badge_ids)) {
+            return (false, current_max);
+        };
+        let (badges_ok, owner_max) = badges_ready(&collection.badge_ids, &collection.badges, 0, vector::length(&collection.badge_ids), current_max);
+        if (!badges_ok) {
+            return (false, current_max);
+        };
+        owners_ready(users, owners, index + 1, len, owner_max)
+    }
+
+    fun badges_ready(
+        badge_ids: &vector<u64>,
+        badges: &table::Table<u64, WinnerBadgeData>,
+        index: u64,
+        len: u64,
+        current_max: u64,
+    ): (bool, u64) {
+        if (index == len) {
+            return (true, current_max);
+        };
+        let badge_id = *vector::borrow(badge_ids, index);
+        if (!table::contains(badges, badge_id)) {
+            return (false, current_max);
+        };
+        if (badge_id_seen_later(badge_ids, badge_id, index + 1, len)) {
+            return (false, current_max);
+        };
+        let next_max = if (badge_id > current_max) { badge_id } else { current_max };
+        badges_ready(badge_ids, badges, index + 1, len, next_max)
+    }
+
+    fun badge_id_seen_later(ids: &vector<u64>, badge_id: u64, index: u64, len: u64): bool {
+        if (index == len) {
+            return false;
+        };
+        let current = *vector::borrow(ids, index);
+        if (current == badge_id) {
+            true
+        } else {
+            badge_id_seen_later(ids, badge_id, index + 1, len)
+        }
+    }
+
+    fun owners_unique(owners: &vector<address>, index: u64, len: u64): bool {
+        if (index == len) {
+            return true;
+        };
+        let owner = *vector::borrow(owners, index);
+        if (owner_seen_later(owners, owner, index + 1, len)) {
+            return false;
+        };
+        owners_unique(owners, index + 1, len)
+    }
+
+    fun owner_seen_later(owners: &vector<address>, owner: address, index: u64, len: u64): bool {
+        if (index == len) {
+            return false;
+        };
+        let current = *vector::borrow(owners, index);
+        if (current == owner) {
+            true
+        } else {
+            owner_seen_later(owners, owner, index + 1, len)
+        }
     }
 
     fun clone_bytes(data: &vector<u8>): vector<u8> {

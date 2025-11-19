@@ -34,6 +34,22 @@ module lottery_engine::vrf_config {
         vrf_stats: lottery_state::VrfStats,
     }
 
+    struct LegacyWhitelistImport has drop, store {
+        callback_sender: option::Option<address>,
+        consumers: vector<address>,
+        client_snapshot: option::Option<lottery_state::ClientWhitelistSnapshot>,
+        consumer_snapshot: option::Option<lottery_state::ConsumerWhitelistSnapshot>,
+    }
+
+    struct LegacyVrfConfigImport has drop, store {
+        lottery_id: u64,
+        gas: lottery_state::GasBudget,
+        whitelist: LegacyWhitelistImport,
+        request_config: option::Option<lottery_state::VrfRequestConfig>,
+        vrf_stats: lottery_state::VrfStats,
+        pending_request: lottery_state::PendingRequest,
+    }
+
     #[view]
     public fun is_initialized(): bool {
         instances::is_initialized() && lottery_state::is_initialized()
@@ -246,6 +262,25 @@ module lottery_engine::vrf_config {
         });
 
         lottery_state::emit_vrf_request_config(state, lottery_id);
+    }
+
+    public entry fun import_existing_vrf_config(
+        caller: &signer,
+        config: LegacyVrfConfigImport,
+    ) acquires instances::InstanceRegistry, lottery_state::LotteryState {
+        let registry = ensure_admin(caller);
+        let state = lottery_state::borrow_mut(@lottery);
+        import_single_config(registry, state, config);
+    }
+
+    public entry fun import_existing_vrf_configs(
+        caller: &signer,
+        configs: vector<LegacyVrfConfigImport>,
+    ) acquires instances::InstanceRegistry, lottery_state::LotteryState {
+        let registry = ensure_admin(caller);
+        let state = lottery_state::borrow_mut(@lottery);
+        let len = vector::length(&configs);
+        import_configs_from_index(registry, state, &configs, 0, len);
     }
 
     #[view]
@@ -533,6 +568,136 @@ module lottery_engine::vrf_config {
         let fee = safe_mul_u128(max_gas_price, gas_sum, E_INVALID_GAS_CONFIG);
         ensure_u128_to_u64(fee, E_INVALID_GAS_CONFIG)
     }
+
+    fun import_single_config(
+        registry: &mut instances::InstanceRegistry,
+        state: &mut lottery_state::LotteryState,
+        config: LegacyVrfConfigImport,
+    ) {
+        let lottery_id = config.lottery_id;
+        let _ = instances::instance(registry, lottery_id);
+        validate_import(&config);
+        let runtime = lottery_state::runtime_mut(state, lottery_id);
+        runtime.gas = normalize_gas_budget(config.gas);
+        runtime.whitelist = build_whitelist_state(config.whitelist);
+        runtime.request_config = config.request_config;
+        runtime.vrf_stats = config.vrf_stats;
+        runtime.pending_request = config.pending_request;
+        lottery_state::emit_vrf_gas_budget(state, lottery_id);
+        lottery_state::emit_vrf_whitelist(state, lottery_id);
+        lottery_state::emit_vrf_request_config(state, lottery_id);
+    }
+
+    fun import_configs_from_index(
+        registry: &mut instances::InstanceRegistry,
+        state: &mut lottery_state::LotteryState,
+        configs: &vector<LegacyVrfConfigImport>,
+        index: u64,
+        len: u64,
+    ) {
+        if (index == len) {
+            return;
+        };
+        let current = *vector::borrow(configs, index);
+        import_single_config(registry, state, current);
+        import_configs_from_index(registry, state, configs, index + 1, len);
+    }
+
+    fun validate_import(config: &LegacyVrfConfigImport) {
+        validate_gas_budget(&config.gas);
+        validate_whitelist(&config.whitelist, &config.gas);
+        validate_request_config(&config.request_config, &config.vrf_stats);
+        validate_pending_request(&config.pending_request, &config.request_config);
+    }
+
+    fun validate_gas_budget(gas: &lottery_state::GasBudget) {
+        assert!(gas.max_gas_price > 0, E_INVALID_GAS_CONFIG);
+        assert!(gas.max_gas_limit > 0, E_INVALID_GAS_CONFIG);
+        assert!(gas.callback_gas_price > 0, E_INVALID_GAS_CONFIG);
+        assert!(gas.callback_gas_limit > 0, E_INVALID_GAS_CONFIG);
+        assert!(gas.verification_gas_value > 0, E_INVALID_GAS_CONFIG);
+        assert!(gas.callback_gas_price <= gas.max_gas_price, E_INVALID_GAS_CONFIG);
+        assert!(gas.callback_gas_limit <= gas.max_gas_limit, E_INVALID_GAS_CONFIG);
+        let expected_max_fee = compute_per_request_fee(gas.max_gas_price, gas.max_gas_limit, gas.verification_gas_value);
+        assert!(gas.max_fee == expected_max_fee, E_INVALID_GAS_CONFIG);
+    }
+
+    fun validate_whitelist(
+        whitelist: &LegacyWhitelistImport,
+        gas: &lottery_state::GasBudget,
+    ) {
+        assert!(option::is_none(&whitelist.callback_sender) || option::borrow(&whitelist.callback_sender) != &0x0, E_INVALID_CALLBACK_SENDER);
+        if (option::is_some(&whitelist.client_snapshot)) {
+            let snapshot = option::borrow(&whitelist.client_snapshot);
+            assert!(snapshot.max_gas_price == gas.max_gas_price, E_INVALID_GAS_CONFIG);
+            assert!(snapshot.max_gas_limit == gas.max_gas_limit, E_INVALID_GAS_CONFIG);
+            let min_balance = compute_min_balance(gas.max_gas_price, gas.max_gas_limit, gas.verification_gas_value);
+            assert!(snapshot.min_balance_limit >= min_balance, E_INVALID_GAS_CONFIG);
+        };
+        if (option::is_some(&whitelist.consumer_snapshot)) {
+            let snapshot = option::borrow(&whitelist.consumer_snapshot);
+            assert!(snapshot.callback_gas_price == gas.callback_gas_price, E_INVALID_GAS_CONFIG);
+            assert!(snapshot.callback_gas_limit == gas.callback_gas_limit, E_INVALID_GAS_CONFIG);
+        };
+        ensure_unique_consumers(&whitelist.consumers, 0, vector::length(&whitelist.consumers));
+    }
+
+    fun validate_request_config(
+        request_config: &option::Option<lottery_state::VrfRequestConfig>,
+        stats: &lottery_state::VrfStats,
+    ) {
+        if (option::is_some(request_config)) {
+            let cfg = option::borrow(request_config);
+            assert!(cfg.rng_count == EXPECTED_RNG_COUNT, E_INVALID_REQUEST_CONFIG);
+            assert!(cfg.num_confirmations > 0, E_INVALID_REQUEST_CONFIG);
+            assert!(cfg.num_confirmations <= MAX_CONFIRMATIONS, E_INVALID_REQUEST_CONFIG);
+            assert!(cfg.client_seed < U64_MAX, E_CLIENT_SEED_OVERFLOW);
+            assert!(stats.next_client_seed >= cfg.client_seed, E_CLIENT_SEED_REGRESSION);
+        };
+    }
+
+    fun validate_pending_request(
+        pending_request: &lottery_state::PendingRequest,
+        request_config: &option::Option<lottery_state::VrfRequestConfig>,
+    ) {
+        if (option::is_some(&pending_request.request_id)) {
+            assert!(option::is_some(request_config), E_INVALID_REQUEST_CONFIG);
+            assert!(option::is_some(&pending_request.last_requester), E_REQUEST_PENDING);
+            assert!(option::is_some(&pending_request.last_request_payload_hash), E_REQUEST_PENDING);
+        };
+    }
+
+    fun normalize_gas_budget(gas: lottery_state::GasBudget): lottery_state::GasBudget {
+        let max_fee = compute_per_request_fee(gas.max_gas_price, gas.max_gas_limit, gas.verification_gas_value);
+        lottery_state::GasBudget {
+            max_fee,
+            max_gas_price: gas.max_gas_price,
+            max_gas_limit: gas.max_gas_limit,
+            callback_gas_price: gas.callback_gas_price,
+            callback_gas_limit: gas.callback_gas_limit,
+            verification_gas_value: gas.verification_gas_value,
+        }
+    }
+
+    fun build_whitelist_state(whitelist: LegacyWhitelistImport): lottery_state::WhitelistState {
+        lottery_state::WhitelistState {
+            callback_sender: whitelist.callback_sender,
+            consumers: whitelist.consumers,
+            client_snapshot: whitelist.client_snapshot,
+            consumer_snapshot: whitelist.consumer_snapshot,
+        }
+    }
+
+    fun ensure_unique_consumers(consumers: &vector<address>, index: u64, len: u64) {
+        if (index >= len) {
+            return;
+        };
+        let current = *vector::borrow(consumers, index);
+        let has_duplicate = contains_from_index(consumers, current, index + 1, len);
+        assert!(!has_duplicate, E_CONSUMER_ALREADY_REGISTERED);
+        ensure_unique_consumers(consumers, index + 1, len);
+    }
+
 
     fun compute_min_balance(
         max_gas_price: u128,

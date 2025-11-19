@@ -118,6 +118,15 @@ module lottery_gateway::history {
     }
 
     #[view]
+    public fun ready(): bool acquires LotteryHistory {
+        if (!exists<LotteryHistory>(@lottery)) {
+            return false;
+        };
+        let history = borrow_global<LotteryHistory>(@lottery);
+        validate_records(&history.records, vector::length(&history.records))
+    }
+
+    #[view]
     public fun history_records(): vector<HistoryRecord> acquires LotteryHistory {
         if (!exists<LotteryHistory>(@lottery)) {
             return vector::empty<HistoryRecord>();
@@ -240,5 +249,18 @@ module lottery_gateway::history {
         let value = *vector::borrow(source, next_remaining);
         vector::push_back(&mut bytes, value);
         bytes
+    }
+
+    fun validate_records(records: &vector<HistoryRecord>, remaining: u64): bool {
+        if (remaining == 0) {
+            return true;
+        };
+        let next_remaining = remaining - 1;
+        let previous_ok = validate_records(records, next_remaining);
+        let record = vector::borrow(records, next_remaining);
+        let status_valid = record.status == STATUS_CREATED
+            || record.status == STATUS_CANCELED
+            || record.status == STATUS_FINALIZED;
+        previous_ok && status_valid
     }
 }

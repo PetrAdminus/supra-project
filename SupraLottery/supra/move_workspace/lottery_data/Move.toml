@@ -11,6 +11,6 @@ lottery_data = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caaf
 lottery_vrf_gateway = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
 
 [dependencies]
-MoveStdlib = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/move-stdlib", rev = "7d1e62c9a5394a279a73515a150e880200640f06" }
-SupraFramework = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/supra-framework", rev = "7d1e62c9a5394a279a73515a150e880200640f06" }
+MoveStdlib = { workspace = true }
+SupraFramework = { workspace = true }
 lottery_vrf_gateway = { local = "../lottery_vrf_gateway" }

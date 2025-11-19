@@ -16,6 +16,10 @@ members = [
   "lottery_multi"
 ]
 
+[workspace.dependencies]
+MoveStdlib = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/move-stdlib", rev = "7d1e62c9a5394a279a73515a150e880200640f06" }
+SupraFramework = { git = "https://github.com/Entropy-Foundation/aptos-core.git", subdir = "aptos-move/framework/supra-framework", rev = "7d1e62c9a5394a279a73515a150e880200640f06" }
+
 [package]
 name = "supra_workspace"
 version = "0.0.1"

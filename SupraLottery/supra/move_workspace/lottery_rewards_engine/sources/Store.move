@@ -6,6 +6,7 @@ module lottery_rewards_engine::store {
     use lottery_data::instances;
     use lottery_data::treasury_multi;
     use lottery_data::treasury;
+    use lottery_rewards::rewards_store;
     use lottery_utils::math;
     use supra_framework::account;
     use supra_framework::event;
@@ -21,6 +22,7 @@ module lottery_rewards_engine::store {
     const E_INVALID_QUANTITY: u64 = 8;
     const E_PRICE_OVERFLOW: u64 = 9;
     const E_SOLD_OVERFLOW: u64 = 10;
+    const E_CAPS_OCCUPIED: u64 = 11;
 
     const SOURCE_STORE: vector<u8> = b"store";
 
@@ -375,6 +377,32 @@ module lottery_rewards_engine::store {
             return;
         };
         let control = treasury_multi::borrow_control_mut(@lottery);
+        let cap_opt = treasury_multi::extract_store_cap(control);
+        if (!option::is_some(&cap_opt)) {
+            abort E_NOT_INITIALIZED;
+        };
+        let cap = option::destroy_some(cap_opt);
+        move_to(admin, StoreAccess { cap });
+    }
+
+    public entry fun claim_store_cap(
+        admin: &signer,
+        _legacy_store_access: rewards_store::StoreAccess,
+    ) acquires StoreAccess, treasury_multi::TreasuryMultiControl {
+        ensure_caps_admin(admin);
+        if (exists<StoreAccess>(@lottery)) {
+            abort E_ALREADY_INITIALIZED;
+        };
+
+        let control = treasury_multi::borrow_control_mut(@lottery);
+        let current_cap_opt = treasury_multi::extract_store_cap(control);
+        if (option::is_some(&current_cap_opt)) {
+            let cap = option::destroy_some(current_cap_opt);
+            treasury_multi::restore_store_cap(control, cap);
+            abort E_CAPS_OCCUPIED;
+        };
+
+        treasury_multi::mint_store_cap(control);
         let cap_opt = treasury_multi::extract_store_cap(control);
         if (!option::is_some(&cap_opt)) {
             abort E_NOT_INITIALIZED;

@@ -231,6 +231,18 @@ module lottery_utils::history {
         completed_events: event::EventHandle<ArchiveDualWriteCompletedEvent>,
     }
 
+    struct ExpectedHashSnapshot has copy, drop, store {
+        lottery_id: u64,
+        expected_hash: vector<u8>,
+    }
+
+    struct DualWriteSnapshot has copy, drop, store {
+        enabled: bool,
+        abort_on_mismatch: bool,
+        abort_on_missing: bool,
+        expectations: vector<ExpectedHashSnapshot>,
+    }
+
     public struct LegacyDualWriteExpectation has drop, store {
         lottery_id: u64,
         expected_hash: vector<u8>,
@@ -623,6 +635,25 @@ module lottery_utils::history {
             abort_on_missing: control.abort_on_missing,
             expected_hash: option::none<vector<u8>>(),
         }
+    }
+
+    #[view]
+    public fun dual_write_snapshot(): option::Option<DualWriteSnapshot>
+    acquires DualWriteControl {
+        if (!exists<DualWriteControl>(@lottery)) {
+            return option::none<DualWriteSnapshot>();
+        };
+        let control = borrow_global<DualWriteControl>(@lottery);
+        let keys = table::keys(&control.expected_hashes);
+        let expectations = collect_expected_hashes(&control.expected_hashes, &keys, 0);
+        option::some(
+            DualWriteSnapshot {
+                enabled: control.enabled,
+                abort_on_mismatch: control.abort_on_mismatch,
+                abort_on_missing: control.abort_on_missing,
+                expectations,
+            },
+        )
     }
 
     #[view]
@@ -1474,6 +1505,26 @@ module lottery_utils::history {
                 expected_hash: hash_for_event,
             },
         );
+    }
+
+    fun collect_expected_hashes(
+        expected_hashes: &table::Table<u64, vector<u8>>,
+        lottery_ids: &vector<u64>,
+        index: u64,
+    ): vector<ExpectedHashSnapshot> {
+        if (index >= vector::length(lottery_ids)) {
+            return vector::empty<ExpectedHashSnapshot>();
+        };
+        let next_index = index + 1;
+        let mut snapshots = collect_expected_hashes(expected_hashes, lottery_ids, next_index);
+        let lottery_id = *vector::borrow(lottery_ids, index);
+        let expected_hash = table::borrow(expected_hashes, lottery_id);
+        let snapshot = ExpectedHashSnapshot {
+            lottery_id,
+            expected_hash: clone_bytes(expected_hash),
+        };
+        vector::push_back(&mut snapshots, snapshot);
+        snapshots
     }
 
     fun clone_bytes(source: &vector<u8>): vector<u8> {

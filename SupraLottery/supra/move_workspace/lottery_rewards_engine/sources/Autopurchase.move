@@ -24,6 +24,7 @@ module lottery_rewards_engine::autopurchase {
     const E_UNKNOWN_LOTTERY: u64 = 9;
     const E_CAPS_UNAVAILABLE: u64 = 10;
     const E_MAX_TICKETS_EXCEEDED: u64 = 11;
+    const E_CAPS_OCCUPIED: u64 = 12;
 
     struct AutopurchasePlan has copy, drop, store {
         balance: u64,
@@ -185,6 +186,36 @@ module lottery_rewards_engine::autopurchase {
             caller,
             AutopurchaseAccess { rounds: rounds_cap, treasury: treasury_cap },
         );
+    }
+
+    public entry fun claim_autopurchase_caps(
+        caller: &signer,
+        _legacy_round_cap: core_rounds::AutopurchaseRoundCap,
+        _legacy_treasury_cap: core_treasury_v1::AutopurchaseTreasuryCap,
+    ) acquires AutopurchaseAccess, rounds::RoundControl, treasury::TreasuryV1Control {
+        let addr = signer::address_of(caller);
+        if (addr != @lottery) {
+            abort E_NOT_AUTHORIZED;
+        };
+        if (exists<AutopurchaseAccess>(@lottery)) {
+            abort E_ALREADY_INITIALIZED;
+        };
+
+        let rounds_control = rounds::borrow_control_mut(@lottery);
+        if (option::is_some(&rounds_control.autopurchase_cap)) {
+            abort E_CAPS_OCCUPIED;
+        };
+        option::fill(&mut rounds_control.autopurchase_cap, rounds::AutopurchaseRoundCap {});
+
+        let treasury_control = treasury::borrow_control_mut(@lottery);
+        if (option::is_some(&treasury_control.autopurchase_cap)) {
+            abort E_CAPS_OCCUPIED;
+        };
+        option::fill(&mut treasury_control.autopurchase_cap, treasury::AutopurchaseTreasuryCap {});
+
+        let rounds_cap = option::extract(&mut rounds_control.autopurchase_cap);
+        let treasury_cap = option::extract(&mut treasury_control.autopurchase_cap);
+        move_to(caller, AutopurchaseAccess { rounds: rounds_cap, treasury: treasury_cap });
     }
 
     public entry fun release_access(caller: &signer)

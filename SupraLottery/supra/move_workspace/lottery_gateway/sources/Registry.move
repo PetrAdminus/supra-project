@@ -96,7 +96,13 @@ module lottery_gateway::registry {
 
     #[view]
     public fun ready(): bool {
-        is_initialized() && instances::is_initialized()
+        if (!is_initialized() || !instances::is_initialized()) {
+            return false;
+        };
+        let registry = borrow_global<LotteryRegistry>(@lottery);
+        let max_id = max_lottery_id(&registry.lottery_ids);
+        entries_match_ids(&registry.entries, &registry.lottery_ids, vector::length(&registry.lottery_ids))
+            && registry.next_lottery_id > max_id
     }
 
     public fun set_admin(new_admin: address) acquires LotteryRegistry {
@@ -503,5 +509,19 @@ module lottery_gateway::registry {
         } else {
             best
         }
+    }
+
+    fun entries_match_ids(
+        entries: &table::Table<u64, LotteryRegistryEntry>,
+        ids: &vector<u64>,
+        remaining: u64,
+    ): bool {
+        if (remaining == 0) {
+            return true;
+        };
+        let next_remaining = remaining - 1;
+        let previous_ok = entries_match_ids(entries, ids, next_remaining);
+        let lottery_id = *vector::borrow(ids, next_remaining);
+        previous_ok && table::contains(entries, lottery_id)
     }
 }

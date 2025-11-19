@@ -1,6 +1,7 @@
 module lottery_rewards_engine::referrals {
     use lottery_data::instances;
     use lottery_data::treasury_multi;
+    use lottery_rewards::rewards_referrals;
     use std::option;
     use std::signer;
     use std::vector;
@@ -19,6 +20,7 @@ module lottery_rewards_engine::referrals {
     const E_ALREADY_REGISTERED: u64 = 6;
     const E_TREASURY_CONFIG_MISSING: u64 = 7;
     const E_CAPS_UNAVAILABLE: u64 = 8;
+    const E_CAPS_OCCUPIED: u64 = 9;
 
     struct ReferralConfig has copy, drop, store {
         referrer_bps: u64,
@@ -163,6 +165,32 @@ module lottery_rewards_engine::referrals {
             abort E_ALREADY_INITIALIZED;
         };
         let control = treasury_multi::borrow_control_mut(@lottery);
+        let cap_opt = treasury_multi::extract_referrals_cap(control);
+        if (!option::is_some(&cap_opt)) {
+            abort E_CAPS_UNAVAILABLE;
+        };
+        let cap = option::destroy_some(cap_opt);
+        move_to(caller, ReferralsControl { treasury_cap: cap });
+    }
+
+    public entry fun claim_referrals_cap(
+        caller: &signer,
+        _legacy_referrals_control: lottery_rewards::rewards_referrals::ReferralsControl,
+    ) acquires ReferralsControl, treasury_multi::TreasuryMultiControl {
+        ensure_lottery_signer(caller);
+        if (exists<ReferralsControl>(@lottery)) {
+            abort E_ALREADY_INITIALIZED;
+        };
+
+        let control = treasury_multi::borrow_control_mut(@lottery);
+        let current_cap_opt = treasury_multi::extract_referrals_cap(control);
+        if (option::is_some(&current_cap_opt)) {
+            let cap = option::destroy_some(current_cap_opt);
+            treasury_multi::restore_referrals_cap(control, cap);
+            abort E_CAPS_OCCUPIED;
+        };
+
+        treasury_multi::mint_referrals_cap(control);
         let cap_opt = treasury_multi::extract_referrals_cap(control);
         if (!option::is_some(&cap_opt)) {
             abort E_CAPS_UNAVAILABLE;

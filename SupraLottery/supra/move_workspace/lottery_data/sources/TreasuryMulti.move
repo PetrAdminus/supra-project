@@ -5,6 +5,7 @@ module lottery_data::treasury_multi {
 
     use supra_framework::account;
     use supra_framework::event;
+    use lottery_core::core_treasury_multi;
     use lottery_vrf_gateway::table;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
@@ -16,6 +17,10 @@ module lottery_data::treasury_multi {
     const E_CAP_MISSING: u64 = 7;
     const E_CAP_ALREADY_PRESENT: u64 = 8;
     const E_SCOPE_MISMATCH: u64 = 9;
+    const E_JACKPOT_CAP_OCCUPIED: u64 = 10;
+    const E_REFERRALS_CAP_OCCUPIED: u64 = 11;
+    const E_STORE_CAP_OCCUPIED: u64 = 12;
+    const E_VIP_CAP_OCCUPIED: u64 = 13;
 
     const SCOPE_JACKPOT: u64 = 20;
     const SCOPE_REFERRALS: u64 = 21;
@@ -294,6 +299,47 @@ module lottery_data::treasury_multi {
                 vip_cap: option::none<MultiTreasuryCap>(),
             },
         );
+    }
+
+    public entry fun claim_multi_treasury_caps(
+        caller: &signer,
+        _legacy_jackpot_cap: core_treasury_multi::MultiTreasuryCap,
+        _legacy_referrals_cap: core_treasury_multi::MultiTreasuryCap,
+        _legacy_store_cap: core_treasury_multi::MultiTreasuryCap,
+        _legacy_vip_cap: core_treasury_multi::MultiTreasuryCap,
+    ) acquires TreasuryMultiControl {
+        let control = borrow_control_mut(@lottery);
+        ensure_control_admin(control, caller);
+
+        if (option::is_some(&control.jackpot_cap)) {
+            abort E_JACKPOT_CAP_OCCUPIED;
+        };
+        if (option::is_some(&control.referrals_cap)) {
+            abort E_REFERRALS_CAP_OCCUPIED;
+        };
+        if (option::is_some(&control.store_cap)) {
+            abort E_STORE_CAP_OCCUPIED;
+        };
+        if (option::is_some(&control.vip_cap)) {
+            abort E_VIP_CAP_OCCUPIED;
+        };
+
+        option::fill(&mut control.jackpot_cap, MultiTreasuryCap { scope: SCOPE_JACKPOT });
+        option::fill(&mut control.referrals_cap, MultiTreasuryCap { scope: SCOPE_REFERRALS });
+        option::fill(&mut control.store_cap, MultiTreasuryCap { scope: SCOPE_STORE });
+        option::fill(&mut control.vip_cap, MultiTreasuryCap { scope: SCOPE_VIP });
+    }
+
+    public fun mint_referrals_cap(control: &mut TreasuryMultiControl) {
+        ensure_cap_slot(&mut control.referrals_cap, SCOPE_REFERRALS);
+    }
+
+    public fun mint_store_cap(control: &mut TreasuryMultiControl) {
+        ensure_cap_slot(&mut control.store_cap, SCOPE_STORE);
+    }
+
+    public fun mint_vip_cap(control: &mut TreasuryMultiControl) {
+        ensure_cap_slot(&mut control.vip_cap, SCOPE_VIP);
     }
 
     #[test_only]
@@ -837,6 +883,12 @@ module lottery_data::treasury_multi {
     fun ensure_admin_signer(caller: &signer) acquires TreasuryState {
         let state = borrow_state(@lottery);
         if (signer::address_of(caller) != state.admin) {
+            abort E_UNAUTHORIZED;
+        };
+    }
+
+    fun ensure_control_admin(control: &TreasuryMultiControl, caller: &signer) {
+        if (signer::address_of(caller) != control.admin) {
             abort E_UNAUTHORIZED;
         };
     }
