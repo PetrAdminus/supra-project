@@ -6,6 +6,7 @@ module lottery_data::instances {
     use supra_framework::account;
     use supra_framework::event;
     use lottery_vrf_gateway::table;
+    use lottery_core::core_instances;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
     const E_UNAUTHORIZED: u64 = 2;
@@ -191,9 +192,21 @@ module lottery_data::instances {
             caller,
             InstanceControl {
                 admin: caller_address,
-                export_cap: option::some(InstancesExportCap {}),
+                export_cap: option::none<InstancesExportCap>(),
             },
         );
+    }
+
+    public entry fun claim_instance_control_cap(
+        caller: &signer,
+        _legacy_cap: core_instances::InstancesExportCap,
+    ) acquires InstanceControl {
+        let control = borrow_control_mut(@lottery);
+        ensure_control_admin(control, caller);
+        if (option::is_some(&control.export_cap)) {
+            abort E_EXPORT_CAP_OCCUPIED;
+        };
+        option::fill(&mut control.export_cap, InstancesExportCap {});
     }
 
     public fun borrow_registry(addr: address): &InstanceRegistry acquires InstanceRegistry {
@@ -229,6 +242,11 @@ module lottery_data::instances {
             abort E_EXPORT_CAP_OCCUPIED;
         };
         option::fill(&mut control.export_cap, cap);
+    }
+
+    #[view]
+    public fun caps_ready(): bool {
+        exists<InstanceControl>(@lottery) && option::is_some(&borrow_control(@lottery).export_cap)
     }
 
     public fun migrate_override_stats(
@@ -494,6 +512,13 @@ module lottery_data::instances {
     fun ensure_admin(caller: &signer) acquires InstanceRegistry {
         let registry = borrow_registry(@lottery);
         if (signer::address_of(caller) != registry.admin) {
+            abort E_UNAUTHORIZED;
+        };
+    }
+
+    fun ensure_control_admin(control: &InstanceControl, caller: &signer) {
+        let caller_address = signer::address_of(caller);
+        if (caller_address != control.admin) {
             abort E_UNAUTHORIZED;
         };
     }

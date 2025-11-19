@@ -4,6 +4,8 @@ module lottery_utils::feature_flags {
     use std::table;
     use std::vector;
 
+    use lottery_multi::feature_switch;
+
     use supra_framework::account;
     use supra_framework::event;
 
@@ -12,6 +14,7 @@ module lottery_utils::feature_flags {
     const E_REGISTRY_MISSING: u64 = 3;
     const E_FEATURE_UNKNOWN: u64 = 4;
     const E_MODE_INVALID: u64 = 5;
+    const E_CAP_ALREADY_CONSUMED: u64 = 6;
 
     const MODE_DISABLED: u8 = 0;
     const MODE_ENABLED_ALL: u8 = 1;
@@ -37,6 +40,10 @@ module lottery_utils::feature_flags {
         force_enable_devnet: bool,
         entries: table::Table<u64, FeatureRecord>,
         updates: event::EventHandle<FeatureUpdatedEvent>,
+    }
+
+    struct FeatureSwitchMigration has key {
+        legacy_cap_consumed: bool,
     }
 
     struct FeatureUpdatedEvent has drop, store {
@@ -134,6 +141,23 @@ module lottery_utils::feature_flags {
         registry.force_enable_devnet = enable;
     }
 
+    public entry fun claim_legacy_admin_cap(
+        caller: &signer,
+        _legacy_cap: feature_switch::FeatureSwitchAdminCap,
+    ) acquires FeatureRegistry, FeatureSwitchMigration {
+        let addr = signer::address_of(caller);
+        assert!(addr == @lottery, E_NOT_ADMIN);
+        ensure_migration_state(caller);
+        let registry = borrow_registry_mut(caller);
+        let admin = registry.admin;
+        assert!(admin == addr, E_NOT_ADMIN);
+        let state = borrow_global_mut<FeatureSwitchMigration>(@lottery);
+        if (state.legacy_cap_consumed) {
+            abort E_CAP_ALREADY_CONSUMED
+        };
+        state.legacy_cap_consumed = true;
+    }
+
     public fun is_enabled(feature_id: u64, has_premium: bool): bool acquires FeatureRegistry {
         let registry = borrow_registry();
         if (registry.force_enable_devnet) {
@@ -171,6 +195,15 @@ module lottery_utils::feature_flags {
 
     public fun is_initialized(): bool {
         exists<FeatureRegistry>(@lottery)
+    }
+
+    #[view]
+    public fun legacy_admin_cap_consumed(): bool acquires FeatureSwitchMigration {
+        if (!exists<FeatureSwitchMigration>(@lottery)) {
+            return false
+        };
+        let state = borrow_global<FeatureSwitchMigration>(@lottery);
+        state.legacy_cap_consumed
     }
 
     public fun feature_purchase_id(): u64 {
@@ -318,6 +351,13 @@ module lottery_utils::feature_flags {
         let len = vector::length(&keys);
         let features = collect_feature_snapshots(&registry.entries, &keys, 0, len);
         FeatureRegistrySnapshot { admin: registry.admin, force_enable_devnet: registry.force_enable_devnet, features }
+    }
+
+    fun ensure_migration_state(caller: &signer) acquires FeatureSwitchMigration {
+        if (exists<FeatureSwitchMigration>(@lottery)) {
+            return
+        };
+        move_to(caller, FeatureSwitchMigration { legacy_cap_consumed: false });
     }
 
     fun collect_feature_snapshots(

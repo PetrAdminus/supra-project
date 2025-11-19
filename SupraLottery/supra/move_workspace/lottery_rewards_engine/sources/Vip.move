@@ -7,6 +7,7 @@ module lottery_rewards_engine::vip {
     use lottery_data::instances;
     use lottery_data::treasury_multi;
     use lottery_data::treasury;
+    use lottery_rewards::rewards_vip;
     use supra_framework::account;
     use supra_framework::event;
     use lottery_vrf_gateway::table;
@@ -18,6 +19,7 @@ module lottery_rewards_engine::vip {
     const E_INVALID_PRICE: u64 = 5;
     const E_INVALID_DURATION: u64 = 6;
     const E_SUBSCRIPTION_NOT_FOUND: u64 = 7;
+    const E_CAPS_OCCUPIED: u64 = 8;
 
     const SOURCE_VIP_SUBSCRIPTION: vector<u8> = b"vip_subscription";
 
@@ -433,6 +435,32 @@ module lottery_rewards_engine::vip {
             return;
         };
         let control = treasury_multi::borrow_control_mut(@lottery);
+        let cap_opt = treasury_multi::extract_vip_cap(control);
+        if (!option::is_some(&cap_opt)) {
+            abort E_NOT_INITIALIZED;
+        };
+        let cap = option::destroy_some(cap_opt);
+        move_to(admin, VipAccess { cap });
+    }
+
+    public entry fun claim_vip_cap(
+        admin: &signer,
+        _legacy_vip_access: rewards_vip::VipAccess,
+    ) acquires VipAccess, treasury_multi::TreasuryMultiControl {
+        ensure_caps_admin(admin);
+        if (exists<VipAccess>(@lottery)) {
+            abort E_ALREADY_INITIALIZED;
+        };
+
+        let control = treasury_multi::borrow_control_mut(@lottery);
+        let current_cap_opt = treasury_multi::extract_vip_cap(control);
+        if (option::is_some(&current_cap_opt)) {
+            let cap = option::destroy_some(current_cap_opt);
+            treasury_multi::restore_vip_cap(control, cap);
+            abort E_CAPS_OCCUPIED;
+        };
+
+        treasury_multi::mint_vip_cap(control);
         let cap_opt = treasury_multi::extract_vip_cap(control);
         if (!option::is_some(&cap_opt)) {
             abort E_NOT_INITIALIZED;

@@ -19,9 +19,19 @@ module lottery_engine::sales {
     const E_TICKET_OVERFLOW: u64 = 5;
     const E_JACKPOT_OVERFLOW: u64 = 6;
     const E_NOT_AUTHORIZED: u64 = 7;
+    const E_INVALID_SNAPSHOT: u64 = 8;
+    const E_UNKNOWN_LOTTERY: u64 = 9;
 
     const MAX_SUPPORTED_TICKETS_PER_PURCHASE: u64 = 128;
     const BPS_DENOMINATOR: u128 = 10_000;
+
+    public struct LegacySalesRecord has drop, store {
+        lottery_id: u64,
+        tickets_sold: u64,
+        jackpot_accumulated: u64,
+        next_ticket_id: u64,
+        draw_scheduled: bool,
+    }
 
     public struct SalesLotterySnapshot has copy, drop, store {
         lottery_id: u64,
@@ -248,6 +258,18 @@ module lottery_engine::sales {
         grant_bonus_tickets_internal(lottery_id, player, bonus_tickets);
     }
 
+    public entry fun record_existing_sale(caller: &signer, record: LegacySalesRecord)
+    acquires instances::InstanceRegistry, lottery_state::LotteryState, rounds::RoundRegistry {
+        ensure_admin(caller);
+        record_existing_sale_internal(record);
+    }
+
+    public entry fun record_existing_sales(caller: &signer, records: vector<LegacySalesRecord>)
+    acquires instances::InstanceRegistry, lottery_state::LotteryState, rounds::RoundRegistry {
+        ensure_admin(caller);
+        record_existing_sales_internal(records, 0);
+    }
+
     fun multiply(value: u64, count: u64): u64 {
         let product = (value as u128) * (count as u128);
         assert!(product <= 18446744073709551615, E_INVALID_PAYMENT);
@@ -401,6 +423,56 @@ module lottery_engine::sales {
             schedule_now,
         );
         rounds::emit_snapshot(rounds_registry, lottery_id);
+    }
+
+    fun record_existing_sales_internal(records: vector<LegacySalesRecord>, index: u64)
+    acquires instances::InstanceRegistry, lottery_state::LotteryState, rounds::RoundRegistry {
+        let len = vector::length(&records);
+        if (index >= len) {
+            return;
+        };
+
+        let record = *vector::borrow(&records, index);
+        record_existing_sale_internal(record);
+
+        let next_index = index + 1;
+        record_existing_sales_internal(records, next_index);
+    }
+
+    fun record_existing_sale_internal(record: LegacySalesRecord)
+    acquires instances::InstanceRegistry, lottery_state::LotteryState, rounds::RoundRegistry {
+        let lottery_id = record.lottery_id;
+
+        let registry = instances::borrow_registry_mut(@lottery);
+        assert!(instances::contains(registry, lottery_id), E_UNKNOWN_LOTTERY);
+        {
+            let instance_record = instances::instance_mut(registry, lottery_id);
+            instance_record.tickets_sold = record.tickets_sold;
+            instance_record.jackpot_accumulated = record.jackpot_accumulated;
+        };
+        instances::emit_snapshot(registry, lottery_id);
+
+        let state = lottery_state::borrow_mut(@lottery);
+        assert!(table::contains(&state.lotteries, lottery_id), E_UNKNOWN_LOTTERY);
+        let runtime = lottery_state::runtime_mut(state, lottery_id);
+        ensure_snapshot_alignment(&runtime.tickets.participants, record.next_ticket_id);
+        runtime.tickets.next_ticket_id = record.next_ticket_id;
+        runtime.jackpot_amount = record.jackpot_accumulated;
+        runtime.draw.draw_scheduled = record.draw_scheduled;
+        lottery_state::emit_snapshot(state, lottery_id);
+
+        let rounds_registry = rounds::borrow_registry_mut(@lottery);
+        assert!(table::contains(&rounds_registry.rounds, lottery_id), E_UNKNOWN_LOTTERY);
+        let round_runtime = rounds::round_mut(rounds_registry, lottery_id);
+        ensure_snapshot_alignment(&round_runtime.tickets, record.next_ticket_id);
+        round_runtime.next_ticket_id = record.next_ticket_id;
+        round_runtime.draw_scheduled = record.draw_scheduled;
+        rounds::emit_snapshot(rounds_registry, lottery_id);
+    }
+
+    fun ensure_snapshot_alignment(participants: &vector<address>, next_ticket_id: u64) {
+        let length = vector::length(participants);
+        assert!(length == next_ticket_id, E_INVALID_SNAPSHOT);
     }
 
     #[view]

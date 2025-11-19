@@ -7,6 +7,7 @@ module lottery_rewards_engine::jackpot {
     use lottery_data::jackpot;
     use lottery_data::treasury_multi;
     use lottery_data::vrf_deposit;
+    use lottery_rewards::rewards_jackpot;
     use lottery_vrf_gateway::hub;
 
     const E_UNAUTHORIZED: u64 = 1;
@@ -22,6 +23,7 @@ module lottery_rewards_engine::jackpot {
     const E_CAPS_NOT_INITIALIZED: u64 = 11;
     const E_CAPS_UNAVAILABLE: u64 = 12;
     const E_ACCESS_ALREADY_INITIALIZED: u64 = 13;
+    const E_CAP_SLOT_OCCUPIED: u64 = 14;
 
     const RANDOMNESS_WINDOW: u64 = 8;
 
@@ -154,6 +156,26 @@ module lottery_rewards_engine::jackpot {
             abort E_CAPS_UNAVAILABLE;
         };
         let cap = option::destroy_some(cap_opt);
+        move_to(caller, JackpotAccess { cap });
+    }
+
+    public entry fun claim_jackpot_access(
+        caller: &signer,
+        _legacy_access: rewards_jackpot::JackpotAccess,
+    ) acquires JackpotAccess, treasury_multi::TreasuryMultiControl {
+        ensure_caps_admin(caller);
+        if (exists<JackpotAccess>(@lottery)) {
+            abort E_ACCESS_ALREADY_INITIALIZED;
+        };
+        let control = treasury_multi::borrow_control_mut(@lottery);
+        if (option::is_some(&control.jackpot_cap)) {
+            abort E_CAP_SLOT_OCCUPIED;
+        };
+        option::fill(
+            &mut control.jackpot_cap,
+            treasury_multi::MultiTreasuryCap { scope: treasury_multi::scope_jackpot() },
+        );
+        let cap = option::extract(&mut control.jackpot_cap);
         move_to(caller, JackpotAccess { cap });
     }
 

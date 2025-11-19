@@ -2,6 +2,7 @@ module lottery_data::treasury {
     use std::option;
     use std::signer;
 
+    use lottery_core::core_treasury_v1;
     use supra_framework::account;
     use supra_framework::event;
     use supra_framework::fungible_asset;
@@ -16,6 +17,13 @@ module lottery_data::treasury {
     const E_STORE_FROZEN: u64 = 6;
     const E_AUTOPURCHASE_CAP_OCCUPIED: u64 = 7;
     const E_LEGACY_CAP_OCCUPIED: u64 = 8;
+
+    public struct LegacyTokenState has drop, store {
+        metadata: object::Object<fungible_asset::Metadata>,
+        mint_ref: fungible_asset::MintRef,
+        burn_ref: fungible_asset::BurnRef,
+        transfer_ref: fungible_asset::TransferRef,
+    }
 
     public struct LegacyVaultConfig has copy, drop, store {
         bp_jackpot: u64,
@@ -219,10 +227,29 @@ module lottery_data::treasury {
             caller,
             TreasuryV1Control {
                 admin: caller_address,
-                autopurchase_cap: option::some(AutopurchaseTreasuryCap {}),
-                legacy_cap: option::some(LegacyTreasuryCap {}),
+                autopurchase_cap: option::none<AutopurchaseTreasuryCap>(),
+                legacy_cap: option::none<LegacyTreasuryCap>(),
             },
         );
+    }
+
+    public entry fun claim_treasury_v1_caps(
+        caller: &signer,
+        _legacy_autopurchase_cap: core_treasury_v1::AutopurchaseTreasuryCap,
+        _legacy_legacy_cap: core_treasury_v1::LegacyTreasuryCap,
+    ) acquires TreasuryV1Control {
+        let control = borrow_control_mut(@lottery);
+        ensure_control_admin(control, caller);
+
+        if (option::is_some(&control.autopurchase_cap)) {
+            abort E_AUTOPURCHASE_CAP_OCCUPIED;
+        };
+        if (option::is_some(&control.legacy_cap)) {
+            abort E_LEGACY_CAP_OCCUPIED;
+        };
+
+        option::fill(&mut control.autopurchase_cap, AutopurchaseTreasuryCap {});
+        option::fill(&mut control.legacy_cap, LegacyTreasuryCap {});
     }
 
     public entry fun init_token_state(
@@ -239,6 +266,19 @@ module lottery_data::treasury {
             caller,
             TokenState { metadata, mint_ref, burn_ref, transfer_ref },
         );
+    }
+
+    public entry fun import_existing_token_state(caller: &signer, state: LegacyTokenState) {
+        let caller_address = signer::address_of(caller);
+        assert!(caller_address == @lottery, E_UNAUTHORIZED);
+        assert!(!exists<TokenState>(caller_address), E_ALREADY_INITIALIZED);
+        let LegacyTokenState {
+            metadata,
+            mint_ref,
+            burn_ref,
+            transfer_ref,
+        } = state;
+        move_to(caller, TokenState { metadata, mint_ref, burn_ref, transfer_ref });
     }
 
     public fun borrow_vaults(addr: address): &Vaults acquires Vaults {
@@ -427,6 +467,12 @@ module lottery_data::treasury {
     fun ensure_admin_signer(caller: &signer) {
         let caller_address = signer::address_of(caller);
         assert!(caller_address == @lottery, E_UNAUTHORIZED);
+    }
+
+    fun ensure_control_admin(control: &TreasuryV1Control, caller: &signer) {
+        if (signer::address_of(caller) != control.admin) {
+            abort E_UNAUTHORIZED;
+        };
     }
 
     fun ensure_vaults_initialized() {

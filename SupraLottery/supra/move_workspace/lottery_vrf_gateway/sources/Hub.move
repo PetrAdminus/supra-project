@@ -75,6 +75,22 @@ module lottery_vrf_gateway::hub {
         callback_sender_events: event::EventHandle<CallbackSenderUpdatedEvent>,
     }
 
+    #[view]
+    public fun ready(): bool acquires HubState {
+        if (!exists<HubState>(@lottery_vrf_gateway)) {
+            return false;
+        };
+        let state = borrow_global<HubState>(@lottery_vrf_gateway);
+        let lotteries_ok = verify_lotteries(&state.lottery_ids, &state.lotteries, vector::length(&state.lottery_ids));
+        let requests_ok = verify_pending_requests(&state.pending_request_ids, &state.requests, vector::length(&state.pending_request_ids));
+        let max_lottery_id = max_id(&state.lottery_ids, vector::length(&state.lottery_ids));
+        let max_pending_request_id = max_id(&state.pending_request_ids, vector::length(&state.pending_request_ids));
+        lotteries_ok
+            && requests_ok
+            && state.next_lottery_id > max_lottery_id
+            && state.next_request_id > max_pending_request_id
+    }
+
     public entry fun import_existing_state(caller: &signer, payload: LegacyHubState)
     acquires HubState {
         import_state_internal(caller, payload);
@@ -534,22 +550,79 @@ module lottery_vrf_gateway::hub {
 
     fun import_requests(state: &mut HubState, requests: &vector<LegacyRequestRecord>) {
         let len = vector::length(requests);
-        let i = 0;
-        while (i < len) {
-            let req_ref = vector::borrow(requests, i);
-            let req = copy *req_ref;
-            table::add(
-                &mut state.requests,
-                req.request_id,
-                RequestRecord { lottery_id: req.lottery_id, payload: clone_bytes(&req.payload), payload_hash: clone_bytes(&req.payload_hash) },
-            );
-            i = i + 1;
-        };
+        import_requests_recursive(state, requests, len);
     }
 
     fun ensure_migration_signer(caller: &signer) {
         let addr = signer::address_of(caller);
         assert!(addr == @lottery_vrf_gateway || addr == @lottery, E_NOT_AUTHORIZED);
+    }
+
+    fun verify_lotteries(
+        lottery_ids: &vector<u64>,
+        lotteries: &table::Table<u64, LotteryRegistration>,
+        remaining: u64,
+    ): bool {
+        if (remaining == 0) {
+            return true;
+        };
+        let next_remaining = remaining - 1;
+        let previous_ok = verify_lotteries(lottery_ids, lotteries, next_remaining);
+        let lottery_id = *vector::borrow(lottery_ids, next_remaining);
+        previous_ok && table::contains(lotteries, lottery_id)
+    }
+
+    fun verify_pending_requests(
+        pending: &vector<u64>,
+        requests: &table::Table<u64, RequestRecord>,
+        remaining: u64,
+    ): bool {
+        if (remaining == 0) {
+            return true;
+        };
+        let next_remaining = remaining - 1;
+        let previous_ok = verify_pending_requests(pending, requests, next_remaining);
+        let request_id = *vector::borrow(pending, next_remaining);
+        if (!table::contains(requests, request_id)) {
+            return false;
+        };
+        let record = table::borrow(requests, request_id);
+        let hash_from_payload = hash::sha3_256(&record.payload);
+        previous_ok && hash_from_payload == record.payload_hash
+    }
+
+    fun max_id(ids: &vector<u64>, remaining: u64): u64 {
+        if (remaining == 0) {
+            return 0;
+        };
+        let next_remaining = remaining - 1;
+        let best = max_id(ids, next_remaining);
+        let value = *vector::borrow(ids, next_remaining);
+        if (value > best) {
+            value
+        } else {
+            best
+        }
+    }
+
+    fun import_requests_recursive(
+        state: &mut HubState,
+        requests: &vector<LegacyRequestRecord>,
+        remaining: u64,
+    ) {
+        if (remaining == 0) {
+            return;
+        };
+        let next_remaining = remaining - 1;
+        import_requests_recursive(state, requests, next_remaining);
+        let req = *vector::borrow(requests, next_remaining);
+        let expected_hash = hash::sha3_256(&req.payload);
+        assert!(expected_hash == req.payload_hash, E_UNKNOWN_REQUEST);
+        table::add(
+            &mut state.requests,
+            req.request_id,
+            RequestRecord { lottery_id: req.lottery_id, payload: clone_bytes(&req.payload), payload_hash: clone_bytes(&req.payload_hash) },
+        );
     }
 
     fun borrow_hub_state_mut(): &mut HubState acquires HubState {

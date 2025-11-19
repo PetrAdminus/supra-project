@@ -3,9 +3,10 @@ module lottery_data::rounds {
     use std::signer;
     use std::vector;
 
+    use lottery_core::core_rounds;
+    use lottery_vrf_gateway::table;
     use supra_framework::account;
     use supra_framework::event;
-    use lottery_vrf_gateway::table;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
     const E_NOT_PUBLISHED: u64 = 2;
@@ -15,6 +16,9 @@ module lottery_data::rounds {
     const E_HISTORY_CAP_OCCUPIED: u64 = 6;
     const E_PURCHASE_QUEUE_MISSING: u64 = 7;
     const E_NOT_ADMIN: u64 = 8;
+    const E_AUTOPURCHASE_CAP_OCCUPIED: u64 = 9;
+    const E_INVALID_HISTORY_RECORD: u64 = 10;
+    const E_INVALID_PURCHASE_RECORD: u64 = 11;
 
     struct RoundRuntime has copy, drop, store {
         tickets: vector<address>,
@@ -186,10 +190,28 @@ module lottery_data::rounds {
             caller,
             RoundControl {
                 admin: caller_address,
-                history_cap: option::some(HistoryWriterCap {}),
-                autopurchase_cap: option::some(AutopurchaseRoundCap {}),
+                history_cap: option::none<HistoryWriterCap>(),
+                autopurchase_cap: option::none<AutopurchaseRoundCap>(),
             },
         );
+    }
+
+    public entry fun claim_round_control_caps(
+        caller: &signer,
+        _legacy_history_cap: core_rounds::HistoryWriterCap,
+        _legacy_autopurchase_cap: core_rounds::AutopurchaseRoundCap,
+    ) acquires RoundControl {
+        let control = borrow_control_mut(@lottery);
+        ensure_control_admin(control, caller);
+        if (option::is_some(&control.history_cap)) {
+            abort E_HISTORY_CAP_OCCUPIED;
+        };
+        if (option::is_some(&control.autopurchase_cap)) {
+            abort E_AUTOPURCHASE_CAP_OCCUPIED;
+        };
+
+        option::fill(&mut control.history_cap, HistoryWriterCap {});
+        option::fill(&mut control.autopurchase_cap, AutopurchaseRoundCap {});
     }
 
     public entry fun init_history_queue(caller: &signer) {
@@ -554,6 +576,8 @@ module lottery_data::rounds {
     ) acquires PendingHistoryQueue, RoundRegistry {
         ensure_admin(caller);
         assert!(exists<PendingHistoryQueue>(@lottery), E_HISTORY_QUEUE_MISSING);
+        let registry = borrow_registry(@lottery);
+        ensure_history_records_valid(&records, registry);
         let queue = borrow_global_mut<PendingHistoryQueue>(@lottery);
         queue.pending = vector::empty<PendingHistoryRecord>();
         append_history_records(&mut queue.pending, &mut records);
@@ -565,6 +589,8 @@ module lottery_data::rounds {
     ) acquires PendingPurchaseQueue, RoundRegistry {
         ensure_admin(caller);
         assert!(exists<PendingPurchaseQueue>(@lottery), E_PURCHASE_QUEUE_MISSING);
+        let registry = borrow_registry(@lottery);
+        ensure_purchase_records_valid(&records, registry);
         let queue = borrow_global_mut<PendingPurchaseQueue>(@lottery);
         queue.pending = vector::empty<PendingPurchaseRecord>();
         append_purchase_records(&mut queue.pending, &mut records);
@@ -903,6 +929,12 @@ module lottery_data::rounds {
         history_records_consistent_recursive(&queue.pending, registry, 0)
     }
 
+    fun ensure_history_records_valid(records: &vector<PendingHistoryRecord>, registry: &RoundRegistry) {
+        if (!history_records_valid(records, registry)) {
+            abort E_INVALID_HISTORY_RECORD;
+        };
+    }
+
     fun history_records_consistent_recursive(
         records: &vector<PendingHistoryRecord>,
         registry: &RoundRegistry,
@@ -927,6 +959,12 @@ module lottery_data::rounds {
         purchase_records_consistent_recursive(&queue.pending, registry, 0)
     }
 
+    fun ensure_purchase_records_valid(records: &vector<PendingPurchaseRecord>, registry: &RoundRegistry) {
+        if (!purchase_records_valid(records, registry)) {
+            abort E_INVALID_PURCHASE_RECORD;
+        };
+    }
+
     fun purchase_records_consistent_recursive(
         records: &vector<PendingPurchaseRecord>,
         registry: &RoundRegistry,
@@ -947,9 +985,77 @@ module lottery_data::rounds {
         purchase_records_consistent_recursive(records, registry, index + 1)
     }
 
+    fun history_records_valid(
+        records: &vector<PendingHistoryRecord>,
+        registry: &RoundRegistry,
+    ): bool {
+        history_records_valid_recursive(records, registry, 0)
+    }
+
+    fun history_records_valid_recursive(
+        records: &vector<PendingHistoryRecord>,
+        registry: &RoundRegistry,
+        index: u64,
+    ): bool {
+        if (index >= vector::length(records)) {
+            return true;
+        };
+
+        let record = vector::borrow(records, index);
+        if (!table::contains(&registry.rounds, record.lottery_id)) {
+            return false;
+        };
+
+        let runtime = table::borrow(&registry.rounds, record.lottery_id);
+        if (!option::is_some(&runtime.pending_request)) {
+            return false;
+        };
+        if (*option::borrow(&runtime.pending_request) != record.request_id) {
+            return false;
+        };
+        if (record.ticket_index >= vector::length(&runtime.tickets)) {
+            return false;
+        };
+
+        history_records_valid_recursive(records, registry, index + 1)
+    }
+
+    fun purchase_records_valid(
+        records: &vector<PendingPurchaseRecord>,
+        registry: &RoundRegistry,
+    ): bool {
+        purchase_records_valid_recursive(records, registry, 0)
+    }
+
+    fun purchase_records_valid_recursive(
+        records: &vector<PendingPurchaseRecord>,
+        registry: &RoundRegistry,
+        index: u64,
+    ): bool {
+        if (index >= vector::length(records)) {
+            return true;
+        };
+
+        let record = vector::borrow(records, index);
+        if (!table::contains(&registry.rounds, record.lottery_id)) {
+            return false;
+        };
+        if (record.ticket_count == 0 || record.paid_amount == 0) {
+            return false;
+        };
+
+        purchase_records_valid_recursive(records, registry, index + 1)
+    }
+
     fun ensure_admin(caller: &signer) acquires RoundRegistry {
         let registry = borrow_registry(@lottery);
         if (signer::address_of(caller) != registry.admin) {
+            abort E_NOT_ADMIN;
+        };
+    }
+
+    fun ensure_control_admin(control: &RoundControl, caller: &signer) {
+        if (signer::address_of(caller) != control.admin) {
             abort E_NOT_ADMIN;
         };
     }

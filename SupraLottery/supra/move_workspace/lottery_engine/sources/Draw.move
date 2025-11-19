@@ -21,6 +21,8 @@ module lottery_engine::draw {
     const E_PENDING_REQUEST_MISMATCH: u64 = 6;
     const E_RANDOMNESS_TOO_SHORT: u64 = 7;
     const E_RANDOMNESS_OVERFLOW: u64 = 8;
+    const E_INVALID_COUNTERS: u64 = 9;
+    const E_HUB_REQUEST_MISSING: u64 = 10;
 
     public struct DrawLotterySnapshot has copy, drop, store {
         lottery_id: u64,
@@ -46,6 +48,15 @@ module lottery_engine::draw {
         hub_pending: bool,
         pending_ids_match: bool,
         payload_hash_match: bool,
+    }
+
+    public struct LegacyDrawRequest has copy, drop, store {
+        lottery_id: u64,
+        request_id: u64,
+        payload: vector<u8>,
+        requester: address,
+        request_count: u64,
+        response_count: u64,
     }
 
     public entry fun schedule_draw(caller: &signer, lottery_id: u64)
@@ -113,6 +124,26 @@ module lottery_engine::draw {
         );
         rounds::emit_snapshot(rounds_registry, lottery_id);
         lottery_state::emit_snapshot(state, lottery_id);
+    }
+
+    public entry fun import_existing_draw_request(caller: &signer, record: LegacyDrawRequest)
+    acquires instances::InstanceRegistry, lottery_state::LotteryState, rounds::RoundRegistry {
+        let admin = signer::address_of(caller);
+        let registry = instances::borrow_registry_mut(@lottery);
+        assert!(admin == registry.admin, E_UNAUTHORIZED_ADMIN);
+        let state = lottery_state::borrow_mut(@lottery);
+        let rounds_registry = rounds::borrow_registry_mut(@lottery);
+        apply_legacy_draw_request(registry, state, rounds_registry, record);
+    }
+
+    public entry fun import_existing_draw_requests(caller: &signer, mut records: vector<LegacyDrawRequest>)
+    acquires instances::InstanceRegistry, lottery_state::LotteryState, rounds::RoundRegistry {
+        let admin = signer::address_of(caller);
+        let registry = instances::borrow_registry_mut(@lottery);
+        assert!(admin == registry.admin, E_UNAUTHORIZED_ADMIN);
+        let state = lottery_state::borrow_mut(@lottery);
+        let rounds_registry = rounds::borrow_registry_mut(@lottery);
+        import_draw_requests_internal(registry, state, rounds_registry, &mut records);
     }
 
     public entry fun request_randomness(
@@ -370,6 +401,76 @@ module lottery_engine::draw {
         let length = vector::length(randomness);
         assert!(length >= 8, E_RANDOMNESS_TOO_SHORT);
         accumulate_randomness(randomness, 0, 0)
+    }
+
+    fun apply_legacy_draw_request(
+        registry: &mut instances::InstanceRegistry,
+        state: &mut lottery_state::LotteryState,
+        rounds_registry: &mut rounds::RoundRegistry,
+        record: LegacyDrawRequest,
+    ) {
+        let LegacyDrawRequest {
+            lottery_id,
+            request_id,
+            payload,
+            requester,
+            request_count,
+            response_count,
+        } = record;
+
+        let instance = instances::instance_mut(registry, lottery_id);
+        assert!(instance.active, E_INSTANCE_INACTIVE);
+
+        let round = rounds::round_mut(rounds_registry, lottery_id);
+        if (option::is_some(&round.pending_request)) {
+            let existing = *option::borrow(&round.pending_request);
+            assert!(existing == request_id, E_PENDING_REQUEST_MISMATCH);
+        };
+        round.draw_scheduled = true;
+        round.pending_request = option::some(request_id);
+
+        let runtime = lottery_state::runtime_mut(state, lottery_id);
+        if (option::is_some(&runtime.pending_request.request_id)) {
+            let existing = *option::borrow(&runtime.pending_request.request_id);
+            assert!(existing == request_id, E_PENDING_REQUEST_MISMATCH);
+        };
+
+        assert!(request_count >= response_count, E_INVALID_COUNTERS);
+        assert!(request_count >= runtime.vrf_stats.request_count, E_INVALID_COUNTERS);
+        assert!(response_count >= runtime.vrf_stats.response_count, E_INVALID_COUNTERS);
+
+        let payload_hash = hash::sha3_256(&payload);
+        runtime.draw.draw_scheduled = true;
+        runtime.pending_request.request_id = option::some(request_id);
+        runtime.pending_request.last_request_payload_hash = option::some(payload_hash);
+        runtime.pending_request.last_requester = option::some(requester);
+        runtime.request_config = option::none<lottery_state::VrfRequestConfig>();
+        runtime.vrf_stats.request_count = request_count;
+        runtime.vrf_stats.response_count = response_count;
+
+        if (hub::is_initialized()) {
+            let snapshot_opt = hub::request_snapshot(request_id);
+            assert!(option::is_some(&snapshot_opt), E_HUB_REQUEST_MISSING);
+            let snapshot = option::destroy_some(snapshot_opt);
+            assert!(snapshot.payload_hash == payload_hash, E_PENDING_REQUEST_MISMATCH);
+        };
+
+        rounds::emit_snapshot(rounds_registry, lottery_id);
+        lottery_state::emit_snapshot(state, lottery_id);
+    }
+
+    fun import_draw_requests_internal(
+        registry: &mut instances::InstanceRegistry,
+        state: &mut lottery_state::LotteryState,
+        rounds_registry: &mut rounds::RoundRegistry,
+        records: &mut vector<LegacyDrawRequest>,
+    ) {
+        if (vector::is_empty(records)) {
+            return;
+        };
+        let record = vector::pop_back(records);
+        import_draw_requests_internal(registry, state, rounds_registry, records);
+        apply_legacy_draw_request(registry, state, rounds_registry, record);
     }
 
     fun build_draw_snapshot(

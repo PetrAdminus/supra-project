@@ -284,6 +284,23 @@ module lottery_utils::price_feed {
         )
     }
 
+    #[view]
+    public fun ready(): bool {
+        if (!exists<PriceFeedRegistry>(@lottery)) {
+            return false;
+        };
+        let registry = borrow_registry_ref();
+        if (registry.admin != @lottery) {
+            return false;
+        };
+        if (registry.version != DEFAULT_VERSION) {
+            return false;
+        };
+
+        let keys = table::keys(&registry.feeds);
+        feeds_consistent(&registry.feeds, &keys, 0, vector::length(&keys))
+    }
+
     public fun is_initialized(): bool {
         exists<PriceFeedRegistry>(@lottery)
     }
@@ -351,6 +368,34 @@ module lottery_utils::price_feed {
             fallback_reason: record.fallback_reason,
             clamp_active: record.clamp_active,
         }
+    }
+
+    fun feeds_consistent(
+        feeds: &table::Table<u64, PriceFeedRecord>,
+        keys: &vector<u64>,
+        index: u64,
+        len: u64,
+    ): bool {
+        if (index >= len) {
+            return true;
+        };
+
+        let asset_id = *vector::borrow(keys, index);
+        if (!table::contains(feeds, asset_id)) {
+            return false;
+        };
+        let record = table::borrow(feeds, asset_id);
+        if (record.asset_id != asset_id) {
+            return false;
+        };
+        if (record.decimals > 18) {
+            return false;
+        };
+        if (record.last_updated_ts == 0 || record.staleness_window == 0) {
+            return false;
+        };
+
+        feeds_consistent(feeds, keys, index + 1, len)
     }
 
     fun borrow_record_mut(
