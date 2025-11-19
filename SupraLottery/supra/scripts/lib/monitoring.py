@@ -1,6 +1,5 @@
 """Reusable Supra CLI helpers for monitoring and HTTP services."""
 from __future__ import annotations
-
 import json
 import os
 import subprocess
@@ -117,6 +116,10 @@ class MonitorConfig:
     @property
     def history_prefix(self) -> str:
         return f"{self.lottery_addr}::history"
+
+    @property
+    def health_prefix(self) -> str:
+        return f"{self.lottery_addr}::health"
 
 
 def _parse_lottery_ids(raw: Any) -> List[int]:
@@ -400,6 +403,34 @@ def normalize_address_list(value: Any) -> List[str]:
     return [] if collapsed is None else [str(collapsed)]
 
 
+HEALTH_FIELDS = (
+    "storage_ready",
+    "queues_ready",
+    "treasury_ready",
+    "rewards_ready",
+    "autopurchase_ready",
+    "utils_ready",
+    "history_ready",
+    "gateway_ready",
+    "access_ready",
+    "cancellations_ready",
+    "automation_ready",
+    "vrf_ready",
+    "engine_ready",
+)
+
+
+def normalize_health_snapshot(value: Any) -> Dict[str, bool]:
+    """Преобразует результат health::snapshot в словарь булевых флагов."""
+
+    snapshot: Dict[str, bool] = {field: False for field in HEALTH_FIELDS}
+    payload = extract_optional(value)
+    if isinstance(payload, dict):
+        for field in snapshot:
+            snapshot[field] = bool(payload.get(field, False))
+    return snapshot
+
+
 def gather_data(config: MonitorConfig) -> Dict[str, Any]:
     """Собирает агрегированный отчёт по VRF-хабу и мульти-лотереям."""
 
@@ -415,17 +446,18 @@ def gather_data(config: MonitorConfig) -> Dict[str, Any]:
     hub_next_lottery_id = move_view(config, f"{config.hub_prefix}::peek_next_lottery_id")
     hub_callback_sender = move_view(config, f"{config.hub_prefix}::callback_sender")
 
+    health_raw = move_view(config, f"{config.health_prefix}::snapshot")
+    health_snapshot = normalize_health_snapshot(health_raw)
+
     inferred_next_id = normalize_int(hub_next_lottery_id)
     configured_ids = list(config.lottery_ids or [])
     if not configured_ids and inferred_next_id is not None and inferred_next_id >= 0:
         configured_ids = list(range(inferred_next_id))
 
-    instances_ready = normalize_bool(move_view(config, f"{config.instances_prefix}::is_initialized"))
-    rounds_ready = normalize_bool(move_view(config, f"{config.rounds_prefix}::is_initialized"))
-    treasury_ready = normalize_bool(move_view(config, f"{config.treasury_prefix}::is_initialized"))
-    autopurchase_ready = normalize_bool(
-        move_view(config, f"{config.autopurchase_prefix}::is_initialized")
-    )
+    instances_ready = health_snapshot["storage_ready"]
+    rounds_ready = health_snapshot["queues_ready"]
+    treasury_ready = health_snapshot["treasury_ready"]
+    autopurchase_ready = health_snapshot["autopurchase_ready"]
     referrals_ready = normalize_bool(
         move_view(config, f"{config.referrals_prefix}::is_initialized")
     )
@@ -433,12 +465,8 @@ def gather_data(config: MonitorConfig) -> Dict[str, Any]:
     metadata_ready = normalize_bool(
         move_view(config, f"{config.metadata_prefix}::is_initialized")
     )
-    operators_ready = normalize_bool(
-        move_view(config, f"{config.operators_prefix}::is_initialized")
-    )
-    history_ready = normalize_bool(
-        move_view(config, f"{config.history_prefix}::is_initialized")
-    )
+    operators_ready = normalize_bool(move_view(config, f"{config.operators_prefix}::ready"))
+    history_ready = health_snapshot["history_ready"]
 
     lotteries: List[Dict[str, Any]] = []
     for lottery_id in configured_ids:
@@ -723,6 +751,7 @@ def gather_data(config: MonitorConfig) -> Dict[str, Any]:
             "deposit": config.deposit_addr,
             "client": config.client_addr,
         },
+        "health": health_snapshot,
         "calculation": calculation.to_json(),
         "hub": {
             "lottery_count": flatten_single_value(hub_lottery_count),

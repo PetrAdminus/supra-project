@@ -197,6 +197,11 @@ module lottery_gateway::registry {
 
     public entry fun import_existing_registry(caller: &signer, payload: LegacyLotteryRegistry)
     acquires LotteryRegistry {
+        import_existing_registry_payload(caller, payload);
+    }
+
+    public fun import_existing_registry_payload(caller: &signer, payload: LegacyLotteryRegistry)
+    acquires LotteryRegistry {
         ensure_initialized();
         ensure_admin_signer(caller);
         let registry = borrow_global_mut<LotteryRegistry>(@lottery);

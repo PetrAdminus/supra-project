@@ -25,11 +25,11 @@ run_view() {
 
 case "$COMMAND" in
   list)
-    run_view "supra move view --config $CONFIG --function lottery_multi::views::list_automation_bots"
+    run_view "supra move view --config $CONFIG --function lottery_engine::automation::registry_snapshot"
     ;;
   get)
     OPERATOR=${1:?"operator address is required"}
-    run_view "supra move view --config $CONFIG --function lottery_multi::views::get_automation_bot --args address:$OPERATOR"
+    run_view "supra move view --config $CONFIG --function lottery_engine::automation::bot_status --args address:$OPERATOR"
     ;;
   *)
     echo "Unknown command: $COMMAND" >&2

@@ -33,13 +33,13 @@
    РїСЂРѕРІРµСЂСЏСЋС‚ РѕРєРЅР° retry (`E_VRF_RETRY_WINDOW`), Р·Р°С‰РёС‚Сѓ РѕС‚ РїРµСЂРµРїРѕР»РЅРµРЅРёСЏ `attempt` Рё С„РѕСЂРјРёСЂРѕРІР°РЅРёРµ `finalization_snapshot`.
 6. **AutomationBot.** Dry-run РѕР±СЏР·Р°С‚РµР»РµРЅ (`automation_tests::record_success_requires_pending`), Р»РёРјРёС‚С‹ `max_failures`
    РєРѕРЅС‚СЂРѕР»РёСЂСѓСЋС‚СЃСЏ С‚РµСЃС‚Р°РјРё `ensure_action_blocks_after_failure_limit`, `record_success_resets_failure_limit`. РџСѓР±Р»РёС‡РЅС‹Рµ
-   view `views::list_automation_bots`/`get_automation_bot` РІРѕР·РІСЂР°С‰Р°СЋС‚ СЃРѕСЃС‚РѕСЏРЅРёРµ Р±РѕС‚Р° РґР»СЏ РѕРїРµСЂР°С‚РѕСЂРѕРІ Рё РїРѕРєСЂС‹С‚С‹ С‚РµСЃС‚РѕРј
+   view `lottery_engine::automation::registry_snapshot`/`lottery_engine::automation::bot_status` РІРѕР·РІСЂР°С‰Р°СЋС‚ СЃРѕСЃС‚РѕСЏРЅРёРµ Р±РѕС‚Р° РґР»СЏ РѕРїРµСЂР°С‚РѕСЂРѕРІ Рё РїРѕРєСЂС‹С‚С‹ С‚РµСЃС‚РѕРј
    `views_tests::automation_views_list_registered_bot`.
 
 ### РћРїРµСЂР°С†РёРѕРЅРЅС‹Рµ Р°СЂС‚РµС„Р°РєС‚С‹
 - Runbook: СЂР°Р·РґРµР»С‹ В«РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂВ», В«AutomationBotВ», В«Dual-write РјРёРіСЂР°С†РёСЏВ» РІ [operations/runbooks.md](../operations/runbooks.md).
 - РњРѕРЅРёС‚РѕСЂРёРЅРі: РјРµС‚СЂРёРєРё `status_overview`, `payout_round_gap`, `automation_failure_count`, `price_feed_*` Рё РЅРѕРІС‹Рµ view
-  `list_automation_bots`/`get_automation_bot` РѕРїРёСЃР°РЅС‹ РІ [operations/monitoring.md](../operations/monitoring.md).
+  `lottery_engine::automation::registry_snapshot`/`lottery_engine::automation::bot_status` описаны в [operations/monitoring.md](../operations/monitoring.md).
 - Р§РµРє-Р»РёСЃС‚ СЂРµР»РёР·Р°: СЃРµРєС†РёРё В«РџСЂРѕРґР°Р¶Рё Рё РІС‹РїР»Р°С‚С‹В», В«AutomationBotВ», В«РџСЂР°Р№СЃ-С„РёРґВ» РІ [operations/release_checklist.md](../operations/release_checklist.md).
 
 ## Р­С‚Р°Рї 4. РњРёРіСЂР°С†РёРё Рё backfill
@@ -80,7 +80,7 @@
   `cleanup_expired_admin`.
 - `automation` вЂ” РїСЂРѕС†РµРґСѓСЂС‹ dry-run, С‚Р°Р№РјР»РѕРєРё, РєРѕРЅС‚СЂРѕР»СЊ `max_failures` Рё СЃРѕР±С‹С‚РёР№ `AutomationTick`/`AutomationError`.
 - `price_feed` вЂ” СЂСѓС‡РЅРѕР№ РєР»Р°РјРї, fallback Рё РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ (`clear_clamp`), СЃРѕР±С‹С‚РёСЏ `PriceFeedClampEvent`, `PriceFeedClampClearedEvent`.
-- `views::status_overview` Рё `views::list_automation_bots` вЂ” Р°РіСЂРµРіРёСЂРѕРІР°РЅРЅС‹Рµ СЃС‡С‘С‚С‡РёРєРё СЃС‚Р°С‚СѓСЃРѕРІ, retry-РѕРєРѕРЅ, Р±СЌРєР»РѕРіР° РІС‹РїР»Р°С‚ Рё С‚РµРєСѓС‰РµРµ СЃРѕСЃС‚РѕСЏРЅРёРµ AutomationBot; РґР»СЏ СЂСѓС‡РЅС‹С… РїСЂРѕРІРµСЂРѕРє Рё РїРѕРґРіРѕС‚РѕРІРєРё РѕС‚С‡С‘С‚РѕРІ РёСЃРїРѕР»СЊР·СѓР№С‚Рµ CLI `./SupraLottery/supra/scripts/automation_status.sh`.
+- `views::status_overview` Рё `lottery_engine::automation::registry_snapshot` вЂ” Р°РіСЂРµРіРёСЂРѕРІР°РЅРЅС‹Рµ СЃС‡С‘С‚С‡РёРєРё СЃС‚Р°С‚СѓСЃРѕРІ, retry-РѕРєРѕРЅ, Р±СЌРєР»РѕРіР° РІС‹РїР»Р°С‚ Рё С‚РµРєСѓС‰РµРµ СЃРѕСЃС‚РѕСЏРЅРёРµ AutomationBot; РґР»СЏ СЂСѓС‡РЅС‹С… РїСЂРѕРІРµСЂРѕРє Рё РїРѕРґРіРѕС‚РѕРІРєРё РѕС‚С‡С‘С‚РѕРІ РёСЃРїРѕР»СЊР·СѓР№С‚Рµ CLI `./SupraLottery/supra/scripts/automation_status.sh`.
 - CLI `SupraLottery/supra/scripts/incident_log.sh` вЂ” Р°РІС‚РѕРјР°С‚РёР·Р°С†РёСЏ Р¶СѓСЂРЅР°Р»РёСЂРѕРІР°РЅРёСЏ СЂРµС€РµРЅРёР№.
 - `registry::cancel_lottery_admin` вЂ” РїРµСЂРµРІРѕРґ СЂРѕР·С‹РіСЂС‹С€Р° РІ `STATUS_CANCELED`, СЃРѕС…СЂР°РЅРµРЅРёРµ `CancellationRecord` Рё СЌРјРёСЃСЃРёСЏ `LotteryCanceledEvent`.
 
@@ -90,7 +90,7 @@
    premium_grant_and_revoke_updates_events}` РїРѕРґС‚РІРµСЂР¶РґР°СЋС‚ СЃРѕР±С‹С‚РёСЏ Рё Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРёР№ РєР»РёРЅР°Рї.
 2. **AutomationBot.** РљР°Р¶РґС‹Р№ dry-run Р·Р°РЅРѕСЃРёС‚СЃСЏ РІ Р¶СѓСЂРЅР°Р» С‡РµСЂРµР· `incident_log.sh --type "Dry-run"`. РџСЂРё РґРѕСЃС‚РёР¶РµРЅРёРё Р»РёРјРёС‚Р° РѕС‚РєР°Р·РѕРІ
    (`E_AUTOBOT_FAILURE_LIMIT`) РѕРїРµСЂР°С‚РѕСЂ РґРѕР»Р¶РµРЅ РІС‹РїРѕР»РЅРёС‚СЊ `rotate_bot` Рё РѕР±РЅРѕРІРёС‚СЊ cron-СЃРїРµРєСѓ. Runbook РѕРїРёСЃС‹РІР°РµС‚ С„РѕСЂРјР°С‚ Р·Р°РїРёСЃРё,
-   РѕР±СЏР·Р°С‚РµР»СЊРЅСѓСЋ РїСЂРѕРІРµСЂРєСѓ `ensure_action` РїРµСЂРµРґ РІС‹Р·РѕРІРѕРј on-chain РѕРїРµСЂР°С†РёР№ Рё РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ view `views::list_automation_bots`
+   РѕР±СЏР·Р°С‚РµР»СЊРЅСѓСЋ РїСЂРѕРІРµСЂРєСѓ `ensure_action` РїРµСЂРµРґ РІС‹Р·РѕРІРѕРј on-chain РѕРїРµСЂР°С†РёР№ Рё РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ view `lottery_engine::automation::registry_snapshot`
    РґР»СЏ РєРѕРЅС‚СЂРѕР»СЏ pending-РґРµР№СЃС‚РІРёР№ Рё С‚Р°Р№РјР»РѕРєРѕРІ.
 3. **РџСЂР°Р№СЃ-С„РёРґ.** РџСЂРё СЂРµР·РєРёС… СЃРєР°С‡РєР°С… С†РµРЅС‹ Р°РєС‚РёРІРёСЂСѓРµС‚СЃСЏ fallback/РєР»Р°РјРї. РўРµСЃС‚С‹ `price_feed_tests::{fallback_blocks_consumers,
    clamp_blocks_latest_price, clear_clamp_allows_recovery}` Рё Prover-СЃРїРµРєР° `spec/price_feed.move` РіР°СЂР°РЅС‚РёСЂСѓСЋС‚ РїРѕРІРµРґРµРЅРёРµ.

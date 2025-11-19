@@ -296,6 +296,31 @@ module lottery_data::treasury_multi {
         );
     }
 
+    #[test_only]
+    public fun bootstrap_control_for_tests(admin: &signer) {
+        let caller_address = signer::address_of(admin);
+        assert!(caller_address == @lottery, E_UNAUTHORIZED);
+        if (!exists<TreasuryMultiControl>(@lottery)) {
+            move_to(
+                admin,
+                TreasuryMultiControl {
+                    admin: caller_address,
+                    jackpot_cap: option::some(MultiTreasuryCap { scope: SCOPE_JACKPOT }),
+                    referrals_cap: option::some(MultiTreasuryCap { scope: SCOPE_REFERRALS }),
+                    store_cap: option::some(MultiTreasuryCap { scope: SCOPE_STORE }),
+                    vip_cap: option::some(MultiTreasuryCap { scope: SCOPE_VIP }),
+                },
+            );
+            return;
+        };
+        let control = borrow_global_mut<TreasuryMultiControl>(@lottery);
+        control.admin = caller_address;
+        ensure_cap_slot(&mut control.jackpot_cap, SCOPE_JACKPOT);
+        ensure_cap_slot(&mut control.referrals_cap, SCOPE_REFERRALS);
+        ensure_cap_slot(&mut control.store_cap, SCOPE_STORE);
+        ensure_cap_slot(&mut control.vip_cap, SCOPE_VIP);
+    }
+
     public fun borrow_state(addr: address): &TreasuryState acquires TreasuryState {
         borrow_global<TreasuryState>(addr)
     }
@@ -726,6 +751,12 @@ module lottery_data::treasury_multi {
             abort E_CAP_ALREADY_PRESENT;
         };
         option::fill(slot, cap);
+    }
+
+    fun ensure_cap_slot(slot: &mut option::Option<MultiTreasuryCap>, scope: u64) {
+        if (!option::is_some(slot)) {
+            option::fill(slot, MultiTreasuryCap { scope });
+        };
     }
 
     fun cap_slot(control: &TreasuryMultiControl, scope: u64): &option::Option<MultiTreasuryCap> {
