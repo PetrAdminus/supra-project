@@ -296,6 +296,35 @@ module lottery_utils::migration {
         (event.lottery_id, event.snapshot)
     }
 
+    #[test_only]
+    public fun migration_snapshot_for_test(
+        lottery_id: u64,
+        ticket_count: u64,
+        legacy_next_ticket_id: u64,
+        migrated_next_ticket_id: u64,
+        legacy_draw_scheduled: bool,
+        migrated_draw_scheduled: bool,
+        legacy_pending_request: bool,
+        jackpot_amount_migrated: u64,
+        prize_bps: u64,
+        jackpot_bps: u64,
+        operations_bps: u64,
+    ): MigrationSnapshot {
+        MigrationSnapshot {
+            lottery_id,
+            ticket_count,
+            legacy_next_ticket_id,
+            migrated_next_ticket_id,
+            legacy_draw_scheduled,
+            migrated_draw_scheduled,
+            legacy_pending_request,
+            jackpot_amount_migrated,
+            prize_bps,
+            jackpot_bps,
+            operations_bps,
+        }
+    }
+
     fun ensure_session_ready() acquires MigrationSession {
         if (!exists<MigrationSession>(@lottery)) {
             abort E_CAPS_NOT_READY;

@@ -27,6 +27,27 @@ module lottery_rewards_engine::vip {
         bonus_tickets: u64,
     }
 
+    public fun vip_config_price(config: &VipConfig): u64 {
+        config.price
+    }
+
+    public fun vip_config_duration_secs(config: &VipConfig): u64 {
+        config.duration_secs
+    }
+
+    public fun vip_config_bonus_tickets(config: &VipConfig): u64 {
+        config.bonus_tickets
+    }
+
+    #[test_only]
+    public fun vip_config_for_tests(
+        price: u64,
+        duration_secs: u64,
+        bonus_tickets: u64,
+    ): VipConfig {
+        VipConfig { price, duration_secs, bonus_tickets }
+    }
+
     struct VipSubscription has copy, drop, store {
         expiry_ts: u64,
         bonus_tickets: u64,

@@ -34,26 +34,26 @@ case "$COMMAND" in
     LOTTERY_ID=${1:?"lottery id is required"}
     SUMMARY_HEX=${2:?"summary BCS hex (with 0x prefix) is required"}
     HASH_HEX=${3:?"expected sha3-256 hash (with 0x prefix) is required"}
-    run "supra move run --config $CONFIG --function lottery_multi::history::import_legacy_summary_admin --args u64:$LOTTERY_ID hex:$SUMMARY_HEX hex:$HASH_HEX"
+    run "supra move run --config $CONFIG --function lottery_utils::history::import_legacy_summary --args u64:$LOTTERY_ID hex:$SUMMARY_HEX hex:$HASH_HEX"
     ;;
   rollback)
     LOTTERY_ID=${1:?"lottery id is required"}
-    run "supra move run --config $CONFIG --function lottery_multi::history::rollback_legacy_summary_admin --args u64:$LOTTERY_ID"
+    run "supra move run --config $CONFIG --function lottery_utils::history::rollback_legacy_summary --args u64:$LOTTERY_ID"
     ;;
   classify)
     LOTTERY_ID=${1:?"lottery id is required"}
     PRIMARY_TYPE=${2:?"primary type (u8) is required"}
     TAGS_MASK=${3:?"tags mask (u64) is required"}
-    run "supra move run --config $CONFIG --function lottery_multi::history::update_legacy_classification_admin --args u64:$LOTTERY_ID u8:$PRIMARY_TYPE u64:$TAGS_MASK"
+    run "supra move run --config $CONFIG --function lottery_utils::history::update_legacy_classification --args u64:$LOTTERY_ID u8:$PRIMARY_TYPE u64:$TAGS_MASK"
     ;;
   status)
     LOTTERY_ID=${1:?"lottery id is required"}
-    view "supra move view --config $CONFIG --function lottery_multi::history::is_legacy_summary --args u64:$LOTTERY_ID"
+    view "supra move view --config $CONFIG --function lottery_utils::history::is_legacy_summary --args u64:$LOTTERY_ID"
     ;;
   list)
     FROM=${1:-0}
     LIMIT=${2:-10}
-    view "supra move view --config $CONFIG --function lottery_multi::history::list_finalized --args u64:$FROM u64:$LIMIT"
+    view "supra move view --config $CONFIG --function lottery_utils::history::list_finalized --args u64:$FROM u64:$LIMIT"
     ;;
   dry-run)
     if [[ $# -lt 1 ]]; then

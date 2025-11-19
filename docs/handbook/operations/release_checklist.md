@@ -32,7 +32,7 @@
 
 ## 4. РџРѕСЃС‚-СЂРµР»РёР· (T+1 РґРµРЅСЊ)
 - [ ] РџСЂРѕРІРµСЃС‚Рё СЃРІРµСЂРєСѓ Р°РіСЂРµРіР°С‚РѕРІ `Accounting` Рё `LotterySummary` РїРѕ РєРѕРЅС‚СЂРѕР»СЊРЅС‹Рј Р»РѕС‚РµСЂРµСЏРј СЃ РїРѕРјРѕС‰СЊСЋ `./SupraLottery/supra/scripts/accounting_check.sh <config> compare <lottery_id>`; СЃРѕС…СЂР°РЅРёС‚СЊ JSON-РѕС‚С‡С‘С‚ РІ `incident_log.md`.
-- [ ] РџСЂРѕРІРµСЂРёС‚СЊ `views::status_overview` Рё `views::list_automation_bots`, РѕР±РЅРѕРІРёС‚СЊ [СЃС‚Р°С‚СѓСЃРЅСѓСЋ СЃС‚СЂР°РЅРёС†Сѓ](status_page.md); РїСЂРё РѕР±РЅР°СЂСѓР¶РµРЅРёРё `vrf_retry_blocked`/`payout_backlog`/`refund_sla_breach`/`refund_batch_pending > 0` > 4С‡/`has_pending = true` РґРѕР»СЊС€Рµ С‚Р°Р№РјР»РѕРєР° РІС‹РїРѕР»РЅРёС‚СЊ С€Р°РіРё РёР· [monitoring.md](monitoring.md).
+- [ ] РџСЂРѕРІРµСЂРёС‚СЊ `views::status_overview` Рё `lottery_engine::automation::registry_snapshot`, РѕР±РЅРѕРІРёС‚СЊ [СЃС‚Р°С‚СѓСЃРЅСѓСЋ СЃС‚СЂР°РЅРёС†Сѓ](status_page.md); РїСЂРё РѕР±РЅР°СЂСѓР¶РµРЅРёРё `vrf_retry_blocked`/`payout_backlog`/`refund_sla_breach`/`refund_batch_pending > 0` > 4С‡/`has_pending = true` РґРѕР»СЊС€Рµ С‚Р°Р№РјР»РѕРєР° РІС‹РїРѕР»РЅРёС‚СЊ С€Р°РіРё РёР· [monitoring.md](monitoring.md).
 - [ ] РћР±РЅРѕРІРёС‚СЊ `docs/handbook/contracts/lottery_multi.md` Рё runbookвЂ™Рё, РµСЃР»Рё РїРѕСЏРІРёР»РёСЃСЊ РЅРѕРІС‹Рµ С€Р°РіРё.
 - [ ] РџРѕРґРіРѕС‚РѕРІРёС‚СЊ РїСѓР±Р»РёС‡РЅСѓСЋ Р·Р°РјРµС‚РєСѓ РІ Р±Р°Рі-Р±Р°СѓРЅС‚Рё-РїСЂРѕРіСЂР°РјРјРµ РїСЂРё РёР·РјРµРЅРµРЅРёРё СѓРіСЂРѕР·/РїРѕРІРµРґРµРЅРёСЏ.
 - [ ] Р—Р°С„РёРєСЃРёСЂРѕРІР°С‚СЊ СЂРµР·СѓР»СЊС‚Р°С‚С‹ smoke-С‚РµСЃС‚РѕРІ Рё РјРѕРЅРёС‚РѕСЂРёРЅРіР° РІ `incident_log.md` (`incident_log.sh --type "Dry-run" ...`).

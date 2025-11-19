@@ -4,7 +4,7 @@
 
 ## Область применения
 
-- Веб-клиенту и партнёрским панелям необходимо валидировать ответы `get_lottery`, `get_lottery_status`, `get_lottery_badges`, `get_vrf_deposit_status`, `accounting_snapshot`, `list_*`, `list_automation_bots`/`get_automation_bot` (панель AutomationBot).
+- Веб-клиенту и партнёрским панелям необходимо валидировать ответы `get_lottery`, `get_lottery_status`, `get_lottery_badges`, `get_vrf_deposit_status`, `accounting_snapshot`, `list_*`, `lottery_engine::automation::registry_snapshot`/`lottery_engine::automation::bot_status` (панель AutomationBot).
 - Индексатору требуется единый контракт на структуры `LotteryConfig`, `LotteryStatusView`, `BadgeMetadata`, `VrfDepositStatusView`, `Accounting`, `LotterySummary`.
 - QA-команда использует схему и пример ответов для генерации моков и проверки совместимости мобильных клиентов.
 

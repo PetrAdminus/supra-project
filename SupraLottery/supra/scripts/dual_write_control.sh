@@ -16,9 +16,11 @@ usage() {
                                                 — обновить флаги dual-write
   set <lottery_id> <expected_hash_hex>             — записать ожидаемый хэш сводки
   clear <lottery_id>                               — удалить ожидаемый хэш
-  enable-mirror                                    — включить запись в legacy архив
-  disable-mirror                                   — отключить запись в legacy архив
-  mirror <lottery_id>                              — вручную зеркалировать сводку
+  enable-mirror [abort_on_mismatch] [abort_on_missing]
+                                                   — включить запись в legacy архив (по умолчанию true/true)
+  disable-mirror [abort_on_mismatch] [abort_on_missing]
+                                                   — отключить запись в legacy архив (с сохранением флагов)
+  mirror [lottery_id]                              — подсказка по повторному импорту сводки через history_backfill.sh
   status <lottery_id>                              — показать статус конкретной лотереи
   flags                                            — вывести текущие флаги dual-write
   pending                                          — вывести список лотерей с ожидаемым хэшем
@@ -272,7 +274,7 @@ case "$COMMAND" in
     local local_abort_missing
     local_abort_mismatch=$(normalize_bool "$1")
     local_abort_missing=$(normalize_bool "$2")
-    run_move "lottery_multi::legacy_bridge::init_dual_write" "bool:${local_abort_mismatch}" "bool:${local_abort_missing}"
+    run_move "lottery_utils::history::init_dual_write" "bool:${local_abort_mismatch}" "bool:${local_abort_missing}"
     ;;
   update-flags)
     if [[ $# -ne 3 ]]; then
@@ -285,7 +287,7 @@ case "$COMMAND" in
     local_enabled=$(normalize_bool "$1")
     local_abort_mismatch=$(normalize_bool "$2")
     local_abort_missing=$(normalize_bool "$3")
-    run_move "lottery_multi::legacy_bridge::update_flags" \
+    run_move "lottery_utils::history::update_dual_write_flags" \
       "bool:${local_enabled}" "bool:${local_abort_mismatch}" "bool:${local_abort_missing}"
     ;;
   set)
@@ -295,48 +297,57 @@ case "$COMMAND" in
     fi
     local normalized_hash
     normalized_hash=$(normalize_hex "$2")
-    run_move "lottery_multi::legacy_bridge::set_expected_hash" "u64:$1" "hex:${normalized_hash}"
+    run_move "lottery_utils::history::set_expected_hash" "u64:$1" "hex:${normalized_hash}"
     ;;
   clear)
     if [[ $# -ne 1 ]]; then
       echo "[dual_write_control] Требуется 1 аргумент: lottery_id" >&2
       exit 1
     fi
-    run_move "lottery_multi::legacy_bridge::clear_expected_hash" "u64:$1"
+    run_move "lottery_utils::history::clear_expected_hash" "u64:$1"
     ;;
   enable-mirror)
-    if [[ $# -ne 0 ]]; then
-      echo "[dual_write_control] Команда enable-mirror не принимает аргументы" >&2
+    if [[ $# -gt 2 ]]; then
+      echo "[dual_write_control] Команда enable-mirror принимает не более двух аргументов" >&2
       exit 1
     fi
-    run_move "lottery_multi::legacy_bridge::enable_legacy_mirror"
+    local abort_mismatch_input="${1:-true}"
+    local abort_missing_input="${2:-true}"
+    local abort_mismatch=$(normalize_bool "$abort_mismatch_input")
+    local abort_missing=$(normalize_bool "$abort_missing_input")
+    run_move "lottery_utils::history::update_dual_write_flags" \
+      "bool:true" "bool:${abort_mismatch}" "bool:${abort_missing}"
     ;;
   disable-mirror)
-    if [[ $# -ne 0 ]]; then
-      echo "[dual_write_control] Команда disable-mirror не принимает аргументы" >&2
+    if [[ $# -gt 2 ]]; then
+      echo "[dual_write_control] Команда disable-mirror принимает не более двух аргументов" >&2
       exit 1
     fi
-    run_move "lottery_multi::legacy_bridge::disable_legacy_mirror"
+    local abort_mismatch_input="${1:-true}"
+    local abort_missing_input="${2:-true}"
+    local abort_mismatch=$(normalize_bool "$abort_mismatch_input")
+    local abort_missing=$(normalize_bool "$abort_missing_input")
+    run_move "lottery_utils::history::update_dual_write_flags" \
+      "bool:false" "bool:${abort_mismatch}" "bool:${abort_missing}"
     ;;
   mirror)
-    if [[ $# -ne 1 ]]; then
-      echo "[dual_write_control] Требуется 1 аргумент: lottery_id" >&2
-      exit 1
-    fi
-    run_move "lottery_multi::history::mirror_summary_admin" "u64:$1"
+    echo "[dual_write_control] Команда mirror больше не выполняет on-chain вызовы" >&2
+    echo "[dual_write_control] Используйте history_backfill.sh import <lottery_id> <summary_hex> <sha3_hash>" >&2
+    echo "[dual_write_control] чтобы повторно зеркалировать сводку через lottery_utils::history::import_legacy_summary" >&2
+    exit 1
     ;;
   status)
     if [[ $# -ne 1 ]]; then
       echo "[dual_write_control] Требуется 1 аргумент: lottery_id" >&2
       exit 1
     fi
-    view_move "lottery_multi::legacy_bridge::dual_write_status" "u64:$1"
+    view_move "lottery_utils::history::dual_write_status" "u64:$1"
     ;;
   flags)
-    view_move "lottery_multi::legacy_bridge::dual_write_flags"
+    view_move "lottery_utils::history::dual_write_flags"
     ;;
   pending)
-    view_move "lottery_multi::legacy_bridge::pending_expected_hashes"
+    view_move "lottery_utils::history::pending_expected_hashes"
     ;;
   *)
     echo "[dual_write_control] Неизвестная команда: $COMMAND" >&2

@@ -26,6 +26,7 @@ module lottery_utils::history {
     const E_ARCHIVE_UNKNOWN_SUMMARY: u64 = 12;
     const E_ARCHIVE_NOT_LEGACY: u64 = 13;
     const E_PAGINATION_TOO_LARGE: u64 = 14;
+    const E_LEGACY_ARCHIVE_NOT_INITIALIZED: u64 = 15;
 
     const EVENT_VERSION_V1: u16 = 1;
     const EVENT_CATEGORY_MIGRATION: u8 = 8;
@@ -157,6 +158,12 @@ module lottery_utils::history {
     struct LegacyArchive has key {
         summaries: table::Table<u64, LegacySummary>,
         summary_events: event::EventHandle<LegacySummaryEvent>,
+    }
+
+    struct LegacyArchiveImport has drop, store {
+        lottery_id: u64,
+        summary_bcs: vector<u8>,
+        expected_hash: vector<u8>,
     }
 
     struct DrawRecord has copy, drop, store {
@@ -329,6 +336,16 @@ module lottery_utils::history {
                 summary_events: account::new_event_handle<LegacySummaryEvent>(caller),
             },
         );
+    }
+
+    public entry fun import_existing_legacy_summaries(
+        caller: &signer,
+        mut imports: vector<LegacyArchiveImport>,
+    ) acquires ArchiveLedger, DualWriteControl, HistoryCollection, LegacyArchive {
+        ensure_admin(caller);
+        ensure_archive_initialized();
+        ensure_legacy_archive_initialized();
+        import_existing_legacy_summaries_recursive(caller, &mut imports);
     }
 
     public entry fun record_archive_summary(caller: &signer, summary: LotterySummary)
@@ -815,9 +832,28 @@ module lottery_utils::history {
         move_to(caller, HistoryWarden { writer: cap });
     }
 
+    fun import_existing_legacy_summaries_recursive(
+        caller: &signer,
+        imports: &mut vector<LegacyArchiveImport>,
+    ) acquires ArchiveLedger, DualWriteControl, HistoryCollection, LegacyArchive {
+        let len = vector::length(imports);
+        if (len == 0) {
+            return;
+        };
+        let record = vector::pop_back(imports);
+        import_legacy_summary(caller, record.lottery_id, record.summary_bcs, record.expected_hash);
+        import_existing_legacy_summaries_recursive(caller, imports);
+    }
+
     fun ensure_archive_initialized() acquires ArchiveLedger {
         if (!exists<ArchiveLedger>(@lottery)) {
             abort E_ARCHIVE_NOT_INITIALIZED;
+        };
+    }
+
+    fun ensure_legacy_archive_initialized() acquires LegacyArchive {
+        if (!exists<LegacyArchive>(@lottery)) {
+            abort E_LEGACY_ARCHIVE_NOT_INITIALIZED;
         };
     }
 

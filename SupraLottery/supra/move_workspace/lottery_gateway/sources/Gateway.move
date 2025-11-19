@@ -27,6 +27,10 @@ module lottery_gateway::gateway {
     const E_NOT_INITIALIZED: u64 = 5;
     const E_INVALID_COUNTER_TARGET: u64 = 6;
     const E_LOTTERY_ALREADY_REGISTERED: u64 = 7;
+    const E_PAYLOAD_LENGTH_MISMATCH: u64 = 8;
+    const E_PAYLOAD_ID_MISMATCH: u64 = 9;
+    const E_PAYLOAD_ADMIN_MISMATCH: u64 = 10;
+    const E_PAYLOAD_COUNTER_MISMATCH: u64 = 11;
 
     struct OwnerLotteries has store {
         lottery_ids: vector<u64>,
@@ -293,12 +297,21 @@ module lottery_gateway::gateway {
     acquires GatewayRegistry {
         let gateway = borrow_global_mut<GatewayRegistry>(@lottery);
         ensure_admin_signer(gateway, caller);
-        reset_gateway_registry(gateway);
-        gateway.admin = payload.admin;
-        gateway.next_lottery_id = payload.next_lottery_id;
-        import_lotteries_batch(gateway, &payload.lotteries, vector::length(&payload.lotteries));
-        normalize_next_lottery_id(gateway);
+        restore_gateway_registry(gateway, &payload);
         emit_snapshot(gateway);
+    }
+
+    public entry fun migrate_lottery_registry(
+        caller: &signer,
+        gateway_payload: LegacyGatewayRegistry,
+        registry_payload: registry::LegacyLotteryRegistry,
+    ) acquires GatewayRegistry, registry::LotteryRegistry {
+        let gateway = borrow_global_mut<GatewayRegistry>(@lottery);
+        ensure_admin_signer(gateway, caller);
+        validate_joint_payload(&gateway_payload, &registry_payload);
+        restore_gateway_registry(gateway, &gateway_payload);
+        emit_snapshot(gateway);
+        registry::import_existing_registry_payload(caller, registry_payload);
     }
 
     public entry fun set_owner(caller: &signer, lottery_id: u64, new_owner: address)
@@ -723,6 +736,14 @@ module lottery_gateway::gateway {
         gateway.next_lottery_id = 1;
     }
 
+    fun restore_gateway_registry(gateway: &mut GatewayRegistry, payload: &LegacyGatewayRegistry) {
+        reset_gateway_registry(gateway);
+        gateway.admin = payload.admin;
+        gateway.next_lottery_id = payload.next_lottery_id;
+        import_lotteries_batch(gateway, &payload.lotteries, vector::length(&payload.lotteries));
+        normalize_next_lottery_id(gateway);
+    }
+
     fun align_counter(gateway: &mut GatewayRegistry, next_lottery_id: u64) {
         let current_next = gateway.next_lottery_id;
         if (next_lottery_id <= current_next) {
@@ -781,6 +802,45 @@ module lottery_gateway::gateway {
     fun ensure_gateway_initialized() acquires GatewayRegistry {
         if (!exists<GatewayRegistry>(@lottery)) {
             abort E_NOT_INITIALIZED;
+        };
+    }
+
+    fun validate_joint_payload(
+        gateway_payload: &LegacyGatewayRegistry,
+        registry_payload: &registry::LegacyLotteryRegistry,
+    ) {
+        if (gateway_payload.admin != registry_payload.admin) {
+            abort E_PAYLOAD_ADMIN_MISMATCH;
+        };
+        if (gateway_payload.next_lottery_id != registry_payload.next_lottery_id) {
+            abort E_PAYLOAD_COUNTER_MISMATCH;
+        };
+        let gateway_len = vector::length(&gateway_payload.lotteries);
+        let registry_len = vector::length(&registry_payload.entries);
+        if (gateway_len != registry_len) {
+            abort E_PAYLOAD_LENGTH_MISMATCH;
+        };
+        validate_payload_ids(
+            &gateway_payload.lotteries,
+            &registry_payload.entries,
+            gateway_len,
+        );
+    }
+
+    fun validate_payload_ids(
+        gateway_lotteries: &vector<LegacyGatewayLottery>,
+        registry_entries: &vector<registry::LegacyLotteryRegistryEntry>,
+        remaining: u64,
+    ) {
+        if (remaining == 0) {
+            return;
+        };
+        let next_remaining = remaining - 1;
+        validate_payload_ids(gateway_lotteries, registry_entries, next_remaining);
+        let gateway_entry = *vector::borrow(gateway_lotteries, next_remaining);
+        let registry_entry = *vector::borrow(registry_entries, next_remaining);
+        if (gateway_entry.lottery_id != registry_entry.lottery_id) {
+            abort E_PAYLOAD_ID_MISMATCH;
         };
     }
 

@@ -24,7 +24,7 @@
 - Сценарий dry-run:
   1. Сформировать `snapshot_hash = sha3-256( bcs::to_bytes(total_balance, minimum_balance, effective_balance, timestamp) )` и занести его в журнал (одно и то же значение используется для dry-run и выполнения).
   2. Вызвать `automation::announce_dry_run(operator, cap, ACTION_TOPUP_VRF_DEPOSIT, snapshot_hash, now_ts, now_ts + timelock_secs)`.
-  3. Дождаться наступления `pending_execute_after` (контролируется через `views::get_automation_bot`).
+  3. Дождаться наступления `pending_execute_after` (контролируется через `lottery_engine::automation::bot_status`).
   4. Вызвать `vrf_deposit::record_snapshot_automation(operator, cap, total_balance, minimum_balance, effective_balance, timestamp, snapshot_hash)` — функция автоматически вызывает `automation::record_success`, публикует `AutomationTick` и очищает pending.
   5. Убедиться, что события `VrfDepositSnapshot` и `AutomationDryRunPlanned/AutomationTick` появились в журнале; при необходимости повторить цикл.
 - При срабатывании алертов бот публикует `AutomationCallRejected` либо dry-run план пополнения, чтобы DevOps успели подтвердить транзакцию; запись выполняется в [incident_log.md](incident_log.md).

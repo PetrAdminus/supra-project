@@ -9,6 +9,9 @@ import re
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
 
+
+INVENTORY_SCHEMA_VERSION = 1
+
 STRUCT_PATTERN = re.compile(
     r"(?P<attrs>(?:#\[[^\]]+\]\s*)*)struct\s+(?P<name>[A-Za-z0-9_]+(?:\s*<[^>]+>)?)\s+has\s+(?P<abilities>[^{}]+?)\{(?P<body>[^{}]*)\}",
     re.S,
@@ -115,14 +118,20 @@ def main() -> None:
         "и ключевые поля. Категория помогает быстро отличить ресурсы (`Ресурс`), события (`Событие`) и вспомогательные структуры (`Структура`).",
         "",
         "**Как обновлять:** запустите `python docs/architecture/tools/export_move_inventory.py` из корня репозитория. "
-        "При необходимости можно указать иные пути через аргументы `--workspace-root` и `--output`.",
+        "При необходимости можно указать иные пути через аргументы `--workspace-root` и `--output`. Для автоматизированных сверок "
+        "используйте JSON-экспорт (`--json-output docs/architecture/move_struct_inventory.json`), формат которого описан в "
+        "`docs/architecture/move_struct_inventory_schema.md` и включает `schema_version`, счётчики пакетов/модулей/структур и "
+        "рекурсивные записи «пакеты → модули → структуры».",
         "",
     ]
 
     inventory: List[dict] = []
+    total_modules = 0
+    total_structs = 0
 
     for pkg in packages:
         pkg_entry = {"package": pkg.name, "modules": []}
+        package_structs = 0
         output_lines.append(f"## Пакет `{pkg.name}`")
         output_lines.append("")
         for source in sorted((pkg / "sources").glob("*.move")):
@@ -161,15 +170,24 @@ def main() -> None:
                     "structs": module_structs,
                 }
             )
+            total_modules += 1
+            total_structs += len(module_structs)
+            package_structs += len(module_structs)
         output_lines.append("")
+        pkg_entry["module_count"] = len(pkg_entry["modules"])
+        pkg_entry["struct_count"] = package_structs
         inventory.append(pkg_entry)
 
     args.output.write_text("\n".join(output_lines) + "\n")
 
     if args.json_output:
         json_payload = {
+            "schema_version": INVENTORY_SCHEMA_VERSION,
             "generated_at": now_utc.isoformat(),
             "workspace_root": str(root),
+            "package_count": len(packages),
+            "module_count": total_modules,
+            "struct_count": total_structs,
             "packages": inventory,
         }
         args.json_output.write_text(json.dumps(json_payload, indent=2, ensure_ascii=True) + "\n")
