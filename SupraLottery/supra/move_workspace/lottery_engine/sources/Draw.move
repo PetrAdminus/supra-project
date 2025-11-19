@@ -10,8 +10,8 @@ module lottery_engine::draw {
     use lottery_data::rounds;
     use lottery_engine::vrf;
     use supra_framework::event;
-    use vrf_hub::table;
-    use vrf_hub::vrf_hub;
+    use lottery_vrf_gateway::table;
+    use lottery_vrf_gateway::hub;
 
     const E_UNAUTHORIZED_ADMIN: u64 = 1;
     const E_NO_TICKETS: u64 = 2;
@@ -36,6 +36,16 @@ module lottery_engine::draw {
         next_ticket_id_state: u64,
         request_count: u64,
         response_count: u64,
+    }
+
+    public struct PendingRequestAlignment has copy, drop, store {
+        lottery_id: u64,
+        round_pending_request_id: option::Option<u64>,
+        state_pending_request_id: option::Option<u64>,
+        hub_request_id: option::Option<u64>,
+        hub_pending: bool,
+        pending_ids_match: bool,
+        payload_hash_match: bool,
     }
 
     public entry fun schedule_draw(caller: &signer, lottery_id: u64)
@@ -132,7 +142,7 @@ module lottery_engine::draw {
         vrf::ensure_requests_allowed();
 
         let payload_for_hash = clone_bytes(&payload);
-        let request_id = vrf_hub::request_randomness(lottery_id, payload);
+        let request_id = hub::request_randomness(lottery_id, payload);
         round.pending_request = option::some(request_id);
 
         runtime.pending_request.request_id = option::some(request_id);
@@ -155,10 +165,10 @@ module lottery_engine::draw {
         request_id: u64,
         randomness: vector<u8>,
     ) acquires instances::InstanceRegistry, lottery_state::LotteryState, rounds::PendingHistoryQueue, rounds::RoundRegistry, payouts::PayoutLedger {
-        vrf_hub::ensure_callback_sender(caller);
-        let record = vrf_hub::consume_request(request_id);
-        let lottery_id = vrf_hub::request_record_lottery_id(&record);
-        let payload = vrf_hub::request_record_payload(&record);
+        hub::ensure_callback_sender(caller);
+        let record = hub::consume_request(request_id);
+        let lottery_id = hub::request_record_lottery_id(&record);
+        let payload = hub::request_record_payload(&record);
 
         let registry = instances::borrow_registry_mut(@lottery);
         let state = lottery_state::borrow_mut(@lottery);
@@ -225,7 +235,7 @@ module lottery_engine::draw {
             payload_for_history,
         );
 
-        vrf_hub::record_fulfillment(request_id, lottery_id, clone_bytes(&randomness));
+        hub::record_fulfillment(request_id, lottery_id, clone_bytes(&randomness));
         event::emit_event(
             &mut rounds_registry.fulfill_events,
             rounds::DrawFulfilledEvent {
@@ -291,6 +301,64 @@ module lottery_engine::draw {
         let len = vector::length(&registry.lottery_ids);
         let snapshots = collect_draw_snapshots(&registry, &state, &rounds_registry, 0, len);
         option::some(snapshots)
+    }
+
+    #[view]
+    public fun pending_request_alignment(lottery_id: u64): option::Option<PendingRequestAlignment>
+    acquires instances::InstanceRegistry, lottery_state::LotteryState, rounds::RoundRegistry {
+        if (!instances::is_initialized() || !lottery_state::is_initialized() || !rounds::is_initialized()) {
+            return option::none<PendingRequestAlignment>();
+        };
+
+        let registry = instances::borrow_registry(@lottery);
+        if (!instances::contains(registry, lottery_id)) {
+            return option::none<PendingRequestAlignment>();
+        };
+
+        let round_snapshot_opt = rounds::round_snapshot(lottery_id);
+        if (!option::is_some(&round_snapshot_opt)) {
+            return option::none<PendingRequestAlignment>();
+        };
+        let mut round_snapshot = option::destroy_some(round_snapshot_opt);
+
+        let runtime_snapshot_opt = lottery_state::runtime_snapshot(lottery_id);
+        if (!option::is_some(&runtime_snapshot_opt)) {
+            return option::none<PendingRequestAlignment>();
+        };
+        let runtime_snapshot = option::destroy_some(runtime_snapshot_opt);
+
+        let pending_ids_match = options_equal_u64(
+            &round_snapshot.pending_request_id,
+            &runtime_snapshot.pending_request.request_id,
+        );
+
+        let mut hub_request_id = option::none<u64>();
+        let mut hub_pending = false;
+        let mut payload_hash_match = false;
+
+        if (hub::is_initialized() && option::is_some(&round_snapshot.pending_request_id)) {
+            let request_id = *option::borrow(&round_snapshot.pending_request_id);
+            let hub_snapshot_opt = hub::request_snapshot(request_id);
+            if (option::is_some(&hub_snapshot_opt)) {
+                let hub_snapshot = option::destroy_some(hub_snapshot_opt);
+                hub_pending = hub_snapshot.pending;
+                hub_request_id = option::some(hub_snapshot.request_id);
+                if (option::is_some(&runtime_snapshot.pending_request.last_request_payload_hash)) {
+                    let state_hash = option::borrow(&runtime_snapshot.pending_request.last_request_payload_hash);
+                    payload_hash_match = *state_hash == hub_snapshot.payload_hash;
+                };
+            };
+        };
+
+        option::some(PendingRequestAlignment {
+            lottery_id,
+            round_pending_request_id: round_snapshot.pending_request_id,
+            state_pending_request_id: runtime_snapshot.pending_request.request_id,
+            hub_request_id,
+            hub_pending,
+            pending_ids_match,
+            payload_hash_match,
+        })
     }
 
     fun randomness_to_index(randomness: &vector<u8>, ticket_count: u64): u64 {
@@ -369,6 +437,19 @@ module lottery_engine::draw {
         };
         vector::push_back(dst, *vector::borrow(src, index));
         append_draw_snapshots(dst, src, index + 1);
+    }
+
+    fun options_equal_u64(a: &option::Option<u64>, b: &option::Option<u64>): bool {
+        if (option::is_some(a)) {
+            if (!option::is_some(b)) {
+                return false;
+            };
+            let lhs = *option::borrow(a);
+            let rhs = *option::borrow(b);
+            lhs == rhs
+        } else {
+            !option::is_some(b)
+        }
     }
 
     fun clone_option_bytes(value: &option::Option<vector<u8>>): option::Option<vector<u8>> {

@@ -6,9 +6,9 @@ module lottery_core::core_instances_tests {
     use lottery_core::core_instances as instances;
     use lottery_core::test_utils;
     use lottery_factory::registry;
-    use vrf_hub::hub;
+    use lottery_vrf_gateway::hub;
 
-    #[test(vrf_admin = @vrf_hub, factory_admin = @lottery_factory, lottery_admin = @lottery)]
+    #[test(vrf_admin = @lottery_vrf_gateway, factory_admin = @lottery_factory, lottery_admin = @lottery)]
     fun create_and_sync_flow(
         vrf_admin: &signer,
         factory_admin: &signer,
@@ -17,7 +17,7 @@ module lottery_core::core_instances_tests {
         test_utils::ensure_core_accounts();
         hub::init(vrf_admin);
         registry::init(factory_admin);
-        instances::init(lottery_admin, @vrf_hub);
+        instances::init(lottery_admin, @lottery_vrf_gateway);
 
         let _ = test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
 
@@ -62,7 +62,7 @@ module lottery_core::core_instances_tests {
         let (collection_admin, collection_hub, collection_entries) =
             instances::instances_snapshot_fields_for_test(&collection_snapshot);
         assert!(collection_admin == @lottery, 22);
-        assert!(collection_hub == @vrf_hub, 23);
+        assert!(collection_hub == @lottery_vrf_gateway, 23);
         assert!(vector::length(&collection_entries) == 1, 24);
 
         let info_opt = instances::get_lottery_info(lottery_id);
@@ -126,7 +126,7 @@ module lottery_core::core_instances_tests {
             let (first_admin, first_hub, first_snapshot) =
                 instances::snapshot_event_fields_for_test(first_event);
             assert!(first_admin == @lottery, 29);
-            assert!(first_hub == @vrf_hub, 30);
+            assert!(first_hub == @lottery_vrf_gateway, 30);
             let (
                 first_lottery_id,
                 _first_owner,
@@ -147,7 +147,7 @@ module lottery_core::core_instances_tests {
             let (event_admin, event_hub, event_snapshot) =
                 instances::snapshot_event_fields_for_test(last_event);
             assert!(event_admin == @lottery, 35);
-            assert!(event_hub == @vrf_hub, 36);
+            assert!(event_hub == @lottery_vrf_gateway, 36);
             let (
                 event_lottery_id,
                 _event_owner,
@@ -195,7 +195,7 @@ module lottery_core::core_instances_tests {
             let (inactive_admin, inactive_hub, inactive_snapshot) =
                 instances::snapshot_event_fields_for_test(inactive_snapshot_event);
             assert!(inactive_admin == @lottery, 72);
-            assert!(inactive_hub == @vrf_hub, 73);
+            assert!(inactive_hub == @lottery_vrf_gateway, 73);
             let (
                 inactive_snapshot_lottery,
                 _inactive_owner,
@@ -237,7 +237,7 @@ module lottery_core::core_instances_tests {
             let (active_admin, active_hub, active_snapshot) =
                 instances::snapshot_event_fields_for_test(active_snapshot_event);
             assert!(active_admin == @lottery, 77);
-            assert!(active_hub == @vrf_hub, 78);
+            assert!(active_hub == @lottery_vrf_gateway, 78);
             let (
                 active_snapshot_lottery,
                 _active_owner,
@@ -273,7 +273,7 @@ module lottery_core::core_instances_tests {
             let (admin_after_change, hub_after_change, _) =
                 instances::instances_snapshot_fields_for_test(admin_snapshot_ref);
             assert!(admin_after_change == @0x123, 63);
-            assert!(hub_after_change == @vrf_hub, 64);
+            assert!(hub_after_change == @lottery_vrf_gateway, 64);
         };
         let admin_snapshot_events =
             test_utils::drain_events<instances::LotteryInstancesSnapshotUpdatedEvent>();
@@ -282,7 +282,7 @@ module lottery_core::core_instances_tests {
             let (event_admin, event_hub, admin_snapshot_details) =
                 instances::snapshot_event_fields_for_test(admin_snapshot_event);
             assert!(event_admin == @0x123, 81);
-            assert!(event_hub == @vrf_hub, 82);
+            assert!(event_hub == @lottery_vrf_gateway, 82);
             let (
                 admin_snapshot_lottery,
                 _admin_owner,
@@ -303,7 +303,7 @@ module lottery_core::core_instances_tests {
         if (vector::length(&hub_events) > 0) {
             let hub_event = test_utils::last_event_ref(&hub_events);
             let (hub_previous, hub_next) = instances::hub_event_fields_for_test(hub_event);
-            assert!(hub_previous == @vrf_hub, 66);
+            assert!(hub_previous == @lottery_vrf_gateway, 66);
             assert!(hub_next == @0x456, 67);
         };
         let snapshot_opt = instances::get_instances_snapshot();

@@ -11,12 +11,12 @@ module lottery_support::support_migration_tests {
     use lottery_core::core_treasury_v1 as treasury_v1;
     use lottery_factory::registry;
     use lottery_support::support_migration as migration;
-    use vrf_hub::hub;
+    use lottery_vrf_gateway::hub;
 
     #[test(
         lottery_admin = @lottery,
         factory_admin = @lottery_factory,
-        vrf_admin = @vrf_hub
+        vrf_admin = @lottery_vrf_gateway
     )]
     fun migration_cap_lifecycle(
         lottery_admin: &signer,
@@ -45,7 +45,7 @@ module lottery_support::support_migration_tests {
     #[test(
         lottery_admin = @lottery,
         factory_admin = @lottery_factory,
-        vrf_admin = @vrf_hub
+        vrf_admin = @lottery_vrf_gateway
     )]
     #[expected_failure(
         location = lottery_core::core_instances,
@@ -66,7 +66,7 @@ module lottery_support::support_migration_tests {
     #[test(
         lottery_admin = @lottery,
         factory_admin = @lottery_factory,
-        vrf_admin = @vrf_hub,
+        vrf_admin = @lottery_vrf_gateway,
         lottery_owner = @player1,
         lottery_contract = @player2
     )]
@@ -243,7 +243,7 @@ module lottery_support::support_migration_tests {
     #[test(
         lottery_admin = @lottery,
         factory_admin = @lottery_factory,
-        vrf_admin = @vrf_hub
+        vrf_admin = @lottery_vrf_gateway
     )]
     #[expected_failure(
         location = lottery_support::support_migration,
@@ -305,7 +305,7 @@ module lottery_support::support_migration_tests {
             registry::init(factory_admin);
         };
         if (!instances::is_initialized()) {
-            instances::init(lottery_admin, @vrf_hub);
+            instances::init(lottery_admin, @lottery_vrf_gateway);
         };
         if (!treasury_multi::is_initialized()) {
             treasury_multi::init(lottery_admin, @jackpot_pool, @operations_pool);

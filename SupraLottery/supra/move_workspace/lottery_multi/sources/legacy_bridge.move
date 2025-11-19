@@ -11,7 +11,7 @@ module lottery_multi::legacy_bridge {
 
     use lottery_support::history_bridge;
 
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const EVENT_VERSION_V1: u16 = 1;
     const EVENT_CATEGORY_MIGRATION: u8 = 8;

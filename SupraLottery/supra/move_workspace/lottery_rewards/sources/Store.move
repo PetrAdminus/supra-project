@@ -4,7 +4,7 @@ module lottery_rewards::rewards_store {
     use std::signer;
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
     use lottery_core::core_instances as instances;
     use lottery_core::core_treasury_multi as treasury_multi;
     use lottery_core::core_treasury_multi::MultiTreasuryCap;

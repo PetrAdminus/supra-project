@@ -43,7 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "переопределить идентификатор функции. По умолчанию используется "
-            "<lottery_addr>::main_v2::set_minimum_balance"
+            "<lottery_addr>::core_main_v2::set_minimum_balance"
         ),
     )
     return parser
@@ -103,7 +103,7 @@ def target_function_id(ns: argparse.Namespace) -> str:
         return str(ns.function_id)
     if not ns.lottery_addr:
         raise MonitorError("Нужно указать адрес контракта лотереи (--lottery-addr)")
-    return f"{ns.lottery_addr}::main_v2::set_minimum_balance"
+    return f"{ns.lottery_addr}::core_main_v2::set_minimum_balance"
 
 
 def _validate_expectations(

@@ -5,7 +5,7 @@ module lottery_data::rounds {
 
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
     const E_NOT_PUBLISHED: u64 = 2;
@@ -314,6 +314,11 @@ module lottery_data::rounds {
         vector::length(&queue.pending)
     }
 
+    #[view]
+    public fun history_queue_initialized(): bool {
+        exists<PendingHistoryQueue>(@lottery)
+    }
+
     public fun enqueue_history_record(
         queue: &mut PendingHistoryQueue,
         lottery_id: u64,
@@ -396,6 +401,47 @@ module lottery_data::rounds {
         };
         let queue = borrow_global<PendingPurchaseQueue>(@lottery);
         vector::length(&queue.pending)
+    }
+
+    #[view]
+    public fun purchase_queue_initialized(): bool {
+        exists<PendingPurchaseQueue>(@lottery)
+    }
+
+    #[view]
+    public fun queues_initialized(): bool {
+        history_queue_initialized() && purchase_queue_initialized()
+    }
+
+    #[view]
+    public fun ready()
+    acquires RoundRegistry, RoundControl, PendingHistoryQueue, PendingPurchaseQueue: bool {
+        if (!exists<RoundRegistry>(@lottery)) {
+            return false;
+        };
+        if (!exists<RoundControl>(@lottery)) {
+            return false;
+        };
+        if (!history_queue_initialized() || !purchase_queue_initialized()) {
+            return false;
+        };
+
+        let registry = borrow_global<RoundRegistry>(@lottery);
+        if (!registry_consistent(&registry)) {
+            return false;
+        };
+
+        let history_queue = borrow_global<PendingHistoryQueue>(@lottery);
+        if (!history_records_consistent(&history_queue, &registry)) {
+            return false;
+        };
+
+        let purchase_queue = borrow_global<PendingPurchaseQueue>(@lottery);
+        if (!purchase_records_consistent(&purchase_queue, &registry)) {
+            return false;
+        };
+
+        caps_ready()
     }
 
     #[view]
@@ -826,6 +872,79 @@ module lottery_data::rounds {
         };
         vector::push_back(dest, *vector::borrow(source, index));
         append_bytes(source, dest, index + 1, len);
+    }
+
+    fun registry_consistent(registry: &RoundRegistry): bool {
+        let len = vector::length(&registry.lottery_ids);
+        registry_consistent_recursive(registry, 0, len)
+    }
+
+    fun registry_consistent_recursive(
+        registry: &RoundRegistry,
+        index: u64,
+        len: u64,
+    ): bool {
+        if (index >= len) {
+            return true;
+        };
+
+        let lottery_id = *vector::borrow(&registry.lottery_ids, index);
+        if (!table::contains(&registry.rounds, lottery_id)) {
+            return false;
+        };
+
+        registry_consistent_recursive(registry, index + 1, len)
+    }
+
+    fun history_records_consistent(
+        queue: &PendingHistoryQueue,
+        registry: &RoundRegistry,
+    ): bool {
+        history_records_consistent_recursive(&queue.pending, registry, 0)
+    }
+
+    fun history_records_consistent_recursive(
+        records: &vector<PendingHistoryRecord>,
+        registry: &RoundRegistry,
+        index: u64,
+    ): bool {
+        if (index >= vector::length(records)) {
+            return true;
+        };
+
+        let record = vector::borrow(records, index);
+        if (!table::contains(&registry.rounds, record.lottery_id)) {
+            return false;
+        };
+
+        history_records_consistent_recursive(records, registry, index + 1)
+    }
+
+    fun purchase_records_consistent(
+        queue: &PendingPurchaseQueue,
+        registry: &RoundRegistry,
+    ): bool {
+        purchase_records_consistent_recursive(&queue.pending, registry, 0)
+    }
+
+    fun purchase_records_consistent_recursive(
+        records: &vector<PendingPurchaseRecord>,
+        registry: &RoundRegistry,
+        index: u64,
+    ): bool {
+        if (index >= vector::length(records)) {
+            return true;
+        };
+
+        let record = vector::borrow(records, index);
+        if (!table::contains(&registry.rounds, record.lottery_id)) {
+            return false;
+        };
+        if (record.ticket_count == 0 || record.paid_amount == 0) {
+            return false;
+        };
+
+        purchase_records_consistent_recursive(records, registry, index + 1)
     }
 
     fun ensure_admin(caller: &signer) acquires RoundRegistry {

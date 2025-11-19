@@ -7,7 +7,7 @@ module lottery_rewards::rewards_jackpot_tests {
     use std::option;
     use std::signer;
     use std::vector;
-    use vrf_hub::hub;
+    use lottery_vrf_gateway::hub;
 
     fun setup_token(lottery_admin: &signer, player1: &signer, player2: &signer) {
         test_utils::ensure_core_accounts();
@@ -40,7 +40,7 @@ module lottery_rewards::rewards_jackpot_tests {
     }
 
     #[test(
-        vrf_admin = @vrf_hub,
+        vrf_admin = @lottery_vrf_gateway,
         lottery_admin = @lottery,
         player1 = @player1,
         player2 = @player2,
@@ -404,7 +404,7 @@ module lottery_rewards::rewards_jackpot_tests {
     }
 
     #[test(
-        vrf_admin = @vrf_hub,
+        vrf_admin = @lottery_vrf_gateway,
         lottery_admin = @lottery,
         player1 = @player3,
         player2 = @player4,

@@ -53,6 +53,8 @@ def _classify_cli(executable: str) -> str:
     name = Path(executable).name.lower()
     if "supra" in name:
         return "supra"
+    if "aptos" in name:
+        return "aptos"
     return "move"
 
 
@@ -63,7 +65,7 @@ def _iter_candidate_cli(preferred: str | None) -> Iterable[str]:
         yield preferred
         return
 
-    for candidate in ("supra", "move"):
+    for candidate in ("supra", "aptos", "move"):
         yield candidate
 
 
@@ -107,6 +109,17 @@ def _build_command(
             action,
             "--package-dir",
             str(package_dir),
+        ]
+    elif flavour == "aptos":
+        target = package_dir if package_name else workspace_path
+        aptos_action = "compile" if action == "check" else action
+        base_cmd = [
+            cli_path,
+            "move",
+            aptos_action,
+            "--package-dir",
+            str(target),
+            "--skip-fetch-latest-git-deps",
         ]
     else:
         # Vanilla Move CLI expects `--package-dir` that points to the package root.
@@ -219,7 +232,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--cli-flavour",
-        choices=("supra", "move"),
+        choices=("supra", "aptos", "move"),
         help="explicit CLI flavour hint when --dry-run is used without a binary",
     )
     parser.add_argument(

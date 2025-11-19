@@ -7,7 +7,7 @@ module lottery_rewards_engine::jackpot {
     use lottery_data::jackpot;
     use lottery_data::treasury_multi;
     use lottery_data::vrf_deposit;
-    use vrf_hub::vrf_hub;
+    use lottery_vrf_gateway::hub;
 
     const E_UNAUTHORIZED: u64 = 1;
     const E_DRAW_ALREADY_SCHEDULED: u64 = 2;
@@ -95,7 +95,7 @@ module lottery_rewards_engine::jackpot {
         ensure_jackpot_positive();
 
         let payload_record = clone_bytes(&payload);
-        let request_id = vrf_hub::request_randomness(lottery_id, payload);
+        let request_id = hub::request_randomness(lottery_id, payload);
         let registry = jackpot::borrow_registry_mut(@lottery);
         jackpot::record_request(registry, lottery_id, request_id, &payload_record);
     }
@@ -105,10 +105,10 @@ module lottery_rewards_engine::jackpot {
         request_id: u64,
         randomness: vector<u8>,
     ) acquires JackpotAccess, jackpot::JackpotRegistry, treasury_multi::TreasuryState, vrf_deposit::VrfDepositLedger {
-        vrf_hub::ensure_callback_sender(caller);
-        let record = vrf_hub::consume_request(request_id);
-        let lottery_id = vrf_hub::request_record_lottery_id(&record);
-        let payload = vrf_hub::request_record_payload(&record);
+        hub::ensure_callback_sender(caller);
+        let record = hub::consume_request(request_id);
+        let lottery_id = hub::request_record_lottery_id(&record);
+        let payload = hub::request_record_payload(&record);
 
         let (winner, ticket_index) = determine_winner(lottery_id, request_id, &randomness);
         let prize_amount = drain_jackpot_balance(winner);
@@ -125,7 +125,7 @@ module lottery_rewards_engine::jackpot {
             &payload,
         );
 
-        vrf_hub::record_fulfillment(request_id, lottery_id, randomness);
+        hub::record_fulfillment(request_id, lottery_id, randomness);
     }
 
     public entry fun import_existing_jackpot(caller: &signer, payload: LegacyJackpotRuntime)
@@ -171,6 +171,11 @@ module lottery_rewards_engine::jackpot {
     #[view]
     public fun is_initialized(): bool {
         jackpot::is_initialized()
+    }
+
+    #[view]
+    public fun ready(): bool {
+        jackpot::ready()
     }
 
     #[view]

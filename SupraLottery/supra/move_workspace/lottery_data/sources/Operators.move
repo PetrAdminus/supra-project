@@ -5,7 +5,7 @@ module lottery_data::operators {
 
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
     const E_UNAUTHORIZED: u64 = 2;
@@ -143,6 +143,18 @@ module lottery_data::operators {
         table::contains(&entry.operators, operator)
     }
 
+    public fun is_initialized(): bool {
+        exists<OperatorRegistry>(@lottery)
+    }
+
+    public fun ready(): bool {
+        if (!exists<OperatorRegistry>(@lottery)) {
+            return false;
+        };
+        let registry = borrow_registry(@lottery);
+        registry.admin == @lottery
+    }
+
     public fun registry_snapshot(): OperatorRegistrySnapshot acquires OperatorRegistry {
         let registry = borrow_registry(@lottery);
         OperatorRegistrySnapshot {
@@ -150,6 +162,22 @@ module lottery_data::operators {
             lottery_ids: registry.lottery_ids,
             entries: build_registry_snapshots(&registry.entries, &registry.lottery_ids, 0),
         }
+    }
+
+    public fun operator_snapshot(lottery_id: u64): option::Option<OperatorSnapshot>
+    acquires OperatorRegistry {
+        if (!exists<OperatorRegistry>(@lottery)) {
+            return option::none<OperatorSnapshot>();
+        };
+
+        let registry = borrow_registry(@lottery);
+        if (!table::contains(&registry.entries, lottery_id)) {
+            return option::none<OperatorSnapshot>();
+        };
+
+        let entry = table::borrow(&registry.entries, lottery_id);
+        let operators = clone_operator_list(&entry.operator_list, 0, vector::length(&entry.operator_list));
+        option::some(OperatorSnapshot { owner: entry.owner, operators })
     }
 
     public fun ensure_entry(registry: &mut OperatorRegistry, lottery_id: u64) {
@@ -214,6 +242,16 @@ module lottery_data::operators {
         };
         let next_index = index + 1;
         remove_operator_from_index(operators, target, next_index, len);
+    }
+
+    fun clone_operator_list(operators: &vector<address>, index: u64, len: u64): vector<address> {
+        if (index == len) {
+            return vector::empty<address>();
+        };
+
+        let mut cloned = clone_operator_list(operators, index + 1, len);
+        vector::push_back(&mut cloned, *vector::borrow(operators, index));
+        cloned
     }
 
     public fun set_owner(registry: &mut OperatorRegistry, lottery_id: u64, new_owner: option::Option<address>) {

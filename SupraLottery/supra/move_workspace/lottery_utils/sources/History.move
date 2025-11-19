@@ -9,7 +9,7 @@ module lottery_utils::history {
 
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const MAX_HISTORY_LENGTH: u64 = 128;
     const E_ALREADY_INITIALIZED: u64 = 1;
@@ -267,6 +267,11 @@ module lottery_utils::history {
     #[view]
     public fun caps_ready(): bool {
         exists<HistoryWarden>(@lottery)
+    }
+
+    #[view]
+    public fun ready(): bool {
+        is_initialized() && caps_ready()
     }
 
     public entry fun set_admin(caller: &signer, new_admin: address)

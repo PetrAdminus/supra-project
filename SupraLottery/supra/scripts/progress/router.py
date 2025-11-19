@@ -82,7 +82,7 @@ def _achievement_progress_to_response(
 
 @router.put("/checklist/{code}", response_model=ChecklistTaskResponse)
 def put_checklist_task(code: str, payload: ChecklistTaskPayload) -> ChecklistTaskResponse:
-    data = payload.dict()
+    data = payload.model_dump()
     data["code"] = code
     task = upsert_checklist_task(data)
     return _task_to_response(task)
@@ -119,7 +119,7 @@ def complete_checklist(
 
 @router.put("/achievements/{code}", response_model=AchievementResponse)
 def put_achievement(code: str, payload: AchievementPayload) -> AchievementResponse:
-    data = payload.dict()
+    data = payload.model_dump()
     data["code"] = code
     achievement = upsert_achievement(data)
     return _achievement_to_response(achievement)

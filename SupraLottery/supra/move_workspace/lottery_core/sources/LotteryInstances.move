@@ -7,8 +7,8 @@ module lottery_core::core_instances {
     use lottery_factory::registry;
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::hub;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::hub;
+    use lottery_vrf_gateway::table;
 
     const E_ALREADY_INIT: u64 = 1;
     const E_NOT_INITIALIZED: u64 = 2;

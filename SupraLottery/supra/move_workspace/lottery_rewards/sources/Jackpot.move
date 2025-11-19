@@ -7,7 +7,7 @@ module lottery_rewards::rewards_jackpot {
     use std::vector;
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::hub;
+    use lottery_vrf_gateway::hub;
 
     const E_NOT_AUTHORIZED: u64 = 1;
     const E_ALREADY_INITIALIZED: u64 = 2;

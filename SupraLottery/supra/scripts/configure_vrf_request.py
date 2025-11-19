@@ -51,7 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "переопределить идентификатор функции. По умолчанию используется "
-            "<lottery_addr>::main_v2::configure_vrf_request"
+            "<lottery_addr>::core_main_v2::configure_vrf_request"
         ),
     )
     return parser
@@ -90,7 +90,7 @@ def target_function_id(ns: argparse.Namespace) -> str:
         return str(ns.function_id)
     if not ns.lottery_addr:
         raise MonitorError("Нужно указать адрес контракта лотереи (--lottery-addr)")
-    return f"{ns.lottery_addr}::main_v2::configure_vrf_request"
+    return f"{ns.lottery_addr}::core_main_v2::configure_vrf_request"
 
 
 def execute(ns: argparse.Namespace, *, now: Optional[datetime] = None) -> Dict[str, object]:

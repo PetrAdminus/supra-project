@@ -2,7 +2,7 @@ module lottery_rewards::rewards_nft {
     use std::option;
     use std::signer;
     use std::vector;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
     use supra_framework::account;
     use supra_framework::event;
     

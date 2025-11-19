@@ -5,7 +5,7 @@ module lottery_data::jackpot {
 
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
     const E_UNAUTHORIZED: u64 = 2;
@@ -92,6 +92,25 @@ module lottery_data::jackpot {
     #[view]
     public fun is_initialized(): bool {
         exists<JackpotRegistry>(@lottery)
+    }
+
+    #[view]
+    public fun ready(): bool acquires JackpotRegistry {
+        if (!exists<JackpotRegistry>(@lottery)) {
+            return false;
+        };
+
+        let registry = borrow_registry(@lottery);
+        if (registry.admin != @lottery) {
+            return false;
+        };
+
+        let expected_len = vector::length(&registry.lottery_ids);
+        if (table::length(&registry.jackpots) != expected_len) {
+            return false;
+        };
+
+        lotteries_ready(&registry.jackpots, &registry.lottery_ids, 0, expected_len)
     }
 
     public entry fun init_registry(caller: &signer) {
@@ -319,6 +338,38 @@ module lottery_data::jackpot {
         }
     }
 
+    fun lotteries_ready(
+        jackpots: &table::Table<u64, JackpotRuntime>,
+        lottery_ids: &vector<u64>,
+        index: u64,
+        len: u64,
+    ): bool {
+        if (index >= len) {
+            return true;
+        };
+
+        let lottery_id = *vector::borrow(lottery_ids, index);
+        if (!table::contains(jackpots, lottery_id)) {
+            return false;
+        };
+
+        let runtime_ref = table::borrow(jackpots, lottery_id);
+        if (!runtime_ready(runtime_ref)) {
+            return false;
+        };
+
+        lotteries_ready(jackpots, lottery_ids, index + 1, len)
+    }
+
+    fun runtime_ready(runtime_ref: &JackpotRuntime): bool {
+        let request_pending = option::is_some(&runtime_ref.pending_request);
+        let payload_pending = option::is_some(&runtime_ref.pending_payload);
+        if (request_pending != payload_pending) {
+            return false;
+        };
+        true
+    }
+
     fun build_snapshot(lottery_id: u64, runtime_ref: &JackpotRuntime): JackpotSnapshot {
         JackpotSnapshot {
             lottery_id,
@@ -479,5 +530,21 @@ module lottery_data::jackpot {
         vector::push_back(buffer, value);
         let next_index = index + 1;
         clone_u64s_into(buffer, data, next_index, len);
+    }
+
+    #[test_only]
+    public fun test_force_pending_mismatch(lottery_id: u64) acquires JackpotRegistry {
+        let registry = borrow_registry_mut(@lottery);
+        let runtime = jackpot_mut(registry, lottery_id);
+        runtime.pending_request = option::some<u64>(999);
+        runtime.pending_payload = option::none<vector<u8>>();
+    }
+
+    #[test_only]
+    public fun test_restore_pending_state(lottery_id: u64) acquires JackpotRegistry {
+        let registry = borrow_registry_mut(@lottery);
+        let runtime = jackpot_mut(registry, lottery_id);
+        runtime.pending_request = option::none<u64>();
+        runtime.pending_payload = option::none<vector<u8>>();
     }
 }

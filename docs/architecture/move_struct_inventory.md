@@ -6,7 +6,7 @@
 
 **Как читать документ:** разделы разбиты по пакетам и модулям. Для каждой структуры указаны способности (`has …`) и ключевые поля. Категория помогает быстро отличить ресурсы (`Ресурс`), события (`Событие`) и вспомогательные структуры (`Структура`).
 
-**Как обновлять:** запустите `python docs/architecture/tools/export_move_inventory.py` из корня репозитория. При необходимости можно указать иные пути через аргументы `--workspace-root` и `--output`.
+**Как обновлять:** запустите `python docs/architecture/tools/export_move_inventory.py` из корня репозитория. При необходимости можно указать иные пути через аргументы `--workspace-root` и `--output`. Для автоматизированных сверок доступен экспорт в JSON: добавьте `--json-output docs/architecture/move_struct_inventory.json` (структура: пакеты → модули → список структур с категориями, способностями и полями).
 
 ## Пакет `SupraVrf`
 
@@ -924,6 +924,34 @@
 | Структура | `PriceFeedClampClearedEvent` | drop, store | `event_version`: u16<br>`event_category`: u8<br>`asset_id`: u64<br>`cleared_ts`: u64 |
 | Структура | `PriceFeedView` | drop, store | `asset_id`: u64<br>`price`: u64<br>`decimals`: u8<br>`last_updated_ts`: u64<br>`staleness_window`: u64<br>`clamp_threshold_bps`: u64<br>`fallback_active`: bool<br>`fallback_reason`: u8<br>`clamp_active`: bool |
 | Ресурс | `PriceFeedRegistry` | key | `admin`: address<br>`version`: u16<br>`feeds`: table::Table<u64, PriceFeedRecord><br>`updates`: event::EventHandle<PriceFeedUpdatedEvent><br>`fallbacks`: event::EventHandle<PriceFeedFallbackEvent><br>`clamps`: event::EventHandle<PriceFeedClampEvent><br>`clamp_clears`: event::EventHandle<PriceFeedClampClearedEvent> |
+
+
+## Пакет `lottery_vrf_gateway`
+
+### Модуль `lottery_vrf_gateway::table` (`SupraLottery/supra/move_workspace/lottery_vrf_gateway/sources/Table.move`)
+
+| Категория | Структура | Способности | Поля |
+| --- | --- | --- | --- |
+| Структура | `Table<K: copy + drop, V: store>` | store | `keys`: vector<K><br>`values`: vector<V> |
+
+### Модуль `lottery_vrf_gateway::hub` (`SupraLottery/supra/move_workspace/lottery_vrf_gateway/sources/Hub.move`)
+
+| Категория | Структура | Способности | Поля |
+| --- | --- | --- | --- |
+| Структура | `LegacyLotteryRegistration` | drop, store | `lottery_id`: u64<br>`owner`: address<br>`lottery`: address<br>`metadata`: vector<u8><br>`active`: bool |
+| Структура | `LegacyRequestRecord` | drop, store | `request_id`: u64<br>`lottery_id`: u64<br>`payload`: vector<u8><br>`payload_hash`: vector<u8> |
+| Структура | `LegacyHubState` | drop, store | `admin`: address<br>`next_lottery_id`: u64<br>`next_request_id`: u64<br>`lotteries`: vector<LegacyLotteryRegistration><br>`requests`: vector<LegacyRequestRecord><br>`lottery_ids`: vector<u64><br>`pending_request_ids`: vector<u64><br>`callback_sender`: option::Option<address> |
+| Структура | `LotteryRegistration` | copy, drop, store | `owner`: address<br>`lottery`: address<br>`metadata`: vector<u8><br>`active`: bool |
+| Структура | `RequestRecord` | copy, drop, store | `lottery_id`: u64<br>`payload`: vector<u8><br>`payload_hash`: vector<u8> |
+| Ресурс | `HubState` | key | `admin`: address<br>`next_lottery_id`: u64<br>`next_request_id`: u64<br>`lotteries`: table::Table<u64, LotteryRegistration><br>`requests`: table::Table<u64, RequestRecord><br>`lottery_ids`: vector<u64><br>`pending_request_ids`: vector<u64><br>`callback_sender`: option::Option<address><br>`register_events`: event::EventHandle<LotteryRegisteredEvent><br>`status_events`: event::EventHandle<LotteryStatusChangedEvent><br>`metadata_events`: event::EventHandle<LotteryMetadataUpdatedEvent><br>`request_events`: event::EventHandle<RandomnessRequestedEvent><br>`fulfill_events`: event::EventHandle<RandomnessFulfilledEvent><br>`callback_sender_events`: event::EventHandle<CallbackSenderUpdatedEvent> |
+| Событие | `LotteryRegisteredEvent` | drop, store, copy | `lottery_id`: u64<br>`owner`: address<br>`lottery`: address |
+| Событие | `LotteryStatusChangedEvent` | drop, store, copy | `lottery_id`: u64<br>`active`: bool |
+| Событие | `LotteryMetadataUpdatedEvent` | drop, store, copy | `lottery_id`: u64<br>`metadata`: vector<u8> |
+| Событие | `RandomnessRequestedEvent` | drop, store, copy | `request_id`: u64<br>`lottery_id`: u64<br>`payload`: vector<u8><br>`payload_hash`: vector<u8> |
+| Событие | `RandomnessFulfilledEvent` | drop, store, copy | `request_id`: u64<br>`lottery_id`: u64<br>`randomness`: vector<u8> |
+| Событие | `CallbackSenderUpdatedEvent` | drop, store, copy | `previous`: option::Option<address><br>`current`: option::Option<address> |
+| Структура | `CallbackSenderStatus` | copy, drop | `sender`: option::Option<address> |
+| Структура | `HubSnapshot` | copy, drop, store | `admin`: address<br>`next_lottery_id`: u64<br>`next_request_id`: u64<br>`lotteries`: vector<LotteryRegistration><br>`requests`: vector<RequestRecord><br>`lottery_ids`: vector<u64><br>`pending_request_ids`: vector<u64><br>`callback_sender`: option::Option<address> |
 
 
 ## Пакет `vrf_hub`

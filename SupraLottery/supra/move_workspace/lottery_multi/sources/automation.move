@@ -9,7 +9,7 @@ module lottery_multi::automation {
     use lottery_multi::errors;
     use lottery_multi::history;
     
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const EVENT_VERSION_V1: u16 = 1;
     const EVENT_CATEGORY_AUTOMATION: u8 = 6;

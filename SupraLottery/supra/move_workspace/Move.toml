@@ -6,6 +6,7 @@ members = [
   "lottery_utils",
   "lottery_rewards_engine",
   "lottery_gateway",
+  "lottery_vrf_gateway",
   "lottery_core",
   "lottery_support",
   "lottery_rewards",
@@ -25,3 +26,4 @@ vrf_hub = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
 lottery_factory = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"
 supra_addr = "0x186ba2ba88f4a14ca51f6ce42702c7ebdf6bfcf738d897cc98b986ded6f1219e"
 lottery_multi_tests = "0xf00dbabe"
+lottery_vrf_gateway = "0xbc959517601034979f21fa2f2f41862219ea38554be27c2fdb4fd9a392caafe0"

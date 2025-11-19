@@ -31,7 +31,7 @@ module lottery_rewards::rewards_autopurchase_tests {
     }
 
     #[test(
-        vrf_admin = @vrf_hub,
+        vrf_admin = @lottery_vrf_gateway,
         factory_admin = @lottery_factory,
         lottery_admin = @lottery,
         buyer = @player1,

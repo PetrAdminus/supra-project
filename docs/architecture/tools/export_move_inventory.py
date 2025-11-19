@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import json
 import re
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
@@ -89,6 +90,12 @@ def main() -> None:
         type=Path,
         help="Путь к markdown-файлу с итоговой инвентаризацией.",
     )
+    parser.add_argument(
+        "--json-output",
+        type=Path,
+        default=None,
+        help="Необязательный путь к JSON-файлу со структурированным инвентаризационным отчётом.",
+    )
     args = parser.parse_args()
 
     root = args.workspace_root
@@ -112,7 +119,10 @@ def main() -> None:
         "",
     ]
 
+    inventory: List[dict] = []
+
     for pkg in packages:
+        pkg_entry = {"package": pkg.name, "modules": []}
         output_lines.append(f"## Пакет `{pkg.name}`")
         output_lines.append("")
         for source in sorted((pkg / "sources").glob("*.move")):
@@ -123,6 +133,7 @@ def main() -> None:
             output_lines.append("")
 
             rows: List[Tuple[str, str, str, str]] = []
+            module_structs: List[dict] = []
             for attrs, name, abilities, fields in iter_structs(text):
                 ability_tokens = {token.strip() for token in abilities.split(",") if token.strip()}
                 if "event" in attrs:
@@ -133,10 +144,35 @@ def main() -> None:
                     category = "Структура"
                 field_repr = "—" if not fields else "<br>".join(f"`{fname}`: {ftype}" for fname, ftype in fields)
                 rows.append((category, name, abilities, field_repr))
+                module_structs.append(
+                    {
+                        "category": category,
+                        "name": name,
+                        "abilities": sorted(ability_tokens),
+                        "fields": [{"name": fname, "type": ftype} for fname, ftype in fields],
+                        "attributes": attrs.strip().split(),
+                    }
+                )
             output_lines.extend(format_table(rows))
+            pkg_entry["modules"].append(
+                {
+                    "name": module_name,
+                    "source": source.as_posix(),
+                    "structs": module_structs,
+                }
+            )
         output_lines.append("")
+        inventory.append(pkg_entry)
 
     args.output.write_text("\n".join(output_lines) + "\n")
+
+    if args.json_output:
+        json_payload = {
+            "generated_at": now_utc.isoformat(),
+            "workspace_root": str(root),
+            "packages": inventory,
+        }
+        args.json_output.write_text(json.dumps(json_payload, indent=2, ensure_ascii=True) + "\n")
 
 
 if __name__ == "__main__":

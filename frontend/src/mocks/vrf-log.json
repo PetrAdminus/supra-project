@@ -65,7 +65,7 @@
     "requests": [
       {
         "sequence_number": 12,
-        "event_type": "vrf_hub::RandomnessRequestedEvent",
+        "event_type": "lottery_vrf_gateway::RandomnessRequestedEvent",
         "timestamp": "2024-05-24T10:15:01Z",
         "data": {
           "lottery_id": 0,
@@ -78,7 +78,7 @@
     "fulfillments": [
       {
         "sequence_number": 14,
-        "event_type": "vrf_hub::RandomnessFulfilledEvent",
+        "event_type": "lottery_vrf_gateway::RandomnessFulfilledEvent",
         "timestamp": "2024-05-24T10:15:58Z",
         "data": {
           "lottery_id": 0,

@@ -5,7 +5,7 @@ module lottery_data::cancellations {
 
     use supra_framework::account;
     use supra_framework::event;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
 
     const E_ALREADY_INITIALIZED: u64 = 1;
     const E_NOT_PUBLISHED: u64 = 2;
@@ -148,6 +148,17 @@ module lottery_data::cancellations {
         table::contains(&ledger.records, lottery_id)
     }
 
+    #[view]
+    public fun ready(): bool acquires CancellationLedger {
+        if (!exists_at(@lottery)) {
+            return false;
+        };
+
+        let ledger = borrow(@lottery);
+        ledger.admin == @lottery
+    }
+
+    #[view]
     public fun ledger_snapshot(): option::Option<CancellationSnapshot> acquires CancellationLedger {
         if (!exists_at(@lottery)) {
             return option::none<CancellationSnapshot>();
@@ -159,6 +170,30 @@ module lottery_data::cancellations {
         let records = collect_cancellation_snapshots(&ledger.records, &lottery_ids, 0, len);
 
         option::some(CancellationSnapshot { admin: ledger.admin, lottery_ids, records })
+    }
+
+    #[view]
+    public fun record_snapshot(lottery_id: u64): option::Option<CancellationRecordSnapshot> acquires CancellationLedger {
+        if (!exists_at(@lottery)) {
+            return option::none<CancellationRecordSnapshot>();
+        };
+
+        let ledger = borrow(@lottery);
+        if (!table::contains(&ledger.records, lottery_id)) {
+            return option::none<CancellationRecordSnapshot>();
+        };
+
+        let record_ref = table::borrow(&ledger.records, lottery_id);
+        option::some(CancellationRecordSnapshot {
+            lottery_id,
+            reason_code: record_ref.reason_code,
+            canceled_ts: record_ref.canceled_ts,
+            previous_status: record_ref.previous_status,
+            tickets_sold: record_ref.tickets_sold,
+            proceeds_accum: record_ref.proceeds_accum,
+            jackpot_locked: record_ref.jackpot_locked,
+            pending_tickets_cleared: record_ref.pending_tickets_cleared,
+        })
     }
 
     fun ensure_admin(caller: &signer) acquires CancellationLedger {

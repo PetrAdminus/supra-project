@@ -9,7 +9,7 @@ module lottery_engine::sales {
     use lottery_data::rounds;
     use lottery_data::treasury_multi;
     use lottery_rewards_engine::treasury;
-    use vrf_hub::table;
+    use lottery_vrf_gateway::table;
     use supra_framework::event;
 
     const E_TICKET_LIMIT_EXCEEDED: u64 = 1;
@@ -32,6 +32,14 @@ module lottery_engine::sales {
         next_ticket_id: u64,
         auto_draw_threshold: u64,
         draw_scheduled: bool,
+    }
+
+    #[view]
+    public fun is_initialized(): bool {
+        instances::is_initialized()
+            && lottery_state::is_initialized()
+            && rounds::is_initialized()
+            && rounds::queues_initialized()
     }
 
     public entry fun enter_paid_round(

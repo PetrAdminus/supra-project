@@ -28,7 +28,7 @@ module lottery_core::core_vrf_callback_tests {
             CALLBACK_GAS_LIMIT,
             VERIFICATION_GAS,
         );
-        main_v2::set_callback_aggregator_for_test(option::some(@vrf_hub));
+        main_v2::set_callback_aggregator_for_test(option::some(@lottery_vrf_gateway));
 
         let tickets = vector::empty<address>();
         vector::push_back(&mut tickets, @player1);
@@ -46,7 +46,7 @@ module lottery_core::core_vrf_callback_tests {
             randomness,
             main_v2::expected_rng_count_for_test(),
             0,
-            @vrf_hub,
+            @lottery_vrf_gateway,
         );
     }
 
@@ -65,7 +65,7 @@ module lottery_core::core_vrf_callback_tests {
             CALLBACK_GAS_LIMIT,
             VERIFICATION_GAS,
         );
-        main_v2::set_callback_aggregator_for_test(option::some(@vrf_hub));
+        main_v2::set_callback_aggregator_for_test(option::some(@lottery_vrf_gateway));
 
         let tickets = vector::empty<address>();
         vector::push_back(&mut tickets, @player1);
@@ -114,7 +114,7 @@ module lottery_core::core_vrf_callback_tests {
             randomness,
             rng_count,
             client_seed,
-            @vrf_hub,
+            @lottery_vrf_gateway,
         );
     }
 
